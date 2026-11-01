@@ -1,0 +1,17 @@
+allprojects {
+    repositories { mavenCentral() }
+    configurations { fixture }
+    dependencies { fixture 'dev.jasper.gentoo.fixture:artifact:1.0' }
+}
+
+tasks.register('verifyOfflineRepository') {
+    doLast {
+        allprojects {
+            assert repositories.size() == 1: "Upstream repositories survived: ${repositories}"
+            assert repositories.first().url == new File(System.getenv('JASPER_MAVEN_REPO')).toURI()
+            def files = configurations.fixture.resolve()
+            assert files.size() == 1
+            assert files.first().text == 'offline-artifact\n'
+        }
+    }
+}

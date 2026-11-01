@@ -1,0 +1,2 @@
+rootProject.name = 'gentoo-offline-fixture'
+include 'child'

@@ -1,0 +1,1524 @@
+{
+  "format": 1,
+  "artifacts": [
+    {
+      "path": "com/fifesoft/rsyntaxtextarea/3.6.0/rsyntaxtextarea-3.6.0-sources.jar",
+      "distfile": "jasper-maven-a6701e400e2c8cde64ba8bc06b6cd2b58fbce155fa80312e01a11bbc91fd2cd7-rsyntaxtextarea-3.6.0-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/com/fifesoft/rsyntaxtextarea/3.6.0/rsyntaxtextarea-3.6.0-sources.jar",
+      "sha256": "c3081acdb06195eaa7a0d313226c7a57e1990a0bcfa0be5c7c655a680d79c505",
+      "size": 1629527
+    },
+    {
+      "path": "com/fifesoft/rsyntaxtextarea/3.6.0/rsyntaxtextarea-3.6.0.jar",
+      "distfile": "jasper-maven-701ff74da1c4914e66731d4791081d758012571b52846760157792b7a2d160cd-rsyntaxtextarea-3.6.0.jar",
+      "url": "https://repo.maven.apache.org/maven2/com/fifesoft/rsyntaxtextarea/3.6.0/rsyntaxtextarea-3.6.0.jar",
+      "sha256": "bf00ec1015798edd433c3dfadf0c34a12a395b8c010f8f9fd8ec6ff4f44eb94c",
+      "size": 1330192
+    },
+    {
+      "path": "com/fifesoft/rsyntaxtextarea/3.6.0/rsyntaxtextarea-3.6.0.module",
+      "distfile": "jasper-maven-7ad41691ebdf65e64397f71be839803375765874bcf5cd99eb380b81f6a4c3a4-rsyntaxtextarea-3.6.0.module",
+      "url": "https://repo.maven.apache.org/maven2/com/fifesoft/rsyntaxtextarea/3.6.0/rsyntaxtextarea-3.6.0.module",
+      "sha256": "c66566de5729b1092612298aa96695b545693d41082ddeb4451fec0126b8fc0a",
+      "size": 3512
+    },
+    {
+      "path": "com/fifesoft/rsyntaxtextarea/3.6.0/rsyntaxtextarea-3.6.0.pom",
+      "distfile": "jasper-maven-76330f7909c918e4c3fea5934a88f3869dbad7aaae5793479694e0c52ae090a0-rsyntaxtextarea-3.6.0.pom",
+      "url": "https://repo.maven.apache.org/maven2/com/fifesoft/rsyntaxtextarea/3.6.0/rsyntaxtextarea-3.6.0.pom",
+      "sha256": "32a7e3d57317ecd391e820f0a2124b4f98ce1ce35f32755192ec433c3507ddb0",
+      "size": 1801
+    },
+    {
+      "path": "com/formdev/flatlaf-extras/3.7/flatlaf-extras-3.7-sources.jar",
+      "distfile": "jasper-maven-1b2b8f533a556addec50338db64e64d28cc42726d8d9cccf5921accd718303e5-flatlaf-extras-3.7-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/com/formdev/flatlaf-extras/3.7/flatlaf-extras-3.7-sources.jar",
+      "sha256": "0e592a1f6ba943529801d3fe4793ac77f8501ff1829ff269115adb25fae4725f",
+      "size": 82301
+    },
+    {
+      "path": "com/formdev/flatlaf-extras/3.7/flatlaf-extras-3.7.jar",
+      "distfile": "jasper-maven-ffe0bad74ed5efa493ec19a83fce41a6d41b058b6c6e22e642087ea8dc42df94-flatlaf-extras-3.7.jar",
+      "url": "https://repo.maven.apache.org/maven2/com/formdev/flatlaf-extras/3.7/flatlaf-extras-3.7.jar",
+      "sha256": "2b4356bc08b08a999fac8bfc4fdbb28d59b5735ccf706168bbb4b375aa88e0eb",
+      "size": 120001
+    },
+    {
+      "path": "com/formdev/flatlaf-extras/3.7/flatlaf-extras-3.7.module",
+      "distfile": "jasper-maven-6a9b72d25fda2b9d4cfdab0e2ed753e03450f2679b6d92ab9ca6fd25d92f8855-flatlaf-extras-3.7.module",
+      "url": "https://repo.maven.apache.org/maven2/com/formdev/flatlaf-extras/3.7/flatlaf-extras-3.7.module",
+      "sha256": "a8b8a6340418b7d9867aadbcf5fc4169efdb526ffe2f021b973347a1ae3d9d0c",
+      "size": 3819
+    },
+    {
+      "path": "com/formdev/flatlaf-extras/3.7/flatlaf-extras-3.7.pom",
+      "distfile": "jasper-maven-7647ccf84e76106da95957da59484dfeea309bc4e920091a9bc04218c15ecd45-flatlaf-extras-3.7.pom",
+      "url": "https://repo.maven.apache.org/maven2/com/formdev/flatlaf-extras/3.7/flatlaf-extras-3.7.pom",
+      "sha256": "f578b49ca64f8a1d4de126b5afe7df64ff21efa9a18b33d82b31fb3cee613bcf",
+      "size": 1945
+    },
+    {
+      "path": "com/formdev/flatlaf/3.7/flatlaf-3.7-sources.jar",
+      "distfile": "jasper-maven-c697a8d59aec0b3567f56b63d3cde98a1a8124f1b22b18e437288a804c96efbb-flatlaf-3.7-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/com/formdev/flatlaf/3.7/flatlaf-3.7-sources.jar",
+      "sha256": "019bf138b483671cf47eb49d9b4d0b3af0c09ff8db5eb649e5cfef4a7c4a2be2",
+      "size": 699506
+    },
+    {
+      "path": "com/formdev/flatlaf/3.7/flatlaf-3.7.jar",
+      "distfile": "jasper-maven-7184e32c22484888e5a13baadb94a1ac7140d3b48d68f1f34740deb72e3e7f77-flatlaf-3.7.jar",
+      "url": "https://repo.maven.apache.org/maven2/com/formdev/flatlaf/3.7/flatlaf-3.7.jar",
+      "sha256": "1dc4f08cc0e01122f5bc6cebe1dcf253872c1fe8126208f43dab314d7deb0da2",
+      "size": 1018560
+    },
+    {
+      "path": "com/formdev/flatlaf/3.7/flatlaf-3.7.module",
+      "distfile": "jasper-maven-ae26246e292199e24402febc5dee5df65aaa73fd255ef935e4ee62d11820a388-flatlaf-3.7.module",
+      "url": "https://repo.maven.apache.org/maven2/com/formdev/flatlaf/3.7/flatlaf-3.7.module",
+      "sha256": "7a6a0936f232b1036e20a43faf25693883ed2b9a311c3aacc34c6a4e9408a790",
+      "size": 3421
+    },
+    {
+      "path": "com/formdev/flatlaf/3.7/flatlaf-3.7.pom",
+      "distfile": "jasper-maven-4611b6f4b3a6a678cc67c4149151163fed94b3a29b56e7e3211388c4398fa78b-flatlaf-3.7.pom",
+      "url": "https://repo.maven.apache.org/maven2/com/formdev/flatlaf/3.7/flatlaf-3.7.pom",
+      "sha256": "5a34f270b74324f050464038f674ed5031a1b6c51e3d954bdad86dd5999dabec",
+      "size": 1547
+    },
+    {
+      "path": "com/github/hypfvieh/dbus-java-core/5.2.0/dbus-java-core-5.2.0-sources.jar",
+      "distfile": "jasper-maven-d36166a2d420771890aa64e145f736ec5142c3c363b2c7ddd1bca16fdaddaf06-dbus-java-core-5.2.0-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/com/github/hypfvieh/dbus-java-core/5.2.0/dbus-java-core-5.2.0-sources.jar",
+      "sha256": "0afc83708ec3fd6e9ce94693e12e2c51ae315a5e9d1a6b8405b5a7382110bcdc",
+      "size": 233981
+    },
+    {
+      "path": "com/github/hypfvieh/dbus-java-core/5.2.0/dbus-java-core-5.2.0.jar",
+      "distfile": "jasper-maven-e998d79023ef2d12dc26c71094b5c5afcdff96d431bee5b715206cc0b773cd46-dbus-java-core-5.2.0.jar",
+      "url": "https://repo.maven.apache.org/maven2/com/github/hypfvieh/dbus-java-core/5.2.0/dbus-java-core-5.2.0.jar",
+      "sha256": "9dfadd65bdfec2154ccf23039f9ae6239dc625735b933653d9403e11c2c9cf10",
+      "size": 385860
+    },
+    {
+      "path": "com/github/hypfvieh/dbus-java-core/5.2.0/dbus-java-core-5.2.0.pom",
+      "distfile": "jasper-maven-24e2f92039b680cb528ac2c415c9b4f7cd32f34faad2719bf964c3834721ceaa-dbus-java-core-5.2.0.pom",
+      "url": "https://repo.maven.apache.org/maven2/com/github/hypfvieh/dbus-java-core/5.2.0/dbus-java-core-5.2.0.pom",
+      "sha256": "19305d6de9e0626d4412489d18458835c9dcfef6a9f28b5283c2d3e661ef865d",
+      "size": 1440
+    },
+    {
+      "path": "com/github/hypfvieh/dbus-java-parent/5.2.0/dbus-java-parent-5.2.0.pom",
+      "distfile": "jasper-maven-76c34568453e83b30dfd843e667e9dd91e6cc0725f6da4d5a49d55911d4ed7e2-dbus-java-parent-5.2.0.pom",
+      "url": "https://repo.maven.apache.org/maven2/com/github/hypfvieh/dbus-java-parent/5.2.0/dbus-java-parent-5.2.0.pom",
+      "sha256": "29b1d9a3880d07ebd1acb62b6083884ce10d3fb392be9055d7e32411f7f77d1c",
+      "size": 30251
+    },
+    {
+      "path": "com/github/hypfvieh/dbus-java-transport-junixsocket/5.2.0/dbus-java-transport-junixsocket-5.2.0-sources.jar",
+      "distfile": "jasper-maven-ec873a96d5de24d3fe5a324017cf96351143ed5ae3945cc2a9abf7c3800baf38-dbus-java-transport-junixsocket-5.2.0-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/com/github/hypfvieh/dbus-java-transport-junixsocket/5.2.0/dbus-java-transport-junixsocket-5.2.0-sources.jar",
+      "sha256": "5b0b191465569a9c16986c52e573f49df79c541caa376981b80ea467a2da0682",
+      "size": 8739
+    },
+    {
+      "path": "com/github/hypfvieh/dbus-java-transport-junixsocket/5.2.0/dbus-java-transport-junixsocket-5.2.0.jar",
+      "distfile": "jasper-maven-c6f09e16e36bb08a51594e382f331c21872fbcc58cbb16558a095f7a7e0cf69f-dbus-java-transport-junixsocket-5.2.0.jar",
+      "url": "https://repo.maven.apache.org/maven2/com/github/hypfvieh/dbus-java-transport-junixsocket/5.2.0/dbus-java-transport-junixsocket-5.2.0.jar",
+      "sha256": "0e4fe9abfd19cccb132806656e71f37732288c66db40d2b4eb0defe41ad4eaab",
+      "size": 13725
+    },
+    {
+      "path": "com/github/hypfvieh/dbus-java-transport-junixsocket/5.2.0/dbus-java-transport-junixsocket-5.2.0.pom",
+      "distfile": "jasper-maven-c3ebfea4aa26ebccba542e3bc047f512809248c253d4b658ddf5052ff7c851d1-dbus-java-transport-junixsocket-5.2.0.pom",
+      "url": "https://repo.maven.apache.org/maven2/com/github/hypfvieh/dbus-java-transport-junixsocket/5.2.0/dbus-java-transport-junixsocket-5.2.0.pom",
+      "sha256": "706a0cab9eb285fd02c65c0cabcff221a5eac58a77b64028fe55722bb63dd628",
+      "size": 1551
+    },
+    {
+      "path": "com/github/weisj/jsvg/2.0.0/jsvg-2.0.0-sources.jar",
+      "distfile": "jasper-maven-374459a9eb2e84f905fe758a68e73fd3dc10f5d191f82d9ff904b192cdaabe3b-jsvg-2.0.0-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/com/github/weisj/jsvg/2.0.0/jsvg-2.0.0-sources.jar",
+      "sha256": "5875aa8321132b1867a58cf7f7e230c1a1612faf546f79600d3ec866aed7096d",
+      "size": 565598
+    },
+    {
+      "path": "com/github/weisj/jsvg/2.0.0/jsvg-2.0.0.jar",
+      "distfile": "jasper-maven-057f4ec698bdae20c0b89e3cdc61549185482da2866336b9c7cecc0a2ae7e4be-jsvg-2.0.0.jar",
+      "url": "https://repo.maven.apache.org/maven2/com/github/weisj/jsvg/2.0.0/jsvg-2.0.0.jar",
+      "sha256": "81fc9ada579fc3f4924ec35f904c043de13ee8fba280322e638c7092006f1b52",
+      "size": 723652
+    },
+    {
+      "path": "com/github/weisj/jsvg/2.0.0/jsvg-2.0.0.pom",
+      "distfile": "jasper-maven-70a5f4d8afc8ea47d6b19f1a0f06fb7ebf33c1ac669ccbc36039c26bb1480704-jsvg-2.0.0.pom",
+      "url": "https://repo.maven.apache.org/maven2/com/github/weisj/jsvg/2.0.0/jsvg-2.0.0.pom",
+      "sha256": "1aec65c32feeb506236ca738ac0a11c02c1db2589c659cd615f0e899c0321627",
+      "size": 1249
+    },
+    {
+      "path": "com/kohlschutter/junixsocket/junixsocket-common/2.10.1/junixsocket-common-2.10.1-sources.jar",
+      "distfile": "jasper-maven-810695c42b68023df1101252e6b884d4535aa4b8ddc9a8bf2f24a1847da1c821-junixsocket-common-2.10.1-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/com/kohlschutter/junixsocket/junixsocket-common/2.10.1/junixsocket-common-2.10.1-sources.jar",
+      "sha256": "4f2479ea737c6dbb63ec8ff97e48342b6e9dcde3a49410cfd4601fc9b31b4904",
+      "size": 226340
+    },
+    {
+      "path": "com/kohlschutter/junixsocket/junixsocket-common/2.10.1/junixsocket-common-2.10.1.jar",
+      "distfile": "jasper-maven-23849a3d03254deac7212d0faa7d7802ff1fffab1362fb629d8f180dbc508748-junixsocket-common-2.10.1.jar",
+      "url": "https://repo.maven.apache.org/maven2/com/kohlschutter/junixsocket/junixsocket-common/2.10.1/junixsocket-common-2.10.1.jar",
+      "sha256": "19e5f7615ad2293f3532bc3f991b31396c1161834e89d9a6aa0c7def939c6729",
+      "size": 2381604
+    },
+    {
+      "path": "com/kohlschutter/junixsocket/junixsocket-common/2.10.1/junixsocket-common-2.10.1.pom",
+      "distfile": "jasper-maven-8a21f66bbbd2e670acb44cb401fdb58e7718b0a19054ae1072701d2395579108-junixsocket-common-2.10.1.pom",
+      "url": "https://repo.maven.apache.org/maven2/com/kohlschutter/junixsocket/junixsocket-common/2.10.1/junixsocket-common-2.10.1.pom",
+      "sha256": "1cbb0a0e5f1ea9ebcb45f39625368d073bddf96afc7cdcd880166533183956c2",
+      "size": 3747
+    },
+    {
+      "path": "com/kohlschutter/junixsocket/junixsocket-native-common/2.10.1/junixsocket-native-common-2.10.1-sources.jar",
+      "distfile": "jasper-maven-75d67b2b15a9e2fc2b526ac88f2f89864d9fde8c3fbc5f4764ceebbcbc5be199-junixsocket-native-common-2.10.1-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/com/kohlschutter/junixsocket/junixsocket-native-common/2.10.1/junixsocket-native-common-2.10.1-sources.jar",
+      "sha256": "8c186272fa22132852799e2414f389e42fa596758546e29db06fb0e0933697fa",
+      "size": 6593
+    },
+    {
+      "path": "com/kohlschutter/junixsocket/junixsocket-native-common/2.10.1/junixsocket-native-common-2.10.1.jar",
+      "distfile": "jasper-maven-20b6c6bb54a838fbb179e728202e1cab353dd57f75840b897266dfc6c9908fb4-junixsocket-native-common-2.10.1.jar",
+      "url": "https://repo.maven.apache.org/maven2/com/kohlschutter/junixsocket/junixsocket-native-common/2.10.1/junixsocket-native-common-2.10.1.jar",
+      "sha256": "0126ce0baf1ceb575ef517807d4d2b14b9f32f06180204e12ec73ab4a772567a",
+      "size": 711644
+    },
+    {
+      "path": "com/kohlschutter/junixsocket/junixsocket-native-common/2.10.1/junixsocket-native-common-2.10.1.pom",
+      "distfile": "jasper-maven-79ef0b14871cab6300ea4517e49a31f6d41e340d1ac34a9c29f8ef69f7a6d524-junixsocket-native-common-2.10.1.pom",
+      "url": "https://repo.maven.apache.org/maven2/com/kohlschutter/junixsocket/junixsocket-native-common/2.10.1/junixsocket-native-common-2.10.1.pom",
+      "sha256": "eef84454159ee0fdb821a0718b95fd5951781b6302aef0bfd66de2d2761d71b4",
+      "size": 11851
+    },
+    {
+      "path": "com/kohlschutter/junixsocket/junixsocket/2.10.1/junixsocket-2.10.1.pom",
+      "distfile": "jasper-maven-7eda5253ba6bced858b9fa41303ccddfe16be0a6c25157f12d25d7b63e3a965a-junixsocket-2.10.1.pom",
+      "url": "https://repo.maven.apache.org/maven2/com/kohlschutter/junixsocket/junixsocket/2.10.1/junixsocket-2.10.1.pom",
+      "sha256": "f000644a3c1f274bc6707f239b02ab2e095fac878468224b43f19f3e6f02cba7",
+      "size": 22984
+    },
+    {
+      "path": "com/kohlschutter/kohlschutter-parent-multirelease/1.7.4/kohlschutter-parent-multirelease-1.7.4.pom",
+      "distfile": "jasper-maven-f8d52471a4449beb7b5ea055b9ca92bedc7af45f8fb830c855563c8b6c1decad-kohlschutter-parent-multirelease-1.7.4.pom",
+      "url": "https://repo.maven.apache.org/maven2/com/kohlschutter/kohlschutter-parent-multirelease/1.7.4/kohlschutter-parent-multirelease-1.7.4.pom",
+      "sha256": "0f85865885e50d648162a17eaa12e24de6788faca0e26c2261f3e84b9585f19c",
+      "size": 104483
+    },
+    {
+      "path": "com/kohlschutter/kohlschutter-parent/1.7.4/kohlschutter-parent-1.7.4.pom",
+      "distfile": "jasper-maven-92b39c721fca1847143645217e5ff87abbb31a2fe5150a18fd421dbf5938087e-kohlschutter-parent-1.7.4.pom",
+      "url": "https://repo.maven.apache.org/maven2/com/kohlschutter/kohlschutter-parent/1.7.4/kohlschutter-parent-1.7.4.pom",
+      "sha256": "1c64551056b7d957fdbc697f00742066aa4aafd54087d597a3b94427112304ee",
+      "size": 92806
+    },
+    {
+      "path": "commons-io/commons-io/2.21.0/commons-io-2.21.0-sources.jar",
+      "distfile": "jasper-maven-fafe9d708809e8e636568e3748297526e4c88daf6738c809767c3adde1e952cd-commons-io-2.21.0-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/commons-io/commons-io/2.21.0/commons-io-2.21.0-sources.jar",
+      "sha256": "5fd4d4493dd1eee5c6f314159dbac7fda1988a4ab037feacbeb2ecb3033c43b4",
+      "size": 595657
+    },
+    {
+      "path": "commons-io/commons-io/2.21.0/commons-io-2.21.0.jar",
+      "distfile": "jasper-maven-a342913dbd8942b852c038fa992c500c61a820849e18a8134a483be94f2c3234-commons-io-2.21.0.jar",
+      "url": "https://repo.maven.apache.org/maven2/commons-io/commons-io/2.21.0/commons-io-2.21.0.jar",
+      "sha256": "7d643a2afea8b058b762aa6fb90e5b256f6c729739f8b3784c3370ddc609e88d",
+      "size": 585274
+    },
+    {
+      "path": "commons-io/commons-io/2.21.0/commons-io-2.21.0.pom",
+      "distfile": "jasper-maven-92a7b1350356600cb75bbd28bb3d1be4ba51b0396ce007fedf50d80239162f46-commons-io-2.21.0.pom",
+      "url": "https://repo.maven.apache.org/maven2/commons-io/commons-io/2.21.0/commons-io-2.21.0.pom",
+      "sha256": "ae47795e721803ec8ff1deed74be28a811a02713bd5a3ab0ac67c2b58cb635ab",
+      "size": 20847
+    },
+    {
+      "path": "commons-net/commons-net/3.13.0/commons-net-3.13.0-sources.jar",
+      "distfile": "jasper-maven-9a62f965ac4c673eb1ba0d63f291fe9296ae31354121ff6f4f919f16dde5d7fc-commons-net-3.13.0-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/commons-net/commons-net/3.13.0/commons-net-3.13.0-sources.jar",
+      "sha256": "d770d2be3a5cf9c75af743c36ac9f2ef737f53d70950a495976504eb33333319",
+      "size": 441857
+    },
+    {
+      "path": "commons-net/commons-net/3.13.0/commons-net-3.13.0.jar",
+      "distfile": "jasper-maven-11e62ba5c0f32060a1719873a4a71201ddd811d87a8c50e2bff3d2f43c6ac48c-commons-net-3.13.0.jar",
+      "url": "https://repo.maven.apache.org/maven2/commons-net/commons-net/3.13.0/commons-net-3.13.0.jar",
+      "sha256": "9e88444afadc9467f0bf3d328f93b9538da35a9be05cdee430766e64fddbd6c5",
+      "size": 337311
+    },
+    {
+      "path": "commons-net/commons-net/3.13.0/commons-net-3.13.0.pom",
+      "distfile": "jasper-maven-05d5f2c84fab78f69c79d2bd796d1a17908c5a885f1b2860df5e4a6492c94661-commons-net-3.13.0.pom",
+      "url": "https://repo.maven.apache.org/maven2/commons-net/commons-net/3.13.0/commons-net-3.13.0.pom",
+      "sha256": "afdb47981c797b186996d1f98074388d2068901cbec4d6c221d7da7905f96301",
+      "size": 26408
+    },
+    {
+      "path": "net/bytebuddy/byte-buddy-parent/1.18.3/byte-buddy-parent-1.18.3.pom",
+      "distfile": "jasper-maven-5650ce7aeba0883c0ad4fe97073f7e15db51c86ca1e6ac5358f993c2f04a9f30-byte-buddy-parent-1.18.3.pom",
+      "url": "https://repo.maven.apache.org/maven2/net/bytebuddy/byte-buddy-parent/1.18.3/byte-buddy-parent-1.18.3.pom",
+      "sha256": "90ea531731508eea75ff9295141c508d7f9a53d1a05f45b80f8f4999521426ef",
+      "size": 65995
+    },
+    {
+      "path": "net/bytebuddy/byte-buddy/1.18.3/byte-buddy-1.18.3-sources.jar",
+      "distfile": "jasper-maven-f4c92000378f4b1ac3140b8f0da518c358c946329a55aa0f2faf63f95ce1207a-byte-buddy-1.18.3-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/net/bytebuddy/byte-buddy/1.18.3/byte-buddy-1.18.3-sources.jar",
+      "sha256": "5cff53ad1e9d4ec737ea0eeeb58231386b6607cc0d643630eb2a58960a92a708",
+      "size": 2778438
+    },
+    {
+      "path": "net/bytebuddy/byte-buddy/1.18.3/byte-buddy-1.18.3.jar",
+      "distfile": "jasper-maven-cffdf0c45f678afa5381a232c9b6e6aaf3c9ae8fd2f5f6d113dda0895c5c0fe9-byte-buddy-1.18.3.jar",
+      "url": "https://repo.maven.apache.org/maven2/net/bytebuddy/byte-buddy/1.18.3/byte-buddy-1.18.3.jar",
+      "sha256": "d78396e3c5bce3f2865c9186647481e5589d34cacc632484715b686108d17c66",
+      "size": 9223908
+    },
+    {
+      "path": "net/bytebuddy/byte-buddy/1.18.3/byte-buddy-1.18.3.pom",
+      "distfile": "jasper-maven-ed7bcab000bbebd08a760ca2602a3a6f118186cbf4156dd76b9965daadddd196-byte-buddy-1.18.3.pom",
+      "url": "https://repo.maven.apache.org/maven2/net/bytebuddy/byte-buddy/1.18.3/byte-buddy-1.18.3.pom",
+      "sha256": "7157b622a0d6885cb5526a10f1220ddf090dbb52ca2fe38c32cc69c4f1530788",
+      "size": 19432
+    },
+    {
+      "path": "net/java/dev/jna/jna-platform/5.14.0/jna-platform-5.14.0-sources.jar",
+      "distfile": "jasper-maven-31eea05c7246af0436942018e6fef2cdcba0ebfe69dc0ded59f11438c27a3770-jna-platform-5.14.0-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/net/java/dev/jna/jna-platform/5.14.0/jna-platform-5.14.0-sources.jar",
+      "sha256": "879f24cf7021c8ff21c22de5f132c50c6d398bbf684be418d48cb8f859c147e7",
+      "size": 1085004
+    },
+    {
+      "path": "net/java/dev/jna/jna-platform/5.14.0/jna-platform-5.14.0.jar",
+      "distfile": "jasper-maven-8e039c7dadc270f067258413d62dd493fd158eb10a2a0edf89fdc533dd85c146-jna-platform-5.14.0.jar",
+      "url": "https://repo.maven.apache.org/maven2/net/java/dev/jna/jna-platform/5.14.0/jna-platform-5.14.0.jar",
+      "sha256": "ae4caceb3840730c2537f9b7fb55a01baba580286b4122951488bcee558c2449",
+      "size": 1369287
+    },
+    {
+      "path": "net/java/dev/jna/jna-platform/5.14.0/jna-platform-5.14.0.pom",
+      "distfile": "jasper-maven-7c8e5002bbd2a828107d077c2c5990a076d5504ab9a449a00ba4528e35e14713-jna-platform-5.14.0.pom",
+      "url": "https://repo.maven.apache.org/maven2/net/java/dev/jna/jna-platform/5.14.0/jna-platform-5.14.0.pom",
+      "sha256": "6cba0e04f9eecb16486000793bb27e103b0f4d0485e0554e2b4c0aed13d2ed16",
+      "size": 2251
+    },
+    {
+      "path": "net/java/dev/jna/jna/5.14.0/jna-5.14.0-sources.jar",
+      "distfile": "jasper-maven-cab4af28bba3b06b1453495111749d14bd5e1bf873835e874c407686aaa937f7-jna-5.14.0-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/net/java/dev/jna/jna/5.14.0/jna-5.14.0-sources.jar",
+      "sha256": "ebd774c761215676cda059fd68240628ef99f4aafa6d355ae00d184855aef134",
+      "size": 163996
+    },
+    {
+      "path": "net/java/dev/jna/jna/5.14.0/jna-5.14.0.jar",
+      "distfile": "jasper-maven-d4988d43bf90ef4c7484db16c4150a873ab815e47c74aaf057d6ca76cd0a087c-jna-5.14.0.jar",
+      "url": "https://repo.maven.apache.org/maven2/net/java/dev/jna/jna/5.14.0/jna-5.14.0.jar",
+      "sha256": "34ed1e1f27fa896bca50dbc4e99cf3732967cec387a7a0d5e3486c09673fe8c6",
+      "size": 1878533
+    },
+    {
+      "path": "net/java/dev/jna/jna/5.14.0/jna-5.14.0.pom",
+      "distfile": "jasper-maven-586e40f80ff671e3b0bb1efa46cafd3060ca1a17f82ffc4d9e767c8ff0346d4d-jna-5.14.0.pom",
+      "url": "https://repo.maven.apache.org/maven2/net/java/dev/jna/jna/5.14.0/jna-5.14.0.pom",
+      "sha256": "e04e25951501df25adc7b1dcdb6c53373c94897b84d3e14921292763ee07ae3d",
+      "size": 2030
+    },
+    {
+      "path": "org/antlr/antlr4-master/4.11.1/antlr4-master-4.11.1.pom",
+      "distfile": "jasper-maven-d0187bf18346750d5aa8656928a4ab50c556427d177708277195cd412cec35b7-antlr4-master-4.11.1.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/antlr/antlr4-master/4.11.1/antlr4-master-4.11.1.pom",
+      "sha256": "72ea5de8dabb6615785fd0feaaababd53dcdae70fe16bcd7c7b9686c0a6e00ad",
+      "size": 4427
+    },
+    {
+      "path": "org/antlr/antlr4-runtime/4.11.1/antlr4-runtime-4.11.1-sources.jar",
+      "distfile": "jasper-maven-637c5e525c172d0e8e9a7fec80e4ddd00f76893ab0733428e2e8c53c02cca424-antlr4-runtime-4.11.1-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/antlr/antlr4-runtime/4.11.1/antlr4-runtime-4.11.1-sources.jar",
+      "sha256": "6fa0efb711a152842ecda1d41ceab94fb2049f833e00e360e161ac0e7a3819fe",
+      "size": 314189
+    },
+    {
+      "path": "org/antlr/antlr4-runtime/4.11.1/antlr4-runtime-4.11.1.jar",
+      "distfile": "jasper-maven-9724a9e05c4180c8a47eb449bcb0c4e230f09cff6d3755ba75f4eb27036fdbff-antlr4-runtime-4.11.1.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/antlr/antlr4-runtime/4.11.1/antlr4-runtime-4.11.1.jar",
+      "sha256": "e06c6553c1ccc14d36052ec4b0fc6f13b808cf957b5b1dc3f61bf401996ada59",
+      "size": 324039
+    },
+    {
+      "path": "org/antlr/antlr4-runtime/4.11.1/antlr4-runtime-4.11.1.pom",
+      "distfile": "jasper-maven-f4822186a8964f04f003efd43f98d0659b1bedd94088dede7b0360651c9b93eb-antlr4-runtime-4.11.1.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/antlr/antlr4-runtime/4.11.1/antlr4-runtime-4.11.1.pom",
+      "sha256": "c456ec2959078c591fbd7ef69ad9400a727920068d746989c74ab804ed681b34",
+      "size": 3552
+    },
+    {
+      "path": "org/apache/apache/30/apache-30.pom",
+      "distfile": "jasper-maven-ec9322f347382a2dff4882930dc90bd968c939f54697bc0cce9db4f07e372924-apache-30.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/apache/apache/30/apache-30.pom",
+      "sha256": "63dd4a393a9c0dfcb314efe83871a41d243bc8d200cbc7f2d197f30da78239d8",
+      "size": 23241
+    },
+    {
+      "path": "org/apache/apache/33/apache-33.pom",
+      "distfile": "jasper-maven-3b499a6533d1106253d3104fd840407860534cb299e9d15367961f8a4119dace-apache-33.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/apache/apache/33/apache-33.pom",
+      "sha256": "d78bd8524c5f8380a190a6525686629a95dfe512df21111383a6d8c0923a4415",
+      "size": 24184
+    },
+    {
+      "path": "org/apache/apache/35/apache-35.pom",
+      "distfile": "jasper-maven-f9509afb0bee7e9d8f8daaa07611bace0a171ca8e2417f443b98b2a6f12476cb-apache-35.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/apache/apache/35/apache-35.pom",
+      "sha256": "ea297dcd114136e8b8e8b630230d52a76c2fc69f6c5db25d672b1857000728b8",
+      "size": 24249
+    },
+    {
+      "path": "org/apache/apache/37/apache-37.pom",
+      "distfile": "jasper-maven-63b2f11d4acfb108aa8df3228032fa04824a3b18a6fac41bdbaf0408c7ef4441-apache-37.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/apache/apache/37/apache-37.pom",
+      "sha256": "524ec4787aff73af6b3a9fafa154c7f1881b648299b663fdbfcadda1286f2353",
+      "size": 25620
+    },
+    {
+      "path": "org/apache/commons/commons-parent/91/commons-parent-91.pom",
+      "distfile": "jasper-maven-07c0e24863046eb1dfc48c14b0a2cd5a667538e2e8dac705569c26fe35b0448d-commons-parent-91.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/apache/commons/commons-parent/91/commons-parent-91.pom",
+      "sha256": "d2f8b6fd4800b6aaf120f5a38226d5f9d5fc6db837af99e2f9b33067868b9872",
+      "size": 79481
+    },
+    {
+      "path": "org/apache/commons/commons-parent/97/commons-parent-97.pom",
+      "distfile": "jasper-maven-7c110feafc1d83f30f6b3c559e2614d04353c01fdab6c3232e446fe4ca8b6dc0-commons-parent-97.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/apache/commons/commons-parent/97/commons-parent-97.pom",
+      "sha256": "14366dcbef67a69bb2a8fe9ca7289c215381c5c25093542a499f9d523a2cad7b",
+      "size": 79659
+    },
+    {
+      "path": "org/apache/ftpserver/ftplet-api/1.2.1/ftplet-api-1.2.1-sources.jar",
+      "distfile": "jasper-maven-ab6f26b95522b2964a1d63315732923928d84c8cc6bf53b1cf96de4c1484e1e7-ftplet-api-1.2.1-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/apache/ftpserver/ftplet-api/1.2.1/ftplet-api-1.2.1-sources.jar",
+      "sha256": "8b76f8f7efcebee6be3a3038393d71d86c5608d10e044622c56875559e4832c3",
+      "size": 39986
+    },
+    {
+      "path": "org/apache/ftpserver/ftplet-api/1.2.1/ftplet-api-1.2.1.jar",
+      "distfile": "jasper-maven-511ec75872bde78cd63d00516768a6ed24f35e56c7beaff1a1b5a3c0177b33f1-ftplet-api-1.2.1.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/apache/ftpserver/ftplet-api/1.2.1/ftplet-api-1.2.1.jar",
+      "sha256": "36e47834dfa4225448aaaa5460b304f26e99e837c4a80ef5b41d090735be9b07",
+      "size": 23347
+    },
+    {
+      "path": "org/apache/ftpserver/ftplet-api/1.2.1/ftplet-api-1.2.1.pom",
+      "distfile": "jasper-maven-ef3db8b2c52f3c416524179cb79813c9c44b9df8dbe4f7377a76c9891267059f-ftplet-api-1.2.1.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/apache/ftpserver/ftplet-api/1.2.1/ftplet-api-1.2.1.pom",
+      "sha256": "7d09c54d1972e5607b65ed684e63819ff321c40b6e4e77149f85463d5def76a3",
+      "size": 2741
+    },
+    {
+      "path": "org/apache/ftpserver/ftpserver-core/1.2.1/ftpserver-core-1.2.1-sources.jar",
+      "distfile": "jasper-maven-9c91e3abc0548ae5263154c422e2e7dbd3b0833aeca6ce6387f21254986e2552-ftpserver-core-1.2.1-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/apache/ftpserver/ftpserver-core/1.2.1/ftpserver-core-1.2.1-sources.jar",
+      "sha256": "5e22baf2a37df4f8d2ca67dbf909d4ef08984f84d56f19b4ff93837d50824574",
+      "size": 336611
+    },
+    {
+      "path": "org/apache/ftpserver/ftpserver-core/1.2.1/ftpserver-core-1.2.1.jar",
+      "distfile": "jasper-maven-9ef05572aae059f17c26a8369382a90fc9403b3bb475a476ee4eb7c711e769c4-ftpserver-core-1.2.1.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/apache/ftpserver/ftpserver-core/1.2.1/ftpserver-core-1.2.1.jar",
+      "sha256": "18279abb21abd74e10bb60d5ac6fa044044cc40f1b34d62418e906f50d4212ec",
+      "size": 319560
+    },
+    {
+      "path": "org/apache/ftpserver/ftpserver-core/1.2.1/ftpserver-core-1.2.1.pom",
+      "distfile": "jasper-maven-415202d6731eb7aada40b180e86062518357187299266cdddb8f853829662e0a-ftpserver-core-1.2.1.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/apache/ftpserver/ftpserver-core/1.2.1/ftpserver-core-1.2.1.pom",
+      "sha256": "8fa25177a20dfc36d99234205124bcd2a0924dc312221c978e0a194362ceb349",
+      "size": 8280
+    },
+    {
+      "path": "org/apache/ftpserver/ftpserver-parent/1.2.1/ftpserver-parent-1.2.1.pom",
+      "distfile": "jasper-maven-ec5b058bb6736acf0949fccdf14d1578284d26b1361370f9784ef4d78b15cde7-ftpserver-parent-1.2.1.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/apache/ftpserver/ftpserver-parent/1.2.1/ftpserver-parent-1.2.1.pom",
+      "sha256": "030db77f35b35f3012d9a064163f593a6917e5377b713386a5e08558197b63e5",
+      "size": 23849
+    },
+    {
+      "path": "org/apache/mina/mina-core/2.2.4/mina-core-2.2.4-sources.jar",
+      "distfile": "jasper-maven-97c4f3cb13c29255e7ad54fda5dbb4e3b6ac39bfc12230c27ea3e54b4a22e085-mina-core-2.2.4-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/apache/mina/mina-core/2.2.4/mina-core-2.2.4-sources.jar",
+      "sha256": "6c7823b8ed5a8d3511b8fb7ba6166ab825a45784741cd15c9991a75e54ad0dba",
+      "size": 616020
+    },
+    {
+      "path": "org/apache/mina/mina-core/2.2.4/mina-core-2.2.4.jar",
+      "distfile": "jasper-maven-68c81220e4e383c0e32f8014966752788cf8980bcdea26fdee036a73af17dbf7-mina-core-2.2.4.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/apache/mina/mina-core/2.2.4/mina-core-2.2.4.jar",
+      "sha256": "39b2dfc8e84380bf7adab657d3d5e1625cb6592a885ebdb854ec5c6f7a3ec88d",
+      "size": 701671
+    },
+    {
+      "path": "org/apache/mina/mina-core/2.2.4/mina-core-2.2.4.pom",
+      "distfile": "jasper-maven-07876de256862a20585578195b0510a12d2718c092bace1978cdd76f385cc564-mina-core-2.2.4.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/apache/mina/mina-core/2.2.4/mina-core-2.2.4.pom",
+      "sha256": "84ac1d47b5f43931082f5fed402071d1d77238c0d63b5bf86f12752efbddd8fa",
+      "size": 4567
+    },
+    {
+      "path": "org/apache/mina/mina-parent/2.2.4/mina-parent-2.2.4.pom",
+      "distfile": "jasper-maven-75400ee84b71d98e581065b3daf39f7ba7e50db81f09b0983c8d58a51aa4f318-mina-parent-2.2.4.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/apache/mina/mina-parent/2.2.4/mina-parent-2.2.4.pom",
+      "sha256": "741e29620d752bea51721cdd1e1d8c3eb38213c2fafa76e1ae27a3318f805c0a",
+      "size": 31673
+    },
+    {
+      "path": "org/apache/sshd/sshd-common/2.19.0/sshd-common-2.19.0-sources.jar",
+      "distfile": "jasper-maven-32d41d34621f3d34dffaf9690ca18cf4c5055391ae2f59e7bf1702711b161321-sshd-common-2.19.0-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/apache/sshd/sshd-common/2.19.0/sshd-common-2.19.0-sources.jar",
+      "sha256": "c0b0a66452b70e6e3195665bf17a28edcd4ddf2f49801fd4732a7c60e49e9d92",
+      "size": 750198
+    },
+    {
+      "path": "org/apache/sshd/sshd-common/2.19.0/sshd-common-2.19.0.jar",
+      "distfile": "jasper-maven-1278e701b0ab576ac4fa0fc3ac3cfa1e7f0d7c05e07b9ec7abf92cef6739375b-sshd-common-2.19.0.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/apache/sshd/sshd-common/2.19.0/sshd-common-2.19.0.jar",
+      "sha256": "41cef234f894e435ae2141e24baa25baf238a273cd28c6bbadcf830b1b2d68cb",
+      "size": 966617
+    },
+    {
+      "path": "org/apache/sshd/sshd-common/2.19.0/sshd-common-2.19.0.pom",
+      "distfile": "jasper-maven-86ef1ac1fb16dfa3db7f6eb4a4e11d167e68dc61d526b75ea347d692a8c09b4e-sshd-common-2.19.0.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/apache/sshd/sshd-common/2.19.0/sshd-common-2.19.0.pom",
+      "sha256": "df5b5e31d783e202f1ea8145eceedd3a54c9a7ccbc3191be80381a1edf5ac071",
+      "size": 4884
+    },
+    {
+      "path": "org/apache/sshd/sshd-core/2.19.0/sshd-core-2.19.0-sources.jar",
+      "distfile": "jasper-maven-002aeb7a4275d103797519fdfc5ec8f89597ace486f25bd60f5d126a32a2fa01-sshd-core-2.19.0-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/apache/sshd/sshd-core/2.19.0/sshd-core-2.19.0-sources.jar",
+      "sha256": "c1ced96338bb28821cfb63f86e4cd4a8c2b8b8ec078f85d0b7f91d4864dde0e0",
+      "size": 732971
+    },
+    {
+      "path": "org/apache/sshd/sshd-core/2.19.0/sshd-core-2.19.0.jar",
+      "distfile": "jasper-maven-ee80e8a0c999721917ee460aac6e3943763480f5d76aa2a9abe15d0b757a5e7b-sshd-core-2.19.0.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/apache/sshd/sshd-core/2.19.0/sshd-core-2.19.0.jar",
+      "sha256": "7215350bf71d95a34494f823a7451f966a2995b59e99fdf8ee9cbd63ef78cdb3",
+      "size": 964323
+    },
+    {
+      "path": "org/apache/sshd/sshd-core/2.19.0/sshd-core-2.19.0.pom",
+      "distfile": "jasper-maven-4cf82153f1cd3ad76758de0af4bf5af85f0d03a135efd8b658d7e6cd2abe482c-sshd-core-2.19.0.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/apache/sshd/sshd-core/2.19.0/sshd-core-2.19.0.pom",
+      "sha256": "b994e3d4b538ea968c3351b24c0d3b764f6284deb96446a81dadf95f1217a080",
+      "size": 15555
+    },
+    {
+      "path": "org/apache/sshd/sshd-sftp/2.19.0/sshd-sftp-2.19.0-sources.jar",
+      "distfile": "jasper-maven-22ee9fdf598d0b6e2342ec4229a2e63f7401ff47f724872985785b1fdbd677ca-sshd-sftp-2.19.0-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/apache/sshd/sshd-sftp/2.19.0/sshd-sftp-2.19.0-sources.jar",
+      "sha256": "e26b7df972cead5c529bca6ab3e782c27dd43b323f9a54f98d9e23d4f5d03c30",
+      "size": 277709
+    },
+    {
+      "path": "org/apache/sshd/sshd-sftp/2.19.0/sshd-sftp-2.19.0.jar",
+      "distfile": "jasper-maven-1f97d0d80036b35a4badb9b8b2f9b214ede74f5a6c30bf404e47f38e78ac381f-sshd-sftp-2.19.0.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/apache/sshd/sshd-sftp/2.19.0/sshd-sftp-2.19.0.jar",
+      "sha256": "a3ad30d2feba9fad589c7ad9117fcd9d332823697d59eb424fe2902f4d805575",
+      "size": 393011
+    },
+    {
+      "path": "org/apache/sshd/sshd-sftp/2.19.0/sshd-sftp-2.19.0.pom",
+      "distfile": "jasper-maven-0986907787a89e822b977aacacf78a50ea5ed0b52765601552254f08eed74c03-sshd-sftp-2.19.0.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/apache/sshd/sshd-sftp/2.19.0/sshd-sftp-2.19.0.pom",
+      "sha256": "a609c2e7d8d1938f88ccb6e9df527b734feee0f331d0306b9c3017836af397a6",
+      "size": 8676
+    },
+    {
+      "path": "org/apache/sshd/sshd/2.19.0/sshd-2.19.0.pom",
+      "distfile": "jasper-maven-bb06eb8de027271808f6cb7740616263f72b274d9959dba48af6e006bc0abd55-sshd-2.19.0.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/apache/sshd/sshd/2.19.0/sshd-2.19.0.pom",
+      "sha256": "f0325c97f48f42dc09d79890c7dc8d2c66b8e679131e34da14de475d4ecf889a",
+      "size": 65148
+    },
+    {
+      "path": "org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2-sources.jar",
+      "distfile": "jasper-maven-d90e5ccba7962b4f0d52d73296642a0c239080a5fa55ba372c317db75780e004-apiguardian-api-1.1.2-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2-sources.jar",
+      "sha256": "277a7a4315412817beb6655b324dc7276621e95ebff00b8bf65e17a27b685e2d",
+      "size": 6636
+    },
+    {
+      "path": "org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar",
+      "distfile": "jasper-maven-0f9b05d5054db59d8bf23b1679bada06f1a1f064b110516ab5425f5a06d8b30f-apiguardian-api-1.1.2.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar",
+      "sha256": "b509448ac506d607319f182537f0b35d71007582ec741832a1f111e5b5b70b38",
+      "size": 6806
+    },
+    {
+      "path": "org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.module",
+      "distfile": "jasper-maven-be1ebd8cf04cb7763e6d67f961ee37b17b5b7d646d616f3d2836f945b90f4573-apiguardian-api-1.1.2.module",
+      "url": "https://repo.maven.apache.org/maven2/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.module",
+      "sha256": "e08028131375b357d1d28734e9a4fb4216da84b240641cb3ef7e7c7d628223fc",
+      "size": 3504
+    },
+    {
+      "path": "org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.pom",
+      "distfile": "jasper-maven-2f839ed86afc8f5c8470c6805ffe4afa0ba42ac32c3dbaa71d86c271ebdea31d-apiguardian-api-1.1.2.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.pom",
+      "sha256": "32355081d109095c3d5d374d5a43b4f4c1b75d549e983ef50723e2772e5302a0",
+      "size": 1526
+    },
+    {
+      "path": "org/assertj/assertj-core/3.27.7/assertj-core-3.27.7-sources.jar",
+      "distfile": "jasper-maven-3d57c99bc63b6bb28bd150d83eeca34325eca71c46a16d829a07974e2a89de61-assertj-core-3.27.7-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/assertj/assertj-core/3.27.7/assertj-core-3.27.7-sources.jar",
+      "sha256": "5ba6de05730cf76021001f8437f35db4cb5b513465d4ace8c3a6fcd68d9a19ee",
+      "size": 1455621
+    },
+    {
+      "path": "org/assertj/assertj-core/3.27.7/assertj-core-3.27.7.jar",
+      "distfile": "jasper-maven-3ef39afc6b4fc0010feca32d40bbabea55499fa666b2e7a54f1c60258110a834-assertj-core-3.27.7.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/assertj/assertj-core/3.27.7/assertj-core-3.27.7.jar",
+      "sha256": "c4a445426c3c2861666863b842cc4ec7bbb1c4226fefd370b6d2fe83d6c4ff0f",
+      "size": 1399383
+    },
+    {
+      "path": "org/assertj/assertj-core/3.27.7/assertj-core-3.27.7.pom",
+      "distfile": "jasper-maven-7f6e3bc29517eb67179fdee5a35e6072562a0bd9914e1249c83fb3daeb964fac-assertj-core-3.27.7.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/assertj/assertj-core/3.27.7/assertj-core-3.27.7.pom",
+      "sha256": "95a10dcfb3ba9aad4d0b5e9c523a8d583377bee5ecd4ba37e19e55a34667f079",
+      "size": 3804
+    },
+    {
+      "path": "org/bouncycastle/bcpkix-jdk18on/1.85/bcpkix-jdk18on-1.85-sources.jar",
+      "distfile": "jasper-maven-a9827f5e2070dcf605d8be7476500aba390e4457cca340f29ae57d504e06229c-bcpkix-jdk18on-1.85-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/bouncycastle/bcpkix-jdk18on/1.85/bcpkix-jdk18on-1.85-sources.jar",
+      "sha256": "e5331f467331aba29bda6ddfb0df0da6d568928e29c2b0f20ea2fe123d802d20",
+      "size": 928504
+    },
+    {
+      "path": "org/bouncycastle/bcpkix-jdk18on/1.85/bcpkix-jdk18on-1.85.jar",
+      "distfile": "jasper-maven-f5fed335c8dd6bb7954ad66f0a8b5a4d2d0d2f4bc18ad8cfec77365e8c12d57a-bcpkix-jdk18on-1.85.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/bouncycastle/bcpkix-jdk18on/1.85/bcpkix-jdk18on-1.85.jar",
+      "sha256": "c9f82b2d4e99c4bbdfccf684e52cc06ea06a0b567bfd0d08f9c5a3f417055996",
+      "size": 1315409
+    },
+    {
+      "path": "org/bouncycastle/bcpkix-jdk18on/1.85/bcpkix-jdk18on-1.85.pom",
+      "distfile": "jasper-maven-8ef10a1fdbe3400f38e0f3e0f2293cf9af0c1c87de37228c574a28191694fd7c-bcpkix-jdk18on-1.85.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/bouncycastle/bcpkix-jdk18on/1.85/bcpkix-jdk18on-1.85.pom",
+      "sha256": "9b052b0cb85cb7d8bb0956afcc74f31c814f1c67e03498e1ca74f8fe8611d957",
+      "size": 1522
+    },
+    {
+      "path": "org/bouncycastle/bcprov-jdk18on/1.85.2/bcprov-jdk18on-1.85.2-sources.jar",
+      "distfile": "jasper-maven-58b4d0bcfa5700d03ea75db59daa0b7a8be1729ec48378ffd9df971ed08528e0-bcprov-jdk18on-1.85.2-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/bouncycastle/bcprov-jdk18on/1.85.2/bcprov-jdk18on-1.85.2-sources.jar",
+      "sha256": "b37ac84b1d5435ab7b8d166c16ab9f75e09f68f8ec50479bae433939b241b03f",
+      "size": 5948221
+    },
+    {
+      "path": "org/bouncycastle/bcprov-jdk18on/1.85.2/bcprov-jdk18on-1.85.2.jar",
+      "distfile": "jasper-maven-fca7f132e7968e197d00b8f4a8fb1fe5affbf67b645eff9b765915338571441f-bcprov-jdk18on-1.85.2.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/bouncycastle/bcprov-jdk18on/1.85.2/bcprov-jdk18on-1.85.2.jar",
+      "sha256": "986b0fb92ec10e0c66b43e036ce0077e6150cfaecd1db9fb92b56672e157afe5",
+      "size": 10280518
+    },
+    {
+      "path": "org/bouncycastle/bcprov-jdk18on/1.85.2/bcprov-jdk18on-1.85.2.pom",
+      "distfile": "jasper-maven-55c88ebb578ef5efdd5a73578a62d97fb4d02ab616f612aa76cb1606a093121c-bcprov-jdk18on-1.85.2.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/bouncycastle/bcprov-jdk18on/1.85.2/bcprov-jdk18on-1.85.2.pom",
+      "sha256": "774ffb514ef342d7e7543805944fec32e4da2c4292ba5d7d8560f05a65a7c2dd",
+      "size": 1164
+    },
+    {
+      "path": "org/bouncycastle/bcutil-jdk18on/1.85/bcutil-jdk18on-1.85-sources.jar",
+      "distfile": "jasper-maven-bc96a3e702c65a58c429fbf7eb50b52afeed93325cdcc54cd526b5d93e64399c-bcutil-jdk18on-1.85-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/bouncycastle/bcutil-jdk18on/1.85/bcutil-jdk18on-1.85-sources.jar",
+      "sha256": "b470a692878f92abf00b9c3af9147a45453250a80930df8f23f1d092c55e2d5e",
+      "size": 534652
+    },
+    {
+      "path": "org/bouncycastle/bcutil-jdk18on/1.85/bcutil-jdk18on-1.85.jar",
+      "distfile": "jasper-maven-25ef4b9e8d98f9873b57615fa397b73d34b257acb0b47af642bdaecb06930466-bcutil-jdk18on-1.85.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/bouncycastle/bcutil-jdk18on/1.85/bcutil-jdk18on-1.85.jar",
+      "sha256": "590f55ed5d68529239898a4a5c4f730b6e37f45d1cfa3fbe51f8485abe32c42d",
+      "size": 718812
+    },
+    {
+      "path": "org/bouncycastle/bcutil-jdk18on/1.85/bcutil-jdk18on-1.85.pom",
+      "distfile": "jasper-maven-289be06d5454eeab1de14ed9b6f194addd70e09ef3938f8cc77c248d82cccaee-bcutil-jdk18on-1.85.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/bouncycastle/bcutil-jdk18on/1.85/bcutil-jdk18on-1.85.pom",
+      "sha256": "9f1c79a12a7c03d78860e05750dcc44e855e20205c7af7cffbf29a69448d85ea",
+      "size": 1344
+    },
+    {
+      "path": "org/checkerframework/checker-qual/3.21.2/checker-qual-3.21.2-sources.jar",
+      "distfile": "jasper-maven-fdb1f53fa22c46e02c6ddcd95ec893172ce8db8880d154fdcab8bc443296b76d-checker-qual-3.21.2-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/checkerframework/checker-qual/3.21.2/checker-qual-3.21.2-sources.jar",
+      "sha256": "4f85e422b5da3c73990e894f1ed4cac45358f34fb4b979687848301584eccb57",
+      "size": 252646
+    },
+    {
+      "path": "org/checkerframework/checker-qual/3.21.2/checker-qual-3.21.2.jar",
+      "distfile": "jasper-maven-027f3830dca71824be3cbd46bd7d78fb8f7e2a01afa73bd2c3cad509e9a2796e-checker-qual-3.21.2.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/checkerframework/checker-qual/3.21.2/checker-qual-3.21.2.jar",
+      "sha256": "7e8554c902b9b839e61396cfe3a64c84ecabfb8eb652c410bfd8e4f5c1a8ece8",
+      "size": 222142
+    },
+    {
+      "path": "org/checkerframework/checker-qual/3.21.2/checker-qual-3.21.2.module",
+      "distfile": "jasper-maven-743f99226a59a3cdde7c903fcb61e9b1ec3c8cc954ea58a00c0d949366b453e3-checker-qual-3.21.2.module",
+      "url": "https://repo.maven.apache.org/maven2/org/checkerframework/checker-qual/3.21.2/checker-qual-3.21.2.module",
+      "sha256": "5ae9ddde3bea276c44c3ca907140e216e6e3d5d8891a41ced031ae033207129e",
+      "size": 3497
+    },
+    {
+      "path": "org/checkerframework/checker-qual/3.21.2/checker-qual-3.21.2.pom",
+      "distfile": "jasper-maven-ea21dc1c4472de0c4b604214dd7ba8251f1c72869841f56ebe3f9e7164122d99-checker-qual-3.21.2.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/checkerframework/checker-qual/3.21.2/checker-qual-3.21.2.pom",
+      "sha256": "81c7d4709177f65a40bcd584d89a857f1ac389c545c5ae6940cb6f143723a395",
+      "size": 2093
+    },
+    {
+      "path": "org/commonmark/commonmark-ext-gfm-strikethrough/0.30.0/commonmark-ext-gfm-strikethrough-0.30.0-sources.jar",
+      "distfile": "jasper-maven-9146b59bdb0bd7bd582c6a1eaa36adad8cdbe7bceb4b9d59445d37b1eba41db7-commonmark-ext-gfm-strikethrough-0.30.0-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/commonmark/commonmark-ext-gfm-strikethrough/0.30.0/commonmark-ext-gfm-strikethrough-0.30.0-sources.jar",
+      "sha256": "7625e013bb205024fdf7db534677726c3f3337b9901932851003b388f5f3de7c",
+      "size": 8334
+    },
+    {
+      "path": "org/commonmark/commonmark-ext-gfm-strikethrough/0.30.0/commonmark-ext-gfm-strikethrough-0.30.0.jar",
+      "distfile": "jasper-maven-5666f27050ab8c606abac276dcf8b4665e4bef0fc8943e7f461b7097220869a1-commonmark-ext-gfm-strikethrough-0.30.0.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/commonmark/commonmark-ext-gfm-strikethrough/0.30.0/commonmark-ext-gfm-strikethrough-0.30.0.jar",
+      "sha256": "2fed2064af3114c9fdfe233f9987682af6b1da073522879520fdb8593b65c995",
+      "size": 13259
+    },
+    {
+      "path": "org/commonmark/commonmark-ext-gfm-strikethrough/0.30.0/commonmark-ext-gfm-strikethrough-0.30.0.pom",
+      "distfile": "jasper-maven-b43f45a57a0e0a4b04704db9c402ae29d9dcecd0bb9e45cd72206b0721713981-commonmark-ext-gfm-strikethrough-0.30.0.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/commonmark/commonmark-ext-gfm-strikethrough/0.30.0/commonmark-ext-gfm-strikethrough-0.30.0.pom",
+      "sha256": "99247f0d0dd3f153556fea5dda3827ca1a8818cdc41641176c56498067e3c279",
+      "size": 1045
+    },
+    {
+      "path": "org/commonmark/commonmark-ext-gfm-tables/0.30.0/commonmark-ext-gfm-tables-0.30.0-sources.jar",
+      "distfile": "jasper-maven-7c6fc44a8f6c4fc02bc031ec91a47cdced5aac5de18def21593c092d6324b29a-commonmark-ext-gfm-tables-0.30.0-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/commonmark/commonmark-ext-gfm-tables/0.30.0/commonmark-ext-gfm-tables-0.30.0-sources.jar",
+      "sha256": "66934658666164f47f44b88f1279be3d4850c4208db761355dddfb5686f1f47e",
+      "size": 13014
+    },
+    {
+      "path": "org/commonmark/commonmark-ext-gfm-tables/0.30.0/commonmark-ext-gfm-tables-0.30.0.jar",
+      "distfile": "jasper-maven-a20267561c1a45d77d498cf1e7ebcd2f547c3e1b9f8cf3a78e20aa4f8010b3d9-commonmark-ext-gfm-tables-0.30.0.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/commonmark/commonmark-ext-gfm-tables/0.30.0/commonmark-ext-gfm-tables-0.30.0.jar",
+      "sha256": "5e28b48e66f7697bee4dfeb4c8f8f08a84a2827d91b53bbd9bd5445e82d14bda",
+      "size": 24485
+    },
+    {
+      "path": "org/commonmark/commonmark-ext-gfm-tables/0.30.0/commonmark-ext-gfm-tables-0.30.0.pom",
+      "distfile": "jasper-maven-ec840a1486ef7c8ca3ec812bd35af2b8c34fd1a0a5138f2c076a679ec567f956-commonmark-ext-gfm-tables-0.30.0.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/commonmark/commonmark-ext-gfm-tables/0.30.0/commonmark-ext-gfm-tables-0.30.0.pom",
+      "sha256": "38fa25fb5859cea392625c63659e83b3a73731e842d3adb33789425e0627f518",
+      "size": 1031
+    },
+    {
+      "path": "org/commonmark/commonmark-ext-task-list-items/0.30.0/commonmark-ext-task-list-items-0.30.0-sources.jar",
+      "distfile": "jasper-maven-7ae11e117c9f837d86571cc213c20f881dfadabb46eecedac8570f4c143f4c18-commonmark-ext-task-list-items-0.30.0-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/commonmark/commonmark-ext-task-list-items/0.30.0/commonmark-ext-task-list-items-0.30.0-sources.jar",
+      "sha256": "d5eaa142308880b38115a5c7bd7c04e243204c027e83d76e5427dd2d1d8e9c33",
+      "size": 7461
+    },
+    {
+      "path": "org/commonmark/commonmark-ext-task-list-items/0.30.0/commonmark-ext-task-list-items-0.30.0.jar",
+      "distfile": "jasper-maven-1c2371710cfc523450bdaa0719155f0078cbf432b83c54ab861fc3bae3bc586b-commonmark-ext-task-list-items-0.30.0.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/commonmark/commonmark-ext-task-list-items/0.30.0/commonmark-ext-task-list-items-0.30.0.jar",
+      "sha256": "fc3a2147bc751d8bc9ad814af8359547b60c8757be04be7153edefa64dd15cca",
+      "size": 11981
+    },
+    {
+      "path": "org/commonmark/commonmark-ext-task-list-items/0.30.0/commonmark-ext-task-list-items-0.30.0.pom",
+      "distfile": "jasper-maven-e3a4b6673ffd6582bcf4411fb4cdb05f595ad857e9d700581df5163eee5c0d17-commonmark-ext-task-list-items-0.30.0.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/commonmark/commonmark-ext-task-list-items/0.30.0/commonmark-ext-task-list-items-0.30.0.pom",
+      "sha256": "ea95e07668c7816f3411c2c9ac7089c18c644da60361e7fd106866d562462a56",
+      "size": 1007
+    },
+    {
+      "path": "org/commonmark/commonmark-parent/0.30.0/commonmark-parent-0.30.0.pom",
+      "distfile": "jasper-maven-c0578c294fe694ecc05b41e102c9e258a571049bf4a57935b25733975e186727-commonmark-parent-0.30.0.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/commonmark/commonmark-parent/0.30.0/commonmark-parent-0.30.0.pom",
+      "sha256": "284486c3a3eb0f42e03526f3f8aceff006afc84c90d76a2c21d1e2bf6962f070",
+      "size": 13787
+    },
+    {
+      "path": "org/commonmark/commonmark/0.30.0/commonmark-0.30.0-sources.jar",
+      "distfile": "jasper-maven-10dc855b6c7039bbfae666c02ff51a3a95009c140a6f524612172fba00337653-commonmark-0.30.0-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/commonmark/commonmark/0.30.0/commonmark-0.30.0-sources.jar",
+      "sha256": "758e0cf865d0122469e777245a9d07cafd5173cd5931e1daf0f9fe8e9e3c2efd",
+      "size": 145322
+    },
+    {
+      "path": "org/commonmark/commonmark/0.30.0/commonmark-0.30.0.jar",
+      "distfile": "jasper-maven-efd5e3d49c4381507b6c60badefe47e020321c2bdcab87fbafa8920064269866-commonmark-0.30.0.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/commonmark/commonmark/0.30.0/commonmark-0.30.0.jar",
+      "sha256": "090f0a758ac2f4f51aa86dff9dff0fdf7403666d0efd29f59886dc8e8b1eac53",
+      "size": 220139
+    },
+    {
+      "path": "org/commonmark/commonmark/0.30.0/commonmark-0.30.0.pom",
+      "distfile": "jasper-maven-2fbfa86a34e5072d4d023ba2611d3fb1cff616bfbfcbc980a8877a749b9b8f81-commonmark-0.30.0.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/commonmark/commonmark/0.30.0/commonmark-0.30.0.pom",
+      "sha256": "cf7554de7f0dec39cf9d7b3642ddefff6a75e087b0d0818515c4a635ccf2c05a",
+      "size": 2440
+    },
+    {
+      "path": "org/jetbrains/annotations/13.0/annotations-13.0-sources.jar",
+      "distfile": "jasper-maven-ecb7fc93f157cff4aa682373ad06da95266f313fa4c7b9b98272cf25500e662e-annotations-13.0-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/jetbrains/annotations/13.0/annotations-13.0-sources.jar",
+      "sha256": "42a5e144b8e81d50d6913d1007b695e62e614705268d8cf9f13dbdc478c2c68e",
+      "size": 17566
+    },
+    {
+      "path": "org/jetbrains/annotations/13.0/annotations-13.0.jar",
+      "distfile": "jasper-maven-a5abecba96f492087720782207e31ad2507c5a7a30b687abe6154951b36dadf5-annotations-13.0.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/jetbrains/annotations/13.0/annotations-13.0.jar",
+      "sha256": "ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478",
+      "size": 17536
+    },
+    {
+      "path": "org/jetbrains/annotations/13.0/annotations-13.0.pom",
+      "distfile": "jasper-maven-e2c1c8c1537b007dc7666befc6aa71f60f19e4fb6fc2ee47bfdbceb6d517f2d4-annotations-13.0.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/jetbrains/annotations/13.0/annotations-13.0.pom",
+      "sha256": "965aeb2bedff369819bdde1bf7a0b3b89b8247dd69c88b86375d76163bb8c397",
+      "size": 4930
+    },
+    {
+      "path": "org/jetbrains/annotations/24.0.1/annotations-24.0.1-sources.jar",
+      "distfile": "jasper-maven-cdcfcfc48b4078ccc2ac7e591dab94dc2583f8d6cffbb231a27ad0435ad3a1e1-annotations-24.0.1-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/jetbrains/annotations/24.0.1/annotations-24.0.1-sources.jar",
+      "sha256": "40978d2ac2fe28e0fc2e1eddc443057572ab775986d7afc83cc0c48cc65652ab",
+      "size": 38622
+    },
+    {
+      "path": "org/jetbrains/annotations/24.0.1/annotations-24.0.1.jar",
+      "distfile": "jasper-maven-bd4fcac0055b877fbff978d3c60d77586975b6951e5b683e0384565db9f53beb-annotations-24.0.1.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/jetbrains/annotations/24.0.1/annotations-24.0.1.jar",
+      "sha256": "61666dbce7e42e6c85b43c04fcfb8293a21dcb55b3c80e869270ce42c01a6b35",
+      "size": 30651
+    },
+    {
+      "path": "org/jetbrains/annotations/24.0.1/annotations-24.0.1.pom",
+      "distfile": "jasper-maven-af77f9c208e4c414485ac9ff3543f73b3666091ec171bdd25d46aa61cfe97463-annotations-24.0.1.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/jetbrains/annotations/24.0.1/annotations-24.0.1.pom",
+      "sha256": "99bede29c0331c1952eee04bf9978de535a90c97e2defffa5e009335171925b0",
+      "size": 1324
+    },
+    {
+      "path": "org/jetbrains/jediterm/jediterm-core/3.76/jediterm-core-3.76-sources.jar",
+      "distfile": "jasper-maven-b997b09a254349f24d37f716485ad48ee98056227b366373b22026d0e7910687-jediterm-core-3.76-sources.jar",
+      "url": "https://packages.jetbrains.team/maven/p/ij/intellij-dependencies/org/jetbrains/jediterm/jediterm-core/3.76/jediterm-core-3.76-sources.jar",
+      "sha256": "0cf28ca4d630a6ce36247d73dc1c331675072826c96e47bfe2c41fb28bf1c5ff",
+      "size": 122903
+    },
+    {
+      "path": "org/jetbrains/jediterm/jediterm-core/3.76/jediterm-core-3.76.jar",
+      "distfile": "jasper-maven-05fb10c14eeaa1c324e1a53c84a5991f6fa2d1a585b21565fdc91b751123710f-jediterm-core-3.76.jar",
+      "url": "https://packages.jetbrains.team/maven/p/ij/intellij-dependencies/org/jetbrains/jediterm/jediterm-core/3.76/jediterm-core-3.76.jar",
+      "sha256": "3808fff4fcaf53cb57c411726f52605ef8e3fcf26b40b2902752a722ee178a0b",
+      "size": 282691
+    },
+    {
+      "path": "org/jetbrains/jediterm/jediterm-core/3.76/jediterm-core-3.76.module",
+      "distfile": "jasper-maven-2462468023b3d27de7205b81bf7914c56a12e733d47b4a2c65e6f4691dde7e0f-jediterm-core-3.76.module",
+      "url": "https://packages.jetbrains.team/maven/p/ij/intellij-dependencies/org/jetbrains/jediterm/jediterm-core/3.76/jediterm-core-3.76.module",
+      "sha256": "39c0ada614d421f3833042118fe28de2461722d9f19c755c0e4fa97b16be562c",
+      "size": 3629
+    },
+    {
+      "path": "org/jetbrains/jediterm/jediterm-core/3.76/jediterm-core-3.76.pom",
+      "distfile": "jasper-maven-4227dc805355856824f6a9329a9c0ecc23f21bf12de9ee90858de45164933db3-jediterm-core-3.76.pom",
+      "url": "https://packages.jetbrains.team/maven/p/ij/intellij-dependencies/org/jetbrains/jediterm/jediterm-core/3.76/jediterm-core-3.76.pom",
+      "sha256": "b2bb268518fd881ce191dc181d0ab3ea85ad5da1e4df3909498a14fd7de44962",
+      "size": 1842
+    },
+    {
+      "path": "org/jetbrains/kotlin/kotlin-reflect/2.4.0/kotlin-reflect-2.4.0-sources.jar",
+      "distfile": "jasper-maven-268422a42082caa820d8a527f14a9936596b51cb53fefa339a5fd4e542d8342d-kotlin-reflect-2.4.0-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-reflect/2.4.0/kotlin-reflect-2.4.0-sources.jar",
+      "sha256": "ff246d790aad39f55779f44e410b477228999cd3c352585c73b56ea5df36549e",
+      "size": 815995
+    },
+    {
+      "path": "org/jetbrains/kotlin/kotlin-reflect/2.4.0/kotlin-reflect-2.4.0.pom",
+      "distfile": "jasper-maven-923fa428409b7d7466668ed93138c6c7be56a1572c309ea0e3f3ae1f6d6bd82a-kotlin-reflect-2.4.0.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-reflect/2.4.0/kotlin-reflect-2.4.0.pom",
+      "sha256": "9e181ee4f21d49c5c8550c3cfca7199c17590a8df3d1ea293e396798e4f10842",
+      "size": 1349
+    },
+    {
+      "path": "org/jetbrains/kotlin/kotlin-stdlib/2.4.0/kotlin-stdlib-2.4.0-sources.jar",
+      "distfile": "jasper-maven-ceea0b3b56572607d12aca8612c3e254c1695f62829f98f7fcbcdba039a1dcd6-kotlin-stdlib-2.4.0-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.4.0/kotlin-stdlib-2.4.0-sources.jar",
+      "sha256": "bca27f834e278d08c1b85a40e636450867e8251c284fd4c24e9879bb99e301c5",
+      "size": 757669
+    },
+    {
+      "path": "org/jetbrains/kotlin/kotlin-stdlib/2.4.0/kotlin-stdlib-2.4.0.jar",
+      "distfile": "jasper-maven-ac1868752952a33189cef02194086e5226789cb7231ffa6a7077942ff03663c9-kotlin-stdlib-2.4.0.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.4.0/kotlin-stdlib-2.4.0.jar",
+      "sha256": "ccb14ff83fabcb11458b798dbc9824748ccdffeec79c9aba789e6ed1cda86b1c",
+      "size": 1841929
+    },
+    {
+      "path": "org/jetbrains/kotlin/kotlin-stdlib/2.4.0/kotlin-stdlib-2.4.0.module",
+      "distfile": "jasper-maven-3a60389ff5ab38ee8c1836eee43ce52281e865dccbf30fd35b8ce08fb1ae4b8a-kotlin-stdlib-2.4.0.module",
+      "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.4.0/kotlin-stdlib-2.4.0.module",
+      "sha256": "c24a47dcbd9295d776f443be41d77ac245309601ed053711dee2b0254be02db6",
+      "size": 12389
+    },
+    {
+      "path": "org/jetbrains/kotlin/kotlin-stdlib/2.4.0/kotlin-stdlib-2.4.0.pom",
+      "distfile": "jasper-maven-557f15627b88016dcd6f6b1b6283c09e5770ff0e9807e1370100730282953306-kotlin-stdlib-2.4.0.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.4.0/kotlin-stdlib-2.4.0.pom",
+      "sha256": "8194ff79a9ee24a7fa3f74a6b179c04a1859de8b987a4f0983056e59451721de",
+      "size": 2299
+    },
+    {
+      "path": "org/jetbrains/pty4j/pty4j/0.13.10/pty4j-0.13.10-sources.jar",
+      "distfile": "jasper-maven-c0df60d0d98fc536734eb2b67e5cba125ef3ea088816212350888c3abc07d748-pty4j-0.13.10-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/jetbrains/pty4j/pty4j/0.13.10/pty4j-0.13.10-sources.jar",
+      "sha256": "0639d8427587d8dba3ed3521ce760ce52fe4ae3e4f77b16a70e2d7fa5ded02d3",
+      "size": 68346
+    },
+    {
+      "path": "org/jetbrains/pty4j/pty4j/0.13.10/pty4j-0.13.10.jar",
+      "distfile": "jasper-maven-33dad6aa61dcf9fbd1122754afccf9a1766e1592145814b02d42a43b97f8fae1-pty4j-0.13.10.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/jetbrains/pty4j/pty4j/0.13.10/pty4j-0.13.10.jar",
+      "sha256": "b60090270006423509c3dc4077043510e7f4ffb1a8905dd41c45fff71f1ae517",
+      "size": 2868260
+    },
+    {
+      "path": "org/jetbrains/pty4j/pty4j/0.13.10/pty4j-0.13.10.module",
+      "distfile": "jasper-maven-1cd0bd4d52d77b7e706a31ffbba0359d532685533b2791263c2544d7cdbab7ce-pty4j-0.13.10.module",
+      "url": "https://repo.maven.apache.org/maven2/org/jetbrains/pty4j/pty4j/0.13.10/pty4j-0.13.10.module",
+      "sha256": "3214939a2148b1999a7c6f62e6f7ff6a6db10db42886c71d21eed612fc81991a",
+      "size": 4697
+    },
+    {
+      "path": "org/jetbrains/pty4j/pty4j/0.13.10/pty4j-0.13.10.pom",
+      "distfile": "jasper-maven-479ef2412f46186f1ed3837061ab178b5e7c80375b118aa1d5143e2c0795d798-pty4j-0.13.10.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/jetbrains/pty4j/pty4j/0.13.10/pty4j-0.13.10.pom",
+      "sha256": "351b086f151ffcb60321def9d2c076f6ed96e3dac088eff909fd67ebe0aeb190",
+      "size": 2776
+    },
+    {
+      "path": "org/jetbrains/runtime/jbr-api/1.9.0/jbr-api-1.9.0-sources.jar",
+      "distfile": "jasper-maven-097fe9dbcbbb16f3ec043aac3f7847c6217f41cf51e08128354410006660540f-jbr-api-1.9.0-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/jetbrains/runtime/jbr-api/1.9.0/jbr-api-1.9.0-sources.jar",
+      "sha256": "70381d761a95c275eb9c09ab0dbf506d07f1ae61ece96a013219da19cbba80b8",
+      "size": 43296
+    },
+    {
+      "path": "org/jetbrains/runtime/jbr-api/1.9.0/jbr-api-1.9.0.jar",
+      "distfile": "jasper-maven-075bfd298b7f4e4a49df36c558abaf603271ecfbe87670ee000086091f60ab34-jbr-api-1.9.0.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/jetbrains/runtime/jbr-api/1.9.0/jbr-api-1.9.0.jar",
+      "sha256": "7e37284e33b5b304ee6174dcaa92db949b257cc4c8991ca865e7daf5113d8279",
+      "size": 50453
+    },
+    {
+      "path": "org/jetbrains/runtime/jbr-api/1.9.0/jbr-api-1.9.0.pom",
+      "distfile": "jasper-maven-60fc4481e191a125bd81b997249736d3ee01819d53e5e2db749527d1d5a48160-jbr-api-1.9.0.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/jetbrains/runtime/jbr-api/1.9.0/jbr-api-1.9.0.pom",
+      "sha256": "33b96c50bedc72a8ab55f7f37d237c5fe330ba05af31164778a1a980fd4ddc4f",
+      "size": 1340
+    },
+    {
+      "path": "org/jspecify/jspecify/1.0.0/jspecify-1.0.0-sources.jar",
+      "distfile": "jasper-maven-c0c60e827fa5fe509ad7a4a92aeb1ff62f894557abd24526a4ca7b1b2565db43-jspecify-1.0.0-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/jspecify/jspecify/1.0.0/jspecify-1.0.0-sources.jar",
+      "sha256": "adf0898191d55937fb3192ba971826f4f294292c4a960740f3c27310e7b70296",
+      "size": 11996
+    },
+    {
+      "path": "org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar",
+      "distfile": "jasper-maven-3f3f254ee91b4f62fa8f5247353c7c32d40b19a0190d8d674dd0580511701a1a-jspecify-1.0.0.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar",
+      "sha256": "1fad6e6be7557781e4d33729d49ae1cdc8fdda6fe477bb0cc68ce351eafdfbab",
+      "size": 3819
+    },
+    {
+      "path": "org/jspecify/jspecify/1.0.0/jspecify-1.0.0.module",
+      "distfile": "jasper-maven-c5f42f3b608955ebd5cef09434a2a708d39391ad93bcdcc40276c69f6f5062f5-jspecify-1.0.0.module",
+      "url": "https://repo.maven.apache.org/maven2/org/jspecify/jspecify/1.0.0/jspecify-1.0.0.module",
+      "sha256": "d307ca77a54e18ac1ef1aaed4e5bbe014bd2f49f29e1d2f813e47c278283195b",
+      "size": 3439
+    },
+    {
+      "path": "org/jspecify/jspecify/1.0.0/jspecify-1.0.0.pom",
+      "distfile": "jasper-maven-df2e439e0a90816f4bd43f378d4f4a23ccdf164b08aa0d8382a6576fcc9d125c-jspecify-1.0.0.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/jspecify/jspecify/1.0.0/jspecify-1.0.0.pom",
+      "sha256": "cdab929a3b95211f43d2090c5e2d0dfe8465960e378bc32b35841dab324433a6",
+      "size": 1511
+    },
+    {
+      "path": "org/junit/junit-bom/5.11.0/junit-bom-5.11.0.module",
+      "distfile": "jasper-maven-bf940d3c765d66acf8dcecb07a95072409654586cb49549f1e13fac69272051d-junit-bom-5.11.0.module",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/junit-bom/5.11.0/junit-bom-5.11.0.module",
+      "sha256": "f7edbe67f22042708c410abc547408e5c476f409f556236a1179221274a2ed2d",
+      "size": 6993
+    },
+    {
+      "path": "org/junit/junit-bom/5.11.0/junit-bom-5.11.0.pom",
+      "distfile": "jasper-maven-64e6e032377114ab1ac068952b9864c22c4329b526a42278dc22f6a47ba9c056-junit-bom-5.11.0.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/junit-bom/5.11.0/junit-bom-5.11.0.pom",
+      "sha256": "e67459d4882424ac6374f40db1c8f4a2e88946b340ba072c80be932a2be4644d",
+      "size": 5649
+    },
+    {
+      "path": "org/junit/junit-bom/5.12.2/junit-bom-5.12.2.module",
+      "distfile": "jasper-maven-a4dcd7696a74eb8f4d88cb8ee71e69eeff5f5aedad130b556acbb684960e8fdd-junit-bom-5.12.2.module",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/junit-bom/5.12.2/junit-bom-5.12.2.module",
+      "sha256": "de70ac5d91a52656d8890a6d23b9e04d99b99b1a0402530decad71bf31b2735e",
+      "size": 6996
+    },
+    {
+      "path": "org/junit/junit-bom/5.12.2/junit-bom-5.12.2.pom",
+      "distfile": "jasper-maven-ed535fbbb2d4b627b0718e9d12bac33399f85dd50c801fa0e116ba1c6b2d69a1-junit-bom-5.12.2.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/junit-bom/5.12.2/junit-bom-5.12.2.pom",
+      "sha256": "cef80fec86454f6806bfb0df24669b5c6f32e2cb728539ea859f47dfdc9bbc17",
+      "size": 5649
+    },
+    {
+      "path": "org/junit/junit-bom/5.13.4/junit-bom-5.13.4.module",
+      "distfile": "jasper-maven-bf07db029828b3642d2710b7b545c7e8700482512e2b310b091fda0523e729db-junit-bom-5.13.4.module",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/junit-bom/5.13.4/junit-bom-5.13.4.module",
+      "sha256": "e959288fde1b1b050d9bc082fc786789128da5d2853091468fca504104bdf400",
+      "size": 6994
+    },
+    {
+      "path": "org/junit/junit-bom/5.13.4/junit-bom-5.13.4.pom",
+      "distfile": "jasper-maven-1603b22bec39009e8722141a297e2ae68ee15b004874ac25e86b28af6978c4c9-junit-bom-5.13.4.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/junit-bom/5.13.4/junit-bom-5.13.4.pom",
+      "sha256": "d7a08a99b2502f0bb68cd4e1f984f0bf69324aaa208bd0f73366c03fc3548a42",
+      "size": 5669
+    },
+    {
+      "path": "org/junit/junit-bom/5.14.2/junit-bom-5.14.2.module",
+      "distfile": "jasper-maven-784877530f01f6ec2264846b9c6f1f933f714b2857d644cdf0de5a7ade9e79c1-junit-bom-5.14.2.module",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/junit-bom/5.14.2/junit-bom-5.14.2.module",
+      "sha256": "5d26f4440392326dd2483cf490143eea1495d5095459a0b9651a7b1b38e24ebf",
+      "size": 6994
+    },
+    {
+      "path": "org/junit/junit-bom/5.14.2/junit-bom-5.14.2.pom",
+      "distfile": "jasper-maven-d042ca5920a1aefc6dfe4500a04c5781f50ec772a455fac6e0ae28d1f100b813-junit-bom-5.14.2.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/junit-bom/5.14.2/junit-bom-5.14.2.pom",
+      "sha256": "ed2dcc7855bd460bccc93a1bf0c962e63b566ff7d8f1ded0f1f2593ba8183aaf",
+      "size": 5669
+    },
+    {
+      "path": "org/junit/junit-bom/6.1.3/junit-bom-6.1.3.module",
+      "distfile": "jasper-maven-914e0fd6971d323ecbaf7b7a304729aeb60d85fcb0a3ee8216a1cecbbdf5d07b-junit-bom-6.1.3.module",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/junit-bom/6.1.3/junit-bom-6.1.3.module",
+      "sha256": "9f5d57dadcfa07f7b38efcfb22b052ece188922a1df76b5a98e44a1df7a7701b",
+      "size": 6216
+    },
+    {
+      "path": "org/junit/junit-bom/6.1.3/junit-bom-6.1.3.pom",
+      "distfile": "jasper-maven-3b914d24e834e206f9f24d3958fdcdb38cf7ff1be280a9edfd4b9385e6ac4a03-junit-bom-6.1.3.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/junit-bom/6.1.3/junit-bom-6.1.3.pom",
+      "sha256": "a9000043610a3e90c852e779a6b1a8eb724a9f312cf5f7ddd57862b010c65dc8",
+      "size": 5416
+    },
+    {
+      "path": "org/junit/jupiter/junit-jupiter-api/6.1.3/junit-jupiter-api-6.1.3-sources.jar",
+      "distfile": "jasper-maven-dfd8f8634bf9d29a3bc65ecde24e878c35771e0d296eeef81db34f69ef358087-junit-jupiter-api-6.1.3-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/jupiter/junit-jupiter-api/6.1.3/junit-jupiter-api-6.1.3-sources.jar",
+      "sha256": "ab473ece6cb3a3c6f88a22e3c87a51899118a702a2fcbaf831d63bd2df5d11e0",
+      "size": 288828
+    },
+    {
+      "path": "org/junit/jupiter/junit-jupiter-api/6.1.3/junit-jupiter-api-6.1.3.jar",
+      "distfile": "jasper-maven-a65d7a1edb59065332edf64cd23ae4186fa1dc9d8b0ff4a37df7487c380c7b50-junit-jupiter-api-6.1.3.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/jupiter/junit-jupiter-api/6.1.3/junit-jupiter-api-6.1.3.jar",
+      "sha256": "555d6cf20fa1710884dd01b86cc5785397ba73e21ada2d4b784f5f1a14dcafc4",
+      "size": 312568
+    },
+    {
+      "path": "org/junit/jupiter/junit-jupiter-api/6.1.3/junit-jupiter-api-6.1.3.module",
+      "distfile": "jasper-maven-8414dde43199e2a722e5346411896df6792fe3bfa6ec34c71404786799f7a5b5-junit-jupiter-api-6.1.3.module",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/jupiter/junit-jupiter-api/6.1.3/junit-jupiter-api-6.1.3.module",
+      "sha256": "ad9909c1fa88a579b2821a091a196c45a84bcd0f4fc7357990fdc73d3801c8a5",
+      "size": 5359
+    },
+    {
+      "path": "org/junit/jupiter/junit-jupiter-api/6.1.3/junit-jupiter-api-6.1.3.pom",
+      "distfile": "jasper-maven-96af11ea1be25f1c5e75be64947cd3ba92e34b955517220e2c33a6fdaea83a99-junit-jupiter-api-6.1.3.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/jupiter/junit-jupiter-api/6.1.3/junit-jupiter-api-6.1.3.pom",
+      "sha256": "a9d6347da0329bf118e9878617e50b5537eb9ec3c5fcd08852650713832d1ac1",
+      "size": 3512
+    },
+    {
+      "path": "org/junit/jupiter/junit-jupiter-engine/6.1.3/junit-jupiter-engine-6.1.3-sources.jar",
+      "distfile": "jasper-maven-2428937dd8f66c7420f2f55df133f8a9d23bb5205c6b0dc7bd644f92528608e2-junit-jupiter-engine-6.1.3-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/jupiter/junit-jupiter-engine/6.1.3/junit-jupiter-engine-6.1.3-sources.jar",
+      "sha256": "bf8e7330b352f5735cccb958def28077dbc07ad59a4de78e3aba66587b903997",
+      "size": 171723
+    },
+    {
+      "path": "org/junit/jupiter/junit-jupiter-engine/6.1.3/junit-jupiter-engine-6.1.3.jar",
+      "distfile": "jasper-maven-af2da2fd1b2c80403937e99f88918ee95cfe842c7b4bcd182b06ec637682b807-junit-jupiter-engine-6.1.3.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/jupiter/junit-jupiter-engine/6.1.3/junit-jupiter-engine-6.1.3.jar",
+      "sha256": "414559e78bbfa3bdb2eab009ac3ab1e22369ac31117c270a0bd666da115c5c6c",
+      "size": 352591
+    },
+    {
+      "path": "org/junit/jupiter/junit-jupiter-engine/6.1.3/junit-jupiter-engine-6.1.3.module",
+      "distfile": "jasper-maven-ba9f40dce8c28c0bc78085b66a5e34669713403ba946edd3edb369346093e9be-junit-jupiter-engine-6.1.3.module",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/jupiter/junit-jupiter-engine/6.1.3/junit-jupiter-engine-6.1.3.module",
+      "sha256": "626a29f286c36d0f6f36409644371e12a3fe2bfcbb881e13f8265ac9de96bb77",
+      "size": 5189
+    },
+    {
+      "path": "org/junit/jupiter/junit-jupiter-engine/6.1.3/junit-jupiter-engine-6.1.3.pom",
+      "distfile": "jasper-maven-3c71602bbd1c2e506d2b8926c6d641388eb57a8d892e797359232ec39e382138-junit-jupiter-engine-6.1.3.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/jupiter/junit-jupiter-engine/6.1.3/junit-jupiter-engine-6.1.3.pom",
+      "sha256": "051fc65d97c15e7cd646831368af8afec590b008c804d293aff114c74a1e2530",
+      "size": 3530
+    },
+    {
+      "path": "org/junit/jupiter/junit-jupiter-params/6.1.3/junit-jupiter-params-6.1.3-sources.jar",
+      "distfile": "jasper-maven-f134e37aba8d86fb1728785b2f48abc75344a0f191ed55d880e80358e8513571-junit-jupiter-params-6.1.3-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/jupiter/junit-jupiter-params/6.1.3/junit-jupiter-params-6.1.3-sources.jar",
+      "sha256": "e390dde576668008ebc75a853020540304303889b922072b5617d6277873320f",
+      "size": 141101
+    },
+    {
+      "path": "org/junit/jupiter/junit-jupiter-params/6.1.3/junit-jupiter-params-6.1.3.jar",
+      "distfile": "jasper-maven-9d198fb68c81ccc7891dea20a1ca023211fb7999365cb8aa523ad79b71071b13-junit-jupiter-params-6.1.3.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/jupiter/junit-jupiter-params/6.1.3/junit-jupiter-params-6.1.3.jar",
+      "sha256": "05c51cedba2c06a9770707391e006cee825876937dea580b94a265ce145d4939",
+      "size": 303149
+    },
+    {
+      "path": "org/junit/jupiter/junit-jupiter-params/6.1.3/junit-jupiter-params-6.1.3.module",
+      "distfile": "jasper-maven-f3624aa8a0e6f83c13185cd3fb84caef2fdcd06b9fdbb58895743a019c121f0f-junit-jupiter-params-6.1.3.module",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/jupiter/junit-jupiter-params/6.1.3/junit-jupiter-params-6.1.3.module",
+      "sha256": "9ec7795f4aeb92578fb4d43b6a73c324fff216ca971f3910335073882c78a167",
+      "size": 5055
+    },
+    {
+      "path": "org/junit/jupiter/junit-jupiter-params/6.1.3/junit-jupiter-params-6.1.3.pom",
+      "distfile": "jasper-maven-524b65e6895329c2debad9a9fbbd667e6d9ddc0e8f9adfa0f76db4def211a8af-junit-jupiter-params-6.1.3.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/jupiter/junit-jupiter-params/6.1.3/junit-jupiter-params-6.1.3.pom",
+      "sha256": "10f7e85b5ce53014c946b14c750b09097bed1892ecaf2cea05d12aab6e8677d2",
+      "size": 3338
+    },
+    {
+      "path": "org/junit/jupiter/junit-jupiter/6.1.3/junit-jupiter-6.1.3-sources.jar",
+      "distfile": "jasper-maven-e7a536cd29834810f9dad1ce89827316547dc69e9010286bc770ef537d5a3be8-junit-jupiter-6.1.3-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/jupiter/junit-jupiter/6.1.3/junit-jupiter-6.1.3-sources.jar",
+      "sha256": "4d2bfa499d86ea7792f0290798608d60a7ad360bb59bf991a0a8780404fc7169",
+      "size": 6098
+    },
+    {
+      "path": "org/junit/jupiter/junit-jupiter/6.1.3/junit-jupiter-6.1.3.jar",
+      "distfile": "jasper-maven-a3ac68bc7b3df98ed7564eb6ee070eff854c152702d6a79495d241b9224d4314-junit-jupiter-6.1.3.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/jupiter/junit-jupiter/6.1.3/junit-jupiter-6.1.3.jar",
+      "sha256": "6b0a14075c74221de53047e363860b7d19fce802bebc152df2c35c4089c6c379",
+      "size": 6378
+    },
+    {
+      "path": "org/junit/jupiter/junit-jupiter/6.1.3/junit-jupiter-6.1.3.module",
+      "distfile": "jasper-maven-c4b96747bf037244c8cbe27a31babaf980715444c974152212a37812ba9e37c5-junit-jupiter-6.1.3.module",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/jupiter/junit-jupiter/6.1.3/junit-jupiter-6.1.3.module",
+      "sha256": "ca7b7dd4508d57a9dc105102aa93fb5bc960b2095601534b9311f951ffb39979",
+      "size": 4968
+    },
+    {
+      "path": "org/junit/jupiter/junit-jupiter/6.1.3/junit-jupiter-6.1.3.pom",
+      "distfile": "jasper-maven-e564d9562e4af1f4a2bda4d9c7c0027feb1498dc3ea4ca580427a2aacf6e535b-junit-jupiter-6.1.3.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/jupiter/junit-jupiter/6.1.3/junit-jupiter-6.1.3.pom",
+      "sha256": "ebfffb41861ab1ccc989de2c9c2d11924e5ddded2728b053f5f2fddc8409c0e1",
+      "size": 3354
+    },
+    {
+      "path": "org/junit/platform/junit-platform-commons/6.1.3/junit-platform-commons-6.1.3-sources.jar",
+      "distfile": "jasper-maven-028bf131210e53eef7ecd25229137a996249a604759d5e4d241a6454207f5de7-junit-platform-commons-6.1.3-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/platform/junit-platform-commons/6.1.3/junit-platform-commons-6.1.3-sources.jar",
+      "sha256": "b14f861a3a3056e5c13af5a7c2e6d9c8f7c2ac8a0d16c4ccfbc7afa2d7a97993",
+      "size": 116585
+    },
+    {
+      "path": "org/junit/platform/junit-platform-commons/6.1.3/junit-platform-commons-6.1.3.jar",
+      "distfile": "jasper-maven-feb131cb9f71d9e9318489733e3c4e04593d442f277539c632993621e167438d-junit-platform-commons-6.1.3.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/platform/junit-platform-commons/6.1.3/junit-platform-commons-6.1.3.jar",
+      "sha256": "a4774ae923c109544034aeae7c762cf017fbcdd1342403ba90e0921984b608c3",
+      "size": 175869
+    },
+    {
+      "path": "org/junit/platform/junit-platform-commons/6.1.3/junit-platform-commons-6.1.3.module",
+      "distfile": "jasper-maven-4062a8a03bc585515eb37d48d9138d51b2d32314f18714f6010782eae258bdfc-junit-platform-commons-6.1.3.module",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/platform/junit-platform-commons/6.1.3/junit-platform-commons-6.1.3.module",
+      "sha256": "a6f1218616341b599f6aa029a3768c6f956ab1d3216ed7250e4be5d79adfce7d",
+      "size": 4736
+    },
+    {
+      "path": "org/junit/platform/junit-platform-commons/6.1.3/junit-platform-commons-6.1.3.pom",
+      "distfile": "jasper-maven-e5d0dc703bc8bfc417d27e8383bb7f1512a565c3b627a0f22157b7d38115d323-junit-platform-commons-6.1.3.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/platform/junit-platform-commons/6.1.3/junit-platform-commons-6.1.3.pom",
+      "sha256": "a5a3a1aec96113b1e953545c3d8c5117ff0220c56f7293c6fff7d35b1cd37c14",
+      "size": 3158
+    },
+    {
+      "path": "org/junit/platform/junit-platform-engine/6.1.3/junit-platform-engine-6.1.3-sources.jar",
+      "distfile": "jasper-maven-42554e62ae1d0e3b27cec5bce8ce69f0f803a5b1667e2384f2253eef92216902-junit-platform-engine-6.1.3-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/platform/junit-platform-engine/6.1.3/junit-platform-engine-6.1.3-sources.jar",
+      "sha256": "1e9e7e5a1c23a421b56f21b31ba13aa3e75d39fdecdf5dc8e262cd4324333d0a",
+      "size": 187963
+    },
+    {
+      "path": "org/junit/platform/junit-platform-engine/6.1.3/junit-platform-engine-6.1.3.jar",
+      "distfile": "jasper-maven-159455074eb91f20b74818cd642c2f719d063845eca0f49a76c26bd478e2f48b-junit-platform-engine-6.1.3.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/platform/junit-platform-engine/6.1.3/junit-platform-engine-6.1.3.jar",
+      "sha256": "21ad7ad3a35beda16387979317be1833a72a71d812f9a66ee4b9a7bafb56334c",
+      "size": 324855
+    },
+    {
+      "path": "org/junit/platform/junit-platform-engine/6.1.3/junit-platform-engine-6.1.3.module",
+      "distfile": "jasper-maven-735a6f9ccb4b85369efeb9c50e9b3b40e299da180978916953bd724b3593d380-junit-platform-engine-6.1.3.module",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/platform/junit-platform-engine/6.1.3/junit-platform-engine-6.1.3.module",
+      "sha256": "70f5020adb4c91575025499a804b266e8fc2d027aa6e78febfa372be3a88cef5",
+      "size": 5181
+    },
+    {
+      "path": "org/junit/platform/junit-platform-engine/6.1.3/junit-platform-engine-6.1.3.pom",
+      "distfile": "jasper-maven-cd17bfa66d2472e6665cd44697fa44169e70732d22fd4257d8a5f492063b6f83-junit-platform-engine-6.1.3.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/platform/junit-platform-engine/6.1.3/junit-platform-engine-6.1.3.pom",
+      "sha256": "5194dad25d878985646a49df71bd985e8d2dd4c6b6765717093ac8a31bdb32e4",
+      "size": 3529
+    },
+    {
+      "path": "org/junit/platform/junit-platform-launcher/6.1.3/junit-platform-launcher-6.1.3-sources.jar",
+      "distfile": "jasper-maven-9f8ee397036f30b549f3334c3feb0cf20f55f7f6b6daa572b20e37d39c27b6a2-junit-platform-launcher-6.1.3-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/platform/junit-platform-launcher/6.1.3/junit-platform-launcher-6.1.3-sources.jar",
+      "sha256": "d30c7f1e7e4c224d5792812956a2bacdf2628c2e77a011f35a46eab3b9c109fa",
+      "size": 139978
+    },
+    {
+      "path": "org/junit/platform/junit-platform-launcher/6.1.3/junit-platform-launcher-6.1.3.jar",
+      "distfile": "jasper-maven-9ad830eee30a67ab2be64b126d8535daea0130e080cb8948350f4e82678f4822-junit-platform-launcher-6.1.3.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/platform/junit-platform-launcher/6.1.3/junit-platform-launcher-6.1.3.jar",
+      "sha256": "1dec64b1fc0b7c47a11302aa5b4d37d8160c041b396e27067709ce775601a7b6",
+      "size": 252729
+    },
+    {
+      "path": "org/junit/platform/junit-platform-launcher/6.1.3/junit-platform-launcher-6.1.3.module",
+      "distfile": "jasper-maven-1c244e1ea64c5a6e98100009cb9f2e2211ee031b22352d99367c2b2e7912dbc9-junit-platform-launcher-6.1.3.module",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/platform/junit-platform-launcher/6.1.3/junit-platform-launcher-6.1.3.module",
+      "sha256": "62d2198a3a779c54316bbe839e51623b3a6bd111e672d586dd9a3bbb222569e6",
+      "size": 4879
+    },
+    {
+      "path": "org/junit/platform/junit-platform-launcher/6.1.3/junit-platform-launcher-6.1.3.pom",
+      "distfile": "jasper-maven-65950093fc5e9450a9c8b6e4db8258b46f8c751f6f42f0c38de127d3e3c12090-junit-platform-launcher-6.1.3.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/junit/platform/junit-platform-launcher/6.1.3/junit-platform-launcher-6.1.3.pom",
+      "sha256": "2daf3b4360ba9e07344210ccf29b6be9703d0abc66de4121f65d90119fe996ca",
+      "size": 3353
+    },
+    {
+      "path": "org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0-sources.jar",
+      "distfile": "jasper-maven-05bf4c0c1a8ba40fbc2ddaafb42178fcc8a3dab5712b324e1ca2f1e71380ae2a-opentest4j-1.3.0-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0-sources.jar",
+      "sha256": "724a24e3a68267d5ebac9411389a15638a71e50c62448ffa58f59c34d5c1ebb2",
+      "size": 10280
+    },
+    {
+      "path": "org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.jar",
+      "distfile": "jasper-maven-091d4b6942b78379e856db247da41c0b3236a128829a8dfa0934eb6efc956b5f-opentest4j-1.3.0.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.jar",
+      "sha256": "48e2df636cab6563ced64dcdff8abb2355627cb236ef0bf37598682ddf742f1b",
+      "size": 14304
+    },
+    {
+      "path": "org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.module",
+      "distfile": "jasper-maven-92ba005e0013684f0d20e26d63890b00f6a595f21322ed9bddf4c7e5bbe6a379-opentest4j-1.3.0.module",
+      "url": "https://repo.maven.apache.org/maven2/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.module",
+      "sha256": "48bf1d6c8b5dc94f74652bd17900f654deb714350248cf5e8fca27b9090c8e0d",
+      "size": 3461
+    },
+    {
+      "path": "org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.pom",
+      "distfile": "jasper-maven-9ce17f2f493a5b2c38391c03867435be00f2b426ea1098d33e1801a65db2ef31-opentest4j-1.3.0.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.pom",
+      "sha256": "9bf7cffc410f3e8372c2522578df9ca56d9d43bd937e30948706c232a943b355",
+      "size": 2035
+    },
+    {
+      "path": "org/slf4j/jcl-over-slf4j/1.7.36/jcl-over-slf4j-1.7.36-sources.jar",
+      "distfile": "jasper-maven-ecdd3341819a90bb131163db25c9be8dba80c8dde4ea6bfd96f1e7857991bfda-jcl-over-slf4j-1.7.36-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/jcl-over-slf4j/1.7.36/jcl-over-slf4j-1.7.36-sources.jar",
+      "sha256": "aa7a3dc5ff8fd8ca2e8b305d54442a99a722af90777227eb3ce4226c2ba47037",
+      "size": 24517
+    },
+    {
+      "path": "org/slf4j/jcl-over-slf4j/1.7.36/jcl-over-slf4j-1.7.36.jar",
+      "distfile": "jasper-maven-16c0df650e4e96bfb2acea3718e1c224d6ff37622f6d508c190ad85713a464bf-jcl-over-slf4j-1.7.36.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/jcl-over-slf4j/1.7.36/jcl-over-slf4j-1.7.36.jar",
+      "sha256": "ab57ca8fd223772c17365d121f59e94ecbf0ae59d08c03a3cb5b81071c019195",
+      "size": 16555
+    },
+    {
+      "path": "org/slf4j/jcl-over-slf4j/1.7.36/jcl-over-slf4j-1.7.36.pom",
+      "distfile": "jasper-maven-c2610e2003b609cd803a1ca63336c942688c9883e0c9e87f04f59e1dae443212-jcl-over-slf4j-1.7.36.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/jcl-over-slf4j/1.7.36/jcl-over-slf4j-1.7.36.pom",
+      "sha256": "bd96243d7d4218cd7cc7d45c0e30fa13480a1a4f91d356edd7dfe93f1ffb68e6",
+      "size": 1181
+    },
+    {
+      "path": "org/slf4j/slf4j-api/1.7.36/slf4j-api-1.7.36.pom",
+      "distfile": "jasper-maven-04c62068d0403f25592909aeaf303f272f94cbcc36ecdc6cc2301404029c88da-slf4j-api-1.7.36.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-api/1.7.36/slf4j-api-1.7.36.pom",
+      "sha256": "fb046a9c229437928bb11c2d27c8b5d773eb8a25e60cbd253d985210dedc2684",
+      "size": 2743
+    },
+    {
+      "path": "org/slf4j/slf4j-api/2.0.13/slf4j-api-2.0.13-sources.jar",
+      "distfile": "jasper-maven-75dbfd6b6b6c19d0ecb2df7b2ed4e1dff5736b1998431369eed4eb5c096fe25a-slf4j-api-2.0.13-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-api/2.0.13/slf4j-api-2.0.13-sources.jar",
+      "sha256": "84f366caa66ddaa9d204e5525580b562271663c05970f056815a1be8489e8b52",
+      "size": 74950
+    },
+    {
+      "path": "org/slf4j/slf4j-api/2.0.13/slf4j-api-2.0.13.jar",
+      "distfile": "jasper-maven-c7d1f01d7452896d9735dca4a595a7ed9686ab52fb58a4239a962cc2a4a999a9-slf4j-api-2.0.13.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-api/2.0.13/slf4j-api-2.0.13.jar",
+      "sha256": "e7c2a48e8515ba1f49fa637d57b4e2f590b3f5bd97407ac699c3aa5efb1204a9",
+      "size": 68605
+    },
+    {
+      "path": "org/slf4j/slf4j-api/2.0.13/slf4j-api-2.0.13.pom",
+      "distfile": "jasper-maven-3fe372884f6762d9f54ab9ce109db59c19760aaeca9c6daecdd4b43664cc8a06-slf4j-api-2.0.13.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-api/2.0.13/slf4j-api-2.0.13.pom",
+      "sha256": "51805cfda80ca2ac82041b906d9865d39e9823e358a0eeb62379dfed475c1571",
+      "size": 2826
+    },
+    {
+      "path": "org/slf4j/slf4j-api/2.0.17/slf4j-api-2.0.17-sources.jar",
+      "distfile": "jasper-maven-c7580555bc86e2ee16016059a3ef7e6b62ba9d7688995a21b76a50cf0f8330b9-slf4j-api-2.0.17-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-api/2.0.17/slf4j-api-2.0.17-sources.jar",
+      "sha256": "db0d08d8efa05ad19d174d747bd9d8e68dbb02b596812fe7b3a681656e346694",
+      "size": 76986
+    },
+    {
+      "path": "org/slf4j/slf4j-api/2.0.17/slf4j-api-2.0.17.jar",
+      "distfile": "jasper-maven-683808887f45a271eec78a63c62b0be2623160e3e703267da39f580de922498e-slf4j-api-2.0.17.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-api/2.0.17/slf4j-api-2.0.17.jar",
+      "sha256": "7b751d952061954d5abfed7181c1f645d336091b679891591d63329c622eb832",
+      "size": 69908
+    },
+    {
+      "path": "org/slf4j/slf4j-api/2.0.17/slf4j-api-2.0.17.pom",
+      "distfile": "jasper-maven-5a87e163d3d9eccc487dfe62c1a7ddb3e7ef90f77f2da9147178e13d1fad2f1b-slf4j-api-2.0.17.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-api/2.0.17/slf4j-api-2.0.17.pom",
+      "sha256": "150c40287f7cecdc21b9380caac98e928c4f33c023db6b348df1c5ac977026bf",
+      "size": 2826
+    },
+    {
+      "path": "org/slf4j/slf4j-api/2.0.9/slf4j-api-2.0.9.pom",
+      "distfile": "jasper-maven-1d438ef5d64cce847b4158b114c7d7bb5eb8fcdcf1323dde6e1b02caf65563f5-slf4j-api-2.0.9.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-api/2.0.9/slf4j-api-2.0.9.pom",
+      "sha256": "9c3a654f9d0aa1a34b3178ebe53a89c76792e1d81fc1e9739cbe9b1610523385",
+      "size": 2816
+    },
+    {
+      "path": "org/slf4j/slf4j-bom/2.0.13/slf4j-bom-2.0.13.pom",
+      "distfile": "jasper-maven-9222bab87caa0e322043515837e58bf7caf0619dca5f538a384e7be5f49dac9b-slf4j-bom-2.0.13.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-bom/2.0.13/slf4j-bom-2.0.13.pom",
+      "sha256": "7af272d7a738e2b98763791ffdd896040e8beb298a88fd606214407976cd310a",
+      "size": 7332
+    },
+    {
+      "path": "org/slf4j/slf4j-bom/2.0.17/slf4j-bom-2.0.17.pom",
+      "distfile": "jasper-maven-fe04ba2ec4bbc319be313c9d11c5dd9322702d27770be450c5672d9a51b34e46-slf4j-bom-2.0.17.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-bom/2.0.17/slf4j-bom-2.0.17.pom",
+      "sha256": "f78d27b642b4b886eb839fc102b5cd9fe7f30f37599ffe68185be4e1609031e9",
+      "size": 7308
+    },
+    {
+      "path": "org/slf4j/slf4j-bom/2.0.9/slf4j-bom-2.0.9.pom",
+      "distfile": "jasper-maven-d7455d80ae50aeaaab81515cefd6cbc30dde3f87d157a2868ca96f6a0f064e24-slf4j-bom-2.0.9.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-bom/2.0.9/slf4j-bom-2.0.9.pom",
+      "sha256": "eaef4584807d812c6a0b6cf839d5e47f50c754327719b9ce081e271d15da6243",
+      "size": 4920
+    },
+    {
+      "path": "org/slf4j/slf4j-jdk14/2.0.13/slf4j-jdk14-2.0.13-sources.jar",
+      "distfile": "jasper-maven-7c34cb2d82de9a641ea2e9d283e7d8ce592f5eac9eba08a813afb9ebc102f3a1-slf4j-jdk14-2.0.13-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-jdk14/2.0.13/slf4j-jdk14-2.0.13-sources.jar",
+      "sha256": "8bd6a94a7f610ea9f0180f8b6832bd8b4398f123bea8ad8febe00c36c49e1d1e",
+      "size": 8480
+    },
+    {
+      "path": "org/slf4j/slf4j-jdk14/2.0.13/slf4j-jdk14-2.0.13.jar",
+      "distfile": "jasper-maven-ea089a336fe570942881acb76ab52806dfb2ff2258c5f097fcfa974d245c8858-slf4j-jdk14-2.0.13.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-jdk14/2.0.13/slf4j-jdk14-2.0.13.jar",
+      "sha256": "83f17205a6470c3cd4214306d3ed011651c173297f705acef544c01795f253cd",
+      "size": 10436
+    },
+    {
+      "path": "org/slf4j/slf4j-jdk14/2.0.13/slf4j-jdk14-2.0.13.pom",
+      "distfile": "jasper-maven-af1c577e7a768492347a60c635a09ad5379af3e856eed325d309536def7c784c-slf4j-jdk14-2.0.13.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-jdk14/2.0.13/slf4j-jdk14-2.0.13.pom",
+      "sha256": "004ad439c2bb1b8aa66b1cb56ae3e6f771a89842bdba76f819c2ef1ec1acc2f8",
+      "size": 1298
+    },
+    {
+      "path": "org/slf4j/slf4j-nop/2.0.13/slf4j-nop-2.0.13-sources.jar",
+      "distfile": "jasper-maven-671eeba1b7f35979b3191a4c5416dd3150cc402cfb9f75d9882cd2667299739f-slf4j-nop-2.0.13-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-nop/2.0.13/slf4j-nop-2.0.13-sources.jar",
+      "sha256": "a569c573fb1e58ee49ab973c91510fd2c30c1574e13d5005bea4c9bf85ed198c",
+      "size": 3550
+    },
+    {
+      "path": "org/slf4j/slf4j-nop/2.0.13/slf4j-nop-2.0.13.jar",
+      "distfile": "jasper-maven-54ecfd8ea9699ec5059411e6915ccb74ce403fdd25bd483bde1c7123b124220a-slf4j-nop-2.0.13.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-nop/2.0.13/slf4j-nop-2.0.13.jar",
+      "sha256": "8962a107b4a8bdf80b6c17e470cd3614ad3329643833ff5cf0c60c7dce9deaac",
+      "size": 4940
+    },
+    {
+      "path": "org/slf4j/slf4j-nop/2.0.13/slf4j-nop-2.0.13.pom",
+      "distfile": "jasper-maven-55a3a300c17257e8ee5076584761af2122cf8567f12a02fd416263c947f8d19c-slf4j-nop-2.0.13.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-nop/2.0.13/slf4j-nop-2.0.13.pom",
+      "sha256": "3b8bdf7b4be159234e4c8f2ff66e44668581a570d827081ed8a7b4c118f3d7f7",
+      "size": 1076
+    },
+    {
+      "path": "org/slf4j/slf4j-nop/2.0.17/slf4j-nop-2.0.17-sources.jar",
+      "distfile": "jasper-maven-40941796578c26e83a3bd6d322725a1c95a5646d6f7286b479fd9b4922f4a1b3-slf4j-nop-2.0.17-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-nop/2.0.17/slf4j-nop-2.0.17-sources.jar",
+      "sha256": "8a7beeaa6ab09b8f90ca8658eb3a0a14188bd6fe9dc827dcfc56acc95c9ceab8",
+      "size": 3681
+    },
+    {
+      "path": "org/slf4j/slf4j-nop/2.0.17/slf4j-nop-2.0.17.jar",
+      "distfile": "jasper-maven-51e9bb391844fb9fc2dcbca54c16cb0d217ad2ef7fe7b79363352db6e2edd22c-slf4j-nop-2.0.17.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-nop/2.0.17/slf4j-nop-2.0.17.jar",
+      "sha256": "3716f83649ec66161a2edefd4f49df34d1dd1c51cdcf941996c6987260f0a829",
+      "size": 4982
+    },
+    {
+      "path": "org/slf4j/slf4j-nop/2.0.17/slf4j-nop-2.0.17.pom",
+      "distfile": "jasper-maven-7e8b35a7068786c012cc444b0537347535f7c766676e6728824133732def3876-slf4j-nop-2.0.17.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-nop/2.0.17/slf4j-nop-2.0.17.pom",
+      "sha256": "e5e548dce8c1c979138a7e96ca354510fa0ce103f0a6df53a1f5b25e9298b9b2",
+      "size": 1294
+    },
+    {
+      "path": "org/slf4j/slf4j-parent/1.7.36/slf4j-parent-1.7.36.pom",
+      "distfile": "jasper-maven-c48c380231f8e48c8af1041977deac9347417d0e02f461fe3a4d715d62da47ea-slf4j-parent-1.7.36.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-parent/1.7.36/slf4j-parent-1.7.36.pom",
+      "sha256": "bb388d37fbcdd3cde64c3cede21838693218dc451f04040c5df360a78ed7e812",
+      "size": 14093
+    },
+    {
+      "path": "org/slf4j/slf4j-parent/2.0.13/slf4j-parent-2.0.13.pom",
+      "distfile": "jasper-maven-430249f3dc7ca54e67362330acc99e6bea1a772f8c5070b64d3bf5600967a0fb-slf4j-parent-2.0.13.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-parent/2.0.13/slf4j-parent-2.0.13.pom",
+      "sha256": "67facfd51f06935cea85615a04775d70d80bfd03ad0f37670351f920ed0bb58a",
+      "size": 13366
+    },
+    {
+      "path": "org/slf4j/slf4j-parent/2.0.17/slf4j-parent-2.0.17.pom",
+      "distfile": "jasper-maven-ba1aa0fe6acc3524b6b747cd4551ed9ea1e9655551a48c20098cd1f3ed3adf4b-slf4j-parent-2.0.17.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-parent/2.0.17/slf4j-parent-2.0.17.pom",
+      "sha256": "95cd71e852dfdb29126e58b7b939d57ec2b2e6024391852e0b545dee082bbf3b",
+      "size": 13366
+    },
+    {
+      "path": "org/slf4j/slf4j-parent/2.0.9/slf4j-parent-2.0.9.pom",
+      "distfile": "jasper-maven-94db578f3a43c2e752097d4957eb2f8a724a1628a13232c47edbf7a1d4e76db8-slf4j-parent-2.0.9.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-parent/2.0.9/slf4j-parent-2.0.9.pom",
+      "sha256": "c307f0424141f1c500ae5cf0d3868e4866cb219ed5e399b66c5a07c61ea21fd5",
+      "size": 15518
+    },
+    {
+      "path": "org/sonatype/oss/oss-parent/9/oss-parent-9.pom",
+      "distfile": "jasper-maven-990b4aa0e8019b1cdbed89f84b239745e71ab2caf290474c2f8ec0049cd3f190-oss-parent-9.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/sonatype/oss/oss-parent/9/oss-parent-9.pom",
+      "sha256": "fb40265f982548212ff82e362e59732b2187ec6f0d80182885c14ef1f982827a",
+      "size": 6569
+    },
+    {
+      "path": "org/springframework/spring-framework-bom/5.3.39/spring-framework-bom-5.3.39.module",
+      "distfile": "jasper-maven-2a56edc6747d69a98e7a8b227b351c8a436005045a9b85a768b7dce7534922a0-spring-framework-bom-5.3.39.module",
+      "url": "https://repo.maven.apache.org/maven2/org/springframework/spring-framework-bom/5.3.39/spring-framework-bom-5.3.39.module",
+      "sha256": "f88b40e2a50333b40b42f181eee272b75ec75dd8666cb145bd90b15b97e183e3",
+      "size": 8102
+    },
+    {
+      "path": "org/springframework/spring-framework-bom/5.3.39/spring-framework-bom-5.3.39.pom",
+      "distfile": "jasper-maven-d1f37f710aaa1543ad1209c3e3820de54bc0f309829d6fbb874af95d729c7491-spring-framework-bom-5.3.39.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/springframework/spring-framework-bom/5.3.39/spring-framework-bom-5.3.39.pom",
+      "sha256": "f6d481093e75767cba1ac7e1db38f8f692cbe3e38744693371a75aeb21c6148b",
+      "size": 5656
+    },
+    {
+      "path": "org/testcontainers/testcontainers-bom/1.21.3/testcontainers-bom-1.21.3.pom",
+      "distfile": "jasper-maven-19dce3bf904bc942e43ff4fb0cbd70e5be4651ed0e2247a0f797f334a0ba25e2-testcontainers-bom-1.21.3.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/testcontainers/testcontainers-bom/1.21.3/testcontainers-bom-1.21.3.pom",
+      "sha256": "2ce717226d1d67b5b1df9707ed98022a366ac892d9e496c5f0173f1ab78a0965",
+      "size": 11545
+    },
+    {
+      "path": "org/tomlj/tomlj/1.1.1/tomlj-1.1.1-sources.jar",
+      "distfile": "jasper-maven-d73e9b68fb14dc496ea73edde4d61e0581fa78e33c536b080c44ae6506f7603b-tomlj-1.1.1-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/tomlj/tomlj/1.1.1/tomlj-1.1.1-sources.jar",
+      "sha256": "533276104d58ebc92ce049c59a129717ce7daf0e9340969256fdb61f4f06f717",
+      "size": 91398
+    },
+    {
+      "path": "org/tomlj/tomlj/1.1.1/tomlj-1.1.1.jar",
+      "distfile": "jasper-maven-28454d1cab7f98c9f89550dd554317d14c7c4c791777434131e0141439680c52-tomlj-1.1.1.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/tomlj/tomlj/1.1.1/tomlj-1.1.1.jar",
+      "sha256": "383b7c66966c42ee4913ec977a7b6573631866bddc5318ec4a6215b688dd0d6c",
+      "size": 179432
+    },
+    {
+      "path": "org/tomlj/tomlj/1.1.1/tomlj-1.1.1.pom",
+      "distfile": "jasper-maven-15ef7839e0bb32db258f5fb7d37dfa6fb2e10f9fe5e6e1c566cfc3461b6a98c0-tomlj-1.1.1.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/tomlj/tomlj/1.1.1/tomlj-1.1.1.pom",
+      "sha256": "1393089af1f9260c004c22313197cae9db1385ccbb30499a82d5a931d1762f66",
+      "size": 1572
+    },
+    {
+      "path": "org/xerial/sqlite-jdbc/3.53.4.0/sqlite-jdbc-3.53.4.0-sources.jar",
+      "distfile": "jasper-maven-5ccba8d71766dda3648a284b599e3dc7d27748df1ebf16e1bcfbfd32055cc99f-sqlite-jdbc-3.53.4.0-sources.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/xerial/sqlite-jdbc/3.53.4.0/sqlite-jdbc-3.53.4.0-sources.jar",
+      "sha256": "6f3fca1257fd02891e9b17b296b4e888cdd6af6d3e077ff7e50991657d69ed46",
+      "size": 14557234
+    },
+    {
+      "path": "org/xerial/sqlite-jdbc/3.53.4.0/sqlite-jdbc-3.53.4.0.jar",
+      "distfile": "jasper-maven-2ea49cf97df82ed2fc3b08f18173305002413f7a2d43a22ef9fec347a09cbcb2-sqlite-jdbc-3.53.4.0.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/xerial/sqlite-jdbc/3.53.4.0/sqlite-jdbc-3.53.4.0.jar",
+      "sha256": "bcb1f51e36f940867e83342f9efbf5968ac44a6bef4d397bb4af7b17b45cd2fb",
+      "size": 12002370
+    },
+    {
+      "path": "org/xerial/sqlite-jdbc/3.53.4.0/sqlite-jdbc-3.53.4.0.pom",
+      "distfile": "jasper-maven-4ce4fda6f7291c42855262406cd09a3862f07e0c3376e6e5d94df3d85d8db0ab-sqlite-jdbc-3.53.4.0.pom",
+      "url": "https://repo.maven.apache.org/maven2/org/xerial/sqlite-jdbc/3.53.4.0/sqlite-jdbc-3.53.4.0.pom",
+      "sha256": "ff588556ba06aa68a568062f2cb9d243dde1f631eafd2010cfef23cab06a7ab9",
+      "size": 28419
+    }
+  ]
+}

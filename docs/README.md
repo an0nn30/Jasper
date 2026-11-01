@@ -83,7 +83,8 @@ window, so a coding agent runs them only with the user's authorization.
 | `jasper-buddy` | [Embedding](../jasper-buddy/README.md) | [Facade, model and presentation](buddy-architecture.md) | [Notices, options, animation and assets](buddy-maintenance.md) |
 
 - [Packaging](packaging.md): native images, the DMG, the Windows ZIP, setup wizard and user installation, the Linux
-  packages, the release workflow and the acceptance checklists.
+  packages, the release workflow and the acceptance checklists. The [Gentoo source overlay](../packaging/gentoo/README.md)
+  covers installation, optional integration USE flags and offline input updates.
 - [Bundled Windows Cygwin](../packaging/windows/cygwin/README.md): the seed, provisioning, package management and
   native acceptance, and its [prebuilt PTY relay](../packaging/windows/cygwin/relay/README.md).
 - [Benchmarks](benchmarks.md): throughput, memory and start-up measurements and how to compare them.

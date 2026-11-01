@@ -2,7 +2,8 @@
 
 Jasper ships as a native application image that bundles a trimmed JetBrains Runtime, so users need no Java: a
 `Jasper.app` and DMG on macOS, a portable ZIP and a per-user setup wizard on Windows, and `.deb` and `.rpm` packages on
-Linux. Every package carries the application, all nine bundled plugins, Jasper's own launcher with its start-up recovery
+Linux. A [Gentoo source overlay](../packaging/gentoo/README.md) builds the application with optional GTK/Qt/KDE USE
+flags. Every package carries the application, all nine bundled plugins, Jasper's own launcher with its start-up recovery
 helper `jasper-watch`, and the native [`jasper` command](command-line.md); the Windows packages also carry the offline
 [Cygwin starter environment](#bundled-cygwin). jpackage builds only for the machine it runs on, so each package is built
 on the operating system and architecture it is for (aarch64 or x64). Installing and using a package on the desktop is
