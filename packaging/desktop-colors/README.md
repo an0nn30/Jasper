@@ -87,10 +87,21 @@ It requires GTK 3/4 and libadwaita development headers, GIO development headers,
 D-Bus. Production compilation needs only GIO headers. Fixture CSS is loaded into the real toolkit in-process;
 subprocess fault injection covers absent libraries and unsupported runtimes. Ubuntu 24.04 CI covers named colors;
 a digest-pinned Ubuntu 26.04 container requires GTK 4.16+ and covers overridden variables. Linux `check` includes
-this gate; other hosts skip it without discovering native dependencies.
+available GTK gates; unavailable headers/display prerequisites warn and skip each affected suite in auto mode.
+Required GTK modes and strict mode fail on missing native test prerequisites. Other hosts skip native discovery.
 
-`compileDesktopHelpers` builds all seven production executables; `stageDesktopHelpers` places only those files in
-`jasper-app/build/desktop-helpers` with mode 0755. Linux installDist ships them in `lib/desktop-colors`; jpackage
+`jasper.desktop.gtk3`, `gtk4`, `qt5`, `qt6`, `kde5` and `kde6` accept `auto` (default), `off` or
+`required`, passed as Gradle `-Pjasper.desktop.<name>=<mode>`. Each SDK is discovered independently;
+missing optional prerequisites warn, while compiler/configuration errors fail. GTK production probes use
+GIO/dlopen and build without toolkit headers; `off` omits them. Portal and GLib/GIO remain required.
+`jasper.desktop.strict=true` requires every integration and native test prerequisite, rejects `off`, and adds
+full native Qt/KDE and release linkage validation to `check` on an equipped host.
+
+`compileDesktopHelpers` records selected production names in `build/desktop-colors/selected-helpers.txt`;
+`stageDesktopHelpers` synchronizes exactly that selection into `jasper-app/build/desktop-helpers` with mode
+0755. Disabling/removing an SDK deletes stale production and staged helpers. The manifest stays outside the
+executable directory and drives JVM resource assertions, ELF validation and package verification. Linux
+installDist ships them in `lib/desktop-colors`; jpackage
 ships them in `lib/app/desktop-colors`. Other operating systems omit them. `run` supplies the absolute
 `jasper.desktopColors.helpers` development path. Installed resolution uses `CodeLocation` and the application jar's
 sibling directory; an invalid explicit path is unavailable. `verifyDesktopHelpers` checks the host ELF architecture,
@@ -111,17 +122,21 @@ Qt/KDE replies carry actual palette polarity and remain live when the requested 
 `compileDesktopQtHelpers` configures each target separately. Select baseline SDKs with
 `jasper.qt5Prefix`, `jasper.qt6Prefix`, `jasper.kf5Prefix`, `jasper.kde6QtPrefix` and `jasper.kf6Prefix`;
 see the [compatibility record](../../docs/design/qt-kde-native-compatibility.md) for the pinned recipe.
-Missing SDKs fail with an actionable CMake diagnostic. Non-Linux tasks skip before native discovery.
+Missing SDKs warn and skip in auto mode, or fail with an actionable diagnostic in required/strict mode.
+Non-Linux tasks skip before native discovery.
 `testDesktopQt`, `testDesktopKde` and `verifyDesktopQtCompatibility` run deterministic fixtures with
 private Xvfb/D-Bus. `checkDesktopQtNative` includes those tests and equipped-runtime linkage verification.
 `compileDesktopQtNativeTests` builds matching fixtures for CI to run the exact baseline-built binaries
 on installed system runtimes. Fixture binaries never enter the production helper directory.
 
-`verify-qt-package.py` checks the exact seven-file set, 0755 modes, host ELF machine, matching Qt/KF
-NEEDED majors, absent RPATH/RUNPATH and Ubuntu22 direct symbol floors (GLIBC 2.35, GLIBCXX 3.4.30,
-CXXABI 1.3.13). Staging permits missing Qt/KF with an explicit isolated loader-failure check;
-`verifyDesktopQtLinkage` requires every library to resolve. Mandatory portal/GTK dependencies always
-resolve. Package verification compares every helper's bytes and mode with the verified stage.
+`verify-qt-package.py` checks the expected file set (`--expected-file` selects a manifest; default all seven),
+0755 modes, host ELF machine, matching Qt/KF NEEDED majors and absent RPATH/RUNPATH. Ordinary
+`verifyDesktopHelpers` validates the selected host-built helpers with `--no-floor`; release verification
+retains Ubuntu22 direct symbol floors (GLIBC 2.35, GLIBCXX 3.4.30, CXXABI 1.3.13).
+`verifyDesktopHelpersRelease` requires all seven helpers and release floors while permitting missing
+Qt/KF runtimes with an isolated loader-failure check. `verifyDesktopQtLinkage` additionally requires every
+library to resolve. Mandatory portal/GTK dependencies always resolve. Package verification compares every
+selected helper's bytes and mode with the verified stage and rejects extra files.
 
 Linux dependency inference excludes only the four `lib/app/desktop-colors/jasper-desktop-{qt5,qt6,kde5,kde6}`
 paths. Every other ELF keeps its requirements, including a Qt-dependent mandatory binary. The selected
@@ -129,7 +144,9 @@ JBR's control/spec templates retain their content while their dependency placeho
 scan plus `xdg-utils`; changed placeholders fail closed. Actual DEB Depends/Pre-Depends and RPM Requires
 must match that scan. Minimal-image install checks require missing optional runtimes to affect only their
 helpers, while all mandatory libraries resolve. Equipped-runtime install checks sample all four installed
-Qt/KDE helpers under private Xvfb/D-Bus. Baseline SDK caches are keyed by architecture, manifest,
-patches and build flags. CI runs exact baseline-built fixtures on Ubuntu22 and Fedora44 system runtimes;
+Qt/KDE helpers under private Xvfb/D-Bus. CI keeps the baseline/equipped-runtime split: baseline jobs
+explicitly require all Qt/KDE SDKs and seven-helper release verification; GTK coverage requires both GTK
+modes. The equipped runtime matrix runs every Qt/KDE fixture, while Ubuntu22 records its KDE6 runtime
+absence. Baseline SDK caches are keyed by architecture, manifest, patches and build flags. CI runs exact baseline-built fixtures on Ubuntu22 and Fedora44 system runtimes;
 Ubuntu22's absent KDE6 capability is recorded separately. Minimum separately installed KDE6 and real desktop
 acceptance remain distinct matrix cases.

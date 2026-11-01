@@ -12,11 +12,14 @@ class PackagedResourcesTest {
         }
         var staged = java.nio.file.Path.of(System.getProperty("jasper.stagedDesktopHelpers"));
         if (System.getProperty("os.name").startsWith("Linux")) {
+            var selected = java.nio.file.Files.readAllLines(java.nio.file.Path.of(System.getProperty("jasper.selectedDesktopHelpers")));
+            assertThat(selected).contains("jasper-desktop-portal").doesNotHaveDuplicates()
+                .allMatch(dev.jasper.app.platform.DesktopColors.helperNames()::contains);
             try (var files = java.nio.file.Files.list(staged)) {
                 assertThat(files.map(path -> path.getFileName().toString()).toList())
-                    .containsExactlyInAnyOrderElementsOf(dev.jasper.app.platform.DesktopColors.helperNames());
+                    .containsExactlyInAnyOrderElementsOf(selected);
             }
-            for (String name : dev.jasper.app.platform.DesktopColors.helperNames()) {
+            for (String name : selected) {
                 var helper = staged.resolve(name);
                 assertThat(java.nio.file.Files.isExecutable(helper)).as(name).isTrue();
                 byte[] bytes = java.nio.file.Files.readAllBytes(helper);

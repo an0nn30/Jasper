@@ -475,8 +475,7 @@ def verifyPackage = tasks.register('verifyPackage') {
         File helperDirectory = new File(appDir, 'desktop-colors')
         List<File> desktopHelpers = []
         if (context.host.os == 'linux') {
-            ['jasper-desktop-portal', 'jasper-desktop-gtk3', 'jasper-desktop-gtk4',
-             'jasper-desktop-qt5', 'jasper-desktop-qt6', 'jasper-desktop-kde5', 'jasper-desktop-kde6'].each { name ->
+            desktopHelperNames().each { name ->
                 File helper = new File(helperDirectory, name)
                 File stagedHelper = new File(inputDirectory.get().asFile, 'desktop-colors/' + name)
                 if (!helper.isFile() || !helper.canExecute() || Files.mismatch(stagedHelper.toPath(), helper.toPath()) != -1L)

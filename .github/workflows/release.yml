@@ -111,7 +111,12 @@ jobs:
       - name: Build Linux packages or macOS DMG
         if: runner.os != 'Windows'
         shell: bash
-        run: ./gradlew :jasper-app:packageDist "-PjasperVersion=$JASPER_VERSION" -x :jasper-app:testLauncherCore -x :jasper-app:testLauncherWatch -x :jasper-app:testWatcher --stacktrace
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            ./gradlew :jasper-app:packageDist :jasper-app:verifyDesktopHelpersRelease "-PjasperVersion=$JASPER_VERSION" -x :jasper-app:testLauncherCore -x :jasper-app:testLauncherWatch -x :jasper-app:testWatcher --stacktrace
+          else
+            ./gradlew :jasper-app:packageDist "-PjasperVersion=$JASPER_VERSION" -x :jasper-app:testLauncherCore -x :jasper-app:testLauncherWatch -x :jasper-app:testWatcher --stacktrace
+          fi
       - uses: actions/upload-artifact@v7
         with:
           name: release-${{ matrix.platform }}

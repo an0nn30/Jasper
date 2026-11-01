@@ -100,6 +100,7 @@ jobs:
         run: |
           tar -xzf desktop-qt-sdk.tar.gz
           printf '\njasper.qt5Prefix=%s/.desktop-qt-sdk/prefixes/qt5\njasper.qt6Prefix=%s/.desktop-qt-sdk/prefixes/qt6\njasper.kf5Prefix=%s/.desktop-qt-sdk/prefixes/kf5\njasper.kde6QtPrefix=%s/.desktop-qt-sdk/prefixes/kde6-qt\njasper.kf6Prefix=%s/.desktop-qt-sdk/prefixes/kf6\n' "$PWD" "$PWD" "$PWD" "$PWD" "$PWD" >> gradle.properties
+          for integration in qt5 qt6 kde5 kde6; do echo "jasper.desktop.$integration=required" >> gradle.properties; done
       - name: Require Linux tray wire, ABI and cancellation gates
         run: |
           ./gradlew :jasper-app:test --tests '*LinuxTrayTransportTest' --tests '*LinuxTrayWireTest' --tests '*LinuxStatusNotifierTest'
@@ -123,7 +124,7 @@ jobs:
                   assert all(int(suite.attrib.get(key, 0)) == 0 for key in ('failures', 'errors', 'skipped')), report
           PYTHON
       - name: Package and build native fixtures at baseline
-        run: ./gradlew :jasper-app:packageDist :jasper-app:compileDesktopQtNativeTests -Pjasper.python=/usr/bin/python3 --max-workers=2 --stacktrace
+        run: ./gradlew :jasper-app:packageDist :jasper-app:verifyDesktopHelpersRelease :jasper-app:compileDesktopQtNativeTests -Pjasper.python=/usr/bin/python3 --max-workers=2 --stacktrace
       - name: Require exact packaged tray runtime
         run: |
           image="$PWD/jasper-app/build/packaging/image/Jasper"

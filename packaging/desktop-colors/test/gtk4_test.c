@@ -53,7 +53,7 @@ static void old_named(void) {
     assert_rgba(p.colors[DC_WINDOW].background,.1,.2,.3,1);assert_unmapped(&api);
 }
 static void runtime_limits(void) {helper_contract(g_getenv("DC_GTK4_HELPER"),"old-gtk4");}
-static void neither(void) {helper_contract(g_getenv("DC_GTK4_HELPER"),"neither");helper_contract(g_getenv("DC_GTK3_HELPER"),"neither");}
+static void neither(void) {helper_contract(g_getenv("DC_GTK4_HELPER"),"neither");if(g_getenv("DC_GTK3_HELPER"))helper_contract(g_getenv("DC_GTK3_HELPER"),"neither");}
 static void no_display(void) {helper_contract(g_getenv("DC_GTK4_HELPER"),"no-display");}
 static void plain_named_native(void) {
     g_assert_null(api.adw);
@@ -74,7 +74,7 @@ static void plain_named_native(void) {
 static void plain(void) {helper_contract(g_getenv("DC_GTK4_HELPER"),"plain");assert_plain_native(program);}
 static void during_notification(void) {assert_nested_requests(&api,provider,true);}
 static void during_timer(void) {assert_nested_requests(&api,provider,false);}
-static void gtk3_only(void) {helper_contract(g_getenv("DC_GTK4_HELPER"),"gtk3-only");helper_contract(g_getenv("DC_GTK3_HELPER"),"gtk3-only");}
+static void gtk3_only(void) {helper_contract(g_getenv("DC_GTK4_HELPER"),"gtk3-only");if(g_getenv("DC_GTK3_HELPER"))helper_contract(g_getenv("DC_GTK3_HELPER"),"gtk3-only");}
 static void ping_and_preview(void) {helper_contract(g_getenv("DC_GTK4_HELPER"),NULL);}
 static void close_idempotent(void) {struct dc_gtk_api absent={0};dc_gtk_api_close(&absent);dc_gtk_api_close(&absent);g_assert_false(dc_gtk_api_open(2,&absent));}
 static void notification(void) {assert_notifications(&api,provider,api.variables);}

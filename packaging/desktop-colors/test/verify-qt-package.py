@@ -8,11 +8,12 @@ OPTIONAL = NAMES[3:]
 def output(*args):
     return subprocess.check_output(args, text=True, stderr=subprocess.STDOUT)
 
-def verify(directory, runtime="required", floor=True):
+def verify(directory, runtime="required", floor=True, expected=NAMES):
     directory = pathlib.Path(directory)
-    assert sorted(p.name for p in directory.iterdir()) == sorted(NAMES), "exact seven production helpers required"
+    assert expected and NAMES[0] in expected and len(set(expected)) == len(expected) and set(expected) <= set(NAMES), "invalid helper selection"
+    assert sorted(p.name for p in directory.iterdir()) == sorted(expected), "exact selected production helpers required"
     machine = 183 if platform.machine() in ("aarch64", "arm64") else 62
-    for name in NAMES:
+    for name in expected:
         path = directory / name
         assert stat.S_IMODE(path.stat().st_mode) == 0o755, f"{name}: expected mode 0755"
         header = path.read_bytes()[:20]
@@ -46,12 +47,14 @@ def verify(directory, runtime="required", floor=True):
             assert failed.returncode != 0 and not failed.stdout, f"{name}: expected isolated missing-runtime startup failure"
         else:
             assert result.returncode == 0 and "not found" not in result.stdout, f"{name}: unexpected loader failure: {result.stdout}{result.stderr}"
-        print(f"{name}: ELF/mode/linkage/floor verified; unresolved={missing}")
+        print(f"{name}: ELF/mode/linkage verified; release-floor={floor}; unresolved={missing}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("directory")
     parser.add_argument("--runtime", choices=("required", "optional", "missing"), default="required")
+    parser.add_argument("--expected-file", type=pathlib.Path, help="selected production helper names, one per line; defaults to all seven")
     parser.add_argument("--no-floor", action="store_true", help="development SDK smoke only; never release verification")
     args = parser.parse_args()
-    verify(args.directory, args.runtime, not args.no_floor)
+    verify(args.directory, args.runtime, not args.no_floor,
+           args.expected_file.read_text().splitlines() if args.expected_file else NAMES)

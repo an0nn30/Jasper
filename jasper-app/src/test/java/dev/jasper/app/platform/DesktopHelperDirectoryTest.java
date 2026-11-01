@@ -27,7 +27,9 @@ class DesktopHelperDirectoryTest {
     @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.LINUX)
     void installedHelperRunsFromAPathWithSpacesWithoutDisplay() throws Exception {
         Path directory = Files.createDirectory(home.resolve("installed helpers with spaces"));
-        Path helper = Files.copy(Path.of(System.getProperty("jasper.stagedDesktopHelpers")).resolve("jasper-desktop-gtk4"),
+        Path staged = Path.of(System.getProperty("jasper.stagedDesktopHelpers")).resolve("jasper-desktop-gtk4");
+        org.junit.jupiter.api.Assumptions.assumeTrue(Files.isExecutable(staged), "GTK4 helper disabled for this build");
+        Path helper = Files.copy(staged,
             directory.resolve("jasper-desktop-gtk4"), StandardCopyOption.COPY_ATTRIBUTES);
         var builder = new ProcessBuilder(helper.toString(), "--protocol=1");
         builder.environment().remove("DISPLAY"); builder.environment().remove("WAYLAND_DISPLAY");

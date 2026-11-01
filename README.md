@@ -161,12 +161,15 @@ The [documentation index](docs/README.md) lists every guide. The main ones:
   command line tools on macOS, `gcc` and `g++` on Linux, or Visual Studio or its Build Tools with the
   "Desktop development with C++" workload on Windows.
 - **Linux native dependencies**: `pkg-config` and GLib/GIO development headers for the desktop helpers.
-  The checks also need GTK 3, GTK 4.10+ and libadwaita development headers, `readelf` (binutils), D-Bus,
-  Xvfb, Xauth, `unzip` and a decimal-comma locale such as `de_DE.UTF-8`. The launcher links the static C++
-  runtime (`libstdc++-static` on Fedora).
-  Qt/KDE helpers also require CMake 3.21+, Qt 5.15 and Qt 6.5+ Widgets, KF5 5.92+ Config/ConfigWidgets,
-  and KF6 6.0+ Config/ColorScheme development packages. Source builds, including `:jasper-app:run`, compile
-  both Qt/KDE generations on every Linux desktop. Install the build/check dependencies and fonts with:
+  Checks use `readelf` (binutils), D-Bus and `unzip`; the launcher links the static C++ runtime
+  (`libstdc++-static` on Fedora). JBR/JCEF also needs the host's X11, GLib/GIO and Chromium runtime libraries.
+  GTK and Qt/KDE SDKs are optional: builds detect each integration independently and warn when skipping
+  unavailable SDKs or native test prerequisites. GTK production probes need only GIO; their native tests use
+  GTK 3.24+, GTK 4.10+, libadwaita headers, Xvfb, Xauth and `de_DE.UTF-8`. Qt/KDE builds use CMake 3.21+
+  and the matching Widgets/Frameworks SDK. Set `-Pjasper.desktop.<gtk3|gtk4|qt5|qt6|kde5|kde6>=off`
+  to omit an integration or `=required` to fail when its prerequisites are unavailable (default `=auto`).
+  `-Pjasper.desktop.strict=true` requires all integrations, their native tests and release ABI validation
+  on an equipped host. To install the full optional build/check dependencies and fonts:
 
   ```bash
   # Debian / Ubuntu with KF6 packages available (use Python 3.11–3.13 for the checks)
@@ -188,7 +191,7 @@ The [documentation index](docs/README.md) lists every guide. The main ones:
   ./gradlew check -Pjasper.python=/usr/bin/python3.13
   ```
 
-  If your distribution lacks the required Qt/KDE development versions, configure the SDK prefixes described in
+  For private Qt/KDE SDKs and exact version requirements, see
   [Desktop colors helpers](packaging/desktop-colors/README.md). Run Gradle as your normal user so the filesystem
   permission tests exercise ordinary user access.
 
