@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """Exercise the real Gradle policy with controlled SDK/tool discovery, not a desktop SDK."""
+import json
 import os
 import pathlib
+import shlex
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
+import venv
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 NAMES = ("gtk3", "gtk4", "qt5", "qt6", "kde5", "kde6")
@@ -61,7 +65,9 @@ else:
 
     def tool(self, name, code):
         path = self.bin / name
-        path.write_text("#!/usr/bin/env python3\nimport os\n" + code)
+        # A shell trampoline preserves interpreter paths that contain spaces.
+        path.write_text("#!/bin/sh\n'''exec' " + shlex.quote(sys.executable)
+                        + " \"$0\" \"$@\"\n' '''\nimport os\n" + code)
         path.chmod(0o755)
 
     def gradle(self, *args, success=True):
@@ -125,6 +131,29 @@ else:
         self.assertIn("jasper-desktop-gtk3", self.selected())
         self.assertIn("jasper-desktop-gtk4", self.selected())
         self.gradle("verifyDesktopGtkAbi", "-Pjasper.desktop.gtk3=required", success=False)
+
+
+class GeneratedToolsTest(unittest.TestCase):
+    def test_uses_selected_interpreter_with_spaces_without_path_python3(self):
+        with tempfile.TemporaryDirectory(prefix="jasper policy tools ") as temp:
+            root = pathlib.Path(temp).resolve()
+            selected = root / "selected python"
+            venv.EnvBuilder(with_pip=False).create(selected)
+            interpreter = selected / "bin/python"
+            tools = root / "tools"
+            tools.mkdir()
+            result = subprocess.run([str(interpreter), "-c", """
+import os, pathlib, runpy, sys
+fixture = runpy.run_path(sys.argv[1])['BuildPolicyTest']()
+fixture.bin = pathlib.Path(sys.argv[2])
+fixture.tool('probe', 'import json, sys; print(json.dumps([sys.executable, sys.argv[1:]]))')
+os.execv(str(fixture.bin / 'probe'), ['probe', 'argument with spaces', "quote'argument"])
+""", str(pathlib.Path(__file__).resolve()), str(tools)],
+                                    env=dict(os.environ, PATH=str(tools)), text=True,
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(result.stdout),
+                             [str(interpreter), ['argument with spaces', "quote'argument"]])
 
 
 if __name__ == "__main__":
