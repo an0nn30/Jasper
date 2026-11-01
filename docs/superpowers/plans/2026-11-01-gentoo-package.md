@@ -1,6 +1,6 @@
 # Gentoo source package implementation
 
-**Status: implemented; independent review and final GTK-only installation verification in progress.** Clean sandboxed all-off and all-on Portage builds and headless package verification passed. Evidence is recorded in the execution report; graphical acceptance remains a user step.
+**Status: implemented, installed and task-reviewed; whole-branch review and user graphical acceptance pending.** Clean sandboxed all-off/all-on builds and final GTK-only installation pass. Independent task review found no actionable defects. The [verification record](2026-11-01-gentoo-package-verification.md) captures installed ownership, helper selection, runtime/ELF/JCEF checks and remaining QA notes.
 
 Spec: `docs/superpowers/specs/2026-11-01-gentoo-package-design.md`
 

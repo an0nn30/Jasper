@@ -64,7 +64,9 @@ All integration flags default off:
 Enabled integrations are required at build time. Disabled integrations are omitted
 even when the SDK is installed; Qt 5 and KDE Frameworks 5 are explicitly off. The
 GIO portal helper and core JBR/X11/Chromium runtime libraries remain dependencies.
-GTK is the target installed configuration on the initial XFCE ARM64 VM.
+GTK is the verified installed configuration on the initial XFCE ARM64 VM; the
+[verification record](../../docs/superpowers/plans/2026-11-01-gentoo-package-verification.md)
+records the headless acceptance evidence and remaining graphical checks.
 
 `FEATURES=test` runs the upstream headless `verifyPackage` task: it checks the
 packaged jars/runtime/selected helpers and runs the native launcher suites.
