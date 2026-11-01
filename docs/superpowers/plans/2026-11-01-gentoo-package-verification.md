@@ -4,8 +4,9 @@ Implementation: `0f647d1928891d3fb069cfe40bafeb9382ad3fed`.
 [Plan](2026-11-01-gentoo-package.md), [approved design](../specs/2026-11-01-gentoo-package-design.md),
 [overlay guide](../../../packaging/gentoo/README.md).
 
-Independent task review approved the implementation with no actionable defects.
-Whole-branch review and user graphical acceptance remain pending. No GUI was launched.
+Independent task and whole-branch reviews approved the implementation with no
+actionable defects. Whole-branch review covered be557f600..6ac73905e. User graphical
+acceptance remains pending. No GUI was launched.
 
 ## Offline build and selection
 
