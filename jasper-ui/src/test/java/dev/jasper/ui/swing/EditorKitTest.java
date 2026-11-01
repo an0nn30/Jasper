@@ -664,7 +664,11 @@ class EditorKitTest {
                 assertThat(close.width).isEqualTo(close.height).isEqualTo(DesignMetrics.DEFAULT.value(DesignMetrics.Role.PANEL_HEADER_ACTION));
                 assertThat(at.apply("next").x - (at.apply("previous").x + at.apply("previous").width)).as("adjacent icon buttons sit close")
                     .isEqualTo(DesignMetrics.DEFAULT.value(DesignMetrics.Role.DOCUMENT_BAR_ACTION_GAP));
-                assertThat(query.height).as("the panel search field's height").isEqualTo(DesignMetrics.DEFAULT.value(DesignMetrics.Role.PANEL_SEARCH_HEIGHT));
+                var field = find(view, "query", JComponent.class);
+                var input = find(view, "query.input", javax.swing.text.JTextComponent.class);
+                CompactTextSizing.assertHeight(field, input, DesignMetrics.DEFAULT.value(DesignMetrics.Role.PANEL_SEARCH_HEIGHT),
+                    DesignMetrics.DEFAULT.value(DesignMetrics.Role.PANEL_SEARCH_VERTICAL_PADDING));
+                assertThat(input.getHeight()).as("the search input is not clipped").isGreaterThanOrEqualTo(input.getPreferredSize().height);
                 assertThat(at.apply("count").width).as("status keeps a stable width").isGreaterThanOrEqualTo(DesignMetrics.DEFAULT.value(DesignMetrics.Role.DOCUMENT_BAR_STATUS_WIDTH));
                 var row = at.apply("find.row");
                 assertThat(row.height).isEqualTo(query.height + 2 * pad);

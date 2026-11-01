@@ -39,7 +39,9 @@ class PanelSurfacesTest {
                 KitFixtures.render(window, s(400), s(300), 1);
                 assertThat(find(view, "empty.tile", JComponent.class).getWidth()).isEqualTo(metric(DesignMetrics.Role.PANEL_EMPTY_TILE));
                 assertThat(find(window, "empty.tile", JComponent.class).getWidth()).as("a window's empty state").isEqualTo(metric(DesignMetrics.Role.EMPTY_TILE));
-                assertThat(find(view, "new", JButton.class).getHeight()).as("the panel references' smaller action").isEqualTo(metric(DesignMetrics.Role.PANEL_EMPTY_ACTION_HEIGHT));
+                var action = find(view, "new", JButton.class);
+                CompactTextSizing.assertHeight(action, action, metric(DesignMetrics.Role.PANEL_EMPTY_ACTION_HEIGHT),
+                    metric(DesignMetrics.Role.BUTTON_VERTICAL_PADDING));
                 assertThat(find(window, "new", JButton.class).getHeight()).isGreaterThanOrEqualTo(metric(DesignMetrics.Role.BUTTON_HEIGHT));
                 var description = find(view, "empty.description", JComponent.class);
                 assertThat(description.getWidth()).as("the narrower panel text width").isLessThanOrEqualTo(metric(DesignMetrics.Role.PANEL_EMPTY_TEXT_WIDTH));

@@ -79,9 +79,24 @@ class CollapsibleNavigationTest {
                 assertThat(section.title.getX()).as("the section title").isEqualTo(21);
                 assertThat(child.title.getX()).as("a page under a section").isEqualTo(24);
                 assertThat(top.title.getX()).as("a top-level page").isEqualTo(9);
-                assertThat(child.getY() - section.getY()).as("22 rows, no group gap").isEqualTo(22);
-                assertThat(top.getY() - child.getY()).isEqualTo(22);
-                assertThat(section.getHeight()).isEqualTo(22);
+                for (var row : List.of(section, child, top)) {
+                    var role = row == section ? dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_HEADING
+                        : dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_ROW;
+                    int padding = com.formdev.flatlaf.util.UIScale.scale(context.metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.ROW_VERTICAL_PADDING));
+                    int floor = com.formdev.flatlaf.util.UIScale.scale(context.metrics().value(role));
+                    // Ordinary tree rows also reserve their shared BODY baseline and LABEL control line, even
+                    // when a navigation title uses the smaller SETTINGS_BODY face. Section headings have their own line allocation.
+                    if (row != section) {
+                        int body = tree.canvas.getFontMetrics(ThemePainting.font(context, dev.jasper.ui.metrics.Typography.Role.BODY)).getHeight() + padding;
+                        var label = ThemePainting.font(context, dev.jasper.ui.metrics.Typography.Role.LABEL);
+                        int control = (int) Math.ceil(label.getLineMetrics("Ag", new java.awt.font.FontRenderContext(null, true, true)).getHeight())
+                            + com.formdev.flatlaf.util.UIScale.scale(context.metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_VERTICAL_PADDING));
+                        floor = Math.max(floor, Math.max(body, control));
+                    }
+                    CompactTextSizing.assertHeight(row, (javax.swing.JComponent) row.title.getComponent(0), floor, padding);
+                }
+                assertThat(child.getY()).as("the page immediately follows its section").isEqualTo(section.getY() + section.getHeight());
+                assertThat(top.getY()).as("no group gap after the child").isEqualTo(child.getY() + child.getHeight());
                 var image = new BufferedImage(230, 300, BufferedImage.TYPE_INT_ARGB);
                 var g = image.createGraphics(); try { view.printAll(g); } finally { g.dispose(); }
                 int y = child.getY() + child.getHeight() / 2 + tree.canvas.getY();

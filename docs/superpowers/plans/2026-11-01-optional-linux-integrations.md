@@ -45,6 +45,8 @@
 
 **Approved scope extension — fixture portability:** The initial full Gentoo build exposed exact 1x glyph-coverage assumptions, fixed catalog heights that ignored documented font growth, and a distro prompt callback under nounset. Test-only corrections preserve exact ink, compact sizing, alignment and document-state assertions while isolating the shell fixture. Local affected scope passes 37 tests (one optional-fish skip); five mutation checks reject wrong ink, missing text, shell errors and inflated field/segment sizes. Targeted Gentoo affected/source-scan scope passes 46 tests with seven optional-shell skips. Full-build retry and review remain pending.
 
+**Further Task 2 extension — UI fixture portability:** The second full build passed the application scope and exposed five UI tests with the same fixed-height assumption. A dedicated test helper now enforces catalog floor, padded actual font line and minimality; normal navigation rows also retain their inherited BODY/LABEL allocation. All fixed positions, adjacency, rules and hairlines stay exact. Gentoo passes 47 focused tests and the full UI suite (971 tests, two skips), with five mutations rejected. No production change; final whole-build confirmation remains pending.
+
 **Files:** Record evidence in this plan/status; production changes only if verification finds defects.
 
 **Interfaces:** Consume reviewed Task 1 branch; pinned JBR25 JCEF and Python3.13 in guest.
