@@ -103,7 +103,8 @@ class PreviewSearchTest {
     @Test void openFindRecomputesMatchesOnlyWhenTheReplacementDocumentIsInstalled() throws Exception {
         var pane=PreviewPaneTest.install(PreviewPaneTest.prepare("old old"));var bar=new FindBar[1];
         SwingUtilities.invokeAndWait(() -> {
-            bar[0]=new FindBar(() -> Optional.of(new FindTarget.Preview(pane)), () -> {}, id -> {});
+            var surface=new BasicPreview(pane,new javax.swing.JScrollPane(pane.editor()));
+            bar[0]=new FindBar(() -> Optional.of(new FindTarget.Preview(surface)), () -> {}, id -> {});
             bar[0].open(false);bar[0].event(new dev.jasper.sdk.ui.UiEvent.Edited(FindBar.FIND,"old"));
             assertThat(bar[0].status()).isEqualTo("2 matches");
         });

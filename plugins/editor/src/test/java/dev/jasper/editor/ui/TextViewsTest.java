@@ -598,7 +598,7 @@ class TextViewsTest {
         one.markdownMode(MarkdownMode.PREVIEW, false);
         assertThat(one.markdown().mode()).isEqualTo(MarkdownMode.PREVIEW);
         assertThat(two.markdown().mode()).as("each view its own mode").isEqualTo(MarkdownMode.SOURCE);
-        assertThat(two.focusedContent()).as("the other view keeps its source").isSameAs(two.area());
+        assertThat(two.surface().previewFocused()).as("the other view keeps its source").isFalse();
         two.markdownMode(MarkdownMode.SPLIT, false);
         assertThat(one.markdown().mode()).isEqualTo(MarkdownMode.PREVIEW);
         assertThat(two.markdown().mode()).isEqualTo(MarkdownMode.SPLIT);

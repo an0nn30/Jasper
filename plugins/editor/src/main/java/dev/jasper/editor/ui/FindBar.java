@@ -3,6 +3,8 @@ package dev.jasper.editor.ui;
 import dev.jasper.sdk.ui.*;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
@@ -21,7 +23,6 @@ public final class FindBar {
     private final Consumer<String> focus;
     private final Runnable revealSource;
     private FindTarget captured;
-    private PreviewSearch previewSearch;
     private final Runnable previewChanged = this::update;
     private String find="", replace="", status="";
     private boolean matchCase, wholeWord, regex, visible, withReplace;
@@ -35,33 +36,33 @@ public final class FindBar {
     public void open(boolean withReplace) {
         detachPreview();
         captured = target.get().filter(FindTarget::available).orElse(null);
-        if (captured instanceof FindTarget.Preview preview) {
-            previewSearch = new PreviewSearch(preview.pane());
-            preview.pane().onInstalled(previewChanged);
-        }
+        capturedPreview().ifPresent(surface -> surface.onInstalled(previewChanged));
         if (captured != null) {
-            String selected=captured.content().getSelectedText();
-            if (selected!=null && !selected.isEmpty() && !selected.contains("\n")) find=selected;
+            String selected=answer(captured.selectedText());
+            if (!selected.isEmpty() && !selected.contains("\n")) find=selected;
         }
         this.withReplace=withReplace; visible=true; update(); focus.accept(FIND);
     }
     public void close() {
         var restore = activeTarget();
         dismiss();
-        restore.or(() -> target.get().filter(FindTarget::available)).ifPresent(value -> value.content().requestFocusInWindow());
+        restore.or(() -> target.get().filter(FindTarget::available)).ifPresent(FindTarget::focus);
     }
     /** Ends captured ownership without moving focus during tab/pane transitions. */
     void dismiss() {
         if (!visible) return;
         visible=false; detachPreview(); captured=null; changed.run();
     }
-    void paneHidden(javax.swing.text.JTextComponent pane) {
-        if (captured != null && captured.content() == pane) dismiss();
+    /** @param owner a pane that no longer shows: a target's {@link FindTarget#owner()} */
+    void paneHidden(Object owner) {
+        if (captured != null && captured.owner() == owner) dismiss();
     }
     private void detachPreview() {
         if (captured instanceof FindTarget.Source source) source.area().clearMarkAllHighlights();
-        if (previewSearch != null) { previewSearch.clear(); previewSearch=null; }
-        if (captured instanceof FindTarget.Preview preview) preview.pane().removeInstalled(previewChanged);
+        capturedPreview().ifPresent(surface -> { surface.clearFind(); surface.removeInstalled(previewChanged); });
+    }
+    private Optional<PreviewSurface> capturedPreview() {
+        return captured instanceof FindTarget.Preview preview ? Optional.of(preview.surface()) : Optional.empty();
     }
     private Optional<FindTarget> activeTarget() {
         return (visible ? Optional.ofNullable(captured) : target.get()).filter(FindTarget::available);
@@ -122,7 +123,7 @@ public final class FindBar {
         revealSource.run();
         // Revalidate after revealing: a shared bar must never edit a different selected tab.
         return owner.filter(area -> target.get().filter(FindTarget::available)
-            .map(value -> value.content() == area).orElse(false));
+            .map(value -> value.owner() == area).orElse(false));
     }
     public void replaceOne() {
         replacementSource().ifPresent(area -> guarded(() -> {
@@ -145,16 +146,16 @@ public final class FindBar {
         var value = activeTarget();
         if (value.isEmpty() || find.isEmpty()) {
             source().ifPresent(RSyntaxTextArea::clearMarkAllHighlights);
-            if (previewSearch != null) previewSearch.clear();
+            capturedPreview().ifPresent(PreviewSurface::clearFind);
             status(""); return;
         }
         // Clear old ranges even when the new expression is invalid.
         source().ifPresent(RSyntaxTextArea::clearMarkAllHighlights);
-        if (previewSearch != null) previewSearch.clear();
+        capturedPreview().ifPresent(PreviewSurface::clearFind);
         guarded(() -> {
             int count = switch (value.get()) {
                 case FindTarget.Source source -> SearchEngine.markAll(source.area(), context(true)).getMarkedCount();
-                case FindTarget.Preview preview -> previewSearch.markAll(context(true));
+                case FindTarget.Preview preview -> answer(preview.surface().markAll(context(true)));
             };
             status(count == 0 ? "No matches" : count == 1 ? "1 match" : count + " matches");
         });
@@ -165,7 +166,7 @@ public final class FindBar {
         activeTarget().ifPresent(value -> guarded(() -> {
             boolean found = switch (value) {
                 case FindTarget.Source source -> SearchEngine.find(source.area(), context(forward)).wasFound();
-                case FindTarget.Preview preview -> (previewSearch != null ? previewSearch : new PreviewSearch(preview.pane())).find(context(forward));
+                case FindTarget.Preview preview -> answer(preview.surface().find(context(forward)));
             };
             if (!found) status("No matches");
         }));
@@ -190,6 +191,18 @@ public final class FindBar {
     private void guarded(Runnable search) {
         try { search.run(); }
         catch (PatternSyntaxException bad) { status("Invalid pattern"); }
+    }
+
+    /**
+     * @return a target's answer, which the Basic preview and the source have ready when asked
+     * @throws PatternSyntaxException when the target refused the pattern
+     */
+    private static <T> T answer(CompletableFuture<T> future) {
+        try { return future.join(); }
+        catch (CompletionException failure) {
+            if (failure.getCause() instanceof PatternSyntaxException refused) throw refused;
+            throw failure;
+        }
     }
 
 }

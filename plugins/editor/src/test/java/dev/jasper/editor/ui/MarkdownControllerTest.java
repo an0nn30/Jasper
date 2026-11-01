@@ -27,7 +27,7 @@ class MarkdownControllerTest {
             var environment = new SessionEnvironment(sessionWorker, ui, Question::dismissed, () -> 8 << 20);
             tab = new EditorTab(new FakeKit("dev.jasper.editor"), DocumentSession.untitled("Untitled", environment), t -> {}, false);
             tab.session().setStyle(org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_MARKDOWN);
-            tab.surface().previewStyle(PreviewPaneTest.TYPE, PreviewPaneTest.palette(false), EditorThemeTest.syntax(1));
+            tab.surface().previewStyle(dev.jasper.sdk.Variant.LIGHT, PreviewPaneTest.TYPE, PreviewPaneTest.palette(false), EditorThemeTest.syntax(1));
             controller = new MarkdownController(tab, worker, ui, () -> {changes++;tab.render();});
             controller.active(true);
         });
@@ -116,12 +116,12 @@ class MarkdownControllerTest {
     @Test void typographyChangeWhileWorkerRunsUsesLatestGeometryButSyntaxChangeRendersAgain() throws Exception {
         var larger=new dev.jasper.sdk.ui.TerminalTypography("Serif",24,java.util.List.of(),false,1.8);
         preview("```java\nint value = 1;\n```\n");
-        edt(() -> {tab.surface().previewStyle(larger,PreviewPaneTest.palette(true),EditorThemeTest.syntax(1));assertThat(worker.size()).isEqualTo(1);});
+        edt(() -> {tab.surface().previewStyle(dev.jasper.sdk.Variant.DARK,larger,PreviewPaneTest.palette(true),EditorThemeTest.syntax(1));assertThat(worker.size()).isEqualTo(1);});
         complete();
         Object[] initial={null};
         edt(() -> {assertThat(worker.size()).isZero();assertThat(tab.surface().preview().editor().getFont().getSize2D()).isEqualTo(24f);
             initial[0]=controller.currentResult().orElseThrow();
-            tab.surface().previewStyle(larger,PreviewPaneTest.palette(true),EditorThemeTest.syntax(0x882200));
+            tab.surface().previewStyle(dev.jasper.sdk.Variant.DARK,larger,PreviewPaneTest.palette(true),EditorThemeTest.syntax(0x882200));
             assertThat(worker.size()).isEqualTo(1);assertThat(controller.currentResult()).isEmpty();});
         complete();
         edt(() -> {assertThat(controller.currentResult().orElseThrow()).isNotSameAs(initial[0]);assertThat(visible()).contains("#8822");});

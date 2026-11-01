@@ -52,7 +52,7 @@ public final class EditorTab {
     void noticeChanged(Runnable value) { noticeChanged = value; }
     Optional<FindTarget> findTarget() {
         if (closed || !showingText()) return Optional.empty();
-        return Optional.of(focusedContent() == area() ? new FindTarget.Source(area()) : new FindTarget.Preview(document.preview()));
+        return Optional.of(document.previewFocused() ? new FindTarget.Preview(document.surface()) : new FindTarget.Source(area()));
     }
 
     private Runnable focusArea = () -> area().requestFocusInWindow();
@@ -101,7 +101,7 @@ public final class EditorTab {
     private void dismissHiddenFind(MarkdownMode mode) {
         if (find == null) return;
         if (mode == MarkdownMode.PREVIEW) find.paneHidden(area());
-        else if (mode == MarkdownMode.SOURCE) find.paneHidden(document.preview().editor());
+        else if (mode == MarkdownMode.SOURCE) find.paneHidden(document.surface());
     }
     private void updateMarkdownEligibility() {
         if (markdown == null) return;
@@ -116,9 +116,8 @@ public final class EditorTab {
         }
         wasMarkdown = eligible;
     }
-    javax.swing.text.JTextComponent focusedContent() { return document.focusedContent(); }
-    void copy() { focusedContent().copy(); }
-    void selectAll() { focusedContent().selectAll(); }
+    void copy() { if (document.previewFocused()) document.surface().copy(); else area().copy(); }
+    void selectAll() { if (document.previewFocused()) document.surface().selectAll(); else area().selectAll(); }
     void paste() { revealSource(); area().paste(); }
 
     void markdown(MarkdownController value) { markdown = value; updateMarkdownEligibility(); }
@@ -235,7 +234,7 @@ public final class EditorTab {
     /** Restores the last valid source/preview content focus after selection, activation or moves. */
     public void focusContent() {
         if (closed) return;
-        if (showingText()) { if (document.focusedContent() == area()) focusArea.run(); else document.focusedContent().requestFocusInWindow(); }
+        if (showingText()) { if (document.previewFocused()) document.surface().focus(); else focusArea.run(); }
         else focusPending = true;
     }
     void focusAction(Runnable value) { focusArea = value; }
@@ -377,7 +376,7 @@ public final class EditorTab {
         if (markdown != null && markdown.failure().isPresent() && markdown.mode() != dev.jasper.editor.markdown.MarkdownMode.SOURCE) {
             children.add(new Nodes.Stack("document.preview.failure", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
                 new Nodes.Text("document.preview.message", ControlState.READY,
-                    (document.preview().installedResult().isPresent() ? "Preview is out of date. " : "") + markdown.failure().orElseThrow(), Nodes.TextRole.BODY),
+                    (document.surface().installedResult().isPresent() ? "Preview is out of date. " : "") + markdown.failure().orElseThrow(), Nodes.TextRole.BODY),
                 button("document.preview.source", "Source", true), button("document.preview.retry", "Retry", true))));
         }
         boolean banner = session.banner() != DocumentSession.Banner.NONE;

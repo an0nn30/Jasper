@@ -10,6 +10,7 @@ import java.awt.RenderingHints;
 import dev.jasper.editor.vim.VimTextArea;
 import dev.jasper.editor.markdown.MarkdownMode;
 import dev.jasper.sdk.Subscription;
+import dev.jasper.sdk.Variant;
 import dev.jasper.sdk.ui.Appearance;
 import dev.jasper.sdk.ui.EditorPalette;
 import dev.jasper.sdk.ui.SyntaxPalette;
@@ -30,7 +31,8 @@ final class DocumentArea extends JComponent implements AutoCloseable {
     final RTextScrollPane scroll;
     private final PreviewPane preview;
     final JScrollPane previewScroll;
-    final ScrollLink scrollLink;
+    private final BasicPreview basic;
+    ScrollLink scrollLink;
     private final JSplitPane split;
     private MarkdownMode mode = MarkdownMode.SOURCE;
     private double dividerRatio = .5;
@@ -107,24 +109,27 @@ final class DocumentArea extends JComponent implements AutoCloseable {
         }
     }
     void focusSource(boolean value) { sourceFocused = value; }
-    javax.swing.text.JTextComponent focusedContent() {
-        return mode == MarkdownMode.PREVIEW || mode == MarkdownMode.SPLIT && !sourceFocused ? preview.editor() : area;
-    }
+    /** @return whether the view's commands go to the preview: it shows alone, or in Split it had the focus last */
+    boolean previewFocused() { return mode == MarkdownMode.PREVIEW || mode == MarkdownMode.SPLIT && !sourceFocused; }
     private java.util.function.IntConsumer activateLink = id -> {};
     private Runnable geometryChanged = () -> {};
     Runnable controllerGeometry = () -> {};
     Runnable styleChanged = () -> {};
-    record PreviewStyle(TerminalTypography typography, dev.jasper.sdk.ui.WorkspacePalette palette, SyntaxPalette syntax) { }
+    /** @param variant whether the workspace is light or dark */
+    record PreviewStyle(Variant variant, TerminalTypography typography, dev.jasper.sdk.ui.WorkspacePalette palette, SyntaxPalette syntax) { }
     private PreviewStyle previewStyle;
     PreviewStyle previewStyle() { return previewStyle; }
-    void previewStyle(TerminalTypography type, dev.jasper.sdk.ui.WorkspacePalette palette, SyntaxPalette syntax) {
+    void previewStyle(Variant variant, TerminalTypography type, dev.jasper.sdk.ui.WorkspacePalette palette, SyntaxPalette syntax) {
         var previous = previewStyle;
-        previewStyle = new PreviewStyle(type, palette, syntax);
-        if (getFont() != null) preview.restyle(type, palette, syntax, getFont(), opacity);
+        previewStyle = new PreviewStyle(variant, type, palette, syntax);
+        if (getFont() != null) surface().restyle(previewStyle, getFont(), opacity);
         if (previous == null || !previous.syntax().equals(syntax)) styleChanged.run();
     }
 
+    /** @return the Basic preview's Swing document view */
     PreviewPane preview() { return preview; }
+    /** @return what the preview draws on */
+    PreviewSurface surface() { return basic; }
     void previewCallbacks(java.util.function.IntConsumer links, Runnable geometry) { activateLink=links;geometryChanged=geometry; }
     double dividerRatio() { return dividerRatio; }
     void mode(MarkdownMode value) {
@@ -132,9 +137,9 @@ final class DocumentArea extends JComponent implements AutoCloseable {
         if (value == MarkdownMode.PREVIEW) sourcePlace = sourceShown();
         else if (mode == MarkdownMode.PREVIEW) restoreSourcePosition = true;
         mode=value;removeAll();split.setLeftComponent(null);split.setRightComponent(null);
-        if(value==MarkdownMode.SOURCE){preview.cancelInstall();add(scroll,BorderLayout.CENTER);}
-        else if(value==MarkdownMode.PREVIEW)add(previewScroll,BorderLayout.CENTER);
-        else {restoringDivider=true;try{split.setLeftComponent(scroll);split.setRightComponent(previewScroll);add(split,BorderLayout.CENTER);}finally{restoringDivider=false;}}
+        if(value==MarkdownMode.SOURCE){surface().cancelInstall();add(scroll,BorderLayout.CENTER);}
+        else if(value==MarkdownMode.PREVIEW)add(surface().component(),BorderLayout.CENTER);
+        else {restoringDivider=true;try{split.setLeftComponent(scroll);split.setRightComponent(surface().component());add(split,BorderLayout.CENTER);}finally{restoringDivider=false;}}
         scrollLink.split(value == MarkdownMode.SPLIT);
         revalidate();repaint();
     }
@@ -173,12 +178,13 @@ final class DocumentArea extends JComponent implements AutoCloseable {
         preview=new PreviewPane(id -> activateLink.accept(id), this::previewGeometry);
         previewScroll=new JScrollPane(preview.editor());previewScroll.setBorder(BorderFactory.createEmptyBorder());
         previewScroll.setOpaque(false);previewScroll.getViewport().setOpaque(false);
+        basic=new BasicPreview(preview,previewScroll);
         split=new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);split.setOpaque(false);split.setBorder(BorderFactory.createEmptyBorder());split.setResizeWeight(.5);
         split.addPropertyChangeListener(JSplitPane.DIVIDER_LOCATION_PROPERTY,event -> {
             int extent=split.getWidth()-split.getDividerSize();
             if(!restoringDivider && mode==MarkdownMode.SPLIT && extent>0)dividerRatio=Math.max(0,Math.min(1,split.getDividerLocation()/(double)extent));
         });
-        addPropertyChangeListener("font",event -> {if(getFont()!=null){preview.bodyFont(getFont());}});
+        addPropertyChangeListener("font",event -> {if(getFont()!=null){surface().bodyFont(getFont());}});
         area.setCodeFoldingEnabled(true);
         area.setMarkOccurrences(true);
         area.setBracketMatchingEnabled(true);
@@ -189,7 +195,7 @@ final class DocumentArea extends JComponent implements AutoCloseable {
         scroll.setLineNumbersEnabled(true);
         scroll.setFoldIndicatorEnabled(true);
         scroll.setBorder(BorderFactory.createEmptyBorder());
-        scrollLink = new ScrollLink(this, preview);
+        scrollLink = new ScrollLink(this, surface(), true);
         area.getDocument().addDocumentListener(insertedAtStart);
         add(scroll, BorderLayout.CENTER);
         addHierarchyListener(hierarchy);
@@ -238,7 +244,7 @@ final class DocumentArea extends JComponent implements AutoCloseable {
             { var chosen = EditorSettings.scheme(appearance.editorSchemes(), settings.colorScheme());
                 apply(settings, theme, chosen.map(dev.jasper.sdk.ui.EditorScheme::editor).orElseGet(appearance::editorPalette),
                     chosen.map(dev.jasper.sdk.ui.EditorScheme::syntax).orElseGet(appearance::syntaxPalette), appearance.workspaceOpacity(this));
-                if(typography!=null)previewStyle(typography,appearance.workspacePalette(),appearance.syntaxPalette()); }
+                if(typography!=null)previewStyle(appearance.workspaceVariant(),typography,appearance.workspacePalette(),appearance.syntaxPalette()); }
     }
 
     void apply(EditorSettings settings, EditorTheme theme, EditorPalette editor, SyntaxPalette syntax, double opacity) {
@@ -256,7 +262,7 @@ final class DocumentArea extends JComponent implements AutoCloseable {
         area.putClientProperty("jasper.editor.closed", Boolean.TRUE);
         area.getDocument().removeDocumentListener(insertedAtStart);
         scrollLink.close();
-        preview.close();
+        surface().close();
         removeHierarchyListener(hierarchy);
         if (changes != null) changes.close();
     }

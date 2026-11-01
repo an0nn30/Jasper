@@ -526,7 +526,7 @@ class EditorWindowTest {
         var second = opened(file("commands-b.md", "# Second")); var b = host.contentTabs().getLast();
         old.run().run(); assertThat(window.selected()).containsSame(second);
         assertThat(first.markdown().mode()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.PREVIEW);
-        a.moveToNewWindow(); assertThat(first.focusedContent()).isSameAs(first.surface().preview().editor());
+        a.moveToNewWindow(); assertThat(first.surface().previewFocused()).isTrue();
         b.select();
         host.contentCommands(a).stream().filter(command -> command.id().equals("delete")).findFirst().orElseThrow().run().run();
         assertThat(window.selected()).containsSame(first);
@@ -606,7 +606,7 @@ class EditorWindowTest {
         var handle=host.contentTabs().getLast();
         host.contentCommands(handle).stream().filter(command -> command.id().equals("replace")).findFirst().orElseThrow().run().run();
         assertThat(tab.markdown().mode()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.SPLIT);
-        assertThat(tab.focusedContent()).isSameAs(tab.area());
+        assertThat(tab.surface().previewFocused()).isFalse();
         Kits.type(tab.view(),FindBar.FIND,"One");Kits.type(tab.view(),FindBar.REPLACE,"Changed");Kits.press(tab.view(),FindBar.ALL);
         assertThat(tab.area().getText()).contains("Changed");
         Kits.press(tab.view(),FindBar.CLOSE);
