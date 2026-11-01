@@ -10,7 +10,7 @@
 
 **Spec:** ../specs/2026-11-01-optional-linux-integrations-design.md
 
-**Task 1 status:** Implemented and self-reviewed; independent review pending. Eight policy regressions, five selected-package regressions, available native suites, 84 focused JVM tests, and default/off/required/strict/stale Linux transitions pass. Baseline CI keeps its split from equipped runtime coverage: explicit required integrations plus seven-helper release-floor validation; global strict mode remains for fully equipped hosts. Full build/check and launch are Task 2.
+**Task 1 status:** Implemented; spec and quality reviews passed. Eight policy regressions, five selected-package regressions, available native suites, 84 focused JVM tests, and default/off/required/strict/stale Linux transitions pass. Baseline CI keeps its split from equipped runtime coverage: explicit required integrations plus seven-helper release-floor validation; global strict mode remains for fully equipped hosts. Full build/check and launch are Task 2.
 
 ## Global Constraints
 
@@ -42,6 +42,8 @@
 - [x] Update concise documentation/status; self-review and commit with Co-Authored-By trailer.
 
 ### Task 2: Gentoo build and launch
+
+**Approved scope extension — fixture portability:** The initial full Gentoo build exposed exact 1x glyph-coverage assumptions, fixed catalog heights that ignored documented font growth, and a distro prompt callback under nounset. Test-only corrections preserve exact ink, compact sizing, alignment and document-state assertions while isolating the shell fixture. Local affected scope passes 37 tests (one optional-fish skip); five mutation checks reject wrong ink, missing text, shell errors and inflated field/segment sizes. Targeted Gentoo affected/source-scan scope passes 46 tests with seven optional-shell skips. Full-build retry and review remain pending.
 
 **Files:** Record evidence in this plan/status; production changes only if verification finds defects.
 

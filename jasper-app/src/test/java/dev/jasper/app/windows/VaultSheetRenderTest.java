@@ -211,10 +211,18 @@ class VaultSheetRenderTest {
                 }
                 assertThat(sheet.fallback()).isEqualTo(state.equals("short"));
                 if (id.equals("vault-login")) {
-                    // The form segment height inside the form track inset.
-                    int segmentHeight = com.formdev.flatlaf.util.UIScale.scale(m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_SEGMENT_HEIGHT));
-                    assertThat(find(surface.holder(), "auth.option.password").getHeight())
-                        .as("actual Login segment preserves its nonheader height in %s", state).isEqualTo(segmentHeight);
+                    // The form segment keeps its catalog floor and enough room for the actual host label line.
+                    // A 20pt system font may need more than the scaled catalog, while a header-sized segment or
+                    // extra blank space must still fail the compactness check.
+                    var segment = find(surface.holder(), "auth.option.password");
+                    int segmentHeight = segment.getHeight();
+                    int floor = com.formdev.flatlaf.util.UIScale.scale(m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_SEGMENT_HEIGHT));
+                    int padding = com.formdev.flatlaf.util.UIScale.scale(m(dev.jasper.ui.metrics.DesignMetrics.Role.ROW_VERTICAL_PADDING));
+                    int line = (int) Math.ceil(segment.getFont().getLineMetrics("Ag", new java.awt.font.FontRenderContext(null, true, true)).getHeight());
+                    assertThat(segmentHeight).as("actual Login segment keeps its form floor in %s", state).isGreaterThanOrEqualTo(floor);
+                    assertThat(segmentHeight - padding).as("actual Login label fits its padded line in %s", state).isGreaterThanOrEqualTo(line);
+                    assertThat(segmentHeight - 1 < floor || segmentHeight - 1 - padding < line)
+                        .as("actual Login segment has no unnecessary height in %s", state).isTrue();
                     assertThat(find(surface.holder(), "auth.input").getHeight())
                         .isEqualTo(segmentHeight + 2 * com.formdev.flatlaf.util.UIScale.scale(m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_SEGMENT_PADDING)));
                 }

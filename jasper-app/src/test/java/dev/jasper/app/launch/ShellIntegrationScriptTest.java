@@ -200,7 +200,10 @@ class ShellIntegrationScriptTest {
     @Test void scriptsStaySilentUnderNounset() throws Exception {
         for (String shell : List.of("/bin/zsh", "/bin/bash")) {
             if (!Files.isExecutable(Path.of(shell))) continue;
-            String rc = shell.endsWith("zsh") ? "setopt nounset\n" : "set -u\n";
+            // Exercise Jasper under nounset with a literal prompt, independently of distro callbacks such as
+            // Gentoo's title hook (which reads PROMPT_DIRTRIM unguarded). Prompt preservation has its own cases.
+            String rc = shell.endsWith("zsh") ? "PROMPT='nounset> '\nsetopt nounset\n"
+                : "PS1='nounset> '\nunset PROMPT_COMMAND\nset -u\n";
             ShellRun.Result result = interactive(shell, rc, "printf 'done\\n'\n");
             assertThat(result.errors()).as("%s under nounset", shell)
                 .doesNotContain("unbound variable").doesNotContain("parameter not set");

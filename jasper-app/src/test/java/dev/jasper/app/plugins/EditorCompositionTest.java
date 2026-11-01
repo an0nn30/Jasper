@@ -387,9 +387,26 @@ class EditorCompositionTest {
             assertThat(button.getText()).as("%s is an icon button", id).isEmpty();
             assertThat(button.getIcon()).as(id).isNotNull();
         }
-        assertThat(named(view, "find.query", JComponent.class).getHeight()).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_SEARCH_HEIGHT));
-        int barRow = m(dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_SEARCH_HEIGHT) + 2 * m(dev.jasper.ui.metrics.DesignMetrics.Role.DOCUMENT_BAR_VERTICAL_PADDING);
-        assertThat(findRow.getHeight()).isEqualTo(barRow); assertThat(replaceRow.getHeight()).isEqualTo(barRow);
+        // The catalog is the field's floor; a host font with a taller line may need more height. Assert
+        // both usable line space and minimal size, independently of the field's preferred-size calculation.
+        var field = named(view, "find.query", JComponent.class);
+        var input = named(view, "find.query.input", JTextComponent.class);
+        int floor = m(dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_SEARCH_HEIGHT);
+        int padding = m(dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_SEARCH_VERTICAL_PADDING);
+        int line = (int) Math.ceil(input.getFont().getLineMetrics("Ag", new java.awt.font.FontRenderContext(null, true, true)).getHeight());
+        assertThat(field.getHeight()).as("the designed field floor").isGreaterThanOrEqualTo(floor);
+        assertThat(field.getHeight() - padding).as("the host text line fits with its vertical padding").isGreaterThanOrEqualTo(line);
+        assertThat(field.getHeight() - 1 < floor || field.getHeight() - 1 - padding < line)
+            .as("a smaller field would violate its floor or clip the padded text line").isTrue();
+        assertThat(input.getHeight()).as("the laid-out input does not clip its text").isGreaterThanOrEqualTo(input.getPreferredSize().height);
+        for (var row : List.of(findRow, replaceRow)) {
+            var children = java.util.Arrays.stream(row.getComponents()).filter(Component::isVisible).toList();
+            int top = children.stream().mapToInt(Component::getY).min().orElseThrow();
+            int bottom = children.stream().mapToInt(child -> child.getY() + child.getHeight()).max().orElseThrow();
+            int rowPadding = m(dev.jasper.ui.metrics.DesignMetrics.Role.DOCUMENT_BAR_VERTICAL_PADDING);
+            assertThat(top - row.getInsets().top).as("compact row leading padding").isEqualTo(rowPadding);
+            assertThat(row.getHeight() - row.getInsets().bottom - bottom).as("compact row trailing padding").isEqualTo(rowPadding);
+        }
         assertThat(bounds(view, replaceRow).y).as("rows stack without a gap").isEqualTo(bounds(view, findRow).y + findRow.getHeight());
     }
 

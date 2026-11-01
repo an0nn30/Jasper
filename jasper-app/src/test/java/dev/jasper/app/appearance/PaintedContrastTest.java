@@ -492,9 +492,11 @@ class PaintedContrastTest {
         };
         for (boolean hover : List.of(false, true)) {
             var component = new JPanel(); component.setSize(300, 32);
-            var image = new BufferedImage(300, 32, BufferedImage.TYPE_INT_ARGB);
+            // Sample opaque glyph interiors, as the header and preview text checks do; small host fonts can
+            // have only antialiased coverage at 1x, with no pixel exactly equal to their authored foreground.
+            var image = new BufferedImage(4 * 300, 4 * 32, BufferedImage.TYPE_INT_ARGB);
             var graphics = image.createGraphics();
-            try { PAINTER.search(component, graphics, theme, hover, false, "", "MMMM", blank, null); } finally { graphics.dispose(); }
+            try { graphics.scale(4, 4); PAINTER.search(component, graphics, theme, hover, false, "", "MMMM", blank, null); } finally { graphics.dispose(); }
             if (!hasColor(image, expected)) return false;
         }
         return true;
