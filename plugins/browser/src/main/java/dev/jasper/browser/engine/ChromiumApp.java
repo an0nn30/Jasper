@@ -13,12 +13,12 @@ import org.cef.callback.CefSchemeRegistrar;
 import org.cef.handler.CefAppHandlerAdapter;
 
 /**
- * The JCEF side of {@link Chromium}: the in-process {@link CefApp}, its one client and its dispose. Only Chromium's start
- * loads this class, so a plugin start that never shows a page loads no Chromium class.
+ * The JCEF side of {@link Chromium}: the in-process {@link CefApp}, its pages' client, its previews' client and its
+ * dispose. Only Chromium's start loads this class, so a plugin start that never shows a page loads no Chromium class.
  */
 final class ChromiumApp {
     private final CefApp app;
-    private CefClient client;
+    private CefClient client, preview;
     private boolean disposed;
 
     private ChromiumApp(CefApp app) { this.app = app; }
@@ -30,9 +30,12 @@ final class ChromiumApp {
      * @param dataDir the plugin's data directory
      * @param about the pages {@code jasper-about:} serves
      * @param pageBrowser whether a browser is a page's, whose main-frame requests {@code jasper-about:} answers
+     * @param previews the previews' origins {@code jasper-preview:} serves
+     * @param previewBrowser whether a browser is on the preview client, whose requests {@code jasper-preview:} answers
      * @param terminated run once Chromium has ended, on the UI thread
      */
-    static ChromiumApp start(Path dataDir, AboutScheme about, Predicate<CefBrowser> pageBrowser, Runnable terminated) {
+    static ChromiumApp start(Path dataDir, AboutScheme about, Predicate<CefBrowser> pageBrowser, PreviewScheme previews,
+            Predicate<CefBrowser> previewBrowser, Runnable terminated) {
         JCefAppConfig config = JCefAppConfig.getInstance();
         CefApp.setIsRemoteEnabled(false);
         SystemBootstrap.setLoader(config.getLoader());
@@ -42,8 +45,9 @@ final class ChromiumApp {
         String[] args = ChromiumOptions.arguments(List.of(config.getAppArgs())).toArray(String[]::new);
         CefApp.addAppHandler(new Handler(args, terminated));
         CefApp app = CefApp.getInstance(args, settings, config.getServerExe());
-        // JCEF holds the factory until the app has initialized.
+        // JCEF holds the factories until the app has initialized.
         app.registerSchemeHandlerFactory(AboutScheme.NAME, "", new AboutSchemeFactory(about, pageBrowser));
+        app.registerSchemeHandlerFactory(PreviewScheme.NAME, "", new PreviewSchemeFactory(previews, previewBrowser));
         return new ChromiumApp(app);
     }
 
@@ -53,8 +57,8 @@ final class ChromiumApp {
     }
 
     /**
-     * Makes the one client, on the UI thread, has the owner's installers set it up, and hands it over, unless the start
-     * ended meanwhile.
+     * Makes the pages' client, on the UI thread, has the owner's installers set it up, and hands it over, unless the
+     * start ended meanwhile.
      */
     void createClient(Chromium owner) {
         if (!owner.mayCreateClient()) return;
@@ -69,20 +73,38 @@ final class ChromiumApp {
     }
 
     /**
-     * Disposes the client, which closes its every browser, then the app; once, on the UI thread. Chromium ends later, on
-     * its own thread.
+     * Makes the previews' client, a second client of the same app, which none of the pages' handlers reach. UI thread,
+     * once, while Chromium runs.
+     *
+     * @return the client, set up by no installer yet
+     */
+    CefClient createPreviewClient() {
+        preview = app.createClient();
+        return preview;
+    }
+
+    /**
+     * Disposes the previews' client and the pages' client, which closes their every browser, then the app; once, on the
+     * UI thread. Chromium ends later, on its own thread.
      */
     void dispose() {
         if (disposed) return;
         disposed = true;
         try {
-            if (client != null) client.dispose();
+            if (preview != null) preview.dispose();
         } finally {
-            app.dispose();
+            try {
+                if (client != null) client.dispose();
+            } finally {
+                app.dispose();
+            }
         }
     }
 
-    /** Registers {@code jasper-about} and reports Chromium's end. JCEF tells it of each state on the UI thread. */
+    /**
+     * Registers {@code jasper-about} and {@code jasper-preview} and reports Chromium's end. JCEF tells it of each state on
+     * the UI thread.
+     */
     private static final class Handler extends CefAppHandlerAdapter {
         private final Runnable terminated;
 
@@ -93,6 +115,7 @@ final class ChromiumApp {
 
         @Override public void onRegisterCustomSchemes(CefSchemeRegistrar registrar) {
             AboutSchemeFactory.register(registrar);
+            PreviewSchemeFactory.register(registrar);
         }
 
         @Override public void stateHasChanged(CefApp.CefAppState state) {

@@ -3,6 +3,7 @@ package dev.jasper.browser;
 import dev.jasper.browser.dialogs.PageDialogs;
 import dev.jasper.browser.engine.AboutScheme;
 import dev.jasper.browser.engine.Chromium;
+import dev.jasper.browser.engine.PreviewScheme;
 import dev.jasper.browser.engine.RunMarker;
 import dev.jasper.browser.item.BrowserItems;
 import dev.jasper.browser.item.ErrorPage;
@@ -60,7 +61,9 @@ public class BrowserPlugin implements Plugin {
         // it must not hold one of the SDK's virtual threads. The executor makes no thread until a page asks for Chromium.
         worker = Executors.newSingleThreadExecutor(Thread.ofPlatform().daemon().name("jasper-browser-chromium").factory());
         var about = new AboutScheme();
-        chromium = new Chromium(data, worker, about, this::startFailed);
+        // The Markdown previews' origins, which read nothing and make no random source until a preview is first made.
+        var previews = new PreviewScheme();
+        chromium = new Chromium(data, worker, about, previews, this::startFailed);
         BrowserSettings.Declared settings = BrowserSettings.declare(context.settings());
         // A page is made when its item first shows: the client's handlers are installed then, before any page is made on
         // it, as naming their types loads Chromium's classes.

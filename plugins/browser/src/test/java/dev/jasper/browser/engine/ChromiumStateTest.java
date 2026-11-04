@@ -272,7 +272,7 @@ class ChromiumStateTest {
     /** A marker that cannot be written fails neither the start nor the close, and is a warning. */
     @Test void aMarkerThatCannotBeWrittenFailsNothing() throws Exception {
         Path notADirectory = Files.createFile(data.resolve("file"));
-        Chromium chromium = new Chromium(notADirectory, recording, new AboutScheme(), cause -> tellings.incrementAndGet(), process, LIMIT);
+        Chromium chromium = new Chromium(notADirectory, recording, new AboutScheme(), new PreviewScheme(), cause -> tellings.incrementAndGet(), process, LIMIT);
         var client = chromium.client();
         assertThat(chromium.enter()).isTrue();
         assertThat(warnings).singleElement().asString().startsWith("The browser's run marker could not be written: ");
@@ -295,6 +295,86 @@ class ChromiumStateTest {
         assertThat(chromium.answersAbout(page)).isTrue();
         assertThat(chromium.answersAbout(devTools)).isFalse();
         assertThat(starts).as("naming them starts nothing").isEmpty();
+    }
+
+    /**
+     * The preview client waits for the client: asking for it starts Chromium as the client does, once, and asking again
+     * shares its future. A close while it waits fails it as the client fails, and nothing more starts.
+     */
+    @Test void thePreviewClientWaitsForTheClientAndSharesItsOneStart() throws Exception {
+        Chromium chromium = chromium(recording, LIMIT);
+        var preview = chromium.previewClient();
+        assertThat(starts).as("one start, on the worker").hasSize(1);
+        assertThat(chromium.client()).as("the client shares that start").isNotDone();
+        assertThat(chromium.previewClient()).isSameAs(preview);
+        assertThat(starts).as("never a second start (R28)").hasSize(1);
+        assertThat(preview).isNotDone();
+        EventQueue.invokeAndWait(chromium::close);
+        assertThat(failure(preview)).isInstanceOf(IllegalStateException.class).hasMessage(Chromium.ONCE);
+        assertThat(starts).hasSize(1);
+        flushUi();
+        assertThat(tellings).as("a start the close cut short is not a failure to tell").hasValue(0);
+    }
+
+    @Test void afterAFailedStartThePreviewClientFailsWithTheSameReason() throws Exception {
+        Chromium refused = chromium(task -> { throw new RejectedExecutionException("The worker stopped"); }, LIMIT);
+        Throwable cause = failure(refused.client());
+        assertThat(failure(refused.previewClient())).isSameAs(cause);
+        assertThat(refused.state()).isEqualTo(Chromium.State.FAILED);
+        refused.close();
+    }
+
+    @Test void aPreviewClientAskedForDuringAStartThatFailsFailsWithTheSameReason() throws Exception {
+        Chromium threw = chromium(recording, LIMIT);
+        var waiting = threw.previewClient();
+        assertThat(threw.enter()).isTrue();
+        var missing = new UnsatisfiedLinkError("no Chromium libraries");
+        threw.threw(missing);
+        assertThat(failure(waiting)).as("asked for during the start").isSameAs(missing);
+        assertThat(failure(threw.previewClient())).as("asked for after it").isSameAs(missing);
+        assertThat(starts).as("a failed start is not tried again").hasSize(1);
+        threw.close();
+    }
+
+    @Test void afterCloseThePreviewClientFailsWithoutStarting() throws Exception {
+        Chromium chromium = chromium(recording, LIMIT);
+        chromium.close();
+        var refused = chromium.previewClient();
+        assertThat(failure(refused)).isInstanceOf(IllegalStateException.class).hasMessage(Chromium.ONCE);
+        assertThat(starts).isEmpty();
+        assertThat(chromium.state()).isEqualTo(Chromium.State.STOPPED);
+    }
+
+    /**
+     * Each client has only its own installers: none of the pages' reaches the preview client, nor any of the previews'
+     * the pages' client. No client can be made here, so the made clients are stand-in nulls.
+     */
+    @Test void thePreviewClientHasOnlyThePreviewInstallers() throws Exception {
+        Chromium chromium = chromium(recording, LIMIT);
+        var ran = new java.util.ArrayList<String>();
+        java.util.function.Consumer<org.cef.CefClient> page = client -> ran.add("page"), preview = client -> ran.add("preview"),
+            render = client -> ran.add("render");
+        chromium.onClient(page);
+        chromium.onPreviewClient(preview);
+        chromium.onPreviewClient(render);
+        chromium.onPreviewClient(preview);
+        EventQueue.invokeAndWait(() -> chromium.install(null));
+        assertThat(ran).containsExactly("page");
+        EventQueue.invokeAndWait(() -> chromium.installPreview(null));
+        assertThat(ran).as("once each, in the order given").containsExactly("page", "preview", "render");
+        EventQueue.invokeAndWait(() -> chromium.installPreview(null));
+        chromium.onPreviewClient(client -> ran.add("late"));
+        assertThat(ran).containsExactly("page", "preview", "render", "late");
+        assertThat(starts).as("giving installers starts nothing").isEmpty();
+        chromium.close();
+    }
+
+    /** N-F12: {@code jasper-preview:} answers no browser before the preview client exists, and no request of none. */
+    @Test void jasperPreviewAnswersNoBrowserBeforeThePreviewClientExists() {
+        Chromium chromium = chromium(recording, LIMIT);
+        assertThat(chromium.answersPreview(browser())).isFalse();
+        assertThat(chromium.answersPreview(null)).isFalse();
+        assertThat(starts).isEmpty();
     }
 
     /** A browser that is only itself. */
@@ -324,7 +404,7 @@ class ChromiumStateTest {
     }
 
     private Chromium chromium(Executor worker, Duration limit) {
-        return new Chromium(data, worker, new AboutScheme(), cause -> {
+        return new Chromium(data, worker, new AboutScheme(), new PreviewScheme(), cause -> {
             tellings.incrementAndGet();
             toldOnUi.set(EventQueue.isDispatchThread());
             told.complete(cause);

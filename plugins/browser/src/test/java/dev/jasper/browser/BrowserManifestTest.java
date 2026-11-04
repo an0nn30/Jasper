@@ -13,7 +13,7 @@ class BrowserManifestTest {
     @Test void theManifestNamesTheBrowserAndItsSdkRange() throws IOException {
         assertThat(string("id")).isEqualTo("dev.jasper.browser");
         assertThat(string("name")).isEqualTo("Browser");
-        assertThat(string("version")).isEqualTo("0.1.0");
+        assertThat(string("version")).isEqualTo("0.2.0");
         assertThat(string("entry")).isEqualTo(BrowserPlugin.class.getName());
         assertThat(string("sdk")).isEqualTo(">=0.28.0, <0.29");
         assertThat(raw("enabled_by_default")).isEqualTo("true");
@@ -23,6 +23,11 @@ class BrowserManifestTest {
     /** Opening a page in the application's default browser goes through {@code Platform.browser}, which needs this. */
     @Test void theBrowserDeclaresBrowserProvideAndNothingElseYet() throws IOException {
         assertThat(list("capabilities")).containsExactly("browser.provide");
+    }
+
+    /** The Markdown preview's API is the one package other plugins may compile against. */
+    @Test void theBrowserExportsItsApiPackageOnly() throws IOException {
+        assertThat(list("exports")).containsExactly("dev.jasper.browser.api");
     }
 
     private static String manifest() throws IOException {

@@ -1,6 +1,6 @@
 id = "dev.jasper.browser"
 name = "Browser"
-version = "0.1.0"
+version = "0.2.0"
 entry = "dev.jasper.browser.BrowserPlugin"
 sdk = ">=0.28.0, <0.29"
 description = "Shows web pages in Jasper's tabs and panes with Chromium."
@@ -10,3 +10,4 @@ icon_selected_ink = "foreground"
 icon = "icons/browser.svg"
 enabled_by_default = true
 capabilities = ["browser.provide"]
+exports = ["dev.jasper.browser.api"]
