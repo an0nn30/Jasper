@@ -32,7 +32,7 @@ import javax.swing.Timer;
 /**
  * One Markdown preview in a page of Chromium's, the API's {@link MarkdownPreview}: the documents, images and theme its
  * caller gives go to its {@link PreviewScheme.Origin} and, as calls, to its page's {@code preview.js}; what the page
- * tells comes back through {@link #received} as {@link PreviewEvent}s. It names no Chromium type: its page is a set of
+ * tells comes back through {@link #received}, read where it arrived, as {@link PreviewEvent}s. It names no Chromium type: its page is a set of
  * {@link Hooks}, which the service makes from a {@link PreviewPage} and a test records. UI thread, as the API says, and
  * every future it returns completes there.
  *
@@ -301,14 +301,14 @@ final class PagePreview implements MarkdownPreview {
     }
 
     /**
-     * A router request of the page, as the page's router checked it: read as {@link PreviewMessages} reads it, and taken
+     * A message of the page, which {@link PreviewMessages} read from a router request the page's router checked: taken
      * only once the page is ready, but for {@code ready} itself. UI thread.
      *
-     * @param request what the page sent
+     * @param message what the page told
      */
-    void received(String request) {
-        if (done()) return;
-        PreviewMessages.read(request).ifPresent(this::take);
+    void received(PreviewMessages.Message message) {
+        Objects.requireNonNull(message, "message");
+        if (!done()) take(message);
     }
 
     /**

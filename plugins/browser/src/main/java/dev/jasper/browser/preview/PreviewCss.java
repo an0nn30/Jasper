@@ -31,10 +31,10 @@ final class PreviewCss {
      *   <li>the colours {@code --bg}, {@code --fg}, {@code --muted}, {@code --border}, {@code --raised},
      *   {@code --sunken}, {@code --accent}, {@code --selection}, {@code --selection-fg}, {@code --success},
      *   {@code --warning} and {@code --error}, from the workspace palette;</li>
-     *   <li>the fonts: {@code --text-font} and {@code --code-font}, CSS font lists of quoted names, the code's the
-     *   typography's family and fallbacks, then {@code monospace}; {@code --font-size}, the typography's size in
-     *   {@code px}, Java's points being its logical pixels; {@code --line-height}; and {@code --code-ligatures},
-     *   {@code normal} or {@code none};</li>
+     *   <li>the fonts: {@code --text-font} and {@code --code-font}, CSS font lists ({@link #fonts}): the text's the
+     *   theme's text family, then {@code system-ui} and {@code sans-serif}, and the code's the typography's family and
+     *   fallbacks, then {@code monospace}; {@code --font-size}, the typography's size in {@code px}, Java's points being
+     *   its logical pixels; {@code --line-height}; and {@code --code-ligatures}, {@code normal} or {@code none};</li>
      *   <li>for each {@link SyntaxRole}, {@code --tok-<role>}, {@code --tok-<role>-weight} (700 or 400) and
      *   {@code --tok-<role>-style} ({@code italic} or {@code normal}), the role's name in lower case with hyphens, as
      *   the Editor's WEB dialect names its classes;</li>
@@ -124,15 +124,42 @@ final class PreviewCss {
     }
 
     private static String textFont(PreviewTheme theme) {
-        return string(theme.textFamily()) + ", sans-serif";
+        return fonts(List.of(theme.textFamily()), "system-ui", "sans-serif");
     }
 
     private static String codeFont(TerminalTypography typography) {
         List<String> families = new ArrayList<>();
-        families.add(string(typography.family()));
-        for (String fallback : typography.fallback()) families.add(string(fallback));
-        families.add("monospace");
-        return String.join(", ", families);
+        families.add(typography.family());
+        families.addAll(typography.fallback());
+        return fonts(families, "monospace");
+    }
+
+    /**
+     * A CSS font list: each of {@code families} as a quoted name, or as the CSS generic it stands for when Chromium
+     * cannot find it by name (plan 9's N17), then {@code generics}. A Java logical family stands for its generic:
+     * {@code Dialog} and {@code SansSerif} for {@code system-ui}, {@code Serif} for {@code serif}, and
+     * {@code DialogInput} and {@code Monospaced} for {@code monospace}, in any case. A hidden system family, whose name
+     * starts with a dot (as the Mac's interface font, {@code .AppleSystemUIFont}), stands for the list's first generic.
+     * A generic is not written twice in a row.
+     */
+    private static String fonts(List<String> families, String... generics) {
+        var names = new ArrayList<String>();
+        for (String family : families) {
+            String generic = family.startsWith(".") ? generics[0] : switch (family.toLowerCase(Locale.ROOT)) {
+                case "dialog", "sansserif" -> "system-ui";
+                case "serif" -> "serif";
+                case "dialoginput", "monospaced" -> "monospace";
+                default -> null;
+            };
+            add(names, generic == null ? string(family) : generic);
+        }
+        for (String generic : generics) add(names, generic);
+        return String.join(", ", names);
+    }
+
+    /** Adds {@code name} to the font list, unless it is the name before it. */
+    private static void add(List<String> names, String name) {
+        if (names.isEmpty() || !names.getLast().equals(name)) names.add(name);
     }
 
     /** {@code text} as a CSS string: in double quotes, with quotes, backslashes and control characters escaped. */

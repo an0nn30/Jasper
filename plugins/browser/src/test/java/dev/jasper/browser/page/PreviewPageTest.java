@@ -9,6 +9,7 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import javax.accessibility.AccessibleContext;
 import javax.accessibility.AccessibleRole;
 import org.junit.jupiter.api.Test;
@@ -23,6 +24,8 @@ class PreviewPageTest {
     private static final URI SHELL = URI.create("jasper-preview://0123456789abcdef0123456789abcdef/");
     @TempDir Path data;
     private final List<String> heard = new ArrayList<>();
+    /** Each request read, and the thread it was read on. */
+    private final List<String> read = java.util.Collections.synchronizedList(new ArrayList<>());
 
     @Test void theCanvasTellsScreenReadersToUseTheBasicPreview() throws Exception {
         EventQueue.invokeAndWait(() -> {
@@ -52,6 +55,7 @@ class PreviewPageTest {
         });
         EventQueue.invokeAndWait(() -> { });
         assertThat(heard).as("nothing after close").isEmpty();
+        assertThat(read).as("not even read").isEmpty();
         assertThat(PreviewPage.NAME).isEqualTo("Markdown preview");
     }
 
@@ -62,6 +66,7 @@ class PreviewPageTest {
             assertThat(page.shell()).isEqualTo(SHELL.toString());
             new Thread(() -> {
                 page.received("{\"op\":\"ready\"}");
+                page.received("nothing");
                 page.linked(7);
                 page.ended("The renderer stopped");
             }).start();
@@ -70,7 +75,10 @@ class PreviewPageTest {
             Thread.sleep(20);
             EventQueue.invokeAndWait(() -> { });
         }
-        assertThat(heard).containsExactly("ui {\"op\":\"ready\"}", "ui {\"op\":\"link\",\"id\":\"7\"}", "ui failed The renderer stopped");
+        assertThat(read).as("each request is read where it arrives").containsExactly("off {\"op\":\"ready\"}", "off nothing",
+            "off {\"op\":\"link\",\"id\":\"7\"}");
+        assertThat(heard).as("and what it tells runs on the UI thread").containsExactly("ui {\"op\":\"ready\"}",
+            "ui {\"op\":\"link\",\"id\":\"7\"}", "ui failed The renderer stopped");
     }
 
     @Test void findRunsFindJsAnsweringThroughThePreviewsRouter() {
@@ -81,8 +89,10 @@ class PreviewPageTest {
     private PreviewPage page() {
         var chromium = new Chromium(data, task -> { throw new AssertionError("Chromium started"); }, new AboutScheme(), new PreviewScheme(),
             cause -> heard.add("startFailed"));
-        return new PreviewPage(chromium, SHELL, () -> heard.add("created"),
-            request -> heard.add((EventQueue.isDispatchThread() ? "ui " : "off ") + request),
-            failure -> heard.add((EventQueue.isDispatchThread() ? "ui " : "off ") + "failed " + failure.getMessage()));
+        return new PreviewPage(chromium, SHELL, () -> heard.add("created"), request -> {
+            read.add((EventQueue.isDispatchThread() ? "ui " : "off ") + request);
+            if (request.equals("nothing")) return Optional.empty();
+            return Optional.of(() -> heard.add((EventQueue.isDispatchThread() ? "ui " : "off ") + request));
+        }, failure -> heard.add((EventQueue.isDispatchThread() ? "ui " : "off ") + "failed " + failure.getMessage()));
     }
 }

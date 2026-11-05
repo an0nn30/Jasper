@@ -53,12 +53,40 @@ class PreviewCssTest {
 
     @Test void fontFamiliesAreCssStringsWithQuotesAndBackslashesEscaped() {
         Map<String, String> variables = PreviewCss.variables(new PreviewTheme(Variant.DARK, PALETTE, syntax(), "Inter \"Display\"", TYPOGRAPHY));
-        assertThat(variables.get("--text-font")).isEqualTo("\"Inter \\\"Display\\\"\", sans-serif");
+        assertThat(variables.get("--text-font")).isEqualTo("\"Inter \\\"Display\\\"\", system-ui, sans-serif");
         assertThat(variables.get("--code-font")).as("the family, its fallbacks, then monospace")
             .isEqualTo("\"Fira \\\"Code\\\"\", \"Menlo\", \"Back\\\\slash\", monospace");
         assertThat(variables).containsEntry("--code-ligatures", "normal");
         var newline = new PreviewTheme(Variant.DARK, PALETTE, syntax(), "A\nB", TYPOGRAPHY);
-        assertThat(PreviewCss.variables(newline).get("--text-font")).as("a control character as a CSS escape").isEqualTo("\"A\\a B\", sans-serif");
+        assertThat(PreviewCss.variables(newline).get("--text-font")).as("a control character as a CSS escape").isEqualTo("\"A\\a B\", system-ui, sans-serif");
+    }
+
+    /**
+     * N17: Chromium cannot find a Java logical family or a hidden system family (a name starting with a dot, such as the
+     * Mac's interface font), so each is written as the CSS generic it stands for; a hidden one takes its list's own.
+     */
+    @Test void javaLogicalAndHiddenSystemFamiliesBecomeCssGenerics() {
+        for (String family : List.of(".AppleSystemUIFont", "Dialog", "SansSerif", "dialog"))
+            assertThat(textFont(family)).as(family).isEqualTo("system-ui, sans-serif");
+        assertThat(textFont("Serif")).isEqualTo("serif, system-ui, sans-serif");
+        assertThat(textFont("Monospaced")).isEqualTo("monospace, system-ui, sans-serif");
+        assertThat(codeFont("Monospaced", List.of())).isEqualTo("monospace");
+        assertThat(codeFont("DialogInput", List.of("Monospaced", "Menlo"))).as("a generic once in a row")
+            .isEqualTo("monospace, \"Menlo\", monospace");
+        assertThat(codeFont(".SF NS Mono", List.of("Serif"))).isEqualTo("monospace, serif, monospace");
+        assertThat(codeFont("Cousine Nerd Font Mono", List.of("Dialog"))).as("a font only Jasper bundles stays a name")
+            .isEqualTo("\"Cousine Nerd Font Mono\", system-ui, monospace");
+        assertThat(StrictJson.object(PreviewCss.mermaid(new PreviewTheme(Variant.DARK, PALETTE, syntax(), ".AppleSystemUIFont", TYPOGRAPHY)), 1)
+            .orElseThrow()).containsEntry("fontFamily", "system-ui, sans-serif");
+    }
+
+    private static String textFont(String family) {
+        return PreviewCss.variables(new PreviewTheme(Variant.DARK, PALETTE, syntax(), family, TYPOGRAPHY)).get("--text-font");
+    }
+
+    private static String codeFont(String family, List<String> fallback) {
+        var typography = new TerminalTypography(family, 13, fallback, false, 1.2);
+        return PreviewCss.variables(new PreviewTheme(Variant.DARK, PALETTE, syntax(), "Inter", typography)).get("--code-font");
     }
 
     @Test void everyRoleHasItsThreeVariables() {
@@ -85,7 +113,7 @@ class PreviewCssTest {
             .containsEntry("primaryTextColor", "#e0e0e0").containsEntry("primaryBorderColor", "#404850")
             .containsEntry("lineColor", "#909090").containsEntry("secondaryColor", "#080c10").containsEntry("tertiaryColor", "#101820")
             .containsEntry("noteBkgColor", "#080c10").containsEntry("noteTextColor", "#e0e0e0")
-            .containsEntry("fontFamily", "\"Inter\", sans-serif").containsEntry("fontSize", "13.0px");
+            .containsEntry("fontFamily", "\"Inter\", system-ui, sans-serif").containsEntry("fontSize", "13.0px");
         assertThat(StrictJson.object(PreviewCss.mermaid(theme(Variant.LIGHT)), 1).orElseThrow()).containsEntry("darkMode", false);
     }
 

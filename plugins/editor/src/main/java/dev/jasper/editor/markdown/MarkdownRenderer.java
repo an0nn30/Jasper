@@ -73,7 +73,11 @@ public final class MarkdownRenderer {
         var parser = Parser.builder().includeSourceSpans(IncludeSourceSpans.BLOCKS_AND_INLINES)
             .extensions(List.of(TablesExtension.create(), StrikethroughExtension.create(), TaskListItemsExtension.create(),
                 AlertsExtension.create(), FootnotesExtension.create(), AutolinkExtension.create())).build();
-        var root = parser.parse(source);
+        return write(source, parser.parse(source), palette, dialect);
+    }
+
+    /** Writes {@code root}, the tree parsed from {@code source}, in {@code dialect}. */
+    static MarkdownResult write(String source, Node root, SyntaxPalette palette, Dialect dialect) {
         var output = new Output(source, palette, root);
         switch (dialect) {
             case SWING -> new Swing(output).document(root);
@@ -141,13 +145,15 @@ public final class MarkdownRenderer {
                     lineStarts[line++] = i + 1;
                 } else if (source.charAt(i) == '\n') lineStarts[line++] = i + 1;
             }
-            // Every heading is named before any footnote, so a footnote never renames a heading.
+            // Every heading is named once the footnotes are numbered, so a reference in it reads as its number, and
+            // before any footnote, so a footnote never renames a heading.
             var ids = new HeadingIds();
-            footnotes = new Footnotes(root, heading -> {
+            footnotes = new Footnotes(root);
+            for (var heading : footnotes.headings()) {
                 String id = ids.next(visible(heading));
                 headingIds.put(heading, id);
                 headings.put(id, start(heading));
-            });
+            }
             footnotes.name(ids);
             for (var note : footnotes.notes()) {
                 headings.put(note.id(), start(note.definition()));
@@ -260,6 +266,9 @@ public final class MarkdownRenderer {
             return AlertsExtension.STANDARD_TYPES.getOrDefault(alert.getType(), alert.getType());
         }
 
+        /** The text of a footnote reference that points at none of the shown footnotes: {@code [^label]}. */
+        static String literal(FootnoteReference reference) { return "[^" + reference.getLabel() + "]"; }
+
         static int start(Node node) {
             var spans = node.getSourceSpans();
             return spans.isEmpty() ? 0 : spans.getFirst().getInputIndex();
@@ -272,7 +281,11 @@ public final class MarkdownRenderer {
             return node;
         }
 
-        static String visible(Node parent) {
+        /**
+         * The text a node shows, which names a heading and is an image's alternative text: a footnote reference reads
+         * as its number, as GitHub names a heading.
+         */
+        String visible(Node parent) {
             var text = new StringBuilder();
             // Use an explicit stack so adversarial inline nesting does not grow the Java call stack.
             var pending = new java.util.ArrayDeque<Node>();
@@ -282,7 +295,10 @@ public final class MarkdownRenderer {
                 if (child instanceof Text value) text.append(value.getLiteral());
                 else if (child instanceof Code value) text.append(value.getLiteral());
                 else if (child instanceof HardLineBreak || child instanceof SoftLineBreak) text.append(' ');
-                else if (child instanceof HtmlInline value) {
+                else if (child instanceof FootnoteReference reference) {
+                    var note = footnotes.note(reference);
+                    text.append(note == null ? literal(reference) : Integer.toString(note.number()));
+                } else if (child instanceof HtmlInline value) {
                     if (!value.getLiteral().startsWith("<!--")) text.append(value.getLiteral());
                 } else for (Node nested = child.getLastChild(); nested != null; nested = nested.getPrevious()) pending.push(nested);
             }
@@ -352,14 +368,17 @@ public final class MarkdownRenderer {
                     html.append("<a href=\"jasper-link:" + out.link(link.getDestination()) + "\">"); children(link); html.append("</a>");
                 }
                 case Image image -> {
-                    String alt = Output.visible(image);
+                    String alt = out.visible(image);
                     html.append("<img src=\"jasper-image:" + out.image(image.getDestination(), alt) + "\" alt=\"");
                     out.attribute(alt); html.append("\">");
                 }
                 case FootnoteReference reference -> {
                     var note = out.footnotes.note(reference);
-                    if (reference == note.first()) name(note.referenceId());
-                    html.append("<a href=\"jasper-link:" + out.link("#" + note.id()) + "\">[" + note.number() + "]</a>");
+                    if (note == null) out.text(Output.literal(reference));
+                    else {
+                        if (reference == note.first()) name(note.referenceId());
+                        html.append("<a href=\"jasper-link:" + out.link("#" + note.id()) + "\">[" + note.number() + "]</a>");
+                    }
                 }
                 case TableBlock table -> container("table", table);
                 case TableHead head -> children(head);

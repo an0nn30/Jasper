@@ -322,6 +322,32 @@ class FindBarTest {
         assertThat(model.status()).isEqualTo("1 match");
     }
 
+    /**
+     * W7: a late answer that fails other than by a refused pattern or a cancel is not lost in the future it completes:
+     * it reaches the UI thread's uncaught-exception handler, for a count and for a step that waited behind one.
+     */
+    @Test void aLateAnswersFailureReachesTheUncaughtExceptionHandler() {
+        var thread = Thread.currentThread();
+        var before = thread.getUncaughtExceptionHandler();
+        var caught = new ArrayList<Throwable>();
+        thread.setUncaughtExceptionHandler((where, failure) -> caught.add(failure));
+        try {
+            var model = chromiumBar();
+            model.open(false);
+            type(model, "a");
+            page.marks().getLast().completeExceptionally(new IllegalStateException("count"));
+            model.next();
+            page.steps().getLast().completeExceptionally(new IllegalStateException("step"));
+            type(model, "ab");
+            model.next();
+            page.marks().getLast().complete(1);
+            page.steps().getLast().completeExceptionally(new IllegalStateException("followed"));
+        } finally {
+            thread.setUncaughtExceptionHandler(before);
+        }
+        assertThat(caught).extracting(Throwable::getCause).extracting(Throwable::getMessage).containsExactly("count", "step", "followed");
+    }
+
     /** N7: a page not yet ready answers at once with nothing found. */
     @Test void findBeforeThePageIsReadyAnswersNoMatchesAtOnce() {
         var model = chromiumBar();

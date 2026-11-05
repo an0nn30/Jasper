@@ -72,7 +72,7 @@ class PreviewScriptTest {
         var preview = new PagePreview(scheme.open(), new PagePreview.Hooks(new JComponent() { }, ran::add, color -> { }, () -> { },
             () -> { }, () -> { }, () -> { }), Runnable::run, event -> { });
         EventQueue.invokeAndWait(() -> {
-            preview.received("{\"op\":\"ready\"}");
+            PagePreviewTest.hear(preview, "{\"op\":\"ready\"}");
             preview.theme(PreviewCssTest.theme(Variant.DARK));
             preview.show(1, "<p>One</p>");
             preview.image(1, new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB));

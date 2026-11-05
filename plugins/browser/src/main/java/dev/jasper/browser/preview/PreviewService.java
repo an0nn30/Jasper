@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
@@ -98,7 +99,7 @@ public final class PreviewService implements MarkdownPreviews {
 
     /**
      * What a preview's page tells its preview: its browser exists, its requests and its failure. Made before the preview
-     * it reaches, which it reaches once made. UI thread.
+     * it reaches, which it reaches once made. UI thread, but for reading a request.
      */
     static final class Wiring {
         private final URI shell;
@@ -117,8 +118,16 @@ public final class PreviewService implements MarkdownPreviews {
             if (preview != null) preview.created();
         }
 
-        void received(String request) {
-            if (preview != null) preview.received(request);
+        /**
+         * Reads a request of the page where it arrives, on Chromium's thread, so a layout's many numbers are never parsed
+         * on the UI thread (plan 9's W8). Any thread; never throws.
+         *
+         * @return what the request tells the preview, run on the UI thread; empty for anything that is no message
+         */
+        Optional<Runnable> received(String request) {
+            return PreviewMessages.read(request).map(message -> () -> {
+                if (preview != null) preview.received(message);
+            });
         }
 
         void failed(Throwable cause) {

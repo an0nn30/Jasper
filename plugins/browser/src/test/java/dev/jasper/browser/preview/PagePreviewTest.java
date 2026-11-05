@@ -67,7 +67,7 @@ class PagePreviewTest {
         });
         assertThat(backgrounds).containsExactly(PreviewCssTest.PALETTE.background());
         assertThat(ran).as("nothing before the page is ready").isEmpty();
-        ui(() -> preview.received("{\"op\":\"ready\"}"));
+        ui(() -> hear(preview, "{\"op\":\"ready\"}"));
         assertThat(ran).hasSize(2);
         assertThat(ran.getFirst()).startsWith("jasperPreview.theme(\"").endsWith(", true);");
         assertThat(ran.get(1)).isEqualTo("jasperPreview.show(\"1\");");
@@ -89,18 +89,18 @@ class PagePreviewTest {
         });
         assertThat(answer("document/1").status()).as("only the latest document is served").isEqualTo(404);
         assertThat(text(answer("document/3"))).isEqualTo("three");
-        ui(() -> preview.received("{\"op\":\"ready\"}"));
+        ui(() -> hear(preview, "{\"op\":\"ready\"}"));
         assertThat(ran).containsExactly("jasperPreview.show(\"3\");");
         ui(() -> {
-            preview.received("{\"op\":\"shown\",\"rev\":\"2\"}");
-            preview.received("{\"op\":\"shown\",\"rev\":\"3\"}");
-            preview.received("{\"op\":\"shown\",\"rev\":\"3\"}");
+            hear(preview, "{\"op\":\"shown\",\"rev\":\"2\"}");
+            hear(preview, "{\"op\":\"shown\",\"rev\":\"3\"}");
+            hear(preview, "{\"op\":\"shown\",\"rev\":\"3\"}");
         });
         assertThat(told).containsExactly(new PreviewEvent.Shown(3));
         assertThatThrownBy(() -> preview.show(3, "again")).isInstanceOf(IllegalArgumentException.class);
         ui(() -> preview.show(4, "four"));
         assertThat(ran.getLast()).isEqualTo("jasperPreview.show(\"4\");");
-        ui(() -> preview.received("{\"op\":\"shown\",\"rev\":\"3\"}"));
+        ui(() -> hear(preview, "{\"op\":\"shown\",\"rev\":\"3\"}"));
         assertThat(told).as("an older shown after a newer show").containsExactly(new PreviewEvent.Shown(3));
     }
 
@@ -115,13 +115,13 @@ class PagePreviewTest {
         ready();
         ui(() -> {
             preview.show(1, "one");
-            preview.received("{\"op\":\"shown\",\"rev\":\"1\"}");
-            preview.received(geometry(1, "0,20"));
+            hear(preview, "{\"op\":\"shown\",\"rev\":\"1\"}");
+            hear(preview, geometry(1, "0,20"));
             preview.show(2, "two");
-            preview.received(geometry(1, "0,30"));
-            preview.received("{\"op\":\"shown\",\"rev\":\"2\"}");
-            preview.received(geometry(1, "0,40"));
-            preview.received(geometry(2, "0,50"));
+            hear(preview, geometry(1, "0,30"));
+            hear(preview, "{\"op\":\"shown\",\"rev\":\"2\"}");
+            hear(preview, geometry(1, "0,40"));
+            hear(preview, geometry(2, "0,50"));
         });
         assertThat(told).containsExactly(new PreviewEvent.Shown(1), new PreviewEvent.Geometry(1, new double[] {0, 20}, 900, 400),
             new PreviewEvent.Geometry(1, new double[] {0, 30}, 900, 400), new PreviewEvent.Shown(2),
@@ -135,14 +135,14 @@ class PagePreviewTest {
             preview.reveal("ignored-before-ready");
         });
         assertThat(ran).isEmpty();
-        ui(() -> preview.received("{\"op\":\"ready\"}"));
+        ui(() -> hear(preview, "{\"op\":\"ready\"}"));
         assertThat(ran).as("the last scroll").containsExactly("jasperPreview.scrollTo(\"250.5\");");
         ui(() -> {
             preview.scrollTo(Double.NaN);
             preview.reveal("intro\"</script>");
-            preview.received("{\"op\":\"scrolled\",\"y\":\"80\",\"user\":true}");
-            preview.received("{\"op\":\"link\",\"id\":\"3\"}");
-            preview.received("{\"op\":\"link\",\"id\":\"x\"}");
+            hear(preview, "{\"op\":\"scrolled\",\"y\":\"80\",\"user\":true}");
+            hear(preview, "{\"op\":\"link\",\"id\":\"3\"}");
+            hear(preview, "{\"op\":\"link\",\"id\":\"x\"}");
         });
         assertThat(ran).containsExactly("jasperPreview.scrollTo(\"250.5\");", "jasperPreview.reveal(\"intro\\\"</script>\");");
         assertThat(told).containsExactly(new PreviewEvent.Scrolled(80, true), new PreviewEvent.LinkActivated(3));
@@ -174,7 +174,7 @@ class PagePreviewTest {
         var deferred = new PagePreview(origin, new PagePreview.Hooks(canvas, ran::add, backgrounds::add, () -> { }, () -> { }, () -> { },
             () -> { }), queued::add, told::add, (delay, task) -> () -> { });
         ui(() -> {
-            deferred.received("{\"op\":\"ready\"}");
+            hear(deferred, "{\"op\":\"ready\"}");
             deferred.image(1, new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB));
             deferred.imageReason(1, "Too large");
             queued.forEach(Runnable::run);
@@ -212,26 +212,26 @@ class PagePreviewTest {
         assertThat(search).containsExactly(Map.entry("action", "search"), Map.entry("search", 1L), Map.entry("query", "needle"),
             Map.entry("matchCase", true), Map.entry("wholeWord", true), Map.entry("regex", false));
         ui(() -> {
-            preview.received("{\"op\":\"find\",\"search\":2,\"count\":5,\"invalid\":false}");
+            hear(preview, "{\"op\":\"find\",\"search\":2,\"count\":5,\"invalid\":false}");
             text.add(preview.selectedText());
         });
         assertThat(marked.getFirst()).as("an answer to another request").isNotDone();
         assertThat(findCommand(ran.getLast())).containsExactly(Map.entry("action", "selection"), Map.entry("search", 2L));
         ui(() -> {
-            preview.received("{\"op\":\"find\",\"search\":1,\"count\":5,\"invalid\":false}");
-            preview.received("{\"op\":\"find\",\"search\":1,\"selection\":\"word\"}");
-            preview.received("{\"op\":\"find\",\"search\":2,\"selection\":\"needle\"}");
+            hear(preview, "{\"op\":\"find\",\"search\":1,\"count\":5,\"invalid\":false}");
+            hear(preview, "{\"op\":\"find\",\"search\":1,\"selection\":\"word\"}");
+            hear(preview, "{\"op\":\"find\",\"search\":2,\"selection\":\"needle\"}");
         });
         assertThat(marked.getFirst()).isCompletedWithValue(5);
         assertThat(text.getFirst()).isCompletedWithValue("needle");
         ui(() -> selected.add(preview.select(new PreviewFind("needle", true, true, false), false)));
         assertThat(findCommand(ran.getLast())).containsEntry("action", "step").containsEntry("search", 3L).containsEntry("forward", false)
             .containsEntry("query", "needle");
-        ui(() -> preview.received("{\"op\":\"find\",\"search\":3,\"count\":5,\"invalid\":false}"));
+        ui(() -> hear(preview, "{\"op\":\"find\",\"search\":3,\"count\":5,\"invalid\":false}"));
         assertThat(selected.getFirst()).isCompletedWithValue(true);
         ui(() -> {
             selected.add(preview.select(new PreviewFind("none", false, false, false), true));
-            preview.received("{\"op\":\"find\",\"search\":4,\"count\":0,\"invalid\":false}");
+            hear(preview, "{\"op\":\"find\",\"search\":4,\"count\":0,\"invalid\":false}");
         });
         assertThat(selected.getLast()).isCompletedWithValue(false);
         ui(preview::clearFind);
@@ -244,9 +244,9 @@ class PagePreviewTest {
         var selected = new ArrayList<CompletableFuture<Boolean>>();
         ui(() -> {
             marked.add(preview.markAll(new PreviewFind("(", false, false, true)));
-            preview.received("{\"op\":\"find\",\"search\":1,\"count\":0,\"invalid\":true}");
+            hear(preview, "{\"op\":\"find\",\"search\":1,\"count\":0,\"invalid\":true}");
             selected.add(preview.select(new PreviewFind("[", false, false, true), true));
-            preview.received("{\"op\":\"find\",\"search\":2,\"count\":0,\"invalid\":true}");
+            hear(preview, "{\"op\":\"find\",\"search\":2,\"count\":0,\"invalid\":true}");
         });
         assertThatThrownBy(marked.getFirst()::get).isInstanceOf(ExecutionException.class).cause()
             .isInstanceOf(PatternSyntaxException.class).hasMessageContaining("(");
@@ -264,7 +264,7 @@ class PagePreviewTest {
         assertThat(waiting.get(0)).isCancelled();
         assertThat(waiting.get(1)).isCancelled();
         assertThat(waiting.get(2)).isNotDone();
-        ui(() -> preview.received("{\"op\":\"find\",\"search\":1,\"count\":3,\"invalid\":false}"));
+        ui(() -> hear(preview, "{\"op\":\"find\",\"search\":1,\"count\":3,\"invalid\":false}"));
         assertThat(waiting.get(2)).as("the cancelled request's late answer").isNotDone();
     }
 
@@ -301,8 +301,8 @@ class PagePreviewTest {
         int scripts = ran.size();
         var after = new ArrayList<CompletableFuture<?>>();
         ui(() -> {
-            preview.received("{\"op\":\"shown\",\"rev\":\"1\"}");
-            preview.received("{\"op\":\"find\",\"search\":1,\"count\":3,\"invalid\":false}");
+            hear(preview, "{\"op\":\"shown\",\"rev\":\"1\"}");
+            hear(preview, "{\"op\":\"find\",\"search\":1,\"count\":3,\"invalid\":false}");
             preview.unavailable("Chromium stopped");
             preview.show(2, "two");
             preview.theme(PreviewCssTest.theme(Variant.DARK));
@@ -326,7 +326,7 @@ class PagePreviewTest {
             waiting.add(preview.markAll(new PreviewFind("a", false, false, false)));
             preview.unavailable("The browser could not start");
             preview.unavailable("again");
-            preview.received("{\"op\":\"scrolled\",\"y\":\"1\",\"user\":true}");
+            hear(preview, "{\"op\":\"scrolled\",\"y\":\"1\",\"user\":true}");
         });
         assertThat(told).containsExactly(new PreviewEvent.Unavailable("The browser could not start"));
         assertThat(waiting.getFirst()).isCancelled();
@@ -338,7 +338,7 @@ class PagePreviewTest {
         assertThat(delays).containsExactly(Duration.ofSeconds(30));
         ui(() -> List.copyOf(waits).forEach(Runnable::run));
         assertThat(told).containsExactly(new PreviewEvent.Unavailable(PagePreview.NOT_LOADED));
-        ui(() -> preview.received("{\"op\":\"ready\"}"));
+        ui(() -> hear(preview, "{\"op\":\"ready\"}"));
         assertThat(ran).as("nothing after Unavailable").isEmpty();
     }
 
@@ -347,14 +347,14 @@ class PagePreviewTest {
         ui(() -> {
             preview.created();
             preview.show(1, "one");
-            preview.received("{\"op\":\"ready\"}");
+            hear(preview, "{\"op\":\"ready\"}");
         });
         assertThat(ran).containsExactly("jasperPreview.show(\"1\");");
         assertThat(waits).as("ready does not end the watch while the document waits").hasSize(1);
         ui(() -> List.copyOf(waits).forEach(Runnable::run));
         assertThat(told).containsExactly(new PreviewEvent.Unavailable(PagePreview.NOT_LOADED));
         ui(() -> {
-            preview.received("{\"op\":\"shown\",\"rev\":\"1\"}");
+            hear(preview, "{\"op\":\"shown\",\"rev\":\"1\"}");
             preview.show(2, "two");
         });
         assertThat(told).as("nothing after Unavailable").hasSize(1);
@@ -368,9 +368,9 @@ class PagePreviewTest {
             preview.created();
             waited.addAll(waits);
             preview.show(1, "one");
-            preview.received("{\"op\":\"ready\"}");
+            hear(preview, "{\"op\":\"ready\"}");
             preview.show(2, "two");
-            preview.received("{\"op\":\"shown\",\"rev\":\"1\"}");
+            hear(preview, "{\"op\":\"shown\",\"rev\":\"1\"}");
         });
         assertThat(waits).as("the watch was stopped").isEmpty();
         ui(() -> {
@@ -385,7 +385,7 @@ class PagePreviewTest {
     @Test void aReadyPageAskedForNothingIsNotUnavailableAtTheDeadline() throws Exception {
         ui(() -> {
             preview.created();
-            preview.received("{\"op\":\"ready\"}");
+            hear(preview, "{\"op\":\"ready\"}");
         });
         ui(() -> List.copyOf(waits).forEach(Runnable::run));
         assertThat(told).isEmpty();
@@ -409,7 +409,12 @@ class PagePreviewTest {
 
     /** The page is ready: it has posted {@code ready}. */
     private void ready() throws Exception {
-        ui(() -> preview.received("{\"op\":\"ready\"}"));
+        ui(() -> hear(preview, "{\"op\":\"ready\"}"));
+    }
+
+    /** {@code to} hears what the page sent as {@code request}, read as the page's wiring reads it: nothing for no message. */
+    static void hear(PagePreview to, String request) {
+        PreviewMessages.read(request).ifPresent(to::received);
     }
 
     private static String geometry(long revision, String tops) {

@@ -100,16 +100,14 @@ final class WebMarkup {
             case SoftLineBreak ignored -> html.append("\n");
             case Link link -> { link(out.link(link.getDestination())); html.append(">"); children(link); html.append("</a>"); }
             case Image image -> {
-                String alt = MarkdownRenderer.Output.visible(image);
+                String alt = out.visible(image);
                 html.append("<img data-image=\"" + out.image(image.getDestination(), alt) + "\" alt=\"");
                 out.attribute(alt); html.append("\">");
             }
             case FootnoteReference reference -> {
                 var note = out.footnotes.note(reference);
-                html.append("<sup class=\"footnote-ref\">");
-                link(out.link("#" + note.id()));
-                if (reference == note.first()) { html.append(" id=\""); out.attribute(note.referenceId()); html.append("\""); }
-                html.append(">" + note.number() + "</a></sup>");
+                if (note == null) out.text(MarkdownRenderer.Output.literal(reference));
+                else footnoteReference(reference, note);
             }
             case TableBlock table -> { html.append("<table>\n"); children(table); html.append("</table>\n"); }
             case TableHead head -> children(head);
@@ -126,6 +124,14 @@ final class WebMarkup {
             case FootnoteDefinition ignored -> { }
             default -> children(node);
         }
+    }
+
+    /** A reference as GitHub's raised number, the first of its note's carrying the id its back reference goes to. */
+    private void footnoteReference(FootnoteReference reference, Footnotes.Note note) {
+        html.append("<sup class=\"footnote-ref\">");
+        link(out.link("#" + note.id()));
+        if (reference == note.first()) { html.append(" id=\""); out.attribute(note.referenceId()); html.append("\""); }
+        html.append(">" + note.number() + "</a></sup>");
     }
 
     private void inline(String tag, Node node) {

@@ -210,7 +210,7 @@ public final class FindBar {
                     });
                     // A step would cancel the count the page has not answered yet: it follows the count instead.
                     if (counting.isDone()) step.run();
-                    else counting.whenComplete((count, failure) -> { if (visible && current.getAsBoolean()) step.run(); });
+                    else counting.whenComplete((count, failure) -> late(() -> { if (visible && current.getAsBoolean()) step.run(); }));
                 }
             }
         });
@@ -246,11 +246,23 @@ public final class FindBar {
     /**
      * Hands {@code then} a target's answer: at once when it is ready, as the source's and the Basic preview's are, else
      * when it arrives, on the UI thread, if the bar still shows and {@code current} still holds. A refused pattern shows
-     * "Invalid pattern"; a cancelled answer changes nothing.
+     * "Invalid pattern"; a cancelled answer changes nothing; any other failure is thrown, by a late answer to the UI
+     * thread's uncaught-exception handler.
      */
     private <T> void answer(CompletableFuture<T> future, BooleanSupplier current, Consumer<T> then) {
         if (future.isDone()) take(future, then);
-        else future.whenComplete((value, failure) -> { if (visible && current.getAsBoolean()) take(future, then); });
+        else future.whenComplete((value, failure) -> late(() -> { if (visible && current.getAsBoolean()) take(future, then); }));
+    }
+    /**
+     * Runs work a late answer brings. What it throws goes to the thread's uncaught-exception handler, as a throw on the
+     * UI thread would, not into the future {@code whenComplete} returns, which nothing reads.
+     */
+    private static void late(Runnable work) {
+        try { work.run(); }
+        catch (RuntimeException | Error failure) {
+            Thread thread = Thread.currentThread();
+            thread.getUncaughtExceptionHandler().uncaughtException(thread, failure);
+        }
     }
     private <T> void take(CompletableFuture<T> future, Consumer<T> then) {
         final T value;

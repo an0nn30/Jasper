@@ -47,12 +47,18 @@ class PreviewServiceTest {
         assertThat(pages).hasSize(2);
         assertThat(scheme.answer("GET", pages.get(0).shell().toString()).status()).as("each page's shell is its open origin's").isEqualTo(200);
         assertThat(pages.get(0).shell()).isNotEqualTo(pages.get(1).shell());
+        // Each request is read here, off the UI thread, as on Chromium's, and what it tells runs on the UI thread.
+        Runnable ready = pages.get(0).received("{\"op\":\"ready\"}").orElseThrow();
         EventQueue.invokeAndWait(() -> {
             pages.get(0).created();
-            pages.get(0).received("{\"op\":\"ready\"}");
+            ready.run();
             made.get(0).show(1, "<p>One</p>");
         });
-        EventQueue.invokeAndWait(() -> pages.get(0).received("{\"op\":\"shown\",\"rev\":\"1\"}"));
+        EventQueue.invokeAndWait(pages.get(0).received("{\"op\":\"shown\",\"rev\":\"1\"}").orElseThrow());
+        assertThat(pages.get(0).received("{\"op\":\"geometry\",\"rev\":\"1\",\"tops\":\"0,x\",\"height\":\"9\",\"viewport\":\"9\"}"))
+            .as("a request that is no message tells the UI thread nothing").isEmpty();
+        assertThat(pages.get(0).received("{\"op\":\"geometry\",\"rev\":\"1\",\"tops\":\"" + "1.5,".repeat(49_999)
+            + "2\",\"height\":\"9\",\"viewport\":\"9\"}")).as("50,000 tops, read here").isPresent();
         assertThat(delays).as("created arms the page's deadline").containsExactly(PagePreview.LOAD_WAIT);
         assertThat(waits).as("which the first document shown stopped").isEmpty();
         assertThat(ran).containsExactly("jasperPreview.show(\"1\");");

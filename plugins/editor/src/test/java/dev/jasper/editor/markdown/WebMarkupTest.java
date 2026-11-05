@@ -9,6 +9,11 @@ import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.IntStream;
+import org.commonmark.ext.footnotes.FootnoteReference;
+import org.commonmark.node.Document;
+import org.commonmark.node.Heading;
+import org.commonmark.node.Paragraph;
+import org.commonmark.node.Text;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -161,6 +166,56 @@ class WebMarkupTest {
         assertThat(result.html()).contains("<h1 id=\"fn-1\"", "<h1 id=\"fnref-1\"", "<li id=\"fn-1-1\">", " id=\"fnref-1-1\">1</a>");
         assertThat(result.html().split("id=\"fnref-1-1\"", -1)).hasSize(2);
         assertThat(result.links()).extracting(MarkdownResult.Link::destination).containsExactly("#fn-1-1", "#fn-1-1", "#fnref-1-1");
+    }
+
+    /**
+     * W5: a heading is named from its text with each footnote reference read as its number, as GitHub names it and as
+     * Jasper did before footnotes: {@code # Heading [^1]} is {@code heading-1}, in both dialects, whichever note it is.
+     */
+    @Test void aHeadingsNameReadsAFootnoteReferenceAsItsNumber() {
+        String first = "# Heading [^1]\n\nSee [the heading](#heading-1).\n\n[^1]: The note\n";
+        String later = "a[^x] b[^y]\n\n# Later [^y]\n\n# Again [^x]\n\n[^x]: X\n[^y]: Y\n";
+        for (var result : List.of(web(first), swing(first))) {
+            assertThat(result.headings()).containsEntry("heading-1", 0).doesNotContainKey("heading-");
+            var link = result.links().stream().filter(each -> each.destination().equals("#heading-1")).findFirst().orElseThrow();
+            assertThat(Destinations.parse(link.destination())).isEqualTo(new Destination.Fragment("heading-1"));
+        }
+        assertThat(web(first).html()).startsWith("<h1 id=\"heading-1\" data-b=\"0\">Heading <sup class=\"footnote-ref\">");
+        for (var result : List.of(web(later), swing(later)))
+            assertThat(result.headings()).containsEntry("later-2", later.indexOf("# Later")).containsEntry("again-1", later.indexOf("# Again"));
+    }
+
+    /** W6: footnote labels match whatever their case, as commonmark matches them. */
+    @Test void aFootnoteLabelMatchesInAnyCase() {
+        String source = "a[^Note] b[^NOTE]\n\n[^note]: The note\n";
+        for (var result : List.of(web(source), swing(source))) {
+            assertThat(result.headings()).containsOnlyKeys("fn-1", "fnref-1");
+            assertThat(result.links()).extracting(MarkdownResult.Link::destination).containsExactly("#fn-1", "#fn-1", "#fnref-1");
+            assertThat(result.html()).contains("The note");
+        }
+    }
+
+    /** W6: a footnote reference with no note, which commonmark does not make but a tree can hold, is written as its text. */
+    @Test void aFootnoteReferenceWithNoNoteIsItsText() {
+        var root = new Document();
+        var paragraph = new Paragraph();
+        paragraph.appendChild(new Text("See "));
+        paragraph.appendChild(new FootnoteReference("missing"));
+        paragraph.appendChild(new Text("."));
+        root.appendChild(paragraph);
+        var heading = new Heading();
+        heading.setLevel(2);
+        heading.appendChild(new Text("Title "));
+        heading.appendChild(new FootnoteReference("gone"));
+        root.appendChild(heading);
+        var web = MarkdownRenderer.write("See [^missing].", root, MarkdownRendererTest.palette(), Dialect.WEB);
+        var swing = MarkdownRenderer.write("See [^missing].", root, MarkdownRendererTest.palette(), Dialect.SWING);
+        assertThat(web.html()).contains("<p>See [^missing].</p>", "<h2 id=\"title-gone\">Title [^gone]</h2>");
+        assertThat(swing.html()).contains("<p>See [^missing].</p>", "<h2>Title [^gone]</h2>");
+        for (var result : List.of(web, swing)) {
+            assertThat(result.links()).isEmpty();
+            assertThat(result.headings()).containsOnlyKeys("title-gone");
+        }
     }
 
     @Test void autolinksBecomeLinks() {

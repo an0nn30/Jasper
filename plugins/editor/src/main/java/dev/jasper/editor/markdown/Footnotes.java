@@ -7,7 +7,6 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import org.commonmark.ext.footnotes.FootnoteDefinition;
@@ -49,9 +48,10 @@ final class Footnotes {
     private final Map<String, FootnoteDefinition> definitions = new HashMap<>();
     private final Map<FootnoteDefinition, Note> numbered = new IdentityHashMap<>();
     private final List<Note> notes = new ArrayList<>();
+    private final List<Heading> headings = new ArrayList<>();
 
-    /** Numbers the document's footnotes, telling {@code headings} each heading the preview shows, in the order it shows them. */
-    Footnotes(Node document, Consumer<Heading> headings) {
+    /** Numbers the document's footnotes, and lists the headings the preview shows, in the order it shows them. */
+    Footnotes(Node document) {
         // As commonmark resolves a reference: the first definition of a label wins.
         walk(document, node -> {
             if (node instanceof FootnoteDefinition definition) definitions.putIfAbsent(label(definition.getLabel()), definition);
@@ -63,7 +63,7 @@ final class Footnotes {
                 // An image's children are its alternative text, not shown nodes.
                 case Image ignored -> { return false; }
                 case FootnoteReference reference -> reference(reference);
-                case Heading heading -> headings.accept(heading);
+                case Heading heading -> headings.add(heading);
                 default -> { }
             }
             return true;
@@ -76,7 +76,10 @@ final class Footnotes {
     /** The shown footnotes, in number order. */
     List<Note> notes() { return Collections.unmodifiableList(notes); }
 
-    /** The footnote a shown reference points at. */
+    /** The headings the preview shows, in its order: the document's, then those of the shown footnotes in number order. */
+    List<Heading> headings() { return Collections.unmodifiableList(headings); }
+
+    /** The footnote a reference points at; null for a reference to none of the shown footnotes. */
     Note note(FootnoteReference reference) {
         return numbered.get(definitions.get(label(reference.getLabel())));
     }

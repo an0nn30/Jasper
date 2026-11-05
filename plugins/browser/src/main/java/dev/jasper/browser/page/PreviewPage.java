@@ -7,7 +7,9 @@ import java.awt.EventQueue;
 import java.awt.event.HierarchyEvent;
 import java.net.URI;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import javax.swing.JComponent;
 import org.cef.CefClient;
 import org.cef.browser.CefFrame;
@@ -15,8 +17,9 @@ import org.cef.browser.CefFrame;
 /**
  * A Markdown preview's page, in plain types: the canvas it is drawn on, made at once, and its browser, made on Chromium's
  * preview client the first time the canvas shows, which loads the preview's shell. Until then it asks nothing of
- * Chromium. The preview client's handlers ({@link PreviewHandlers}) hand it its main frame's router requests and the
- * failures of its page, which it hands on on the UI thread. Every method but those runs on the UI thread. With
+ * Chromium. The preview client's handlers ({@link PreviewHandlers}) hand it its main frame's router requests, which it
+ * has read where they arrive, and the failures of its page; it hands on what they tell on the UI thread. Every method
+ * but those runs on the UI thread. With
  * {@link Page}, this is the one class that makes a {@link PageView}: the preview's, which tells screen readers to use
  * the Editor's Basic preview, paints the theme's background until the page's first frame and refuses drops.
  */
@@ -31,7 +34,7 @@ public final class PreviewPage implements AutoCloseable {
     private final Chromium chromium;
     private final String shell, token;
     private final Runnable created;
-    private final Consumer<String> requests;
+    private final Function<String, Optional<Runnable>> requests;
     private final Consumer<Throwable> failed;
     // UI thread: whether the browser was asked for, the browser, whether it hears what it is asked, and the close.
     private boolean started, ready, closed;
@@ -45,10 +48,13 @@ public final class PreviewPage implements AutoCloseable {
      * @param chromium the plugin's Chromium, asked for the preview client the first time the canvas shows
      * @param shell the shell's address, {@code jasper-preview://<token>/}, which the browser loads
      * @param created told once the page's browser exists, on the UI thread
-     * @param requests handed each router request of the page's main frame, on the UI thread
+     * @param requests reads each router request of the page's main frame on the thread it arrives on, Chromium's, so the
+     *     UI thread never parses what the page sends, and answers what the request tells, which runs on the UI thread;
+     *     empty for a request that tells nothing. It must not throw.
      * @param failed told why the page cannot show, on the UI thread: its client could not be made, or its renderer ended
      */
-    public PreviewPage(Chromium chromium, URI shell, Runnable created, Consumer<String> requests, Consumer<Throwable> failed) {
+    public PreviewPage(Chromium chromium, URI shell, Runnable created, Function<String, Optional<Runnable>> requests,
+            Consumer<Throwable> failed) {
         this.chromium = Objects.requireNonNull(chromium, "chromium");
         this.shell = shell.toString();
         token = Objects.requireNonNull(shell.getHost(), "the shell's token");
@@ -204,11 +210,15 @@ public final class PreviewPage implements AutoCloseable {
         return true;
     }
 
-    /** A router request of the main frame, which the router checked: handed on on the UI thread. Any thread. */
+    /**
+     * A router request of the main frame, which the router checked: read on this thread, and what it tells run on the
+     * UI thread. Any thread.
+     */
     void received(String request) {
-        EventQueue.invokeLater(() -> {
-            if (!closed) requests.accept(request);
-        });
+        if (gone) return;
+        requests.apply(request).ifPresent(told -> EventQueue.invokeLater(() -> {
+            if (!closed) told.run();
+        }));
     }
 
     /** The user activated link {@code id} and the page's script did not take it: handed on as the script would. Any thread. */
