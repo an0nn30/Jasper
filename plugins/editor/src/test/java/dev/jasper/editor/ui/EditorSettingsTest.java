@@ -138,10 +138,10 @@ class EditorSettingsTest {
             host.start(INFO, Set.of(), Set.of(), context -> declared.set(new EditorSettings.Declared(recording(context.settings(), specs), Set.of())));
             var spec = specs.stream().filter(declaration -> declaration.key().equals("markdown_preview")).findFirst().orElseThrow();
             assertThat(spec.label()).isEqualTo("Markdown preview");
-            assertThat(spec.description()).isEqualTo("Chromium draws GitHub's look with Mermaid diagrams and needs the Browser plugin; Basic is "
+            assertThat(spec.description()).isEqualTo("Chromium draws GitHub's look and needs the Browser plugin; Basic is "
                 + "the Editor's own preview, which screen readers can read. Without the Browser plugin, the preview is Basic.");
             assertThat(spec.section()).isEqualTo("Markdown");
-            assertThat(spec.keywords()).containsExactly("editor", "markdown", "preview", "chromium", "mermaid", "screen reader");
+            assertThat(spec.keywords()).containsExactly("editor", "markdown", "preview", "chromium", "screen reader");
             assertThat(declared.get().markdownPreview()).isEqualTo(PreviewEngine.CHROMIUM);
             assertThat(declared.get().markdownPreferences().engine()).isEqualTo(PreviewEngine.CHROMIUM);
             host.setSetting(ID, "markdown_preview", "basic");

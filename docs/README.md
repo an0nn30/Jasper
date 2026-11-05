@@ -52,7 +52,7 @@ bundled plugins, the plugin SDK, and the libraries the application is built from
 - [Writing a plugin](plugin-authoring.md): the manifest, capabilities, lifecycle, contributions, settings, packaging
   and testing.
 - [Plugin UI](plugin-ui.md): building panels, dialogs, forms and content tabs with the theme engine.
-- [Plugin APIs](plugin-apis.md): the APIs that the Vault, Editor, Remote and Snippets plugins export to other
+- [Plugin APIs](plugin-apis.md): the APIs that the Vault, Editor, Remote, Snippets and Browser plugins export to other
   plugins.
 - [SDK architecture](sdk-architecture.md): how Jasper discovers, loads, threads and stops plugins.
 - [Plugin icons](sdk-icons.md): the semantic icon names and registering a plugin's own monochrome icons.

@@ -3,10 +3,11 @@
 The bundled Browser plugin (`dev.jasper.browser`) shows web pages in workspace tabs and panes, beside terminals. Jasper
 draws them with Chromium, which comes with Jasper's runtime, so nothing else needs installing. It is also the web
 browser Jasper opens links with: a link you click in a terminal can open here, after asking you first
-([Links from terminals and Jasper](#links-from-terminals-and-jasper)). It is on by default and can be turned off on the
-Plugins page ([Plugins](plugins.md#browser)); without it, links open in the system browser and local files in the
-Default editor, and while Jasper is itself the system's [default browser](#making-jasper-your-default-browser), web
-links open nothing.
+([Links from terminals and Jasper](#links-from-terminals-and-jasper)), and it draws the Editor's
+[Markdown preview](#markdown-preview). It is on by default and can be turned off on the Plugins page
+([Plugins](plugins.md#browser)); without it, links open in the system browser and local files in the Default editor,
+the Markdown preview is the Editor's Basic one, and while Jasper is itself the system's
+[default browser](#making-jasper-your-default-browser), web links open nothing.
 
 ## Opening pages
 
@@ -31,12 +32,12 @@ without any user name and password in it.
   tab; Chromium lets a page's script do so only while the page's history has a single entry, and a linked popup can
   always close itself ([Popups](#popups)).
 - A page in a tab that is not shown draws one frame a second; its network requests go on.
-- Chromium starts the first time a browser page shows, not when Jasper starts, and runs until Jasper quits. When it
-  cannot start, Jasper posts "The browser could not start" with the reason, such as "Chromium did not start within 90
-  seconds", and the plugin's log has it too. From then on the links Jasper hands the Browser open in the system browser
-  (a local web file in the Default editor; while Jasper is itself the system's default browser, a web link opens
-  nothing), and New Browser Tab, New Browser Window and the Browser split item post the notification again instead of
-  opening a page.
+- Chromium starts the first time a browser page or a [Markdown preview](#markdown-preview) shows, not when Jasper
+  starts, and runs until Jasper quits. When it cannot start, Jasper posts "The browser could not start" with the
+  reason, such as "Chromium did not start within 90 seconds", and the plugin's log has it too. From then on the links
+  Jasper hands the Browser open in the system browser (a local web file in the Default editor; while Jasper is itself
+  the system's default browser, a web link opens nothing), and New Browser Tab, New Browser Window and the Browser split
+  item post the notification again instead of opening a page.
 - All pages share one Chromium profile, kept across runs: cookies, session cookies included, the cache and other site
   data ([Files](#files)).
 
@@ -500,16 +501,26 @@ take, such as `http://my_service:8080/` (a `_` in a host), opens nothing too, wh
 "Jasper’s browser can’t open this address" with the address, without any user name and password in it, and **Copy
 Link**.
 
+## Markdown preview
+
+The Editor's [Markdown preview](editor.md#markdown-preview) draws with the Browser while its **Markdown preview** setting
+is Chromium, the default. Each preview is a page of its own, apart from your browser pages, in GitHub's layout and the
+theme's colours: it loads nothing from the network, runs none of the file's scripts and goes to no other address. Its
+links and images are the Editor's: a click on a link, or Enter on one, goes to the Editor, which follows it as
+[Links in the preview](editor.md#links-in-the-preview) says, and its images are those the Editor loads, web images only
+after **Load external images**. It has no right-click menu and opens no popups or page dialogs. While the Browser plugin
+is off, and once Chromium could not start or has stopped, the Editor's previews are Basic, the Editor's own.
+
 ## Restore
 
 When Jasper restores a window ([Saving and restoring the windows](workspace.md#saving-and-restoring-the-windows)), each
 browser page comes back in its tab and pane, at the address it last showed, at its own [zoom](#zoom) and for the OSC 8
 target it was opened for.
-It loads the first time it shows, so restoring starts no Chromium; until then its tab is named after the address's host.
-Chromium starts inside Jasper the first time a page shows and runs until Jasper quits. If Jasper ends while Chromium
-starts or runs, for example in a Chromium crash or a force-quit, the pages the next launch restores wait instead: each
-says "Jasper closed while this page was open." and loads when you click **Load Page**, press Enter in its address field,
-click **Reload** or open a link in it.
+It loads the first time it shows, so restoring a page starts no Chromium; until then its tab is named after the
+address's host. Chromium starts inside Jasper the first time a page or a Markdown preview shows and runs until Jasper
+quits. If Jasper ends while Chromium starts or runs, for example in a Chromium crash or a force-quit, the pages the next
+launch restores wait instead: each says "Jasper closed while this page was open." and loads when you click **Load
+Page**, press Enter in its address field, click **Reload** or open a link in it.
 
 - An address too long for the saved state (4,096 characters, counted with the target and the zoom) is saved without
   its query and fragment, and when it is still too long, not at all.

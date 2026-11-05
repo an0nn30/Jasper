@@ -1,5 +1,91 @@
 # Jasper — Status and Handoff
 
+**Browser plan 9: the Chromium Markdown preview — 2026-11-05** (`claude/browser-markdown-preview`, worktree
+`.claude/worktrees/browser-4b-4c-e6deab`, from local `main` `420bfd63a`, which has plans 4a, 4b and 4c merged; the plan
+`1364c1dc3`, commits `8676bfab4` to `a38f29813`, then the docs; not merged or pushed;
+[plan](superpowers/plans/2026-10-30-browser-9-markdown-preview.md), whose banner lists every deviation by task,
+[spec](superpowers/specs/2026-10-26-jasper-browser-plugin-design.md) sections 18 and 23,
+[guide](editor.md#markdown-preview); executed with per-task subagents and reviews, Task 1 as slices 1a and 1b). The
+Editor's Markdown preview is drawn by Chromium through the Browser:
+- **The setting** `markdown_preview` (Settings › Tools › Editor › Markdown › Markdown preview): `chromium`, the default,
+  in GitHub's layout and the theme's colours, or `basic`, the Editor's own Swing preview, which screen readers can
+  read. A change applies to open tabs at once, keeping each one's view, divider and Synchronize scrolling. Every
+  preview is Basic without the Browser plugin and once Chromium could not start or has stopped; a view whose page did
+  not load within 10 seconds, or whose page stopped, is Basic for the rest of the run, one UI turn later (Task 6's fix
+  round). A view makes its Chromium preview the first time Split or Preview shows (N9), so start-up and restored Source
+  tabs start no Chromium.
+- **The renderer:** commonmark's alerts, footnotes and autolinks (0.30.0, with autolink-java 0.12.0) in both
+  previews; a WEB dialect beside the SWING one, whose vocabulary keeps raw HTML as text and writes every link as a
+  `jasper-link:` id and every image as a `data-image` id; Basic shows alerts as quotes with a bold title and footnote
+  references as `[n]`.
+- **The Browser** (0.2.0) exports `dev.jasper.browser.api` (`MarkdownPreviews`, `MarkdownPreview`, `PreviewEvent`,
+  `PreviewTheme`, `PreviewFind`) and publishes `PreviewService`; behind it, a second Chromium client for previews only,
+  the `jasper-preview:` scheme with a random 128-bit origin per preview under one content security policy (header and
+  the shell's first `<meta>`), a request filter that refuses everything outside the origin, a navigation rule that
+  cancels everything but the shell's first load, no popups, dialogs or context menu, `preview.js` and `preview.css`.
+  Images reach the page only from the Editor's loader, as PNGs. Only `Page` and `PreviewPage` make `PageView`.
+- **The Editor** (0.19.0) optionally requires the Browser `>=0.2.0`; a sealed `PreviewSurface` (`BasicPreview`,
+  `ChromiumPreview`) carries install, images, fragments, scroll sync, Find and Copy; only `ChromiumPreview` and
+  `ChromiumPreviews` name the Browser's API (`EditorBrowserBoundaryTest`). Scroll sync reads the page's layout and
+  scrolling, and an echo of Jasper's own scroll never leads; Find is asynchronous with sequence numbers and runs 4b's
+  `find.js` in the page (JavaScript's regular expressions, at most 10,000 matches).
+- **Mermaid has not landed** (slice 1b): its download waits for the user's approval (N1, N5). Until then a `mermaid`
+  fence shows as a plain code block in both previews, the scheme answers `/mermaid.min.js` with 404, and the setting's
+  description, its keywords, `settings.toml` and the guides name no Mermaid (N8). 1b adds `mermaid.min.js` under the
+  Browser's `third_party/`, the Mermaid notices component with `mermaid.LICENSE.txt` and `mermaid.NOTICE.txt`, and
+  `MermaidBundleTest`. `autolink.LICENSE.txt` is unverified against upstream's at tag `autolink-0.12.0` (N2).
+
+No SDK change: `JasperSdk.VERSION` stays 0.28.0. Notices: three commonmark modules on the CommonMark Java component, a
+new autolink-java component, and the `third_party/` rule in `verifyThirdPartyNotices`. Docs: the Editor guide (the
+setting, the fallback, alerts, footnotes and autolinks, footnote ids, Chromium's Find and colours, translucency), the
+Browser guide (Markdown preview, Chromium's start), Plugins (versions, the export and the optional requirement), Plugin
+APIs (five exporting plugins, the Browser API section), SDK architecture and AGENTS.md (`PreviewPage` makes `PageView`;
+the export and its one consumer), configuration and creating themes (Basic's translucency, Chromium's alert colours),
+the docs index, the SDK reference's guide pages and the regenerated reference. `./gradlew check --continue` (JBR
+25.0.4.1 b635.75 jcef, 15m 10s, after the docs): **14,722 tests, 0 failures, 0 errors, 103 skipped** (1,324 classes in
+the 16 build folders, without the example plugin's: jasper-app 5,256 with 90 skipped, Editor 5,382 with 4 skipped,
+Browser 604 with 1 skipped, jasper-sdk 131, jasper-sdk-testkit 295), one test and one class fewer than Task 7's tally of
+14,723, since every module's result files now match its test sources and that tally most likely counted a stale one; the
+example external plugin's `check pluginZip` against `build/sdk-release` passes (1 test, up to date: the SDK is
+unchanged); `sdkReference` was rerun; source hygiene is clean over 3,296 Java files. No GUI was launched.
+
+The controller's rulings, one line each (the pre-flight scan's F1-F38 adopted as N0; the banner gives each N-F*n*
+where it applied):
+- N0: every ruling the pre-flight scan proposed (F1-F38) is adopted and cited as N-F*n*.
+- N1: Task 1 split into 1a (the commonmark extensions through Gradle, autolink-java's notice, the `third_party/` rule)
+  and 1b (Mermaid's npm tarball, its notices and `MermaidBundleTest`), which waits for the user's own approval of the
+  download.
+- N2: `autolink.LICENSE.txt` is checked against upstream's `LICENSE` at tag `autolink-0.12.0` before the merge;
+  recorded as unverified until then.
+- N3: the WEB task checkbox inside the item's first `<p>`; ↩ ends the definition's last paragraph; SWING's
+  `fn-n`/`fnref-n` are named markers, not block anchors.
+- N4: Remote's `PublicationCrashTest` timeouts under extreme load during Task 3 are not Task 3's; a later full check
+  reruns.
+- N5: Task 5 builds the page with a seam for Mermaid, which loads the bundled script when present; a `mermaid` fence is
+  code until slice 1b.
+- N6: `previewClient()` fails on the UI thread too and hands out copies of its future, as `client()` does; every
+  `MarkdownPreview` future completes on the UI thread; the scheme answers a preview's browser only for its own token.
+- N7: Find before the page is ready answers no matches at once.
+- N8: if 1b has not landed when plan 9 merges, "Mermaid" leaves the setting's description and the guides (done in
+  Task 8, with the keyword and `settings.toml`).
+- N9: a view makes its Chromium preview the first time Split or Preview shows, not when it opens.
+- N10: regex Whole Word is `\b(?:` + pattern + `)\b` in both previews, after the pattern compiles alone.
+- N11: the source editor's regex Whole Word stays RSyntaxTextArea's; the difference from the previews is a follow-up.
+
+Known gaps and follow-ups (the banner has them all, with the deferred minors by task): Mermaid waits for 1b, and after
+it the guides and the setting name Mermaid again and the first `/mermaid.min.js` read should leave Chromium's IO thread;
+`autolink.LICENSE.txt` is unverified (N2); memory does not go back when previews close (in-process Chromium cannot
+restart, N-F32 from 4a); a view that falls back to Basic says nothing unless Chromium's start failed; regex Whole Word
+differs between the source and the previews for an alternation (N11); **Line height** spaces only Basic's lines; every
+browser page's canvas now has the accessible role of a canvas (Task 5's side effect); the `Unavailable` reasons "The
+Markdown preview's page did not load within 10 seconds." and "Chromium's page for the Markdown preview stopped." are
+carried but not shown; an unresolved footnote label would fail the whole render (Task 2's minor, for the final
+review); no JavaScript runs in a test (`preview.js` and `find.js` are checked as text and with `node --check`). Task 9
+(the user's check on macOS, with their OK): pending, F38's GUI-only line first, then the plan's twelve lines and the
+task reviews'; if the first line fails,
+`markdown_preview`'s default goes to `basic` before anything is pushed. Windows and Linux are not run; benchmarks and
+the memory run are deferred.
+
 **Browser plan 4c: registering Jasper as the default browser — 2026-10-31** (`claude/browser-default-browser`, worktree
 `.claude/worktrees/browser-4b-4c-e6deab`, from local `main` `4e0ce0a14`, which has plan 4b merged; commits `ff4a7bfc9`
 to `a56f78cc4`, the docs `120cf12e3`, then the final review's fix wave `e831f6939` to `4b3de41f8` and its docs; not

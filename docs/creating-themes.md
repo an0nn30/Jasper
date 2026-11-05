@@ -503,10 +503,12 @@ fine where the Editor needs a colour of its own. On macOS, with a translucent wo
 100), the Editor's background and gutter are left clear and the current-line highlight takes the workspace's opacity.
 
 The Editor's [Markdown preview](editor.md#markdown-preview) colours its code blocks with these syntax roles, and the
-rest of its page with UI roles: `surface.panel` behind it (at the workspace's opacity), `text.primary` for text,
-`accent` for links, `text.secondary` for block quotes and image placeholders, `surface.card` behind code blocks,
-`border.window` for table borders, `surface.panel.raised` behind table header cells, and `selection.bg` with
-`text.onSelection` for selected text; Find's matches in it are laid on `selection.bg`.
+rest of its page with UI roles: `surface.panel` behind it (at the workspace's opacity in Basic), `text.primary` for
+text, `accent` for links, `text.secondary` for block quotes and image placeholders, `surface.card` behind code blocks,
+`border.window` for table borders, `surface.panel.raised` behind table header cells (in Chromium, behind every other
+row), and `selection.bg` with `text.onSelection` for selected text; Find's matches in it are laid on `selection.bg`.
+Chromium's alerts take `accent` (Note), `status.success` (Tip), the `keyword` role's colour (Important),
+`status.warning` (Warning) and `status.danger` (Caution).
 
 ## Contrast and the token rule
 

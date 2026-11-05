@@ -209,7 +209,7 @@ those opened afterwards, *Restart* at the next start. **Settings** names the pag
 | `ui.theme.light` | string | `"desktop-colors"` on Linux, `"jasper-meadow"` elsewhere, or the [look's](#look-dependent-defaults) | A theme id | Live | Appearance › Light theme |
 | `ui.font.family` | string | `"system"` | `"system"` or a font family name ([Interface font](#interface-font)) | Live | Appearance › Font |
 | `ui.font.size` | number | Not set: the look's size | 8–32 points | Live | Appearance › Use platform font size, Font size |
-| `ui.workspace.opacity` | number | Not set: opaque | 10–100 percent: the opacity of terminal and editor backgrounds, the Editor's Markdown preview included; macOS only | Live | Appearance › Enable opacity, Opacity (macOS) |
+| `ui.workspace.opacity` | number | Not set: opaque | 10–100 percent: the opacity of terminal and editor backgrounds, the Editor's Basic Markdown preview included; macOS only | Live | Appearance › Enable opacity, Opacity (macOS) |
 | `ui.workspace.blur` | string | `"theme"` | `"theme"` (the theme's choice; no theme blurs), `"on"`, `"off"`: blurs the desktop behind a translucent workspace; macOS only | Live | Appearance › Background blur (macOS) |
 | `ui.animations.enabled` | boolean | `true` | `false` stops motion; running transitions finish at once | Live | Appearance › Enable animations; hidden under a look without motion, such as Enterprise |
 

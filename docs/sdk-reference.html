@@ -804,12 +804,12 @@ packages exactly as yours would, and each can be turned off in Settings › Plug
 <tbody>
 <tr><td>Remote: SSH, SFTP and tunnels</td><td><code>dev.jasper.remote</code></td><td><code>terminal.open</code>, <code>session.provide</code>, <code>terminal.observe</code>, <code>palette.contribute</code>, <code>files.source</code></td><td><code>dev.jasper.remote.api</code></td><td>Vault, Editor</td></tr>
 <tr><td>Credential Vault</td><td><code>dev.jasper.vault</code></td><td><code>palette.contribute</code></td><td><code>dev.jasper.vault.api</code></td><td></td></tr>
-<tr><td>Editor</td><td><code>dev.jasper.editor</code></td><td><code>palette.contribute</code>, <code>terminal.environment</code>, <code>editor.provide</code>, <code>terminal.open</code></td><td><code>dev.jasper.editor.api</code></td><td></td></tr>
+<tr><td>Editor</td><td><code>dev.jasper.editor</code></td><td><code>palette.contribute</code>, <code>terminal.environment</code>, <code>editor.provide</code>, <code>terminal.open</code></td><td><code>dev.jasper.editor.api</code></td><td>Browser</td></tr>
 <tr><td>File Server</td><td><code>dev.jasper.fileserver</code></td><td><code>network.listen</code>, <code>terminal.observe</code>, <code>palette.contribute</code>, <code>clipboard.read</code></td><td></td><td>Vault</td></tr>
 <tr><td>Project Index</td><td><code>dev.jasper.indexer</code></td><td><code>terminal.observe</code>, <code>terminal.open</code>, <code>palette.contribute</code></td><td></td><td>Editor, Remote</td></tr>
 <tr><td>Shell History</td><td><code>dev.jasper.history</code></td><td><code>palette.contribute</code>, <code>terminal.observe</code>, <code>terminal.inject</code></td><td></td><td>Snippets</td></tr>
 <tr><td>Snippets</td><td><code>dev.jasper.snippets</code></td><td><code>palette.contribute</code>, <code>terminal.inject</code></td><td><code>dev.jasper.snippets.api</code></td><td></td></tr>
-<tr><td>Browser: web pages</td><td><code>dev.jasper.browser</code></td><td><code>browser.provide</code></td><td></td><td></td></tr>
+<tr><td>Browser: web pages and the Editor's Markdown preview</td><td><code>dev.jasper.browser</code></td><td><code>browser.provide</code></td><td><code>dev.jasper.browser.api</code></td><td></td></tr>
 <tr><td>Enterprise look (off by default)</td><td><code>dev.jasper.enterprise</code></td><td><code>presentation.provide</code></td><td></td><td></td></tr>
 <tr><td>Sample</td><td><code>dev.jasper.sample</code></td><td><code>terminal.observe</code>, <code>terminal.inject</code>, <code>terminal.open</code>, <code>session.provide</code>, <code>palette.contribute</code></td><td></td><td></td></tr>
 </tbody>
@@ -2231,7 +2231,7 @@ and then listens. One topic id carries one payload type; using it with another t
 <a href="#dev.jasper.sdk.activity.Activities.CONNECTIONS"><code>Activities.CONNECTIONS</code></a> and the <a href="#dev.jasper.sdk.terminal.TerminalEvents"><code>TerminalEvents</code></a>, which need <code>terminal.observe</code>.</p>
 
 <h3>The bundled plugins' APIs</h3>
-<p>Four bundled plugins export an API package. Their types are in the <a href="#group-plugins">Bundled plugin APIs</a> part
+<p>Five bundled plugins export an API package. Their types are in the <a href="#group-plugins">Bundled plugin APIs</a> part
 of this reference; how each behaves for its users is in <a href="plugin-apis.md">plugin APIs</a>.</p>
 <div class="table-wrap"><table>
 <thead><tr><th>Package</th><th>Service</th><th>What it offers</th><th>Requires line</th></tr></thead>
@@ -2240,6 +2240,7 @@ of this reference; how each behaves for its users is in <a href="plugin-apis.md"
 <tr><td><a href="#package-dev.jasper.editor.api"><code>dev.jasper.editor.api</code></a></td><td><a href="#dev.jasper.editor.api.Editor"><code>Editor</code></a></td><td>Opening a local file, or a document the consumer reads and writes (<a href="#dev.jasper.editor.api.EditorDocument"><code>EditorDocument</code></a>), in an editor tab; reopening the consumer's documents from Recent Files; answering Open in Editor… first; offering a file source's places in the Editor's chooser; resolving the relative images and links of a Markdown preview through the consumer's document (<a href="#dev.jasper.editor.api.EditorDocument.resolveRelative(String)"><code>EditorDocument.resolveRelative(String)</code></a>)</td><td><code>{ id = "dev.jasper.editor", version = "&gt;=0.7", optional = true }</code></td></tr>
 <tr><td><a href="#package-dev.jasper.remote.api"><code>dev.jasper.remote.api</code></a></td><td><a href="#dev.jasper.remote.api.RemoteProjects"><code>RemoteProjects</code></a></td><td>The saved host and folder of an SSH pane; whether a host is connected; listing a remote work tree; looking for marker files; opening a remote file in the Editor or a terminal in a remote folder</td><td><code>{ id = "dev.jasper.remote", version = "&gt;=0.12", optional = true }</code></td></tr>
 <tr><td><a href="#package-dev.jasper.snippets.api"><code>dev.jasper.snippets.api</code></a></td><td><a href="#dev.jasper.snippets.api.SnippetService"><code>SnippetService</code></a></td><td>Looking a snippet up by name; appending a snippet; the Snippets palette scope's id and row ids, for reopening the palette on a snippet</td><td><code>{ id = "dev.jasper.snippets", version = "&gt;=0.1", optional = true }</code></td></tr>
+<tr><td><a href="#package-dev.jasper.browser.api"><code>dev.jasper.browser.api</code></a></td><td><a href="#dev.jasper.browser.api.MarkdownPreviews"><code>MarkdownPreviews</code></a></td><td>Markdown previews Chromium draws (<a href="#dev.jasper.browser.api.MarkdownPreview"><code>MarkdownPreview</code></a>): a canvas showing the consumer's HTML in its theme, with its images; its links, scrolling and layout reported as events; finding text with JavaScript's regular expressions; copying and selecting</td><td><code>{ id = "dev.jasper.browser", version = "&gt;=0.2.0", optional = true }</code></td></tr>
 </tbody>
 </table></div>
 <p>The ranges shown are the highest a bundled consumer declares; Remote declares <code>&gt;=0.2</code> for the Editor. The SDK release carries no jar for these packages: their

@@ -234,12 +234,12 @@ Paste. Use the menus or the command palette for those.
 the text, or in a Markdown tab the pane that last had the focus: the source, or the rendered preview
 ([Finding in the preview](#finding-in-the-preview)). **Replace…** opens the bar with a second row for the replacement
 and always searches the source; in the Preview view it first switches the tab to Source and preview. The bar has the
-query field, **Match Case**, **Whole Word** and **Regular Expression** (Java's regular expressions) toggles, the match
-count ("No matches", "1 match", "*n* matches", or "Invalid pattern"), **Previous Match**, **Next Match** and **Close**.
-Every match is highlighted, and the search wraps around the end of the file. In the replace row, **Replace** replaces
-the next match after the caret and **Replace All** replaces every one and reports "Replaced *n*". With Regular
-Expression on, `$1`, `$2` and so on in the replacement stand for the pattern's groups, `\n` and `\t` for a new line and
-a tab, and `\$` for a dollar sign.
+query field, **Match Case**, **Whole Word** and **Regular Expression** (Java's regular expressions; JavaScript's in the
+Chromium preview) toggles, the match count ("No matches", "1 match", "*n* matches", or "Invalid pattern"), **Previous
+Match**, **Next Match** and **Close**. Every match is highlighted, and the search wraps around the end of the file. In
+the replace row, **Replace** replaces the next match after the caret and **Replace All** replaces every one and reports
+"Replaced *n*". With Regular Expression on, `$1`, `$2` and so on in the replacement stand for the pattern's groups, `\n`
+and `\t` for a new line and a tab, and `\$` for a dollar sign.
 
 | Key | In the find bar |
 |---|---|
@@ -249,7 +249,7 @@ a tab, and `\$` for a dollar sign.
 
 The query and toggles are shared by every Editor tab. **Find Next** and **Find Previous** search for the query while the
 bar is closed too. The bar closes when you select another tab, or when a Markdown view change hides the pane it
-searches.
+searches, or when the preview it searches changes between Chromium and Basic ([Markdown preview](#markdown-preview)).
 
 ## Go to Line and Language
 
@@ -343,25 +343,42 @@ first time it shows Markdown; tabs already open keep theirs. A choice that canno
 Markdown default view". When **Language…** changes a tab to another language, the bar hides and the tab shows its
 source; changing it back to Markdown brings back the tab's last view.
 
-**Markdown preview** (`markdown_preview`) chooses what draws the preview: **Chromium**, which the
-[Browser](browser.md) plugin runs, or **Basic**, the Editor's own preview, which screen readers can read. Without the
-Browser plugin the preview is Basic. A change applies to open tabs at once, and each keeps its view, divider and
-Synchronize scrolling. When Chromium cannot draw a tab's preview, because it could not start, has stopped or the
-preview's page did not load, that tab's preview is Basic for the rest of Jasper's run; a Chromium that could not start
-also posts "The browser could not start".
+**Markdown preview** (`markdown_preview`) chooses what draws the preview: **Chromium** (the default), which the
+[Browser](browser.md#markdown-preview) plugin runs, in GitHub's layout, or **Basic**, the Editor's own preview, which
+screen readers can read. The Chromium preview gives a screen reader only its name, "Markdown preview", and the
+description "Screen readers cannot read this preview. Set Markdown preview to Basic in the Editor's settings to read
+it." A change applies to open tabs at once, and each keeps its view, divider and Synchronize scrolling. Chromium starts
+the first time a Chromium preview, or a browser page, shows.
+
+Every preview is Basic without the Browser plugin, and for the rest of Jasper's run once Chromium could not start or
+has stopped; a Chromium that could not start also posts "The browser could not start". A tab whose Chromium page did
+not load within 10 seconds, or whose page stopped, previews in Basic for the rest of the run; other tabs stay on
+Chromium.
 
 ### What the preview shows
 
-The preview renders CommonMark with GitHub's tables, strikethrough (`~~text~~`) and task lists (☑ and ☐): headings,
-paragraphs, emphasis, block quotes, numbered and bulleted lists, inline code, code blocks, rules, links and images. HTML
-in the text shows as text, tags included, and HTML comments are left out. A fenced code block whose info string starts
-with a language the Editor highlights, by its name in **Language…** (such as `python` or `yaml`) or as `js`, `ts`, `py`,
-`sh`, `bash`, `shell`, `c++` or `c#`, is coloured as the Editor colours that language; other code is plain. Code does
-not wrap: the preview scrolls sideways when a code line or a table is wider than the pane.
+The preview renders CommonMark with GitHub's tables, strikethrough (`~~text~~`), task lists, alerts, footnotes and
+autolinks: headings, paragraphs, emphasis, block quotes, numbered and bulleted lists, inline code, code blocks, rules,
+links and images. HTML in the text shows as text, tags included, and HTML comments are left out. A fenced code block
+whose info string starts with a language the Editor highlights, by its name in **Language…** (such as `python` or
+`yaml`) or as `js`, `ts`, `py`, `sh`, `bash`, `shell`, `c++` or `c#`, is coloured as the Editor colours that language;
+other code is plain. Code does not wrap: when a code line or a table is wider than the pane, Basic's preview scrolls
+sideways, and in Chromium's that code block or table does.
+
+- **Task lists** (`- [x] done`, `- [ ] to do`) show checkboxes in Chromium, and ☑ and ☐ in Basic.
+- **Alerts**, block quotes whose first line is `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]` or `[!CAUTION]`, show
+  their title (Note, Tip, Important, Warning or Caution): in Chromium as GitHub's coloured box, and in Basic as a quote
+  whose first line is the title in bold.
+- **Footnotes:** a reference such as `[^1]` links to its note, a definition such as `[^1]: The note.` written anywhere
+  in the document. Notes are numbered in the order they are first referenced and follow the document, after a rule, in
+  that order, each ending with ↩, which goes back to its first reference; a note never referenced is left out. Chromium
+  shows a reference as a raised number, and Basic as `[1]`.
+- **Autolinks:** an address written in the text, such as `https://example.com` or `www.example.org` (which links to
+  `http://www.example.org`), and an email address are links.
 
 Text is in the interface font's family at the tab's font size, with larger headings; code is in the Editor's font,
-with its fallback fonts and ligatures, and **Line height** spaces the preview's lines too. Colours come from the UI
-theme ([Theme colours](#theme-colours)). A change of theme or font applies to the preview at once.
+with its fallback fonts and ligatures. In Basic, **Line height** spaces the preview's lines too. Colours come from the
+UI theme ([Theme colours](#theme-colours)). A change of theme or font applies to the preview at once.
 
 The preview cannot be edited. Copy copies the text selected in it, and **Select All** in the tab menu selects all of it
 while it has the focus. In the Preview view, the commands that change or locate text (Paste, and **Cut**, **Delete**,
@@ -394,8 +411,9 @@ and before the first; Enter follows the selected link.
 
 A heading's name is its text in lower case, with each run of spaces made one `-` and every character but letters,
 digits, `-` and `_` left out: `## Getting started` is `#getting-started`. A second heading with the same name gets `-1`
-added, the next `-2`, and a heading with none of those characters is `#section`. In a linked file that shows only its
-source, the caret goes to the heading's line.
+added, the next `-2`, and a heading with none of those characters is `#section`. A footnote's note is `#fn-1`, `#fn-2`
+and so on, by its number, and its first reference `#fnref-1`; a heading of the same name keeps it, and the footnote's
+gets `-1` added. In a linked file that shows only its source, the caret goes to the heading's line.
 
 A relative path uses `/` and starts in the document's folder; percent escapes such as `%20` are decoded. A remote
 file's links open on its host, over the same connection and login ([Remote files](#remote-files)). A link that cannot
@@ -438,7 +456,9 @@ image has failed, loads the failed ones again.
 While the preview has the focus, **Find…** searches its rendered text, code blocks included, with the same **Match
 Case**, **Whole Word** and **Regular Expression** options. Every match is highlighted in the selection colour, Enter
 and Shift+Enter select the next and previous one, and the count follows when the preview renders again. **Replace…**
-works on the source ([Find and replace](#find-and-replace)).
+works on the source ([Find and replace](#find-and-replace)). In the Chromium preview, **Regular Expression** takes
+JavaScript's regular expressions, and a pattern JavaScript refuses shows "Invalid pattern"; a search counts and
+highlights at most 10,000 matches, and only those in the text it reads within 250 ms.
 
 ## Encodings and line endings
 
@@ -673,10 +693,13 @@ the Editor. A change of theme or of the setting applies to open tabs at once, wi
 highlight, and Vim sneak's magenta matches, keep their own colours.
 
 The [Markdown preview](#markdown-preview) takes its page from the UI theme's roles instead: `surface.panel` behind it
-(translucent too, with `ui.workspace.opacity`), `text.primary` for text, `accent` for links, `text.secondary` for block
-quotes and image placeholders, `surface.card` behind code blocks, `border.window` and `surface.panel.raised` for table
-borders and header cells, and `selection.bg` and `text.onSelection` for selected text; Find's matches in it are
-highlighted in `selection.bg`. Its code blocks take the workspace's editor scheme's syntax colours, whatever **Color scheme** chooses. Writing an editor scheme:
+(translucent too in Basic, with `ui.workspace.opacity`; the Chromium preview stays opaque), `text.primary` for text,
+`accent` for links, `text.secondary` for block quotes and image placeholders, `surface.card` behind code blocks,
+`border.window` and `surface.panel.raised` for table borders and header cells (in Chromium, behind every other row
+instead), and `selection.bg` and `text.onSelection` for selected text; Find's matches in it are highlighted in `selection.bg`. In
+Chromium an alert's rule and title take `accent` (Note), `status.success` (Tip), the workspace's editor scheme's
+keyword colour (Important), `status.warning` (Warning) or `status.danger` (Caution). Its code blocks take the
+workspace's editor scheme's syntax colours, whatever **Color scheme** chooses. Writing an editor scheme:
 [Creating themes](creating-themes.md); the SDK's view of it:
 [`Appearance.editorPalette()`](sdk-reference.html#dev.jasper.sdk.ui.Appearance.editorPalette()) and
 [`Appearance.syntaxPalette()`](sdk-reference.html#dev.jasper.sdk.ui.Appearance.syntaxPalette()), and every installed

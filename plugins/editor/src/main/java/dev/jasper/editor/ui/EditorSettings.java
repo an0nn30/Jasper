@@ -131,9 +131,9 @@ public record EditorSettings(String fontFamily, double fontSize, List<String> fo
                     Choice.of("chromium", "Chromium", PreviewEngine.CHROMIUM),
                     Choice.of("basic", "Basic", PreviewEngine.BASIC))), PreviewEngine.CHROMIUM)
                 .label("Markdown preview")
-                .description("Chromium draws GitHub's look with Mermaid diagrams and needs the Browser plugin; Basic is the "
+                .description("Chromium draws GitHub's look and needs the Browser plugin; Basic is the "
                     + "Editor's own preview, which screen readers can read. Without the Browser plugin, the preview is Basic.")
-                .section("Markdown").keywords("editor", "markdown", "preview", "chromium", "mermaid", "screen reader"));
+                .section("Markdown").keywords("editor", "markdown", "preview", "chromium", "screen reader"));
             markdownPreferences = new MarkdownPreferences(markdownViewMode::get, markdownViewMode::set, markdownPreview::get);
             tabSize = settings.declare(SettingSpec.of("tab_size", SettingKind.integer(1, 16), 4)
                 .label("Tab size").description("Columns per tab stop.").section("Editing").keywords("editor", "indent"));

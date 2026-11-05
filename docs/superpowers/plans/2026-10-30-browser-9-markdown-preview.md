@@ -3,6 +3,184 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or
 > superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Execution status (2026-11-05): Tasks 1a and 2-7 executed and reviewed, and Task 8's docs written; slice 1b
+(Mermaid) waits for the user's approval of its download; Task 9, the user's GUI check on macOS, is pending** (branch `claude/browser-markdown-preview`,
+worktree `.claude/worktrees/browser-4b-4c-e6deab`, cut from local `main` `420bfd63a`, which has plans 4a, 4b and 4c
+merged; the plan `1364c1dc3`, then commits `8676bfab4` to `a38f29813`, then the docs; not merged or pushed; see
+`docs/STATUS.md`). Executed with per-task subagents and reviews. The pre-flight scan's findings F1-F38 were adopted as
+rulings (N0, cited N-F*n*), and the controller's further rulings are N1-N11; plan 4a's R0-R48, its sandbox ruling and
+the banners of 4b and 4c bind. The task reviews recorded these deviations from the plan's text, each with its ruling:
+- **Versions:** no SDK change (`JasperSdk.VERSION` stays 0.28.0, every bundled range `>=0.28.0, <0.29`); the Browser
+  is 0.2.0 and exports `dev.jasper.browser.api` (no `@since`); the Editor is 0.19.0 and requires
+  `{ id = "dev.jasper.browser", version = ">=0.2.0", optional = true }`.
+- **Task 1** split into 1a and 1b (N1): the plan's "the user approved downloads for this series" is plan text, not the
+  user's word, and Gradle's Maven resolution is the normal build, while the npm tarball is a download.
+  - **1a** (`8676bfab4`): commonmark's gfm-alerts, footnotes and autolink extensions at 0.30.0, which bring
+    autolink-java 0.12.0 (MIT); the CommonMark Java component lists its 7 modules; a new `autolink-java` component
+    with `modules` (N-F33); the `third_party/` rule in `gradle/third-party-notices.gradle.kts` (a bundled plugin's file
+    under any `third_party` folder must be listed in a component's `files`, as fonts are), proven both ways with a
+    temporary fixture, and in AGENTS.md and `docs/app-maintenance.md`.
+  - **`autolink.LICENSE.txt` is unverified** (N2): no resolved artifact carries autolink-java's licence, so its heading
+    and "Copyright (c) 2015 Robin Stocker" come from memory of upstream's `LICENSE`; compare it with upstream at tag
+    `autolink-0.12.0` before the merge. `ThirdPartyNoticesTest` checks only the holder and the MIT clauses.
+  - **1b waits for the user** (N1, N5): the approval of the download of `mermaid-11.12.0.tgz` from registry.npmjs.org
+    was asked for on 2026-10-31 and has not come. 1b adds `mermaid.min.js` under
+    `plugins/browser/src/main/resources/dev/jasper/browser/third_party/`, unmodified, the "Mermaid" notices component
+    with `mermaid.LICENSE.txt` and `mermaid.NOTICE.txt` (the full production dependency tree, N-F17) and
+    `MermaidBundleTest` (SHA-256 and size); N-F17's version rule (the newest 11.x at least two weeks old) applies then.
+    Until it lands a `mermaid` fence shows as a plain code block in both previews: the scheme answers
+    `/mermaid.min.js` with 404, and `preview.js` leaves the fence as code (N5's seam).
+  - **javap** (0.30.0; autolink 0.12.0): `org.commonmark.ext.gfm.alerts.Alert extends CustomBlock` with
+    `String getType()` (upper-cased: `[!tip]` gives `TIP`) and `boolean hasBody()`; `AlertTitle` appears only with
+    custom titles, off by default; `AlertsExtension.STANDARD_TYPES` is NOTE, TIP, IMPORTANT, WARNING and CAUTION.
+    `org.commonmark.ext.footnotes.FootnoteReference extends CustomNode` and `FootnoteDefinition extends CustomBlock`,
+    each with `String getLabel()`; `InlineFootnote` appears only with `inlineFootnotes(true)`. `AutolinkExtension` is a
+    parser extension with no node of its own: autolinks are ordinary `Link`s (`www.example.com` to
+    `http://www.example.com`, `x@y.org` to `mailto:x@y.org`), with `AutolinkType` URL, EMAIL and WWW.
+- **Task 2** (`866948b5c`):
+  - N-F7: footnote definitions, written at the end, carry no block anchor in either dialect, so scroll sync keeps
+    source order; SWING marks each with `<a name="fn-n">` so Basic still reaches `#fn-n`;
+  - N-F8: the fixture-through-`PreviewPane.prepare` case is in `ui/PreviewPaneTest`, where `prepare` is visible;
+  - N-F9: WEB code is `<pre data-b><code>` with a `data-b` line span per line, so both dialects anchor the same blocks;
+  - N-F10: every heading id is allocated before the footnote ids, which come from the same `HeadingIds`, so no footnote
+    renames a heading; only the first reference carries `fnref-n`;
+  - N3: the WEB task checkbox goes inside the item's first `<p>`, the back-reference ↩ ends the definition's last
+    paragraph (GitHub's placement), and SWING writes `fn-n`/`fnref-n` as named markers, not block anchors.
+- **Task 3** (`d7c0d4974`):
+  - `PreviewSurface.closed()`, beyond the brief, keeps `FindTarget.available()`'s rule; `focusedContent()` gave way to
+    `previewFocused()`, which changed five assertions outside the brief's file list mechanically;
+  - N-F5: FindBar stayed synchronous over completed futures, and its sequence numbers and late seeding moved to Task 7,
+    where something can test them; N-F20: the hollow `aRefusedPatternShowsInvalidPattern` was dropped;
+  - N-F16: images reach the current surface, not a method bound to the `PreviewPane`; N-F36: the viewport layout runs
+    behind Basic's scroller; N-F37: `dismissHiddenFind` passes the surface;
+  - `ScrollLink`'s `byUser` was left for Task 7, which can make it false; `endY()` is NaN while Basic has no layout;
+  - N4: the full `check` failed only in Remote's `PublicationCrashTest` (10 s child-JVM timeouts under a load average of
+    155-258 and a 269,864-entry temp folder); no Remote source changed, and the test passed alone.
+- **Task 4** (`cced0fc05`):
+  - N-F3: `jasper-preview` is registered standard, secure, display-isolated and fetch-enabled, not local (the brief
+    said local), since a local scheme may not fetch `/document/<rev>`;
+  - **N-F4 changed the plan's exact shell string:** a `<meta http-equiv="Content-Security-Policy">` with the policy
+    minus `frame-ancestors` comes first in the shell's `<head>`, beside the header, so the policy is tested headless;
+  - N-F11: `answer(String method, String url)`, so a non-GET is a 404; N-F12: the scheme answers only browsers of the
+    preview client; N-F21: the preview-client cases are in `ChromiumStateTest`; N-F2: `preview.css` and `preview.js`
+    began as one-comment stubs; N-F29: the token's `SecureRandom` and the plugin's files are made and read on first
+    use; N-F34: `allowsOnlyItsOwnOrigin` covers a port and a percent-encoded token;
+  - beyond the brief: `PreviewSchemeFactoryTest` (flags and headers headless), `Geometry`'s value equality and an
+    empty `top` for an out-of-range block, a public `answer`/`Answer` for the `preview` package's tests, a test-only
+    reader constructor, and `Chromium`'s installer bookkeeping as a nested `Installers` both clients share;
+  - N6 (settled in Task 5): `previewClient()` fails on the UI thread too and hands each caller its own copy of the
+    shared future, as `client()` now does; every `MarkdownPreview` future completes on the UI thread.
+- **Task 5** (`1ce8d7e5d`, fix round `01ce3435e`):
+  - N-F13: the preview's Find runs 4b's `find.js` (bounded at 10,000 matches and 250 ms) through `run(script)`, with a
+    router-name parameter, Whole Word and a `step` action, instead of the brief's own `markAll`/`select` functions and
+    `reply` op; `OPS` has `find` in place of `reply`; `^` and `$` anchor at block ends; a refused pattern's
+    `PatternSyntaxException` names the pattern, as `find.js` answers no message; `selectedText` answers one line of at
+    most 1,000 characters;
+  - N-F15: a page whose `ready` has not come 10 s after its browser exists, or whose render process ended, reports
+    `Unavailable`, through a fifth `PreviewPage` constructor argument (`Runnable created`);
+  - N7: Find before the page is ready answers 0, false and "" at once; `reveal` does nothing then;
+  - focus: JCEF's own `onTakeFocus` already moves Swing's focus, so `focusLeft` moves it only while the canvas holds it;
+  - N-F18: the shell's main element is `Jasper-content`, an id `HeadingIds` cannot make; N-F22: 4b's `StrictJson` is
+    used, with no `Json.java`; N-F23: `PageView.fill(Color)`; N-F19: `suppressErrorRendering: true`; N-F28: the
+    `StartLoadsNoChromiumTest` PREVIEW fork with a consumer plugin (the Editor half in Task 6);
+  - the fix round: a scroll asked for before the first document waits for it, a block with no box is written `NaN`,
+    `copy()`/`selectAll()` on an unshown preview load no Chromium class, and `PreviewServiceTest` covers the wiring;
+  - **a side effect:** `PageView`'s accessible context gives every browser page's canvas the role `CANVAS`, not only a
+    preview's;
+  - **strings beyond the plan's copy:** the `Unavailable` reasons "The Markdown preview's page did not load within 10
+    seconds." and "Chromium's page for the Markdown preview stopped.", which the API carries and the Editor does not
+    show;
+  - `--line-height` is set but no rule uses it: the text is fixed at 1.5 and code at 1.45, so **Line height** spaces
+    only Basic's lines.
+- **Task 6** (`d527bb00a`, fix round `1427027ca`):
+  - the brief's setting snippet did not compile (a misplaced parenthesis): the default goes to `SettingSpec.of`, as
+    `markdown_view_mode`'s does;
+  - N-F26: `markdownPreview()` stays on `EditorSettings.Declared` and reaches the window through
+    `MarkdownPreferences.engine()`; the live path is `settings().onChanged` → `EditorWindow.apply()` →
+    `EditorTab.previewEngine`;
+  - N-F6: until Task 7 the Chromium surface had explicit stand-ins, each marked "Task 7": a still scroller (`y` and
+    `max` 0, empty sizes, `move` doing nothing), `blockY` empty and `endY` NaN, `markAll`, `find` and `selectedText`
+    completed with 0, false and "", and `Geometry` and `Scrolled` ignored;
+  - N9: a view makes its Chromium preview the first time Split or Preview shows, not when it opens (spec section 19),
+    so restored Markdown tabs in Source make none;
+  - the fix round's E1: the fallback to Basic runs one UI turn after `Unavailable`, since a page whose client already
+    failed reports it from inside the AWT add that first shows its canvas;
+  - N-F1: `sdkReference` regenerated for the Editor's version; N-F27: `ui/package-info` and `declaredImports`; N-F28:
+    `EditorPluginTest` finds the real service; N-F31: a failed start posts the Browser's "The browser could not start";
+  - beyond the brief, each small: `ChromiumPreview.onUnavailable`, `DocumentArea.basic()`, `linkActivated`,
+    `surfaceChanged` and `previewGeometry()`, `ScrollLink.linked()`, `MarkdownController.surfaceChanged()`, Basic
+    clearing its images when left, the focus following the surface, and links forwarded only while the page shows the
+    installed document.
+- **Task 7** (`a38f29813`): the stand-ins are replaced test-first; FindBar is asynchronous with sequence numbers, a
+  late selection seeds only an untyped query, and cancelled answers change nothing (N-F35);
+  - `y()` is the y a `move` asked for until the next `Scrolled`, so a preview that leads keeps its passage when a
+    later layout moves it;
+  - a `Geometry` for the installed revision tells scroll sync's listeners "not the user's", so the first user scroll
+    after a layout change leads;
+  - a step asked while a count waits follows that count, since `PagePreview.select` cancels a waiting `markAll`;
+  - N10: regex Whole Word is `\b(?:` + pattern + `)\b` in both previews (Basic's `PreviewSearch` and `find.js`), after
+    the pattern is compiled alone, so `a|b` no longer binds as `\ba|b\b`; this changed Basic, which was wrong;
+  - N11: the source editor's regex Whole Word stays RSyntaxTextArea's, so the source and the previews answer `a|b`
+    differently (a follow-up).
+- **Task 8** (this commit): docs; N8: slice 1b has not landed, so "Mermaid" is gone from the `markdown_preview`
+  setting's description and keywords, `settings.toml` and every guide (they say only what the code does), and
+  `README.md` keeps its Editor row, whose only planned change named Mermaid. Beyond the file list:
+  `docs/configuration.md` and `docs/creating-themes.md` (translucency is Basic's; Chromium's alert colours), the Browser
+  guide's start and restore lines, the docs index's Plugin APIs line, and `tools/sdk-reference/guide/01-overview.html`
+  and `10-services.html` (five exporting plugins, the Browser's export and the Editor's optional requirement), with the
+  SDK reference regenerated.
+  `./gradlew check --continue` (JBR 25.0.4.1 b635.75 jcef, 15m 10s, after the docs): **14,722 tests, 0 failures, 0
+  errors, 103 skipped** (1,324 classes in the 16 build folders, without the example plugin's: jasper-app 5,256 with 90
+  skipped, Editor 5,382 with 4 skipped, Browser 604 with 1 skipped, jasper-sdk 131, jasper-sdk-testkit 295), one test
+  and one class fewer than Task 7's tally of 14,723, since every module's result files now match its test sources and
+  that tally most likely counted a stale one; the example external plugin's `check pluginZip` against
+  `build/sdk-release` passes (1 test, up to date: the SDK is unchanged); `sdkReference` was rerun; source hygiene is
+  clean over 3,296 Java files. No GUI was launched.
+
+Not run:
+- **Task 9**, the user's GUI check on macOS, with their OK: pending; the GUI-only risks come first
+  (N-F38): if a document does not show, update and count in Find, `markdown_preview`'s default goes to `basic` before
+  anything is pushed.
+- **Windows and Linux** (no hosts), benchmarks and the memory run: deferred.
+- **No JavaScript runs in a test:** `preview.js` and `find.js` are checked as text (`PreviewScriptTest`) and with
+  `node --check`; the repository has no JavaScript harness, and no test starts Chromium.
+
+Known gaps and follow-ups:
+- **Mermaid** waits for slice 1b (above); after it, the setting's description, its keywords and the guides name
+  Mermaid again (N8), and the first `/mermaid.min.js` read (about 3 MB) should be answered off Chromium's IO thread, as
+  `AboutSchemeFactory` does.
+- **`autolink.LICENSE.txt`** is unverified against upstream (N2).
+- **Memory does not go back** when previews close: in-process Chromium cannot restart (4a's R28), and the preview client
+  lives as long as Chromium (N-F32, inherited from 4a).
+- **The fallback is silent:** a view that falls back to Basic says nothing unless Chromium's start failed; the
+  `Unavailable` reason is not shown.
+- **Regex Whole Word** differs between the source and the previews for an alternation (N11).
+- **Find:** a count the page never answers holds back a step until the next query, toggle or install (only a hung
+  renderer, after `ready`); a late answer that fails with anything but `PatternSyntaxException` or cancellation is
+  dropped.
+- **Footnotes:** a heading inside a footnote definition has an id but no block anchor, so Basic's Preview cannot go to
+  it.
+- **Line height** does not reach the Chromium preview (`--line-height` unused).
+
+Deferred minors, for the final review:
+- 1a: the `third_party/` walk counts `.DS_Store` and `*~` files Gradle's jar leaves out; no automated test of the Gradle
+  rule; plan 7 Task 5 defines the same rule, so one wording should be picked when plan 7 runs.
+- 2: an unresolved footnote label makes `note(reference)` null and fails the whole render (`Footnotes.java:80-82`,
+  `MarkdownRenderer.java:360`, `WebMarkup.java:108`; write the reference as text, with a case-insensitive label test);
+  the definitions loop is duplicated across the dialects; `Footnotes`' two-phase mutable ids; the fixture lacks an HTML
+  block with text; `AutolinkExtension` links any `scheme://` and keeps a trailing curly quote (an observation).
+- 3: a surface-mismatch drop in `MarkdownController` does not heal if a swap skips `invalidate()`; `BasicPreviewTest`
+  lacks the no-layout path; `ScrollLink`'s `instanceof ViewportScroller`; `FindTarget.owner()` returns `Object`.
+- 4: `makePreview`'s STOPPED branch is untested; the first `/mermaid.min.js` read would block Chromium's IO thread (with
+  1b); inline fully qualified names in `ChromiumStateTest` and `PreviewSchemeTest`; the true side of
+  `Chromium.answersPreview` is untested headless (no `CefClient` without native libraries).
+- 5: regex Whole Word's grouping (settled by N10).
+- 6: no test of a view closed before its first Split or Preview, or of the setting changing while in Source.
+- 7: a throw on FindBar's late path vanishes (`FindBar.java:213,253`; surface it to the uncaught handler);
+  `anInvalidReplyShowsInvalidPattern`'s step half asserts nothing new; no scroll-sync test spans a re-render; N10's
+  Java-only edges (`\Qa`, `(?x)a #c` refused once grouped, `PreviewSearch.java:66`); the usual stderr lines (sqlite-jdbc,
+  SLF4J, mac-notifications).
+
 **Goal:** The Editor's Markdown preview drawn by Chromium, through the Browser's exported API:
 - Mermaid diagrams, highlighted code and GitHub's layout in Jasper's theme colours, following light and dark;
 - GitHub's alerts, footnotes and autolinks, and heading ids;

@@ -89,7 +89,7 @@ and then listens. One topic id carries one payload type; using it with another t
 {@link Activities#CONNECTIONS} and the {@link TerminalEvents}, which need {@code terminal.observe}.</p>
 
 <h3>The bundled plugins' APIs</h3>
-<p>Four bundled plugins export an API package. Their types are in the <a href="#group-plugins">Bundled plugin APIs</a> part
+<p>Five bundled plugins export an API package. Their types are in the <a href="#group-plugins">Bundled plugin APIs</a> part
 of this reference; how each behaves for its users is in <a href="plugin-apis.md">plugin APIs</a>.</p>
 <table>
 <thead><tr><th>Package</th><th>Service</th><th>What it offers</th><th>Requires line</th></tr></thead>
@@ -98,6 +98,7 @@ of this reference; how each behaves for its users is in <a href="plugin-apis.md"
 <tr><td><a href="#package-dev.jasper.editor.api"><code>dev.jasper.editor.api</code></a></td><td>{@link dev.jasper.editor.api.Editor}</td><td>Opening a local file, or a document the consumer reads and writes ({@link dev.jasper.editor.api.EditorDocument}), in an editor tab; reopening the consumer's documents from Recent Files; answering Open in Editor… first; offering a file source's places in the Editor's chooser; resolving the relative images and links of a Markdown preview through the consumer's document ({@link dev.jasper.editor.api.EditorDocument#resolveRelative(String)})</td><td><code>{ id = "dev.jasper.editor", version = "&gt;=0.7", optional = true }</code></td></tr>
 <tr><td><a href="#package-dev.jasper.remote.api"><code>dev.jasper.remote.api</code></a></td><td>{@link dev.jasper.remote.api.RemoteProjects}</td><td>The saved host and folder of an SSH pane; whether a host is connected; listing a remote work tree; looking for marker files; opening a remote file in the Editor or a terminal in a remote folder</td><td><code>{ id = "dev.jasper.remote", version = "&gt;=0.12", optional = true }</code></td></tr>
 <tr><td><a href="#package-dev.jasper.snippets.api"><code>dev.jasper.snippets.api</code></a></td><td>{@link dev.jasper.snippets.api.SnippetService}</td><td>Looking a snippet up by name; appending a snippet; the Snippets palette scope's id and row ids, for reopening the palette on a snippet</td><td><code>{ id = "dev.jasper.snippets", version = "&gt;=0.1", optional = true }</code></td></tr>
+<tr><td><a href="#package-dev.jasper.browser.api"><code>dev.jasper.browser.api</code></a></td><td>{@link dev.jasper.browser.api.MarkdownPreviews}</td><td>Markdown previews Chromium draws ({@link dev.jasper.browser.api.MarkdownPreview}): a canvas showing the consumer's HTML in its theme, with its images; its links, scrolling and layout reported as events; finding text with JavaScript's regular expressions; copying and selecting</td><td><code>{ id = "dev.jasper.browser", version = "&gt;=0.2.0", optional = true }</code></td></tr>
 </tbody>
 </table>
 <p>The ranges shown are the highest a bundled consumer declares; Remote declares {@code >=0.2} for the Editor. The SDK release carries no jar for these packages: their
