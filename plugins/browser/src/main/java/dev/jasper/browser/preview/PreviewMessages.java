@@ -18,7 +18,7 @@ import java.util.regex.Pattern;
  *   <li>{@code {"op":"ready"}}: the page has loaded;</li>
  *   <li>{@code {"op":"shown","rev":"<n>"}}: the document of revision {@code n} is in the page and laid out;</li>
  *   <li>{@code {"op":"geometry","rev":"<n>","tops":"<y0>,<y1>,…","height":"<h>","viewport":"<v>"}}: where that
- *   document's blocks are, an empty entry for a block with no box;</li>
+ *   document's blocks are, {@code NaN} for a block with no box, and an empty {@code tops} for no blocks;</li>
  *   <li>{@code {"op":"scrolled","y":"<y>","user":true|false}};</li>
  *   <li>{@code {"op":"link","id":"<n>"}}: the user activated a link;</li>
  *   <li>{@code {"op":"find","search":<n>,"count":<c>,"invalid":true|false}}: a Find request's matches, and
@@ -125,7 +125,8 @@ final class PreviewMessages {
         if (!(message.get("tops") instanceof String written)) throw new IllegalArgumentException("tops");
         String[] entries = written.isEmpty() ? new String[0] : written.split(",", -1);
         var tops = new double[entries.length];
-        for (int at = 0; at < entries.length; at++) tops[at] = entries[at].isEmpty() ? Double.NaN : number(entries[at]);
+        // A block with no box is NaN, so that one such block is not an empty list, which is none.
+        for (int at = 0; at < entries.length; at++) tops[at] = entries[at].equals("NaN") ? Double.NaN : number(entries[at]);
         double height = length(message.get("height")), viewport = length(message.get("viewport"));
         return new Laid(new PreviewEvent.Geometry(revision, tops, height, viewport));
     }

@@ -504,7 +504,7 @@ final class PagePreview implements MarkdownPreview {
     }
 
     /** A UI-thread timer that runs {@code task} once, after {@code delay}; the answer stops it. */
-    private static Runnable onUiAfter(Duration delay, Runnable task) {
+    static Runnable onUiAfter(Duration delay, Runnable task) {
         var timer = new Timer((int) delay.toMillis(), event -> task.run());
         timer.setRepeats(false);
         timer.start();

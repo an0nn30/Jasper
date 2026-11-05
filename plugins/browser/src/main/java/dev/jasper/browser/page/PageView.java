@@ -120,7 +120,10 @@ public final class PageView extends JComponent {
         static final Hooks NONE = new Hooks(shown -> { }, rate -> { }, key -> { });
     }
 
-    /** A canvas without a page yet; its {@link PageBrowser} attaches to it. UI thread. Only {@link Page} makes one. */
+    /**
+     * A canvas without a page yet; its {@link PageBrowser} attaches to it. UI thread. Only {@link Page} and
+     * {@link PreviewPage} make one.
+     */
     public PageView() {
         taken = KeyEvent::isConsumed;
         navigationButtons = NavigationButton::of;

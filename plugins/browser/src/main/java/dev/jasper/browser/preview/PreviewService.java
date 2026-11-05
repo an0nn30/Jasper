@@ -6,13 +6,17 @@ import dev.jasper.browser.api.PreviewEvent;
 import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.engine.PreviewScheme;
 import dev.jasper.browser.page.PreviewPage;
+import java.net.URI;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Executor;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * The Markdown previews' service the Browser publishes: each preview it makes is a {@link PagePreview} on an origin of
@@ -24,6 +28,8 @@ public final class PreviewService implements MarkdownPreviews {
     private final PreviewScheme scheme;
     private final Chromium chromium;
     private final Executor background;
+    private final Function<Wiring, PagePreview.Hooks> pages;
+    private final BiFunction<Duration, Runnable, Runnable> later;
     private final Set<PagePreview> live = new LinkedHashSet<>();
 
     /**
@@ -34,9 +40,21 @@ public final class PreviewService implements MarkdownPreviews {
      * @param background encodes the previews' documents and images
      */
     public PreviewService(PreviewScheme scheme, Chromium chromium, Executor background) {
+        this(scheme, chromium, background, null, PagePreview::onUiAfter);
+    }
+
+    /**
+     * As the public constructor, with each preview's page made by {@code pages}, given the preview's wiring, and the
+     * UI-thread timer its ready watch runs on; a test's records them. Null {@code pages} makes the production
+     * {@link PreviewPage}, on {@code chromium}.
+     */
+    PreviewService(PreviewScheme scheme, Chromium chromium, Executor background, Function<Wiring, PagePreview.Hooks> pages,
+            BiFunction<Duration, Runnable, Runnable> later) {
         this.scheme = Objects.requireNonNull(scheme, "scheme");
         this.chromium = Objects.requireNonNull(chromium, "chromium");
         this.background = Objects.requireNonNull(background, "background");
+        this.pages = pages == null ? this::page : pages;
+        this.later = Objects.requireNonNull(later, "later");
     }
 
     @Override public boolean available() {
@@ -46,10 +64,8 @@ public final class PreviewService implements MarkdownPreviews {
     @Override public MarkdownPreview create(Consumer<PreviewEvent> events) {
         Objects.requireNonNull(events, "events");
         PreviewScheme.Origin origin = scheme.open();
-        var wiring = new Wiring();
-        var page = new PreviewPage(chromium, origin.shell(), wiring::created, wiring::received, wiring::failed);
-        var preview = new PagePreview(origin, new PagePreview.Hooks(page.view(), page::run, page::background, page::copy,
-            page::selectAll, page::focus, page::close), background, events);
+        var wiring = new Wiring(origin.shell());
+        var preview = new PagePreview(origin, pages.apply(wiring), background, events, later);
         wiring.preview = preview;
         live.add(preview);
         preview.onClose(() -> live.remove(preview));
@@ -74,9 +90,28 @@ public final class PreviewService implements MarkdownPreviews {
         return cause.getMessage() == null || cause.getMessage().isBlank() ? cause.toString() : cause.getMessage();
     }
 
-    /** What a preview's page tells its preview, made before the preview it reaches. UI thread. */
-    private static final class Wiring {
+    /** The production page of the preview {@code wiring} reaches: a {@link PreviewPage} on Chromium's preview client. */
+    private PagePreview.Hooks page(Wiring wiring) {
+        var page = new PreviewPage(chromium, wiring.shell(), wiring::created, wiring::received, wiring::failed);
+        return new PagePreview.Hooks(page.view(), page::run, page::background, page::copy, page::selectAll, page::focus, page::close);
+    }
+
+    /**
+     * What a preview's page tells its preview: its browser exists, its requests and its failure. Made before the preview
+     * it reaches, which it reaches once made. UI thread.
+     */
+    static final class Wiring {
+        private final URI shell;
         private PagePreview preview;
+
+        private Wiring(URI shell) {
+            this.shell = shell;
+        }
+
+        /** The shell of the preview's origin, which its page loads. */
+        URI shell() {
+            return shell;
+        }
 
         void created() {
             if (preview != null) preview.created();

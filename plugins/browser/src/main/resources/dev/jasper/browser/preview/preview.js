@@ -11,8 +11,9 @@
  * - image(id, url) shows the image at url in each image element whose data-image is id; imageReason(id, text) shows,
  *   in its place, a box with its alternative text, or "Image", then text; clearImages() forgets them all. Each holds for
  *   every document after, until clearImages.
- * - scrollTo(y) scrolls the page; reveal(id) scrolls the document's element with that id to the top and puts the caret
- *   at its start, so Tab moves to the next link after it.
+ * - scrollTo(y) scrolls the page; before the first document is in the page, as when Jasper replays the last scroll on
+ *   ready, that document goes there once installed. reveal(id) scrolls the document's element with that id to the top
+ *   and puts the caret at its start, so Tab moves to the next link after it.
  *
  * It tells Jasper through the preview client's message router, jasperPreviewQuery, one flat JSON object at a time, every
  * number written as a string:
@@ -20,7 +21,7 @@
  * - {op: "ready"}, once it has loaded;
  * - {op: "shown", rev}, once a document is in the page;
  * - {op: "geometry", rev, tops, height, viewport}: each data-b block's top, comma-separated in the order of the blocks'
- *   numbers, an empty entry for a block with no box; after each shown, and whenever the layout changes (a resize, an
+ *   numbers, NaN for a block with no box; after each shown, and whenever the layout changes (a resize, an
  *   image or a font loading, a diagram drawn), at most once an animation frame and, after the first, every 100 ms;
  * - {op: "scrolled", y, user}, at most once an animation frame: user is false from a scrollTo until the first scroll
  *   more than 1 px from where it went, and true otherwise;
@@ -48,8 +49,9 @@
   let fetching = null, shownRevision = null;
   // The images by data-image id: {url} or {reason}; and each image element's reason box.
   const images = new Map(), boxes = new WeakMap();
-  // Where the last scrollTo went, until the user scrolls elsewhere.
-  let target = null, scrollWaiting = false;
+  // Where the last scrollTo went, until the user scrolls elsewhere; and one asked for before the first document, which
+  // that document takes.
+  let target = null, scrollWaiting = false, pending = null;
   // Whether geometry waits to be told, and when it was last.
   let geometryWaiting = false, lastGeometry = 0;
   // Mermaid: 'absent' until a document asks for it, then 'loading', 'ready' or 'missing'; its theme, as the JSON text
@@ -97,11 +99,12 @@
   function install(rev, html) {
     const template = document.createElement('template');
     template.innerHTML = html;
-    const y = window.scrollY;
+    const asked = pending, kept = window.scrollY;
+    pending = null;
     content.replaceChildren(template.content);
-    window.scrollTo({top: y, behavior: 'instant'});
-    // A shorter document moves the page: its own doing, not the user's.
-    if (window.scrollY !== y) target = window.scrollY;
+    window.scrollTo({top: asked === null ? kept : asked, behavior: 'instant'});
+    // Jasper's scroll, or a shorter document's move: neither is the user's.
+    if (asked !== null || window.scrollY !== kept) target = window.scrollY;
     shownRevision = rev;
     for (const element of content.querySelectorAll('img[data-image]')) applyImage(element);
     post({op: 'shown', rev});
@@ -166,6 +169,11 @@
   function scrollPage(y) {
     const top = Number(y);
     if (!Number.isFinite(top)) return;
+    // The shell alone cannot scroll: the first document goes there.
+    if (shownRevision === null) {
+      pending = top;
+      return;
+    }
     window.scrollTo({top, behavior: 'instant'});
     target = window.scrollY;
   }
@@ -190,7 +198,7 @@
       const written = block.getAttribute('data-b');
       if (!/^(0|[1-9][0-9]{0,5})$/.test(written)) continue;
       const number = Number(written);
-      while (tops.length <= number) tops.push('');
+      while (tops.length <= number) tops.push('NaN');
       if (block.getClientRects().length > 0) tops[number] = String(Math.round((block.getBoundingClientRect().top + scrolled) * 100) / 100);
     }
     return {op: 'geometry', rev: shownRevision, tops: tops.join(','), height: String(root.scrollHeight),

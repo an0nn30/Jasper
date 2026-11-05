@@ -21,13 +21,13 @@ class PreviewMessagesTest {
     @Test void eachOpParses() {
         assertThat(PreviewMessages.read("{\"op\":\"ready\"}")).contains(new Ready());
         assertThat(PreviewMessages.read("{\"op\":\"shown\",\"rev\":\"12\"}")).contains(new Shown(12));
-        var laid = PreviewMessages.read("{\"op\":\"geometry\",\"rev\":\"3\",\"tops\":\"0,,48.5,1e+21\",\"height\":\"900\",\"viewport\":\"400.25\"}");
+        var laid = PreviewMessages.read("{\"op\":\"geometry\",\"rev\":\"3\",\"tops\":\"0,NaN,48.5,1e+21\",\"height\":\"900\",\"viewport\":\"400.25\"}");
         assertThat(laid).hasValueSatisfying(message -> {
             PreviewEvent.Geometry geometry = ((Laid) message).geometry();
             assertThat(geometry.revision()).isEqualTo(3);
             assertThat(geometry.blocks()).isEqualTo(4);
             assertThat(geometry.top(0)).isEqualTo(OptionalDouble.of(0));
-            assertThat(geometry.top(1)).as("an empty entry: a block with no box").isEmpty();
+            assertThat(geometry.top(1)).as("NaN: a block with no box").isEmpty();
             assertThat(geometry.top(2)).isEqualTo(OptionalDouble.of(48.5));
             assertThat(geometry.top(3)).isEqualTo(OptionalDouble.of(1e21));
             assertThat(geometry.height()).isEqualTo(900);
@@ -35,6 +35,12 @@ class PreviewMessagesTest {
         });
         assertThat(PreviewMessages.read("{\"op\":\"geometry\",\"rev\":\"0\",\"tops\":\"\",\"height\":\"0\",\"viewport\":\"0\"}"))
             .as("no blocks").hasValueSatisfying(message -> assertThat(((Laid) message).geometry().blocks()).isZero());
+        assertThat(PreviewMessages.read("{\"op\":\"geometry\",\"rev\":\"0\",\"tops\":\"NaN\",\"height\":\"0\",\"viewport\":\"0\"}"))
+            .as("one block, with no box: not read as none").hasValueSatisfying(message -> {
+                PreviewEvent.Geometry geometry = ((Laid) message).geometry();
+                assertThat(geometry.blocks()).isEqualTo(1);
+                assertThat(geometry.top(0)).isEmpty();
+            });
         assertThat(PreviewMessages.read("{\"op\":\"scrolled\",\"y\":\"120.5\",\"user\":true}")).contains(new Scrolled(120.5, true));
         assertThat(PreviewMessages.read("{\"op\":\"scrolled\",\"y\":\"-0\",\"user\":false}")).contains(new Scrolled(-0.0, false));
         assertThat(PreviewMessages.read("{\"op\":\"link\",\"id\":\"7\"}")).contains(new Link(7));
@@ -62,7 +68,10 @@ class PreviewMessagesTest {
             "{\"op\":\"shown\",\"rev\":\"1.0\"}",
             "{\"op\":\"shown\",\"rev\":\"99999999999999999999\"}",
             "{\"op\":\"geometry\",\"rev\":\"1\",\"tops\":\"0,x\",\"height\":\"1\",\"viewport\":\"1\"}",
-            "{\"op\":\"geometry\",\"rev\":\"1\",\"tops\":\"NaN\",\"height\":\"1\",\"viewport\":\"1\"}",
+            "{\"op\":\"geometry\",\"rev\":\"1\",\"tops\":\"0,,1\",\"height\":\"1\",\"viewport\":\"1\"}",
+            "{\"op\":\"geometry\",\"rev\":\"1\",\"tops\":\",\",\"height\":\"1\",\"viewport\":\"1\"}",
+            "{\"op\":\"geometry\",\"rev\":\"1\",\"tops\":\"nan\",\"height\":\"1\",\"viewport\":\"1\"}",
+            "{\"op\":\"geometry\",\"rev\":\"1\",\"tops\":\"0\",\"height\":\"NaN\",\"viewport\":\"1\"}",
             "{\"op\":\"geometry\",\"rev\":\"1\",\"tops\":\"Infinity\",\"height\":\"1\",\"viewport\":\"1\"}",
             "{\"op\":\"geometry\",\"rev\":\"1\",\"tops\":\"0x10\",\"height\":\"1\",\"viewport\":\"1\"}",
             "{\"op\":\"geometry\",\"rev\":\"1\",\"tops\":\"0\",\"height\":\"-1\",\"viewport\":\"1\"}",

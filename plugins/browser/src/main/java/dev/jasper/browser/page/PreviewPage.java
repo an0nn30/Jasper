@@ -98,17 +98,17 @@ public final class PreviewPage implements AutoCloseable {
      */
     public void run(String script) {
         Objects.requireNonNull(script, "script");
-        onMainFrame(frame -> frame.executeJavaScript(script, SCRIPT_URL, 0));
+        if (hearing()) onMainFrame(frame -> frame.executeJavaScript(script, SCRIPT_URL, 0));
     }
 
-    /** Copies the page's selection to the clipboard. */
+    /** Copies the page's selection to the clipboard; nothing before the page's browser exists, or after its close. */
     public void copy() {
-        onMainFrame(CefFrame::copy);
+        if (hearing()) onMainFrame(CefFrame::copy);
     }
 
-    /** Selects the whole page. */
+    /** Selects the whole page; nothing before the page's browser exists, or after its close. */
     public void selectAll() {
-        onMainFrame(CefFrame::selectAll);
+        if (hearing()) onMainFrame(CefFrame::selectAll);
     }
 
     /** Gives the canvas the keyboard focus. */
@@ -165,11 +165,17 @@ public final class PreviewPage implements AutoCloseable {
     }
 
     /**
-     * Runs {@code command} on the page's main frame, then releases only this handle to the frame; nothing before the page
-     * has its browser or after its close.
+     * Whether the page's browser hears what it is asked: it exists, and the page has not closed. Checked before a command
+     * on its frame is formed, as forming one names the frame's Chromium type, which a preview that never showed must not
+     * load.
      */
+    private boolean hearing() {
+        return ready && !closed;
+    }
+
+    /** Runs {@code command} on the page's main frame, then releases only this handle to the frame. */
     private void onMainFrame(Consumer<CefFrame> command) {
-        CefFrame frame = ready && !closed ? browser.getMainFrame() : null;
+        CefFrame frame = browser.getMainFrame();
         if (frame == null) return;
         try {
             command.accept(frame);

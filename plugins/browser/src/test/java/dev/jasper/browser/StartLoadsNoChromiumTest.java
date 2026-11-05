@@ -50,7 +50,7 @@ class StartLoadsNoChromiumTest {
     /**
      * Spec section 19: the Markdown previews' service costs no Chromium until a preview shows. A plugin that requires the
      * Browser, optionally, finds the published service, then makes a preview and themes it, shows it a document and an
-     * image and closes it, the preview never shown (N-F28).
+     * image, finds, copies and selects all in it and closes it, the preview never shown (N-F28).
      */
     @Test void makingAndFeedingAnUnshownPreviewLoadsNoChromiumClass() throws Exception {
         List<String> loaded = fork(Main.PREVIEW);
@@ -155,6 +155,9 @@ class StartLoadsNoChromiumTest {
             preview.imageReason(1, "Load external images to see it");
             preview.scrollTo(10);
             preview.markAll(new dev.jasper.browser.api.PreviewFind("Intro", false, false, false));
+            preview.copy();
+            preview.selectAll();
+            preview.focus();
             if (preview.component() == null) return List.of("The preview has no canvas");
             preview.close();
             return told.isEmpty() ? List.of() : List.of("An unshown preview told " + told);

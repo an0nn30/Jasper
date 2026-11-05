@@ -103,6 +103,28 @@ class PreviewScriptTest {
         EventQueue.invokeAndWait(preview::close);
     }
 
+    /**
+     * A scroll Jasper asks for before the first document is in the page, as on {@code ready}, is kept for that document
+     * rather than run on the empty shell, and the document's install goes there as Jasper's own move.
+     */
+    @Test void aScrollBeforeTheFirstDocumentWaitsForIt() throws IOException {
+        String script = script("/dev/jasper/browser/preview/preview.js");
+        String scroll = body(script, "scrollPage(y)"), install = body(script, "install(rev, html)");
+        assertThat(scroll).as("no document yet: kept").containsPattern(
+            "if \\(shownRevision === null\\) \\{\\s*pending = top;\\s*return;\\s*}");
+        assertThat(scroll.indexOf("pending = top")).as("kept before any scroll").isLessThan(scroll.indexOf("window.scrollTo"));
+        assertThat(install).contains("const asked = pending").contains("pending = null")
+            .contains("top: asked === null ? kept : asked").contains("if (asked !== null || window.scrollY !== kept) target = window.scrollY;");
+        assertThat(install.indexOf("pending = null")).as("taken before the document replaces the shell's")
+            .isLessThan(install.indexOf("content.replaceChildren"));
+    }
+
+    /** A block with no box is written as NaN, so one such block is not read as none (an empty list). */
+    @Test void aBlockWithNoBoxIsWrittenAsNaN() throws IOException {
+        String geometry = body(script("/dev/jasper/browser/preview/preview.js"), "geometry()");
+        assertThat(geometry).contains("tops.push('NaN')").doesNotContain("tops.push('')");
+    }
+
     /** Task 2's note: a heading's id is a window property, so the script reads no global it does not define first. */
     @Test void theScriptsOwnIdsAreOnesNoHeadingHas() throws IOException {
         String script = script("/dev/jasper/browser/preview/preview.js");
@@ -113,6 +135,13 @@ class PreviewScriptTest {
         assertThat(ids).allSatisfy(each -> assertThat(each).as("an upper-case letter, which heading ids never hold").matches(".*[A-Z].*"));
         assertThat(script).contains("'Jasper-diagram-'").doesNotContainPattern("window\\.mermaid\\s*(?:===|!==|\\)|&&|\\|\\|)")
             .doesNotContainPattern("typeof\\s+mermaid\\b").doesNotContainPattern("typeof\\s+window\\.mermaid\\b");
+    }
+
+    /** The body of the script's function {@code signature}, from its brace to the brace that closes it at its indentation. */
+    private static String body(String script, String signature) {
+        Matcher function = Pattern.compile("(?s)\n( *)function " + Pattern.quote(signature) + " \\{\n(.*?)\n\\1}\n").matcher(script);
+        assertThat(function.find()).as("function " + signature).isTrue();
+        return function.group(2);
     }
 
     private static String script(String name) throws IOException {
