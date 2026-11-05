@@ -2,6 +2,7 @@ package dev.jasper.browser.item;
 
 import dev.jasper.browser.page.PageTestAccess;
 import dev.jasper.browser.settings.BrowserSettings;
+import dev.jasper.browser.store.HistoryStore;
 import dev.jasper.browser.store.HistoryStore.HistoryEntry;
 import dev.jasper.browser.store.HistoryStore.Visit;
 import dev.jasper.browser.store.MemoryStores;
@@ -242,9 +243,49 @@ class HistoryRecordingTest {
         assertThat(visits(stores)).isEqualTo(visits);
     }
 
+    /** F18 and H14: a title waiting for its entry when the plugin stops lands before the stores close. */
+    @Test void aTitleWaitingForItsEntryAtThePluginsStopLandsBeforeTheStoresClose() throws Exception {
+        Stores stores = memory.make();
+        BrowserItems items = items(stores);
+        BrowserItem item = open(items, A);
+        Runnable release = memory.hold(stores);
+        onUi(() -> {
+            PageTestAccess.loadStarted(item.page(), A, Reached.LINK);
+            PageTestAccess.titleChanged(item.page(), "Last");
+            items.close();
+            return null;
+        });
+        CompletableFuture<HistoryStore.HistoryPage> listed = stores.history().list("", Optional.empty(), 10);
+        stores.close();
+        release.run();
+        assertThat(listed.get(10, TimeUnit.SECONDS).entries()).extracting(HistoryEntry::url, HistoryEntry::title)
+            .containsExactly(tuple(A, "Last"));
+    }
+
     /**
-     * A failure that is not the document's own leaves its entry: one after the document loaded, as a reload stopped before
-     * it committed gives, and one of another address, as a download gives.
+     * Review item 1: a document that stops loading, as Stop, Escape or {@code window.stop()} make it, fails with
+     * {@code ERR_ABORTED} before its load ends, shows no error page and keeps its entry.
+     */
+    @Test void aDocumentThatStopsLoadingKeepsItsEntry() throws Exception {
+        Stores stores = memory.make();
+        BrowserItem item = open(items(stores), A);
+        onUi(() -> PageTestAccess.loadStarted(item.page(), A, Reached.LINK));
+        memory.settle();
+        onUi(() -> PageTestAccess.loadFailed(item.page(), A, "ERR_ABORTED"));
+        memory.settle();
+        onUi(() -> {
+            PageTestAccess.loadStarted(item.page(), B, Reached.LINK);
+            PageTestAccess.loadFailed(item.page(), B, "ERR_ABORTED");
+            return null;
+        });
+        memory.settle();
+        assertThat(entries(stores)).extracting(HistoryEntry::url).containsExactly(B, A);
+    }
+
+    /**
+     * A failure that is not the document's own leaves its entry, though it shows an error page: one after the document
+     * loaded, as a reload offline gives before it commits, and one of another address, as a link that fails before it
+     * commits gives while the document still loads.
      */
     @Test void aFailureAfterTheDocumentLoadedOrOfAnotherAddressKeepsTheEntry() throws Exception {
         Stores stores = memory.make();
@@ -255,10 +296,10 @@ class HistoryRecordingTest {
             return null;
         });
         memory.settle();
-        onUi(() -> PageTestAccess.loadFailed(item.page(), A, "ERR_ABORTED"));
+        onUi(() -> PageTestAccess.loadFailed(item.page(), A, "ERR_INTERNET_DISCONNECTED"));
         onUi(() -> PageTestAccess.loadStarted(item.page(), B, Reached.LINK));
         memory.settle();
-        onUi(() -> PageTestAccess.loadFailed(item.page(), B + "file.zip", "ERR_ABORTED"));
+        onUi(() -> PageTestAccess.loadFailed(item.page(), "https://c.example/", "ERR_NAME_NOT_RESOLVED"));
         memory.settle();
         assertThat(entries(stores)).extracting(HistoryEntry::url).containsExactly(B, A);
     }

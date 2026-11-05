@@ -40,6 +40,36 @@ class HistoryStoreTest {
         assertThat(page.next()).isEmpty();
     }
 
+    /**
+     * H14: a retitle given for a record that has not answered yet runs behind it, as the database runs its calls in order,
+     * and lands; one for a record that made no entry, failed, or is no call of this store's gives nothing.
+     */
+    @Test void aRetitleOfARecordNotYetAnsweredLandsBehindIt() throws Exception {
+        var parked = new java.util.concurrent.CountDownLatch(1);
+        var released = new java.util.concurrent.CountDownLatch(1);
+        database.call(connection -> {
+            parked.countDown();
+            try {
+                released.await(30, TimeUnit.SECONDS);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+            return null;
+        });
+        assertThat(parked.await(10, TimeUnit.SECONDS)).isTrue();
+        CompletableFuture<Optional<Recorded>> recorded = history.record("https://a.example/", Reached.LINK, 1);
+        CompletableFuture<Optional<Visit>> retitled = history.retitle(recorded, "Title");
+        assertThat(recorded).as("the record waits").isNotDone();
+        released.countDown();
+        assertThat(done(retitled)).map(Visit::title).contains("Title");
+        assertThat(done(history.list("", Optional.empty(), 10)).entries()).extracting(HistoryEntry::title).containsExactly("Title");
+        assertThat(done(history.retitle(history.record("jasper-about:history", Reached.LINK, 2), "None"))).as("no entry").isEmpty();
+        assertThat(done(history.retitle(CompletableFuture.failedFuture(new java.sql.SQLException("unavailable")), "None")))
+            .as("a failed record").isEmpty();
+        assertThat(done(history.retitle(new CompletableFuture<>(), "None"))).as("no record of this store's").isEmpty();
+        assertThat(done(history.list("", Optional.empty(), 10)).entries()).extracting(HistoryEntry::title).containsExactly("Title");
+    }
+
     @Test void howAPageWasReachedIsStoredAsItsLowerCaseName() throws Exception {
         long when = 1;
         for (Reached reached : Reached.values()) record("https://a.example/" + reached, reached, when++);

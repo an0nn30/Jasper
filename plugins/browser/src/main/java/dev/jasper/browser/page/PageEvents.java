@@ -42,12 +42,15 @@ import org.cef.network.CefRequest;
  * ({@link Page#onVisit}). A page that enters fullscreen is told at once to leave it: Jasper refuses fullscreen (spec
  * section 5). A page's {@link DevTools} browser is no page's: none of this reaches it, but for the editing keys.
  *
- * <p>JCEF hands every load the same six {@link CefRequest.TransitionType} constants, and ORs each load's qualifiers into
- * the constant's own value without ever clearing them, so a flag one load set would be read by every later load of that
- * source. {@link Load#onLoadStart} therefore reads a transition's source and qualifiers before anything else and clears
- * the qualifiers there and then, whatever the load. It must stay the one handler given a {@code TransitionType}: one
- * that reads a transition without clearing it, as {@code CefRequest.getTransitionType()} gives it to a request
- * handler, would read and leave flags of other loads.
+ * <p>JCEF hands every load, on every client, the same six {@link CefRequest.TransitionType} constants, and ORs each
+ * load's qualifiers into the constant's own value without ever clearing them, so a flag one load set would be read by
+ * every later load of that source. {@link Load#onLoadStart}, and the preview client's load handler
+ * ({@code PreviewHandlers}), therefore read a transition before anything else and clear there and then, whatever the
+ * load, the six qualifiers JCEF names ({@link CefRequest.TransitionFlags}). Chromium's other qualifier bits, which JCEF
+ * names no flag for (from the address bar {@code 0x02000000}, a home page {@code 0x04000000}, from an API
+ * {@code 0x08000000}), cannot be cleared and stay on the constants: only the named flags are ever tested, never
+ * {@code getValue()}. No other code may take a {@code TransitionType}, {@code CefRequest.getTransitionType()} included:
+ * it would leave its load's flags for the next.
  */
 public final class PageEvents {
     private static final Consumer<CefClient> INSTALL = PageEvents::install;
@@ -130,8 +133,8 @@ public final class PageEvents {
     }
 
     /**
-     * How the load {@code transition} names reached its page, read from it, whose qualifiers are then cleared, as JCEF
-     * never clears them itself; JCEF leaves a source it does not map without a transition. Chromium's thread.
+     * How the load {@code transition} names reached its page, read from it, whose named qualifiers are then cleared, as
+     * JCEF never clears them itself; JCEF leaves a source it does not map without a transition. Chromium's thread.
      *
      * @return the way; {@link Reached#OTHER} without a transition
      */

@@ -98,6 +98,25 @@ class StoreSuggestionsTest {
         assertThat(Suggestions.target(rows.get(2).id(), GOOGLE)).map(Object::toString).contains("https://example.com/docs");
     }
 
+    /**
+     * Review item 3: Chromium stores a site's root as {@code https://example.com/}, and the typed {@code example.com}
+     * loads {@code https://example.com}: one address, listed once, as the typed row.
+     */
+    @Test void aStoredRootAndTheTypedBareDomainListOnceAsTheTypedRow() {
+        List<Suggestion> stored = StoreSuggestions.of("example.com", List.of(bookmark(1, "https://example.com/", "Example")),
+            List.of(visit(1, "https://example.com", "Example", 3), visit(2, "https://example.com/?q=1", "Query", 1)));
+        assertThat(stored).as("the bookmark, its root visit once, and the query").extracting(Suggestion::id)
+            .containsExactly("navigate:https://example.com/", "navigate:https://example.com/?q=1");
+        List<Suggestion> rows = Suggestions.rank("example.com", GOOGLE, List.of(), stored);
+        assertThat(rows).extracting(Suggestion::id)
+            .containsExactly("navigate:https://example.com", "search:example.com", "navigate:https://example.com/?q=1");
+        assertThat(rows.getFirst().detail()).isEqualTo("URL");
+        assertThat(Suggestions.rank("http://example.com/a/", GOOGLE, List.of(),
+            StoreSuggestions.of("example.com/a", List.of(bookmark(1, "http://example.com/a", "A")), List.of())))
+            .as("only a root path is the same address without its slash").extracting(Suggestion::id)
+            .containsExactly("navigate:http://example.com/a/", "search:http://example.com/a/", "navigate:http://example.com/a");
+    }
+
     private static Bookmark bookmark(long id, String url, String title) {
         return new Bookmark(id, url, title, id, List.of());
     }

@@ -22,6 +22,7 @@ import org.cef.handler.CefJSDialogHandlerAdapter;
 import org.cef.handler.CefKeyboardHandler;
 import org.cef.handler.CefKeyboardHandlerAdapter;
 import org.cef.handler.CefLifeSpanHandlerAdapter;
+import org.cef.handler.CefLoadHandlerAdapter;
 import org.cef.handler.CefMessageRouterHandlerAdapter;
 import org.cef.handler.CefRequestHandler;
 import org.cef.handler.CefRequestHandlerAdapter;
@@ -49,6 +50,8 @@ import org.cef.network.CefRequest;
  *   whose address is on that preview's origin, up to 4 MiB ({@link #counts}), and goes to its page. Every request is
  *   answered {@code success("")}.</li>
  *   <li><b>The renderer.</b> When the page's renderer ends, the page cannot show any more.</li>
+ *   <li><b>Load starts</b> clear the qualifiers JCEF leaves on the transition's shared constants, as the pages' client
+ *   does ({@link PageEvents#reached(CefRequest.TransitionType)}): the two clients share them.</li>
  * </ul>
  *
  * Chromium calls them on its own threads; what reaches a page goes to the UI thread there.
@@ -82,6 +85,7 @@ final class PreviewHandlers {
         client.addContextMenuHandler(new Menu());
         client.addFocusHandler(new Focus());
         client.addKeyboardHandler(new Keys());
+        client.addLoadHandler(new Loads());
         client.addMessageRouter(CefMessageRouter.create(new CefMessageRouter.CefMessageRouterConfig(QUERY, CANCEL), new Router()));
     }
 
@@ -229,6 +233,13 @@ final class PreviewHandlers {
             Optional<EditingCommand> command = EditingCommand.of(event.type == CefKeyboardHandler.CefKeyEvent.EventType.KEYEVENT_RAWKEYDOWN,
                 event.modifiers, event.windows_key_code).filter(EditingCommand.SELECT_ALL::equals);
             return PageEvents.edit(browser, command, CefBrowser::getFocusedFrame);
+        }
+    }
+
+    /** Each load start's transition is read, which clears what JCEF left on it, and nothing else is done. */
+    static final class Loads extends CefLoadHandlerAdapter {
+        @Override public void onLoadStart(CefBrowser browser, CefFrame frame, CefRequest.TransitionType transition) {
+            PageEvents.reached(transition);
         }
     }
 

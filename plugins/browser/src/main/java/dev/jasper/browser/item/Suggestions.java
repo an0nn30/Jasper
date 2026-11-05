@@ -12,7 +12,8 @@ import java.util.Set;
 /**
  * The address field's suggestions (spec section 6). Each row's id says what it loads, so the same row keeps its id from
  * one keystroke to the next: {@value #NAVIGATE} and an address, which loads that address, or {@value #SEARCH} and terms,
- * which searches for them with the chosen engine. A store's rows use the same ids.
+ * which searches for them with the chosen engine. A store's rows use the same ids. Rows that load one address are listed
+ * once ({@link #key}).
  */
 final class Suggestions {
     /** The start of a row's id that loads the address after it. */
@@ -40,9 +41,9 @@ final class Suggestions {
      *   <li>a bare word's host, such as {@code jcef} or {@code devbox/app}, as the typed address is;</li>
      *   <li>then {@code stores}' rows.</li>
      * </ol>
-     * When the typed text is itself a results page's address, a search for its terms comes first. A row whose id is
-     * already listed is left out. Chromium's own {@code chrome:} pages are not offered (spec section 6; plan 4b's P45):
-     * {@code chrome:} text lists no row, and an engine's {@code chrome:} suggestion is left out.
+     * When the typed text is itself a results page's address, a search for its terms comes first. A row that loads what a
+     * row listed already loads is left out ({@link #key}). Chromium's own {@code chrome:} pages are not offered (spec
+     * section 6; plan 4b's P45): {@code chrome:} text lists no row, and an engine's {@code chrome:} suggestion is left out.
      *
      * @param typed the field's text
      * @param settings the settings, which say what a results page is
@@ -146,18 +147,38 @@ final class Suggestions {
         return colon >= 0 && !host.substring(colon + 1).chars().allMatch(c -> c >= '0' && c <= '9');
     }
 
+    /**
+     * What tells rows apart: their id, but that an http or https address whose path is just {@code /}, with no query or
+     * fragment, is the same address without it, as Chromium writes a site's root ({@code https://example.com/}) and the
+     * field loads the typed {@code example.com} ({@code https://example.com}).
+     *
+     * @param id a row's id
+     * @return the key; rows with the same key load the same page
+     */
+    static String key(String id) {
+        if (!id.startsWith(NAVIGATE) || !id.endsWith("/")) return id;
+        String address = id.substring(NAVIGATE.length());
+        int authority = address.indexOf("://");
+        if (authority < 0) return id;
+        String scheme = address.substring(0, authority);
+        if (!scheme.equalsIgnoreCase("http") && !scheme.equalsIgnoreCase("https")) return id;
+        String rest = address.substring(authority + 3);
+        boolean root = rest.indexOf('/') == rest.length() - 1 && rest.indexOf('?') < 0 && rest.indexOf('#') < 0;
+        return root ? id.substring(0, id.length() - 1) : id;
+    }
+
     /** {@code text} as a row shows it: its first {@value #SHOWN} characters, then an ellipsis. */
     static String shown(String text) {
         return text.length() <= SHOWN ? text : text.substring(0, SHOWN) + "…";
     }
 
-    /** The rows so far, each id once. */
+    /** The rows so far, each address or search once ({@link #key}). */
     private static final class Rows {
         final List<Nodes.Suggestion> list = new ArrayList<>();
-        private final Set<String> ids = new HashSet<>();
+        private final Set<String> keys = new HashSet<>();
 
         boolean add(Nodes.Suggestion row) {
-            if (!ids.add(row.id())) return false;
+            if (!keys.add(key(row.id()))) return false;
             list.add(row);
             return true;
         }

@@ -17,8 +17,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * How a main frame's load reached its page (spec section 10), as the client's load handler reads Chromium's transition:
  * its qualifiers first, then its source. JCEF ORs each load's qualifiers into the shared {@link TransitionType} constant
- * and never clears them (F1), so the handler clears them as it reads them, whatever the load. Chromium's side is played
- * by the test: the frame and its thread. No Chromium.
+ * and never clears them (F1), so the handler clears the named ones as it reads them, whatever the load, and so does the
+ * preview client's. Chromium's side is played by the test: the frame and its thread. No Chromium.
  */
 class PageEventsReachedTest {
     private static final int FORWARD_BACK = TransitionFlags.TT_FORWARD_BACK_FLAG.getValue();
@@ -74,6 +74,18 @@ class PageEventsReachedTest {
         onUiThread(() -> null);
         assertThat(visits).as("the main frame's, on the UI thread; a transition JCEF does not map is OTHER")
             .containsExactly(Reached.BACK_FORWARD, Reached.LINK, Reached.OTHER);
+    }
+
+    /**
+     * Review item 4: the preview client's load starts use the same shared constants, so its load handler clears them too,
+     * whatever the browser and frame.
+     */
+    @Test void thePreviewClientsLoadStartClearsTheFlagsToo() {
+        TransitionType.TT_LINK.addQualifier(TransitionFlags.TT_FORWARD_BACK_FLAG);
+        TransitionType.TT_LINK.addQualifier(TransitionFlags.TT_SERVER_REDIRECT_FLAG);
+        new PreviewHandlers.Loads().onLoadStart(null, null, TransitionType.TT_LINK);
+        assertThat(TransitionType.TT_LINK.getQualifiers()).isZero();
+        new PreviewHandlers.Loads().onLoadStart(null, frame(true), null);
     }
 
     /** A frame that answers whether it is the main one and its address, and runs nothing. */

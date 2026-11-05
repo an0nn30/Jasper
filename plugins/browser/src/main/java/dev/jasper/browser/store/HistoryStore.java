@@ -132,7 +132,32 @@ public final class HistoryStore {
      */
     public CompletableFuture<Optional<Visit>> retitle(long entry, String title) {
         String kept = cut(title);
-        return database.call(connection -> Sql.transaction(connection, c -> {
+        return database.call(connection -> retitled(connection, entry, kept));
+    }
+
+    /**
+     * As {@link #retitle(long, String)}, for the entry a {@link #record} of this store makes, whether or not it has
+     * answered yet: the database runs its calls in order, and completes each call's answer before it runs the next, so
+     * this one, given after the record, finds it answered. A title given as a page loads is so stored behind its load's
+     * record, and when it is given before the database closes, it lands.
+     *
+     * @param recorded what {@link #record} answered or will answer, on this store
+     * @param title the title, cut to 1,024 characters
+     * @return the entry's row; empty when the record made no entry, failed, or is no call of this store's, and when the
+     *     entry or its row is gone
+     */
+    public CompletableFuture<Optional<Visit>> retitle(CompletableFuture<Optional<Recorded>> recorded, String title) {
+        Objects.requireNonNull(recorded, "recorded");
+        String kept = cut(title);
+        return database.call(connection -> {
+            Optional<Recorded> made = recorded.isDone() && !recorded.isCompletedExceptionally() ? recorded.join() : Optional.empty();
+            return made.isEmpty() ? Optional.empty() : retitled(connection, made.get().entry(), kept);
+        });
+    }
+
+    /** Gives {@code entry} the title {@code kept}, and its row too while the row shows the entry's address. */
+    private static Optional<Visit> retitled(Connection connection, long entry, String kept) throws SQLException {
+        return Sql.transaction(connection, c -> {
             Optional<String> url;
             try (var update = c.prepareStatement("UPDATE history SET title = ? WHERE id = ? RETURNING url")) {
                 update.setString(1, kept);
@@ -149,7 +174,7 @@ public final class HistoryStore {
                 update.executeUpdate();
             }
             return visit(c, key);
-        }));
+        });
     }
 
     /**

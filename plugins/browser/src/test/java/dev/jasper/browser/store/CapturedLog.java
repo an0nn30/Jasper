@@ -6,8 +6,8 @@ import java.util.logging.Handler;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 
-/** What a class's {@code System.Logger} writes while this is open, kept off the console. */
-final class CapturedLog implements AutoCloseable {
+/** What a {@code System.Logger} writes while this is open, kept off the console. */
+public final class CapturedLog implements AutoCloseable {
     private final List<LogRecord> records = new CopyOnWriteArrayList<>();
     // Held, so the logger keeps the handler.
     private final Logger logger;
@@ -19,14 +19,27 @@ final class CapturedLog implements AutoCloseable {
     };
 
     CapturedLog(Class<?> owner) {
-        logger = Logger.getLogger(owner.getName());
+        this(owner.getName());
+    }
+
+    /**
+     * Captures what the logger {@code name} writes, as {@code System.getLogger(name)} gives it.
+     *
+     * @param name the logger's name
+     */
+    public CapturedLog(String name) {
+        logger = Logger.getLogger(name);
         parentHandlers = logger.getUseParentHandlers();
         logger.setUseParentHandlers(false);
         logger.addHandler(capture);
     }
 
-    /** The records written so far. */
-    List<LogRecord> records() {
+    /**
+     * The records written so far.
+     *
+     * @return them, in order
+     */
+    public List<LogRecord> records() {
         return List.copyOf(records);
     }
 

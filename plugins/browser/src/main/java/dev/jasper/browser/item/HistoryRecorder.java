@@ -19,11 +19,12 @@ import java.util.function.BiFunction;
  * history keeps, is recorded with how the load reached it, as one entry, and the visit index hears of it. The entry then
  * takes the page's titles: the first change waits {@value #TITLE_WAIT_MILLIS} ms, the changes meanwhile coalesce, and the
  * latest lands when the wait ends, when the next document starts loading, when the item closes or when the plugin stops
- * ({@link #flush}). A title the page gives before the store has answered with its entry lands once it has, the item
- * closed or not; only at the plugin's stop, which closes the stores, is such a title lost. A document that fails to load
- * before its load ends, as one Chromium shows its own error page for, leaves no entry: a failure of the address it
- * started at deletes its entry, and the store takes its visit off its row. Answers reach the recorder on the UI thread;
- * a store that cannot answer, closed or unavailable, records nothing. UI thread.
+ * ({@link #flush}). Each title is queued behind its load's record, so the titles land in order whether or not the record
+ * has answered, and those given at the plugin's stop land before the stores close. A document that fails before its load
+ * ends, with an error Jasper shows its error page for, leaves no entry: a failure of the address it started at deletes
+ * its entry, and the store takes its visit off its row. One that stops loading, as Stop makes it ({@code ERR_ABORTED}),
+ * keeps its entry. Answers reach the recorder on the UI thread; a store that cannot answer, closed or unavailable,
+ * records nothing. UI thread.
  */
 final class HistoryRecorder {
     /** How long a title waits for the changes after it. */
@@ -41,17 +42,20 @@ final class HistoryRecorder {
     /** A visit, its entry and its titles. UI thread. */
     private static final class Visited {
         final String address;
-        // Whether the store has answered the record, and the entry it made; empty for none.
+        // The store's record of the load, which each title is stored behind.
+        final CompletableFuture<Optional<Recorded>> record;
+        // Whether the record has answered on the UI thread, and the entry it made, for a failure to delete; empty for none.
         boolean answered;
         OptionalLong entry = OptionalLong.empty();
-        // The title given last, and whether it waits to be stored: for the wait, or for the entry, when it is due.
+        // The title given last, and whether it waits to be stored.
         String title = "";
-        boolean pending, due;
+        boolean pending;
         // Whether the load failed before its document loaded: the entry goes.
         boolean failed;
 
-        Visited(String address) {
+        Visited(String address, CompletableFuture<Optional<Recorded>> record) {
             this.address = address;
+            this.record = record;
         }
     }
 
@@ -88,9 +92,9 @@ final class HistoryRecorder {
         flush();
         visit = null;
         if (Addresses.storable(address).isEmpty()) return; // Jasper's own pages, about:blank and the like: no entry
-        var started = new Visited(address);
-        visit = started;
         CompletableFuture<Optional<Recorded>> record = stores.history().record(address, reached, System.currentTimeMillis());
+        var started = new Visited(address, record);
+        visit = started;
         // A failed record, as from a closed or unavailable store, answers no entry.
         record.whenComplete((recorded, failure) -> EventQueue.invokeLater(() ->
             answered(started, failure == null ? recorded : Optional.empty())));
@@ -106,7 +110,6 @@ final class HistoryRecorder {
             return;
         }
         stores.visitIndex().recorded(recorded.get().visit());
-        if (started.due) store(started);
     }
 
     /** The title's wait ended: the visit's latest title is stored. */
@@ -115,28 +118,27 @@ final class HistoryRecorder {
         if (visit != null) store(visit);
     }
 
-    /** Stores {@code titled}'s latest title on its entry, now that it has one, or as soon as it does. */
+    /**
+     * Stores {@code titled}'s latest title on its entry, queued behind its record, so the titles land in the order given,
+     * whether or not the record has answered.
+     */
     private void store(Visited titled) {
-        if (!titled.pending) return;
-        if (!titled.answered) {
-            titled.due = true;
-            return;
-        }
+        if (!titled.pending || titled.failed) return;
         titled.pending = false;
-        titled.due = false;
-        if (titled.entry.isEmpty() || titled.failed) return;
-        stores.history().retitle(titled.entry.getAsLong(), titled.title).whenComplete((row, failure) -> EventQueue.invokeLater(() -> {
-            if (failure == null) row.ifPresent(stores.visitIndex()::recorded);
+        stores.history().retitle(titled.record, titled.title).whenComplete((row, failure) -> EventQueue.invokeLater(() -> {
+            if (failure == null && !titled.failed) row.ifPresent(stores.visitIndex()::recorded);
         }));
     }
 
     /**
-     * A load of the page's main frame failed: when it is the document whose visit this is, failing before it loaded, the
-     * visit was none.
+     * A load of the page's main frame failed: when it is the document whose visit this is, failing before it loaded with
+     * an error Jasper shows its error page for, the visit was none. A document that stops loading, as Stop makes it,
+     * fails with {@code ERR_ABORTED}, which shows none, and keeps its visit.
      */
     private void failed(LoadFailure failure) {
         Visited current = visit;
-        if (current == null || page.documentLoaded() || !current.address.equals(failure.url())) return;
+        if (current == null || ErrorPage.title(failure.code()).isEmpty() || page.documentLoaded()
+            || !current.address.equals(failure.url())) return;
         current.failed = true;
         if (current.answered) delete(current);
     }

@@ -13,8 +13,8 @@ import java.util.Set;
  * The address field's rows of Jasper's bookmarks and history (spec section 6), matched by prefix. With the text trimmed,
  * an address matches when the text begins it after its scheme ({@code github.com/x} of {@code https://github.com/x}), or
  * after its scheme and a leading {@code www.}; a title matches when the text begins it, or begins one of its words. Case
- * is ignored. Each row's id is the field's own for the address it loads ({@link Suggestions#NAVIGATE}), so an address
- * listed once is listed once, the typed address's own row first.
+ * is ignored. Each row's id is the field's own for the address it loads ({@link Suggestions#NAVIGATE}), so an address is
+ * listed once ({@link Suggestions#key}), the typed address's own row first.
  */
 final class StoreSuggestions {
     /** The most rows of bookmarks. */
@@ -44,18 +44,23 @@ final class StoreSuggestions {
         Set<String> listed = new HashSet<>();
         for (Bookmark bookmark : bookmarks) {
             if (rows.size() == BOOKMARKS) break;
-            if (matches(text, bookmark.url(), bookmark.title()) && listed.add(bookmark.url()))
+            if (matches(text, bookmark.url(), bookmark.title()) && listed.add(key(bookmark.url())))
                 rows.add(row(bookmark.url(), bookmark.title(), "Bookmark"));
         }
         List<Visit> matching = visits.stream().filter(visit -> matches(text, visit.url(), visit.title())).sorted(MOST_VISITED).toList();
         int visited = 0;
         for (Visit visit : matching) {
             if (visited == VISITS) break;
-            if (!listed.add(visit.url())) continue;
+            if (!listed.add(key(visit.url()))) continue;
             rows.add(row(visit.url(), visit.title(), "Visited " + visit.count() + (visit.count() == 1 ? " time" : " times")));
             visited++;
         }
         return rows;
+    }
+
+    /** What tells {@code address}'s row from the others' ({@link Suggestions#key}). */
+    private static String key(String address) {
+        return Suggestions.key(Suggestions.NAVIGATE + address);
     }
 
     /** Whether {@code text} begins {@code address} after its scheme, or after that and {@code www.}, or a word of {@code title}. */

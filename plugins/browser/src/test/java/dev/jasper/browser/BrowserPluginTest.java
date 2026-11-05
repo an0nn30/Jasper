@@ -5,6 +5,7 @@ import dev.jasper.browser.api.PreviewEvent;
 import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.item.BrowserItems;
 import dev.jasper.browser.restore.BrowserRestore;
+import dev.jasper.browser.store.CapturedLog;
 import dev.jasper.browser.store.MemoryStores;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.Variant;
@@ -24,10 +25,13 @@ import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 /** The plugin's registrations and its part in Chromium's life, on the SDK's fake host; nothing here starts Chromium. */
 class BrowserPluginTest {
@@ -50,7 +54,7 @@ class BrowserPluginTest {
 
     /** Plan 5: a database that cannot be used posts one notification with the reason, while the plugin runs. */
     @Test void historyAndBookmarksThatAreUnavailablePostANotificationWithTheReasonWhileThePluginRuns() throws Exception {
-        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost(); var log = new CapturedLog("dev.jasper.plugins." + ID)) {
             var plugin = new BrowserPlugin();
             host.start(INFO, Set.of(), Set.of(), plugin);
             plugin.storesUnavailable(new java.sql.SQLException("[SQLITE_NOTADB] file is not a database"));
@@ -59,6 +63,10 @@ class BrowserPluginTest {
             host.stopAll();
             plugin.storesUnavailable(new java.sql.SQLException("late"));
             assertThat(host.notifications().lines()).as("a stopped plugin only logs").hasSize(1);
+            assertThat(log.records()).extracting(LogRecord::getLevel, LogRecord::getMessage).containsExactly(
+                tuple(Level.WARNING, "Browser history and bookmarks are unavailable: [SQLITE_NOTADB] file is not a database"),
+                tuple(Level.WARNING, "Browser history and bookmarks are unavailable: late"));
+            assertThat(log.records()).allSatisfy(logged -> assertThat(logged.getThrown()).isInstanceOf(java.sql.SQLException.class));
             assertThat(host.failures()).isEmpty();
         } });
     }
