@@ -86,7 +86,8 @@ public final class HistoryStore {
     }
 
     /**
-     * Records a page load: an entry, and a visit counted on its host and path's row, which takes the load's address.
+     * Records a page load: an entry, and a visit counted on its host and path's row, which takes the load's address, and
+     * has no title until that address's page gives one.
      *
      * @param address the page's address
      * @param reached how it was reached
@@ -108,7 +109,8 @@ public final class HistoryStore {
                 entry = Sql.single(insert, rows -> rows.getLong(1)).orElseThrow();
             }
             try (var upsert = c.prepareStatement("INSERT INTO visits (host, path, url, count, first_visit, last_visit) VALUES (?, ?, ?, 1, ?, ?)"
-                    + " ON CONFLICT (host, path) DO UPDATE SET count = count + 1, last_visit = excluded.last_visit, url = excluded.url")) {
+                    + " ON CONFLICT (host, path) DO UPDATE SET count = count + 1, last_visit = excluded.last_visit,"
+                    + " title = CASE WHEN url = excluded.url THEN title ELSE '' END, url = excluded.url")) {
                 upsert.setString(1, key.host());
                 upsert.setString(2, key.path());
                 upsert.setString(3, url);
@@ -182,8 +184,7 @@ public final class HistoryStore {
                     select.setLong(at++, before.get().id());
                 }
                 select.setLong(at, limit + 1L);
-                List<HistoryEntry> entries = Sql.all(select, rows -> new HistoryEntry(rows.getLong(1), rows.getString(2), rows.getString(3),
-                    rows.getLong(4), Reached.of(rows.getString(5))));
+                List<HistoryEntry> entries = Sql.all(select, HistoryStore::entry);
                 if (entries.size() <= limit) return new HistoryPage(entries, Optional.empty());
                 HistoryEntry last = entries.get(limit - 1);
                 return new HistoryPage(entries.subList(0, limit), Optional.of(new Cursor(last.visitedAt(), last.id())));
@@ -192,8 +193,10 @@ public final class HistoryStore {
     }
 
     /**
-     * Deletes an entry and takes its visit off its row, which goes once it counts none: a site whose entries are all
-     * deleted leaves Top Sites, the suggestions and the palette.
+     * Deletes an entry and takes its visit off its row. The row's first visit becomes that of the oldest entry of its host
+     * and path that is left, and a row that showed the deleted entry's address shows the newest one's: its address,
+     * title and time. The row goes with the last entry, so a site whose entries are all deleted leaves Top Sites, the
+     * suggestions and the palette.
      *
      * @param id the entry's id
      * @return whether there was such an entry
@@ -208,13 +211,25 @@ public final class HistoryStore {
                 }
                 if (url.isEmpty()) return false;
                 Addresses.VisitKey key = Addresses.visitKey(url.get());
-                for (String sql : List.of("UPDATE visits SET count = count - 1 WHERE host = ? AND path = ?",
-                        "DELETE FROM visits WHERE host = ? AND path = ? AND count <= 0")) {
-                    try (var statement = c.prepareStatement(sql)) {
-                        statement.setString(1, key.host());
-                        statement.setString(2, key.path());
-                        statement.executeUpdate();
+                Optional<Visit> row = visit(c, key);
+                if (row.isEmpty()) return true;
+                List<HistoryEntry> left = entries(c, key);
+                if (left.isEmpty()) {
+                    try (var delete = c.prepareStatement("DELETE FROM visits WHERE id = ?")) {
+                        delete.setLong(1, row.get().id());
+                        delete.executeUpdate();
                     }
+                    return true;
+                }
+                HistoryEntry newest = left.getFirst();
+                boolean shown = row.get().url().equals(url.get());
+                try (var update = c.prepareStatement("UPDATE visits SET count = count - 1, first_visit = ?, url = ?, title = ?, last_visit = ? WHERE id = ?")) {
+                    update.setLong(1, left.getLast().visitedAt());
+                    update.setString(2, shown ? newest.url() : row.get().url());
+                    update.setString(3, shown ? newest.title() : row.get().title());
+                    update.setLong(4, shown ? newest.visitedAt() : row.get().lastVisit());
+                    update.setLong(5, row.get().id());
+                    update.executeUpdate();
                 }
                 return true;
             });
@@ -281,6 +296,24 @@ public final class HistoryStore {
                 return Sql.all(select, HistoryStore::visit);
             }
         });
+    }
+
+    /**
+     * The entries of a host and path, newest first. History keeps no host and path of its own, so the entries whose
+     * address holds {@code //host/path}, ignoring the case of ASCII letters, are read and those of another host or path
+     * dropped: one without a path has none to hold.
+     */
+    private static List<HistoryEntry> entries(Connection connection, Addresses.VisitKey key) throws SQLException {
+        String written = "//" + key.host() + ("/".equals(key.path()) ? "" : key.path());
+        try (var select = connection.prepareStatement(
+                "SELECT id, url, title, visited_at, reached FROM history WHERE url LIKE ? ESCAPE '\\' ORDER BY visited_at DESC, id DESC")) {
+            select.setString(1, Sql.containing(written));
+            return Sql.all(select, HistoryStore::entry).stream().filter(entry -> Addresses.visitKey(entry.url()).equals(key)).toList();
+        }
+    }
+
+    private static HistoryEntry entry(ResultSet rows) throws SQLException {
+        return new HistoryEntry(rows.getLong(1), rows.getString(2), rows.getString(3), rows.getLong(4), Reached.of(rows.getString(5)));
     }
 
     private static Optional<Visit> visit(Connection connection, Addresses.VisitKey key) throws SQLException {

@@ -5,12 +5,13 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.TreeSet;
+import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 
@@ -147,16 +148,14 @@ public final class BookmarkStore {
     }
 
     /**
-     * Gives a bookmark these tags in place of its own. Each is trimmed, and kept only when it is nonblank, at most 64
-     * characters and free of control characters; a tag that matches an earlier one ignoring case is dropped, and the
-     * first 100 are kept, in the order given. The SDK's token field keeps its tokens by the same rule.
+     * Gives a bookmark these tags in place of its own, those {@link #keptTags} keeps.
      *
      * @param id the bookmark's id
      * @param tags its tags
      * @return the bookmark; failed with a {@link NoSuchElementException} when it is gone
      */
     public CompletableFuture<Bookmark> tags(long id, List<String> tags) {
-        List<String> kept = kept(tags);
+        List<String> kept = keptTags(tags);
         return database.call(connection -> {
             Bookmark bookmark = Sql.transaction(connection, c -> {
                 try (var delete = c.prepareStatement("DELETE FROM bookmark_tags WHERE bookmark = ?")) {
@@ -191,16 +190,16 @@ public final class BookmarkStore {
     }
 
     /**
-     * Every tag a bookmark has, once each ignoring case, sorted ignoring case.
+     * Every tag a bookmark has, once each, as first written, and sorted, ignoring the case of ASCII letters.
      *
      * @return the tags
      */
     public CompletableFuture<List<String>> allTags() {
         return database.call(connection -> {
             try (var select = connection.prepareStatement("SELECT tag FROM bookmark_tags ORDER BY rowid")) {
-                var tags = new TreeSet<String>(String.CASE_INSENSITIVE_ORDER);
-                tags.addAll(Sql.all(select, rows -> rows.getString(1)));
-                return List.copyOf(tags);
+                var tags = new TreeMap<String, String>();
+                for (String tag : Sql.all(select, rows -> rows.getString(1))) tags.putIfAbsent(folded(tag), tag);
+                return List.copyOf(tags.values());
             }
         });
     }
@@ -251,17 +250,33 @@ public final class BookmarkStore {
         return changes.add(listener);
     }
 
-    /** The tags {@link #tags} keeps of {@code tags}. */
-    static List<String> kept(List<String> tags) {
-        var seen = new TreeSet<String>(String.CASE_INSENSITIVE_ORDER);
+    /**
+     * The tag rule: each tag is trimmed, and kept only when it is nonblank, at most 64 characters and free of control
+     * characters; one that matches an earlier one ignoring the case of ASCII letters, as SQLite's {@code NOCASE} does, is
+     * dropped, so "Work" and "work" are one tag and "\u00C4pfel" and "\u00E4pfel" two; and the first 100 are kept, in the
+     * order given. The SDK's token field keeps its tokens by the same rule.
+     *
+     * @param tags the tags given
+     * @return those kept
+     */
+    public static List<String> keptTags(List<String> tags) {
+        var seen = new HashSet<String>();
         var kept = new ArrayList<String>();
         for (String given : tags) {
             String tag = given.strip();
             if (kept.size() < MAX_TAGS && !tag.isEmpty() && tag.length() <= MAX_TAG && tag.chars().noneMatch(Character::isISOControl)
-                    && seen.add(tag))
+                    && seen.add(folded(tag)))
                 kept.add(tag);
         }
         return List.copyOf(kept);
+    }
+
+    /** {@code tag} with its ASCII letters in lower case, as SQLite's {@code NOCASE} compares it. */
+    private static String folded(String tag) {
+        char[] chars = tag.toCharArray();
+        for (int i = 0; i < chars.length; i++)
+            if (chars[i] >= 'A' && chars[i] <= 'Z') chars[i] = (char) (chars[i] + ('a' - 'A'));
+        return new String(chars);
     }
 
     /** Runs a delete of at most one bookmark, and tells the listeners when it deleted one. */

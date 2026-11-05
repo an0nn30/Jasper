@@ -1,5 +1,6 @@
 package dev.jasper.browser.store;
 
+import java.io.IOException;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
@@ -112,6 +113,34 @@ class BrowserDatabaseTest {
         }
     }
 
+    /** A page of a real database damaged past its header: SQLite opens it, and its quick check finds the damage. */
+    @Test void aFileThatFailsTheQuickCheckIsLeftAsItWas() throws Exception {
+        Path file = data.resolve("browser.sqlite");
+        written(file);
+        byte[] bytes = Files.readAllBytes(file);
+        int pageSize = (bytes[16] & 0xFF) << 8 | bytes[17] & 0xFF;
+        assertThat(bytes[pageSize]).as("page 2, the history table's, is a table leaf").isEqualTo((byte) 13);
+        bytes[pageSize + 7] = 5; // the page's count of fragmented free bytes, which the quick check compares with the page
+        Files.write(file, bytes);
+        runsInMemory(file, file, SQLException.class, "failed SQLite's quick check");
+    }
+
+    /**
+     * A connection that cannot keep a write-ahead log is refused. The seam hands the file's open an in-memory
+     * connection, whose journal can never be WAL; a real file cannot be made to refuse without a VFS of its own.
+     */
+    @Test void aConnectionThatCannotKeepAWriteAheadLogRunsInMemory() throws Exception {
+        Path file = data.resolve("browser.sqlite");
+        BrowserDatabase database = BrowserDatabase.file(file, this::unavailable, url -> SqliteOpener.open("jdbc:sqlite::memory:"));
+        opened.add(database);
+        HistoryStore history = new HistoryStore(database);
+        long entry = done(history.record("https://a.example/", Reached.LINK, 1)).orElseThrow().entry();
+        assertThat(done(history.list("", Optional.empty(), 10)).entries()).extracting(HistoryStore.HistoryEntry::id).containsExactly(entry);
+        assertThat(unavailable).singleElement().isInstanceOf(SQLException.class).extracting(Throwable::getMessage).asString()
+            .contains("cannot keep a write-ahead log").contains("(memory)");
+        assertThat(file).doesNotExist();
+    }
+
     @Test void aDataPathWhoseFolderIsARegularFileRunsInMemory() throws Exception {
         Path blocker = data.resolve("data");
         Files.writeString(blocker, "not a folder");
@@ -192,6 +221,24 @@ class BrowserDatabaseTest {
         assertThat(writes).allSatisfy(write -> assertThat(write.getNow(Optional.empty())).isPresent());
         BrowserDatabase again = file(file);
         assertThat(done(new HistoryStore(again).list("", Optional.empty(), 50)).entries()).hasSize(10);
+    }
+
+    /** A folder for SQLite's native library that cannot be made is logged once, at INFO, and SQLite runs all the same. */
+    @Test void aNativeFolderThatCannotBeMadeIsLoggedOnceAndSqliteRunsAllTheSame() throws Exception {
+        var noFolder = new BrowserDatabase.Opener() {
+            @Override public void extractNatives() throws IOException { throw new IOException("the folder cannot be made"); }
+            @Override public Connection open(String url) throws SQLException { return SqliteOpener.open(url); }
+        };
+        try (var log = new CapturedLog(BrowserDatabase.class)) {
+            BrowserDatabase database = BrowserDatabase.file(data.resolve("browser.sqlite"), this::unavailable, noFolder);
+            opened.add(database);
+            for (int i = 0; i < 2; i++) assertThat(done(database.<String>call(connection -> text(connection, "PRAGMA journal_mode")))).isEqualTo("wal");
+            assertThat(log.records()).singleElement().satisfies(record -> {
+                assertThat(record.getLevel()).isEqualTo(java.util.logging.Level.INFO);
+                assertThat(record.getThrown()).hasMessage("the folder cannot be made");
+            });
+        }
+        assertThat(unavailable).isEmpty();
     }
 
     @Test void closingBeforeAnyCallStartsNoThreadAndClosesAtOnce() {

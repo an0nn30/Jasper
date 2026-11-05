@@ -12,8 +12,9 @@ import java.nio.file.attribute.PosixFilePermissions;
  * first window's own native libraries waited for it; in a folder of Jasper's own it takes about 0.2 s.
  *
  * <p>A copy of Remote's {@code dev.jasper.remote.transfer.store.SqliteNatives}: plugins share no code, and each loads its
- * own sqlite-jdbc. This copy gives each user a folder of their own on Linux, whose {@code /tmp} every user shares, and
- * lets only its owner use it.
+ * own sqlite-jdbc. {@code org.sqlite.tmpdir} is one for the JVM, set by whichever copy runs first, so the two choose the
+ * same folder by the same rule: on Linux, whose {@code /tmp} every user shares, one for each user, and wherever the file
+ * system has POSIX permissions, one that only its owner may use, so that no other user can plant a library in it.
  */
 final class SqliteNatives {
     private static final String PROPERTY = "org.sqlite.tmpdir";

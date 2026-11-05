@@ -119,6 +119,11 @@ class BrowserRestoreTest {
             .as("no path").containsExactly(entry("url", "ftp://example.com"));
         assertThat(BrowserRestore.state(URI.create("http://ada:pw@[::1]:8080/x"), Optional.empty(), OptionalInt.empty()).orElseThrow().values())
             .as("an IPv6 host").containsExactly(entry("url", "http://[::1]:8080/x"));
+        // java.net.URI reads an authority whose host has an underscore as a registry, with no user information of its own.
+        assertThat(BrowserRestore.state(URI.create("http://admin:hunter2@build_server:8080/job"), Optional.empty(), OptionalInt.empty())
+            .orElseThrow().values()).as("a host with an underscore").containsExactly(entry("url", "http://build_server:8080/job"));
+        assertThat(BrowserRestore.withoutUserInfo(URI.create("https://a@b@host.example/x"))).as("up to the last @")
+            .hasToString("https://host.example/x");
     }
 
     @Test void anAddressWithoutAUserNameIsKeptAsItIs() {

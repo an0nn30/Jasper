@@ -14,6 +14,19 @@ class AddressesTest {
             .contains("https://example.com/@ada?to=ada@example.com#@");
     }
 
+    /**
+     * Review H8: a host with an underscore makes {@link java.net.URI} read the authority as a registry, which it does not
+     * part into user information and host, yet the user information is dropped all the same, up to the authority's last
+     * {@code @}, as Chromium reads it.
+     */
+    @Test void userInformationIsDroppedBeforeAHostWithAnUnderscore() {
+        assertThat(Addresses.storable("http://admin:hunter2@build_server:8080/job")).contains("http://build_server:8080/job");
+        assertThat(Addresses.storable("https://user:pw@my_host.example/")).contains("https://my_host.example/");
+        assertThat(Addresses.storable("https://a@b@host.example/x")).as("up to the last @").contains("https://host.example/x");
+        assertThat(Addresses.visitKey(Addresses.storable("http://admin:hunter2@build_server:8080/job").orElseThrow()))
+            .isEqualTo(new Addresses.VisitKey("build_server:8080", "/job"));
+    }
+
     @Test void webAndFileAddressesAreKeptAsTheyAre() {
         for (String address : List.of("file:///tmp/a.html", "http://example.com/", "https://example.com/a|b?q={x}",
                 "HTTPS://Example.COM/Path", "https://[::1]:8443/x"))

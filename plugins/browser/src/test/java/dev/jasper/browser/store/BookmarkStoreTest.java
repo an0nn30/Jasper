@@ -44,7 +44,7 @@ class BookmarkStoreTest {
 
     @Test void aTitleIsCutTo1024CharactersAndOtherwiseKeptExactly() throws Exception {
         assertThat(add("https://a.example/", "t".repeat(2_000), 1).title()).isEqualTo("t".repeat(1_024));
-        String hostile = " </script><img src=x onerror=alert(1)>  ";
+        String hostile = " </script><img src=x onerror=alert(1)>\u2028 ";
         assertThat(add("https://b.example/", hostile, 2).title()).isEqualTo(hostile);
     }
 
@@ -80,6 +80,24 @@ class BookmarkStoreTest {
             .as("kept in the order given").containsExactly("x".repeat(64), "zeta", "Alpha");
         assertThat(done(bookmarks.all())).singleElement().extracting(Bookmark::tags).isEqualTo(List.of("x".repeat(64), "zeta", "Alpha"));
         assertThat(done(bookmarks.tags(bookmark.id(), List.of())).tags()).isEmpty();
+    }
+
+    /**
+     * Review H10: tags ignore the case of ASCII letters only, as SQLite's {@code NOCASE} does, so "\u00C4pfel" and "\u00E4pfel" are
+     * two tags, and each one's chip finds its own bookmark.
+     */
+    @Test void tagsIgnoreTheCaseOfAsciiLettersOnly() throws Exception {
+        Bookmark bookmark = add("https://a.example/", "A", 1);
+        assertThat(done(bookmarks.tags(bookmark.id(), List.of("\u00C4pfel", "\u00E4pfel", "APFEL", "apfel"))).tags())
+            .containsExactly("\u00C4pfel", "\u00E4pfel", "APFEL");
+        Bookmark upper = tagged("https://x.example/", 2, "\u00C4pfel");
+        Bookmark lower = tagged("https://y.example/", 3, "\u00E4pfel");
+        done(bookmarks.delete(bookmark.id()));
+        assertThat(done(bookmarks.allTags())).containsExactly("\u00C4pfel", "\u00E4pfel");
+        assertThat(list("", Sort.DATE_ADDED, Set.of("\u00C4pfel"))).containsExactly(upper);
+        assertThat(list("", Sort.DATE_ADDED, Set.of("\u00E4pfel"))).containsExactly(lower);
+        assertThat(BookmarkStore.keptTags(List.of("Work", "wORK", "\u00C4pfel", "\u00E4pfel"))).as("the rule the token field shares")
+            .containsExactly("Work", "\u00C4pfel", "\u00E4pfel");
     }
 
     @Test void aBookmarkHasAtMost100Tags() throws Exception {

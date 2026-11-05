@@ -10,13 +10,11 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Handler;
 import java.util.logging.Level;
-import java.util.logging.LogRecord;
-import java.util.logging.Logger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 /** Spec section 10's history: one entry per page load, and a row per host and path that counts the visits. */
 class HistoryStoreTest {
@@ -89,9 +87,9 @@ class HistoryStoreTest {
     @Test void aTitleIsCutTo1024Characters() throws Exception {
         long entry = record("https://a.example/", Reached.LINK, 1).entry();
         assertThat(done(history.retitle(entry, "t".repeat(2_000))).orElseThrow().title()).isEqualTo("t".repeat(1_024));
-        String split = "t".repeat(1_023) + "😀" + "t";
+        String split = "t".repeat(1_023) + "\uD83D\uDE00" + "t";
         assertThat(done(history.retitle(entry, split)).orElseThrow().title()).isEqualTo("t".repeat(1_023));
-        String hostile = " </script><img src=x onerror=alert(1)>  ";
+        String hostile = " </script><img src=x onerror=alert(1)>\u2028 ";
         assertThat(done(history.retitle(entry, hostile)).orElseThrow().title()).isEqualTo(hostile);
     }
 
@@ -102,6 +100,52 @@ class HistoryStoreTest {
         done(history.retitle(second.entry(), "Second"));
         assertThat(done(history.retitle(first.entry(), "First")).orElseThrow().title()).isEqualTo("Second");
         assertThat(done(history.list("", Optional.empty(), 10)).entries()).extracting(HistoryEntry::title).containsExactly("Second", "First");
+    }
+
+    /** A row that takes another address has no title until that address's page gives one (review round 1). */
+    @Test void aRowThatTakesAnotherAddressHasNoTitleUntilThatPageGivesOne() throws Exception {
+        titled("https://a.example/p?x=1", "One", 1_000);
+        Recorded second = record("https://a.example/p?x=2", Reached.LINK, 2_000);
+        assertThat(second.visit().title()).isEmpty();
+        done(history.retitle(second.entry(), "Two"));
+        assertThat(record("https://a.example/p?x=2", Reached.RELOAD, 3_000).visit().title()).as("the same address again").isEqualTo("Two");
+    }
+
+    /**
+     * Review H8: deleting the entry a row shows points the row at the newest entry of its host and path that is left,
+     * whose address and title it then shows, and its first visit at the oldest.
+     */
+    @Test void deletingTheEntryARowShowsPointsTheRowAtTheNewestEntryLeft() throws Exception {
+        long one = titled("https://a.example/p?x=1", "One", 1_000);
+        titled("https://a.example/p?x=0", "Zero", 1_100);
+        record("https://a.example/p/q", Reached.LINK, 5_000); // another path, which the search for the row's entries finds too
+        record("https://b.example/", Reached.LINK, 1_500);
+        long two = titled("https://a.example/p?x=2", "Two", 2_000);
+        assertThat(done(history.delete(two))).isTrue();
+        assertThat(done(history.visits(10))).extracting(Visit::url, Visit::title, Visit::count, Visit::firstVisit, Visit::lastVisit)
+            .containsExactly(tuple("https://a.example/p/q", "", 1, 5_000L, 5_000L), tuple("https://b.example/", "", 1, 1_500L, 1_500L),
+                tuple("https://a.example/p?x=0", "Zero", 2, 1_000L, 1_100L));
+        done(history.delete(one));
+        assertThat(done(history.visits(10))).extracting(Visit::url, Visit::title, Visit::count, Visit::firstVisit, Visit::lastVisit)
+            .last().isEqualTo(tuple("https://a.example/p?x=0", "Zero", 1, 1_100L, 1_100L));
+    }
+
+    /** Deleting an older entry leaves the row as it was, apart from its count and its first visit. */
+    @Test void deletingAnOlderEntryChangesOnlyTheRowsCountAndFirstVisit() throws Exception {
+        long one = titled("https://a.example/p?x=1", "One", 1_000);
+        titled("https://a.example/p?x=2", "Two", 2_000);
+        done(history.delete(one));
+        assertThat(done(history.visits(10))).extracting(Visit::url, Visit::title, Visit::count, Visit::firstVisit, Visit::lastVisit)
+            .containsExactly(tuple("https://a.example/p?x=2", "Two", 1, 2_000L, 2_000L));
+    }
+
+    /** An address without a path counts under {@code /}, though its text has none: the row finds its entries all the same. */
+    @Test void aRowFindsItsEntriesWhenAnAddressHasNoPath() throws Exception {
+        titled("https://a.example", "Bare", 1_000);
+        long slash = titled("https://a.example/?q=100%25", "Query", 2_000);
+        done(history.delete(slash));
+        assertThat(done(history.visits(10))).extracting(Visit::url, Visit::title, Visit::count, Visit::lastVisit)
+            .containsExactly(tuple("https://a.example", "Bare", 1, 1_000L));
     }
 
     /** Pages run by a cursor, so an entry recorded between two pages never shifts the second one. */
@@ -207,29 +251,17 @@ class HistoryStoreTest {
 
     /** A listener that throws is logged, and neither fails the change nor keeps the others from hearing it. */
     @Test void aListenerThatThrowsDoesNotFailTheChange() throws Exception {
-        var warnings = new CopyOnWriteArrayList<Throwable>();
-        Logger logger = Logger.getLogger(Changes.class.getName());
-        Handler capture = new Handler() {
-            @Override public void publish(LogRecord record) {
-                if (record.getLevel().intValue() >= Level.WARNING.intValue()) warnings.add(record.getThrown());
-            }
-            @Override public void flush() { }
-            @Override public void close() { }
-        };
-        boolean parentHandlers = logger.getUseParentHandlers();
-        logger.setUseParentHandlers(false);
-        logger.addHandler(capture);
-        try {
+        try (var log = new CapturedLog(Changes.class)) {
             var told = new CopyOnWriteArrayList<String>();
             history.onChanged(() -> { throw new IllegalStateException("a broken listener"); });
             history.onChanged(() -> told.add("heard"));
             long entry = record("https://a.example/", Reached.LINK, 1).entry();
             assertThat(done(history.delete(entry))).isTrue();
             assertThat(told).containsExactly("heard");
-            assertThat(warnings).singleElement().extracting(Throwable::getMessage).isEqualTo("a broken listener");
-        } finally {
-            logger.removeHandler(capture);
-            logger.setUseParentHandlers(parentHandlers);
+            assertThat(log.records()).singleElement().satisfies(record -> {
+                assertThat(record.getLevel()).isEqualTo(Level.WARNING);
+                assertThat(record.getThrown()).hasMessage("a broken listener");
+            });
         }
     }
 

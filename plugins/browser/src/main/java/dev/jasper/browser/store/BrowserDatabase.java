@@ -42,8 +42,16 @@ public final class BrowserDatabase implements AutoCloseable {
         T run(Connection connection) throws SQLException;
     }
 
-    /** Opens a connection to a {@code jdbc:sqlite:} address; the test seam for a native library that does not load. */
+    /**
+     * Readies SQLite's native library and opens connections to {@code jdbc:sqlite:} addresses; the test seam for a native
+     * library that does not load, or a folder for it that cannot be made.
+     */
     @FunctionalInterface interface Opener {
+        /** Points sqlite-jdbc at the folder its native library is extracted into, before the first connection. */
+        default void extractNatives() throws IOException {
+            SqliteNatives.extractInto(SqliteNatives.folder());
+        }
+
         Connection open(String url) throws SQLException;
     }
 
@@ -184,9 +192,11 @@ public final class BrowserDatabase implements AutoCloseable {
 
     private void open() {
         try {
-            SqliteNatives.extractInto(SqliteNatives.folder());
+            opener.extractNatives();
         } catch (IOException | RuntimeException notMade) {
             // sqlite-jdbc then extracts its library into java.io.tmpdir itself: slower, and still working.
+            LOG.log(System.Logger.Level.INFO, "SQLite's native library goes to the temporary folder: Jasper's own folder for it"
+                + " could not be used", notMade);
         }
         if (file.isPresent()) {
             try {
