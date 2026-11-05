@@ -4,7 +4,10 @@ import java.util.Arrays;
 import java.util.Objects;
 import java.util.OptionalDouble;
 
-/** What a {@link MarkdownPreview} reports, on the UI thread. Lengths are CSS pixels from the top of the document. */
+/**
+ * What a {@link MarkdownPreview} reports, on the UI thread. Lengths are CSS pixels from the top of the document. Later
+ * versions of the Browser may add kinds of event, so a {@code switch} over them needs a {@code default} branch.
+ */
 public sealed interface PreviewEvent {
     /**
      * A document is in the page and laid out.

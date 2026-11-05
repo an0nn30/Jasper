@@ -32,9 +32,9 @@ import javax.swing.Timer;
 /**
  * One Markdown preview in a page of Chromium's, the API's {@link MarkdownPreview}: the documents, images and theme its
  * caller gives go to its {@link PreviewScheme.Origin} and, as calls, to its page's {@code preview.js}; what the page
- * tells comes back through {@link #received}, read where it arrived, as {@link PreviewEvent}s. It names no Chromium type: its page is a set of
- * {@link Hooks}, which the service makes from a {@link PreviewPage} and a test records. UI thread, as the API says, and
- * every future it returns completes there.
+ * tells comes back through {@link #received}, read where it arrived, as {@link PreviewEvent}s. It names no Chromium
+ * type: its page is a set of {@link Hooks}, which the service makes from a {@link PreviewPage} and a test records. UI
+ * thread, as the API says, and every future it returns completes there.
  *
  * <p><b>Before the page is ready</b> (its script has said {@code ready}), calls wait: on {@code ready} the page is sent the
  * theme, then only the latest document, its images, then the last scroll. A Find or a selection read asked before then

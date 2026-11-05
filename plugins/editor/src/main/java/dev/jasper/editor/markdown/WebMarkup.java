@@ -57,7 +57,8 @@ final class WebMarkup {
         for (Node node = parent.getFirstChild(); node != null; node = node.getNext()) node(node);
     }
 
-    // This exhaustive vocabulary is the tag allowlist, and it anchors the nodes the SWING dialect anchors, in its order.
+    // This exhaustive vocabulary is the tag allowlist, and it anchors the nodes the SWING dialect anchors, in its order,
+    // but for a mermaid fence, which it anchors once, where SWING anchors the fence and each of its lines.
     private void node(Node node) {
         if (node instanceof Block || node instanceof TableRow) MarkdownRenderer.checkInterrupted();
         switch (node) {

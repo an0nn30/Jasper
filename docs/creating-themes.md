@@ -506,7 +506,8 @@ The Editor's [Markdown preview](editor.md#markdown-preview) colours its code blo
 rest of its page with UI roles: `surface.panel` behind it (at the workspace's opacity in Basic), `text.primary` for
 text, `accent` for links, `text.secondary` for block quotes and image placeholders, `surface.card` behind code blocks,
 `border.window` for table borders, `surface.panel.raised` behind table header cells (in Chromium, behind every other
-row), and `selection.bg` with `text.onSelection` for selected text; Find's matches in it are laid on `selection.bg`.
+row), and `selection.bg` with `text.onSelection` for selected text; Find's matches in it are laid on `selection.bg`, but
+for Chromium's current match, which is orange (`#FF9632`) in every theme.
 Chromium's alerts take `accent` (Note), `status.success` (Tip), the `keyword` role's colour (Important),
 `status.warning` (Warning) and `status.danger` (Caution).
 

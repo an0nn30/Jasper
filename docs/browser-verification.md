@@ -354,6 +354,17 @@ Each is pending.
 - **Browser pages (Task 5):** every browser page's canvas now has the accessible role of a canvas; what VoiceOver says
   on a browser page.
 
+#### Lines the final review's fix wave added
+
+Each is pending.
+
+- **Typing near the end (W1, ruling N15):** type near the end of a Markdown document with images in Split with
+  Synchronize scrolling on; the source does not move, and images do not flicker.
+- **The first preview (W3, ruling N16):** the first Markdown preview after a fresh install, or after a restart of the
+  Mac, shows the document, not Basic.
+- **Fonts (W4, ruling N17):** the Chromium preview's text is the system font and its code a monospace font with default
+  settings.
+
 ### Plan 9 on Windows and Linux (not run)
 
 The user has no Windows or Linux host yet. Every line above waits for each of them too, with Ctrl in place of Cmd, and

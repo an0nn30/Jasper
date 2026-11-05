@@ -352,8 +352,8 @@ the first time a Chromium preview, or a browser page, shows.
 
 Every preview is Basic without the Browser plugin, and for the rest of Jasper's run once Chromium could not start or
 has stopped; a Chromium that could not start also posts "The browser could not start". A tab whose Chromium page did
-not load within 10 seconds, or whose page stopped, previews in Basic for the rest of the run; other tabs stay on
-Chromium.
+not load and show its document within 30 seconds, or whose page stopped, previews in Basic for the rest of the run;
+other tabs stay on Chromium.
 
 ### What the preview shows
 
@@ -377,7 +377,9 @@ sideways, and in Chromium's that code block or table does.
   `http://www.example.org`), and an email address are links.
 
 Text is in the interface font's family at the tab's font size, with larger headings; code is in the Editor's font,
-with its fallback fonts and ligatures. In Basic, **Line height** spaces the preview's lines too. Colours come from the
+with its fallback fonts and ligatures. Chromium draws only the fonts installed on the computer: in its preview, text in
+a font only Jasper bundles is in the system's interface font, and code in one, such as the default Cousine Nerd Font
+Mono, in the system's monospace font. In Basic, **Line height** spaces the preview's lines too. Colours come from the
 UI theme ([Theme colours](#theme-colours)). A change of theme or font applies to the preview at once.
 
 The preview cannot be edited. Copy copies the text selected in it, and **Select All** in the tab menu selects all of it
@@ -456,9 +458,10 @@ image has failed, loads the failed ones again.
 While the preview has the focus, **Find…** searches its rendered text, code blocks included, with the same **Match
 Case**, **Whole Word** and **Regular Expression** options. Every match is highlighted in the selection colour, Enter
 and Shift+Enter select the next and previous one, and the count follows when the preview renders again. **Replace…**
-works on the source ([Find and replace](#find-and-replace)). In the Chromium preview, **Regular Expression** takes
-JavaScript's regular expressions, and a pattern JavaScript refuses shows "Invalid pattern"; a search counts and
-highlights at most 10,000 matches, and only those in the text it reads within 250 ms.
+works on the source ([Find and replace](#find-and-replace)). In the Chromium preview, the match Enter or Shift+Enter went
+to is orange (`#FF9632`) in every theme, **Regular Expression** takes JavaScript's regular expressions, and a pattern
+JavaScript refuses shows "Invalid pattern"; a search counts and highlights at most 10,000 matches, and only those in the
+text it reads within 250 ms.
 
 ## Encodings and line endings
 
@@ -696,9 +699,10 @@ The [Markdown preview](#markdown-preview) takes its page from the UI theme's rol
 (translucent too in Basic, with `ui.workspace.opacity`; the Chromium preview stays opaque), `text.primary` for text,
 `accent` for links, `text.secondary` for block quotes and image placeholders, `surface.card` behind code blocks,
 `border.window` and `surface.panel.raised` for table borders and header cells (in Chromium, behind every other row
-instead), and `selection.bg` and `text.onSelection` for selected text; Find's matches in it are highlighted in `selection.bg`. In
-Chromium an alert's rule and title take `accent` (Note), `status.success` (Tip), the workspace's editor scheme's
-keyword colour (Important), `status.warning` (Warning) or `status.danger` (Caution). Its code blocks take the
+instead), and `selection.bg` and `text.onSelection` for selected text; Find's matches in it are highlighted in
+`selection.bg`, but for Chromium's current match, which is orange (`#FF9632`). In Chromium an alert's rule and title
+take `accent` (Note), `status.success` (Tip), the workspace's editor scheme's keyword colour (Important),
+`status.warning` (Warning) or `status.danger` (Caution). Its code blocks take the
 workspace's editor scheme's syntax colours, whatever **Color scheme** chooses. Writing an editor scheme:
 [Creating themes](creating-themes.md); the SDK's view of it:
 [`Appearance.editorPalette()`](sdk-reference.html#dev.jasper.sdk.ui.Appearance.editorPalette()) and

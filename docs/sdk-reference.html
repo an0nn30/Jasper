@@ -804,7 +804,7 @@ packages exactly as yours would, and each can be turned off in Settings › Plug
 <tbody>
 <tr><td>Remote: SSH, SFTP and tunnels</td><td><code>dev.jasper.remote</code></td><td><code>terminal.open</code>, <code>session.provide</code>, <code>terminal.observe</code>, <code>palette.contribute</code>, <code>files.source</code></td><td><code>dev.jasper.remote.api</code></td><td>Vault, Editor</td></tr>
 <tr><td>Credential Vault</td><td><code>dev.jasper.vault</code></td><td><code>palette.contribute</code></td><td><code>dev.jasper.vault.api</code></td><td></td></tr>
-<tr><td>Editor</td><td><code>dev.jasper.editor</code></td><td><code>palette.contribute</code>, <code>terminal.environment</code>, <code>editor.provide</code>, <code>terminal.open</code></td><td><code>dev.jasper.editor.api</code></td><td>Browser</td></tr>
+<tr><td>Editor</td><td><code>dev.jasper.editor</code></td><td><code>palette.contribute</code>, <code>terminal.environment</code>, <code>editor.provide</code>, <code>terminal.open</code>, <code>terminal.observe</code></td><td><code>dev.jasper.editor.api</code></td><td>Browser</td></tr>
 <tr><td>File Server</td><td><code>dev.jasper.fileserver</code></td><td><code>network.listen</code>, <code>terminal.observe</code>, <code>palette.contribute</code>, <code>clipboard.read</code></td><td></td><td>Vault</td></tr>
 <tr><td>Project Index</td><td><code>dev.jasper.indexer</code></td><td><code>terminal.observe</code>, <code>terminal.open</code>, <code>palette.contribute</code></td><td></td><td>Editor, Remote</td></tr>
 <tr><td>Shell History</td><td><code>dev.jasper.history</code></td><td><code>palette.contribute</code>, <code>terminal.observe</code>, <code>terminal.inject</code></td><td></td><td>Snippets</td></tr>
@@ -13080,7 +13080,8 @@ revision follows once it is in the page and laid out, unless a later document re
 </div>
 <div class="member" id="dev.jasper.browser.api.MarkdownPreview.clearImages()">
 <pre class="sig"><a class="self" href="#dev.jasper.browser.api.MarkdownPreview.clearImages()" aria-label="Link to this member">#</a><code><span class="kw">void</span> <b>clearImages</b>()</code></pre>
-<div class="doc"><p>Forgets every image and image reason given.</p></div>
+<div class="doc"><p>Forgets every image and image reason given, for the documents after: the document shown keeps its images until the
+next replaces it.</p></div>
 </div>
 <div class="member" id="dev.jasper.browser.api.MarkdownPreview.scrollTo(double)">
 <pre class="sig"><a class="self" href="#dev.jasper.browser.api.MarkdownPreview.scrollTo(double)" aria-label="Link to this member">#</a><code><span class="kw">void</span> <b>scrollTo</b>(<span class="kw">double</span> y)</code></pre>
@@ -13158,7 +13159,8 @@ draw it, or stops, it reports <a href="#dev.jasper.browser.api.PreviewEvent.Unav
 <header class="type-head"><span class="kind kind-interface">sealed interface</span><h4><a class="self" href="#dev.jasper.browser.api.PreviewEvent">PreviewEvent</a></h4><span class="pkg">dev.jasper.browser.api</span></header>
 <pre class="sig"><code><span class="kw">sealed</span> <span class="kw">interface</span> <b>PreviewEvent</b>
     <span class="kw">permits</span> <a class="tl" href="#dev.jasper.browser.api.PreviewEvent.Shown">PreviewEvent.Shown</a>, <a class="tl" href="#dev.jasper.browser.api.PreviewEvent.Geometry">PreviewEvent.Geometry</a>, <a class="tl" href="#dev.jasper.browser.api.PreviewEvent.Scrolled">PreviewEvent.Scrolled</a>, <a class="tl" href="#dev.jasper.browser.api.PreviewEvent.LinkActivated">PreviewEvent.LinkActivated</a>, <a class="tl" href="#dev.jasper.browser.api.PreviewEvent.Unavailable">PreviewEvent.Unavailable</a></code></pre>
-<div class="doc"><p>What a <a href="#dev.jasper.browser.api.MarkdownPreview"><code>MarkdownPreview</code></a> reports, on the UI thread. Lengths are CSS pixels from the top of the document.</p></div>
+<div class="doc"><p>What a <a href="#dev.jasper.browser.api.MarkdownPreview"><code>MarkdownPreview</code></a> reports, on the UI thread. Lengths are CSS pixels from the top of the document. Later
+versions of the Browser may add kinds of event, so a <code>switch</code> over them needs a <code>default</code> branch.</p></div>
 <h5>Nested types</h5>
 <ul class="nested-list"><li><a href="#dev.jasper.browser.api.PreviewEvent.Shown"><code>PreviewEvent.Shown</code></a> <span class="kind kind-record">record</span> A document is in the page and laid out.</li><li><a href="#dev.jasper.browser.api.PreviewEvent.Geometry"><code>PreviewEvent.Geometry</code></a> <span class="kind kind-class">class</span> Where a document's blocks are laid out: after <a href="#dev.jasper.browser.api.PreviewEvent.Shown"><code>Shown</code></a>, and again whenever the layout changes, as when a
 diagram, an image or a font arrives.</li><li><a href="#dev.jasper.browser.api.PreviewEvent.Scrolled"><code>PreviewEvent.Scrolled</code></a> <span class="kind kind-record">record</span> The page scrolled.</li><li><a href="#dev.jasper.browser.api.PreviewEvent.LinkActivated"><code>PreviewEvent.LinkActivated</code></a> <span class="kind kind-record">record</span> The user clicked a link of the document, or pressed Enter on it.</li><li><a href="#dev.jasper.browser.api.PreviewEvent.Unavailable"><code>PreviewEvent.Unavailable</code></a> <span class="kind kind-record">record</span> Chromium cannot draw the preview, or has stopped: it shows nothing more for the rest of Jasper's run.</li></ul>

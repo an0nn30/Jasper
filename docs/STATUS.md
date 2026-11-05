@@ -2,7 +2,8 @@
 
 **Browser plan 9: the Chromium Markdown preview — 2026-11-05** (`claude/browser-markdown-preview`, worktree
 `.claude/worktrees/browser-4b-4c-e6deab`, from local `main` `420bfd63a`, which has plans 4a, 4b and 4c merged; the plan
-`1364c1dc3`, commits `8676bfab4` to `a38f29813`, then the docs; not merged or pushed;
+`1364c1dc3`, commits `8676bfab4` to `a38f29813`, the docs `ea57ab1af` and the checklist `11e04ff16`, then the final
+review's fix wave `af2f1e1ed` to `8031cee59` and its docs; not merged or pushed;
 [plan](superpowers/plans/2026-10-30-browser-9-markdown-preview.md), whose banner lists every deviation by task,
 [spec](superpowers/specs/2026-10-26-jasper-browser-plugin-design.md) sections 18 and 23,
 [guide](editor.md#markdown-preview); executed with per-task subagents and reviews, Task 1 as slices 1a and 1b). The
@@ -10,9 +11,9 @@ Editor's Markdown preview is drawn by Chromium through the Browser:
 - **The setting** `markdown_preview` (Settings › Tools › Editor › Markdown › Markdown preview): `chromium`, the default,
   in GitHub's layout and the theme's colours, or `basic`, the Editor's own Swing preview, which screen readers can
   read. A change applies to open tabs at once, keeping each one's view, divider and Synchronize scrolling. Every
-  preview is Basic without the Browser plugin and once Chromium could not start or has stopped; a view whose page did
-  not load within 10 seconds, or whose page stopped, is Basic for the rest of the run, one UI turn later (Task 6's fix
-  round). A view makes its Chromium preview the first time Split or Preview shows (N9), so start-up and restored Source
+  preview is Basic without the Browser plugin and once Chromium could not start or has stopped; a view whose page was
+  not ready, or had shown no document asked for, 30 seconds after its browser started (N16), or whose page stopped, is
+  Basic for the rest of the run, one UI turn later (Task 6's fix round). A view makes its Chromium preview the first time Split or Preview shows (N9), so start-up and restored Source
   tabs start no Chromium.
 - **The renderer:** commonmark's alerts, footnotes and autolinks (0.30.0, with autolink-java 0.12.0) in both
   previews; a WEB dialect beside the SWING one, whose vocabulary keeps raw HTML as text and writes every link as a
@@ -33,7 +34,8 @@ Editor's Markdown preview is drawn by Chromium through the Browser:
   fence shows as a plain code block in both previews, the scheme answers `/mermaid.min.js` with 404, and the setting's
   description, its keywords, `settings.toml` and the guides name no Mermaid (N8). 1b adds `mermaid.min.js` under the
   Browser's `third_party/`, the Mermaid notices component with `mermaid.LICENSE.txt` and `mermaid.NOTICE.txt`, and
-  `MermaidBundleTest`. `autolink.LICENSE.txt` is unverified against upstream's at tag `autolink-0.12.0` (N2).
+  `MermaidBundleTest`. Plan 9 merges into local `main` without 1b (N20). `autolink.LICENSE.txt` is unverified against
+  upstream's at tag `autolink-0.12.0` (N2), and is checked before any push (N14).
 
 No SDK change: `JasperSdk.VERSION` stays 0.28.0. Notices: three commonmark modules on the CommonMark Java component, a
 new autolink-java component, and the `third_party/` rule in `verifyThirdPartyNotices`. Docs: the Editor guide (the
@@ -71,18 +73,49 @@ where it applied):
 - N9: a view makes its Chromium preview the first time Split or Preview shows, not when it opens.
 - N10: regex Whole Word is `\b(?:` + pattern + `)\b` in both previews, after the pattern compiles alone.
 - N11: the source editor's regex Whole Word stays RSyntaxTextArea's; the difference from the previews is a follow-up.
+- N12: N8 also drops the setting's `mermaid` search keyword; 1b adds it back with the description.
+- N13: Task 8's count, one fewer than Task 7's, is a stale result file in Task 7's run; no test was removed.
+- N14: amends N2: `autolink.LICENSE.txt` is checked against upstream before any push, not before the merge into local
+  `main`, as the GitHub read waits for the user's yes.
+- N15: a layout's clamp of the page's scroll is told apart from the user's scroll in the page, not in Java.
+- N16: one 30 s deadline from the page's browser covers ready and the first document asked for; later documents none.
+- N17: a Java logical or dot-prefixed font family becomes its CSS generic; serving the bundled fonts to the page
+  (`font-src 'self'` in the pinned policy) is the user's call.
+- N18: the version mismatches from before this branch (Plugin APIs' Remote and Snippets, the overview's Editor
+  capabilities) are fixed in the fix wave.
+- N19: Find's current match in Chromium keeps `find.js`'s orange and is documented so; theming it can follow the GUI
+  check.
+- N20: plan 9 merges into local `main` without slice 1b; Mermaid lands on top of `main` once the user approves its
+  download.
+
+The final review ("With fixes", base `420bfd63a`, head `11e04ff16`) and the docs review (Approved, one Important) were
+answered by one fix wave, W1-W10 (the banner has each): the page reports a layout's clamp of its scroll as not the
+user's and keeps its images on an edit until the next document (W1, with `ScrollLinkChromiumTest` across a re-render);
+the docs review's Important (W2) needed no change, as an image without alternative text shows its file name in the
+reason in both previews; one 30 s deadline for the page and its first document (W3); fonts Chromium can find (W4);
+`# Heading [^1]` is `#heading-1` again (W5); a footnote reference with no note is written as text (W6); a late Find
+answer's throw reaches the uncaught-exception handler (W7); the page's messages are parsed on Chromium's thread (W8);
+`PreviewEvent` may grow (W9); and the docs corrections of W10. Verification after the wave:
+`./gradlew check --continue` (JBR 25.0.4.1 b635.75 jcef, 15m 4s, after the wave): **14,732 tests, 0 failures, 0 errors,
+103 skipped** (1,324 classes in the 16 build folders, without the example plugin's: jasper-app 5,256 with 90 skipped,
+Editor 5,387 with 4 skipped, Browser 609 with 1 skipped), Task 8's 14,722 and the wave's ten new tests; the example
+external plugin's `check pluginZip` passes (1 test, up to date); `sdkReference` was rerun; source hygiene is clean over
+3,296 Java files. No GUI was launched.
 
 Known gaps and follow-ups (the banner has them all, with the deferred minors by task): Mermaid waits for 1b, and after
 it the guides and the setting name Mermaid again and the first `/mermaid.min.js` read should leave Chromium's IO thread;
 `autolink.LICENSE.txt` is unverified (N2); memory does not go back when previews close (in-process Chromium cannot
-restart, N-F32 from 4a); a view that falls back to Basic says nothing unless Chromium's start failed; regex Whole Word
-differs between the source and the previews for an alternation (N11); **Line height** spaces only Basic's lines; every
-browser page's canvas now has the accessible role of a canvas (Task 5's side effect); the `Unavailable` reasons "The
-Markdown preview's page did not load within 10 seconds." and "Chromium's page for the Markdown preview stopped." are
-carried but not shown; an unresolved footnote label would fail the whole render (Task 2's minor, for the final
-review); no JavaScript runs in a test (`preview.js` and `find.js` are checked as text and with `node --check`). Task 9
-(the user's check on macOS, with their OK): pending, F38's GUI-only line first, then the plan's twelve lines and the
-task reviews'
+restart, N-F32 from 4a); a view that falls back to Basic says nothing unless Chromium's start failed, and a broken page
+shows its background for up to 30 seconds first (N16); regex Whole Word differs between the source and the previews
+for an alternation (N11); **Line height** spaces only Basic's lines; a font only Jasper bundles falls back to the
+system's in Chromium, and serving the bundled fonts is the user's call (N17); Find's current match in Chromium is
+orange in every theme (N19); after an edit the next document's images show once the Editor sets them again, and a
+hidden view's page keeps its images until its next document (W1's cost); every browser page's canvas now has the
+accessible role of a canvas (Task 5's side effect); the `Unavailable` reasons "The Markdown preview's page did not load
+within 30 seconds." and "Chromium's page for the Markdown preview stopped." are carried but not shown; no JavaScript
+runs in a test (`preview.js` and `find.js` are checked as text and with `node --check`). Task 9 (the user's check on
+macOS, with their OK): pending, F38's GUI-only line first, then the plan's twelve lines, the task reviews' and the fix
+wave's three
 ([checklist](browser-verification.md#plan-9-the-chromium-markdown-preview)); if the first line fails,
 `markdown_preview`'s default goes to `basic` before anything is pushed. Windows and Linux are not run; benchmarks and
 the memory run are deferred.

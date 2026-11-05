@@ -53,7 +53,10 @@ public interface MarkdownPreview extends AutoCloseable {
      */
     void imageReason(int id, String reason);
 
-    /** Forgets every image and image reason given. */
+    /**
+     * Forgets every image and image reason given, for the documents after: the document shown keeps its images until the
+     * next replaces it.
+     */
     void clearImages();
 
     /**

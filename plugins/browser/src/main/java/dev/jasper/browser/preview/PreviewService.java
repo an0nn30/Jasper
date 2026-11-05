@@ -120,7 +120,7 @@ public final class PreviewService implements MarkdownPreviews {
 
         /**
          * Reads a request of the page where it arrives, on Chromium's thread, so a layout's many numbers are never parsed
-         * on the UI thread (plan 9's W8). Any thread; never throws.
+         * on the UI thread. Any thread; never throws.
          *
          * @return what the request tells the preview, run on the UI thread; empty for anything that is no message
          */

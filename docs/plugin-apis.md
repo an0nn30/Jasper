@@ -432,7 +432,7 @@ older than 0.11.0, which lack `RelativePaths` ([methods newer than the provider]
 ## Remote API
 
 Package [`dev.jasper.remote.api`](sdk-reference.html#package-dev.jasper.remote.api), from Remote (`dev.jasper.remote`,
-0.18.0). The user's side is in [Remote](remote.md).
+0.19.0). The user's side is in [Remote](remote.md).
 
 Remote publishes one [`RemoteProjects`](sdk-reference.html#dev.jasper.remote.api.RemoteProjects) for every consumer
 with `publish`. Call every method on the UI thread. A stage completes on a worker thread once its remote work has
@@ -494,7 +494,7 @@ private void countFiles(ActionContext invoked) {
 ## Snippets API
 
 Package [`dev.jasper.snippets.api`](sdk-reference.html#package-dev.jasper.snippets.api), from Snippets
-(`dev.jasper.snippets`, 0.3.0). The user's side is in [Shell History and Snippets](history-and-snippets.md).
+(`dev.jasper.snippets`, 0.4.0). The user's side is in [Shell History and Snippets](history-and-snippets.md).
 
 Snippets publishes one [`SnippetService`](sdk-reference.html#dev.jasper.snippets.api.SnippetService) for every consumer
 with `publish`. Call both methods on the UI thread.
@@ -555,7 +555,7 @@ completes on the UI thread. The API names only JDK and SDK types.
 | [`component()`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.component()) | The canvas, the same `JComponent` each time, for the consumer to lay out. Chromium starts the first time it shows. Its accessible name is "Markdown preview", and its description "Screen readers cannot read this preview. Set Markdown preview to Basic in the Editor's settings to read it." |
 | [`theme(theme)`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.theme(PreviewTheme)) | The look, a [`PreviewTheme`](sdk-reference.html#dev.jasper.browser.api.PreviewTheme): the variant, the workspace and syntax palettes, the text's font family, and a typography for the code's font and the text's size. The page takes it before the next document. |
 | [`show(revision, html)`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.show(long,String)) | Shows a document in place of the one shown, keeping the scroll position. `IllegalArgumentException` for a revision no greater than the last, or for HTML over 16 MiB in UTF-8. A `Shown` with the revision follows once it is laid out, unless a later document replaced it first. |
-| [`image(id, image)`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.image(int,BufferedImage)), [`imageReason(id, reason)`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.imageReason(int,String)), [`clearImages()`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.clearImages()) | Shows an image in each `img` whose `data-image` is `id`, or in its place its alternative text (else "Image") and the reason, in this document and the ones after, until `clearImages`. |
+| [`image(id, image)`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.image(int,BufferedImage)), [`imageReason(id, reason)`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.imageReason(int,String)), [`clearImages()`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.clearImages()) | Shows an image in each `img` whose `data-image` is `id`, or in its place its alternative text (else "Image") and the reason, in this document and the ones after, until `clearImages`, which forgets them for the documents after: the document shown keeps its images until the next replaces it. |
 | [`scrollTo(y)`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.scrollTo(double)), [`reveal(elementId)`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.reveal(String)) | Scrolls the page to `y`, CSS pixels from the document's top; or brings the element with that id to the top and puts the caret at its start, so Tab goes on from there. |
 | [`markAll(find)`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.markAll(PreviewFind)), [`select(find, forward)`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.select(PreviewFind,boolean)), [`clearFind()`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.clearFind()), [`selectedText()`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.selectedText()) | Find, with a [`PreviewFind`](sdk-reference.html#dev.jasper.browser.api.PreviewFind) (the query, Match Case, Whole Word, and JavaScript's regular expressions): the number of matches, marking at most 10,000; whether the next or previous match from the selection was selected, wrapping round; removing the marks; the selected text when it is one line of at most 1,000 characters, else "". A pattern JavaScript refuses fails the future with a `PatternSyntaxException`; a later `markAll` or `select` cancels one that waits, and a later `selectedText` the one before. Before the page has loaded they answer at once with 0, false and "". |
 | [`copy()`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.copy()), [`selectAll()`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.selectAll()), [`focus()`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.focus()) | Copies the selection, selects the whole document, or gives the canvas the keyboard focus. |
@@ -567,11 +567,13 @@ completes on the UI thread. The API names only JDK and SDK types.
 | [`Geometry`](sdk-reference.html#dev.jasper.browser.api.PreviewEvent.Geometry) | Where the document's blocks are: `top(n)` of the element whose `data-b` is `n` (empty for one with no box), the document's `height()` and the view's `viewport()`. After each `Shown`, and again when the layout changes, as when an image or a font arrives. |
 | [`Scrolled(y, user)`](sdk-reference.html#dev.jasper.browser.api.PreviewEvent.Scrolled) | The page scrolled; `user` is false for the scrolling `scrollTo` asked for. |
 | [`LinkActivated(id)`](sdk-reference.html#dev.jasper.browser.api.PreviewEvent.LinkActivated) | A click, a middle click or Enter on an element whose `data-link` is `id`. The page goes nowhere: the consumer follows the link. |
-| [`Unavailable(reason)`](sdk-reference.html#dev.jasper.browser.api.PreviewEvent.Unavailable) | Chromium cannot draw this preview any more, for the rest of Jasper's run: it could not start or has stopped, the page did not load within 10 seconds ("The Markdown preview's page did not load within 10 seconds."), or the page stopped ("Chromium's page for the Markdown preview stopped."). Close the preview then too: the Browser keeps it until it closes. |
+| [`Unavailable(reason)`](sdk-reference.html#dev.jasper.browser.api.PreviewEvent.Unavailable) | Chromium cannot draw this preview any more, for the rest of Jasper's run: it could not start or has stopped, the page was not ready, or had shown no document asked for, 30 seconds after its browser started ("The Markdown preview's page did not load within 30 seconds."), or the page stopped ("Chromium's page for the Markdown preview stopped."). Close the preview then too: the Browser keeps it until it closes. |
+
+Later versions of the Browser may add kinds of `PreviewEvent`, so a `switch` over them needs a `default` branch.
 
 **The page.** Each preview's page is its own origin under one content security policy (`default-src 'none'`, scripts
 and styles only from the origin, inline styles allowed): no script in the HTML runs, nothing outside the origin is
-requested, every navigation is cancelled, and there is no right-click menu, popup or page dialog. Images come only
+requested, every navigation after the shell's first load is cancelled, and there is no right-click menu, popup or page dialog. Images come only
 from `image`. The HTML goes into a `main` element of class `markdown-body`, whose stylesheet draws GitHub's layout in
 the theme's colours: the ordinary elements, and the classes the Editor writes for alerts (`markdown-alert`,
 `markdown-alert-<type>`, `markdown-alert-title`), task items (`task-list-item`), footnotes (`footnotes`, `footnote-ref`,
