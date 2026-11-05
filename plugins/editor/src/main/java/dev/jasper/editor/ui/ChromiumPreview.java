@@ -3,6 +3,7 @@ package dev.jasper.editor.ui;
 import dev.jasper.browser.api.MarkdownPreview;
 import dev.jasper.browser.api.MarkdownPreviews;
 import dev.jasper.browser.api.PreviewEvent;
+import dev.jasper.browser.api.PreviewFind;
 import dev.jasper.browser.api.PreviewTheme;
 import dev.jasper.editor.markdown.MarkdownRenderer;
 import dev.jasper.editor.markdown.MarkdownResult;
@@ -28,20 +29,11 @@ import org.fife.ui.rtextarea.SearchContext;
 /**
  * The Chromium preview: the Browser's {@link MarkdownPreview}, whose page draws the WEB dialect in GitHub's look. An
  * install ends when the page says it shows that document; a document shown for an older install, or for one cancelled,
- * installs nothing. The page is opaque, also in a translucent window. Made by {@link ChromiumPreviews}; with it, the only
- * class of the Editor that names the Browser's API. UI thread.
+ * installs nothing. Scroll sync reads the page's layout of the installed document and where the page scrolled; Find asks
+ * the page, which answers later, and its regular expressions are JavaScript's. The page is opaque, also in a translucent
+ * window. Made by {@link ChromiumPreviews}; with it, the only class of the Editor that names the Browser's API. UI thread.
  */
 final class ChromiumPreview implements PreviewSurface {
-    /** Task 7 replaces it: a page that never scrolls, so scroll sync leaves it alone. */
-    private static final ScrollLink.Scroller STILL = new ScrollLink.Scroller() {
-        @Override public int y() { return 0; }
-        @Override public int max() { return 0; }
-        @Override public Dimension extent() { return new Dimension(); }
-        @Override public Dimension size() { return new Dimension(); }
-        @Override public void move(int y) { }
-        @Override public Subscription onMoved(Consumer<Boolean> byUser) { return () -> { }; }
-    };
-
     private final DocumentArea area;
     private final MarkdownPreview preview;
     /** The view's commands go to the preview when it had the focus last, as they go to Basic's. */
@@ -49,7 +41,10 @@ final class ChromiumPreview implements PreviewSurface {
         @Override public void focusGained(FocusEvent event) { area.focusSource(false); }
     };
     private final List<Runnable> installedListeners = new ArrayList<>();
+    private final PageScroller scroller = new PageScroller();
     private Runnable beforeReplace = () -> { }, unavailable = () -> { };
+    /** The page's last layout of the installed document, or of the one installed before it; null before the first. */
+    private PreviewEvent.Geometry geometry;
     private DocumentArea.PreviewStyle style;
     private PreviewTheme theme;
     /** Revisions: the last given to the page, the install's, the installed document's and the last the page showed; 0 is none. */
@@ -81,10 +76,25 @@ final class ChromiumPreview implements PreviewSurface {
             // A page whose client already failed says so from inside the add that first shows its canvas: the view
             // falls back to Basic once that layout is done, not in the middle of it.
             case PreviewEvent.Unavailable _ -> EventQueue.invokeLater(() -> { if (!closed) unavailable.run(); });
-            // Task 7: the page's geometry and scrolling drive scroll sync.
-            case PreviewEvent.Geometry _ -> { }
-            case PreviewEvent.Scrolled _ -> { }
+            case PreviewEvent.Geometry layout -> laidOut(layout);
+            case PreviewEvent.Scrolled scrolled -> scroller.scrolled(scrolled.y(), scrolled.user());
         }
+    }
+
+    /**
+     * The page laid out the installed document: scroll sync hears its new sizes, which are not the user's doing, then
+     * the area's geometry hook runs. A layout of another revision is dropped.
+     */
+    private void laidOut(PreviewEvent.Geometry layout) {
+        if (installed == null || layout.revision() != installedRevision) return;
+        geometry = layout;
+        scroller.tell(false);
+        area.previewGeometry();
+    }
+
+    /** @return the page's layout of the installed document, or null when it has none yet */
+    private PreviewEvent.Geometry installedLayout() {
+        return installed != null && geometry != null && geometry.revision() == installedRevision ? geometry : null;
     }
 
     /** The page shows revision {@code number}: when it is the install waiting, that document is installed. */
@@ -160,14 +170,37 @@ final class ChromiumPreview implements PreviewSurface {
         return true;
     }
 
-    // Task 7 replaces these stand-ins with the page's geometry, scrolling and Find. The futures are complete: FindBar
-    // joins them on the UI thread.
-    @Override public OptionalDouble blockY(String blockId) { return OptionalDouble.empty(); }
-    @Override public double endY() { return Double.NaN; }
-    @Override public ScrollLink.Scroller scroller() { return STILL; }
-    @Override public CompletableFuture<Integer> markAll(SearchContext context) { return CompletableFuture.completedFuture(0); }
-    @Override public CompletableFuture<Boolean> find(SearchContext context) { return CompletableFuture.completedFuture(false); }
-    @Override public CompletableFuture<String> selectedText() { return CompletableFuture.completedFuture(""); }
+    /** @return block {@code b<n>}'s top in the page's layout of the installed document */
+    @Override public OptionalDouble blockY(String blockId) {
+        var layout = installedLayout();
+        if (layout == null || !blockId.startsWith("b")) return OptionalDouble.empty();
+        try { return layout.top(Integer.parseInt(blockId, 1, blockId.length(), 10)); }
+        catch (NumberFormatException notABlock) { return OptionalDouble.empty(); }
+    }
+    /** @return the installed document's height in the page's layout of it */
+    @Override public double endY() {
+        var layout = installedLayout();
+        return layout == null ? Double.NaN : layout.height();
+    }
+    @Override public ScrollLink.Scroller scroller() { return scroller; }
+
+    /** Asks the page; its answer comes later, on the UI thread, and a pattern JavaScript refuses fails it. */
+    @Override public CompletableFuture<Integer> markAll(SearchContext context) {
+        var find = question(context);
+        return find == null ? CompletableFuture.completedFuture(0) : preview.markAll(find);
+    }
+    /** Asks the page to select the next match in the context's direction, wrapping at the document's end. */
+    @Override public CompletableFuture<Boolean> find(SearchContext context) {
+        var find = question(context);
+        return find == null ? CompletableFuture.completedFuture(false) : preview.select(find, context.getSearchForward());
+    }
+    /** @return what the page looks for, or null for an empty query, which finds nothing */
+    private static PreviewFind question(SearchContext context) {
+        String query = context.getSearchFor();
+        if (query == null || query.isEmpty()) return null;
+        return new PreviewFind(query, context.getMatchCase(), context.getWholeWord(), context.isRegularExpression());
+    }
+    @Override public CompletableFuture<String> selectedText() { return preview.selectedText(); }
 
     @Override public void clearFind() { preview.clearFind(); }
     @Override public void copy() { preview.copy(); }
@@ -181,8 +214,39 @@ final class ChromiumPreview implements PreviewSurface {
         if (closed) return;
         closed = true;
         installing = installed = null;
+        geometry = null;
         installedListeners.clear();
+        scroller.listeners.clear();
         preview.component().removeFocusListener(focus);
         preview.close();
+    }
+
+    /**
+     * Where the page shows its document: where it last said it scrolled to, rounded, and the sizes of its last layout. A
+     * move asks the page to scroll, and the position is where it was asked to go until the page says where it went.
+     */
+    private final class PageScroller implements ScrollLink.Scroller {
+        private final List<Consumer<Boolean>> listeners = new ArrayList<>();
+        private int y;
+        @Override public int y() { return y; }
+        @Override public int max() { return geometry == null ? 0 : (int) Math.max(0, Math.round(geometry.height() - geometry.viewport())); }
+        @Override public Dimension extent() { return new Dimension(0, geometry == null ? 0 : (int) Math.round(geometry.viewport())); }
+        @Override public Dimension size() { return new Dimension(0, geometry == null ? 0 : (int) Math.round(geometry.height())); }
+        @Override public void move(int y) {
+            if (closed) return;
+            this.y = y;
+            preview.scrollTo(y);
+        }
+        @Override public Subscription onMoved(Consumer<Boolean> byUser) {
+            Objects.requireNonNull(byUser);
+            listeners.add(byUser);
+            return () -> listeners.remove(byUser);
+        }
+        /** The page scrolled to {@code to}: by the user, or as {@link #move} asked. */
+        void scrolled(double to, boolean user) {
+            y = (int) Math.round(to);
+            tell(user);
+        }
+        void tell(boolean user) { List.copyOf(listeners).forEach(listener -> listener.accept(user)); }
     }
 }

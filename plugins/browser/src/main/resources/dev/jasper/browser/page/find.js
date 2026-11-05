@@ -7,7 +7,8 @@
  * - {action: "search", search, query, matchCase, wholeWord, regex} finds the query, at most 1,000 characters, in the
  *   frame's visible text: as plain text, whose runs of white space match any, or as a JavaScript regular expression
  *   (RegExp, "i" added when case does not matter). With wholeWord, plain text matches only where no letter or digit
- *   comes right before or after it, and a regular expression is put between \b and \b, as the Editor's Find does.
+ *   comes right before or after it, and a regular expression is put in a group between \b and \b, as the Editor's Basic
+ *   preview does.
  *   The text is read a block at a time: what one block-level element holds, up
  *   to a <br> or another block-level element, each run of white space (space, tab, line feed, form feed, carriage
  *   return and no-break space) as one space, so a match may span inline elements and the source's line breaks.
@@ -386,7 +387,7 @@
       const text = String(command.query).slice(0, LIMIT);
       let source, flags = command.matchCase ? 'g' : 'gi';
       if (command.regex) {
-        source = command.wholeWord === true ? '\\b' + text + '\\b' : text;
+        source = text;
       } else {
         source = text.replace(BLANKS, ' ').replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
         if (command.wholeWord === true) {
@@ -395,7 +396,10 @@
         }
       }
       try {
-        return new RegExp(source, flags);
+        const pattern = new RegExp(source, flags);
+        // Whole Word puts the whole expression between the boundaries, so a|b is a whole a or a whole b; compiled
+        // alone first, an expression such as a)(b stays refused.
+        return command.regex && command.wholeWord === true ? new RegExp('\\b(?:' + source + ')\\b', flags) : pattern;
       } catch (invalid) {
         return null;
       }

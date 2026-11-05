@@ -51,7 +51,10 @@ public final class FakeMarkdownPreviews implements MarkdownPreviews {
     /**
      * A preview that records each call as a line, such as {@code show 2} or {@code imageReason 0 Loading image}, keeps
      * the themes and documents it was given, and tells its events once a test fires them, until it closes. Its canvas
-     * holds the focus from {@link #focus()} until the preview closes, as a canvas that took it would.
+     * holds the focus from {@link #focus()} until the preview closes, as a canvas that took it would. Each Find answer
+     * and selection read waits until the test completes its future, in any order, and its close cancels those still
+     * waiting; while {@link #ready(boolean)} is false, they answer at once with nothing found, as a page not yet ready
+     * does.
      */
     public static final class Recording implements MarkdownPreview {
         private final Consumer<PreviewEvent> events;
@@ -62,7 +65,11 @@ public final class FakeMarkdownPreviews implements MarkdownPreviews {
         private final List<PreviewTheme> themes = new ArrayList<>();
         private final Map<Long, String> documents = new HashMap<>();
         private final Map<Integer, BufferedImage> images = new HashMap<>();
-        private boolean closed, focused, shown;
+        private final List<PreviewFind> finds = new ArrayList<>();
+        private final List<CompletableFuture<Integer>> marks = new ArrayList<>();
+        private final List<CompletableFuture<Boolean>> steps = new ArrayList<>();
+        private final List<CompletableFuture<String>> selections = new ArrayList<>();
+        private boolean closed, focused, shown, ready = true;
 
         Recording(Consumer<PreviewEvent> events, String unavailableWhenShown) {
             this.events = Objects.requireNonNull(events);
@@ -91,6 +98,33 @@ public final class FakeMarkdownPreviews implements MarkdownPreviews {
         /** @return whether the preview has closed */
         public boolean closed() { return closed; }
 
+        /**
+         * @param value false: from now on, Find and the selection read answer at once with nothing found, as the page
+         *     does before it is ready; true: they wait for the test again
+         */
+        public void ready(boolean value) { ready = value; }
+
+        /** @return what each {@code markAll} and {@code select} looked for, in order */
+        public List<PreviewFind> finds() { return List.copyOf(finds); }
+
+        /** @return each future {@code markAll} returned, in order, for the test to complete */
+        public List<CompletableFuture<Integer>> marks() { return List.copyOf(marks); }
+
+        /** @return each future {@code select} returned, in order, for the test to complete */
+        public List<CompletableFuture<Boolean>> steps() { return List.copyOf(steps); }
+
+        /** @return each future {@code selectedText} returned, in order, for the test to complete */
+        public List<CompletableFuture<String>> selections() { return List.copyOf(selections); }
+
+        /** A future a test completes; once closed, one cancelled; before ready, one that holds {@code nothing}. */
+        private <T> CompletableFuture<T> answer(List<CompletableFuture<T>> waiting, T nothing) {
+            var future = new CompletableFuture<T>();
+            if (closed) future.cancel(false);
+            else if (!ready) future.complete(nothing);
+            else waiting.add(future);
+            return future;
+        }
+
         private void call(String line) { if (!closed) calls.add(line); }
 
         @Override public JComponent component() { return component; }
@@ -101,16 +135,26 @@ public final class FakeMarkdownPreviews implements MarkdownPreviews {
         @Override public void clearImages() { call("clearImages"); images.clear(); }
         @Override public void scrollTo(double y) { call("scrollTo " + y); }
         @Override public void reveal(String elementId) { call("reveal " + elementId); }
-        @Override public CompletableFuture<Integer> markAll(PreviewFind find) { call("markAll " + find.query()); return CompletableFuture.completedFuture(0); }
+        @Override public CompletableFuture<Integer> markAll(PreviewFind find) {
+            call("markAll " + find.query());
+            if (!closed) finds.add(find);
+            return answer(marks, 0);
+        }
         @Override public CompletableFuture<Boolean> select(PreviewFind find, boolean forward) {
             call("select " + find.query() + " " + forward);
-            return CompletableFuture.completedFuture(false);
+            if (!closed) finds.add(find);
+            return answer(steps, false);
         }
         @Override public void clearFind() { call("clearFind"); }
-        @Override public CompletableFuture<String> selectedText() { call("selectedText"); return CompletableFuture.completedFuture(""); }
+        @Override public CompletableFuture<String> selectedText() { call("selectedText"); return answer(selections, ""); }
         @Override public void copy() { call("copy"); }
         @Override public void selectAll() { call("selectAll"); }
         @Override public void focus() { call("focus"); if (!closed) focused = true; }
-        @Override public void close() { call("close"); closed = true; focused = false; }
+        @Override public void close() {
+            call("close");
+            closed = true;
+            focused = false;
+            for (var waiting : List.of(marks, steps, selections)) waiting.forEach(future -> future.cancel(false));
+        }
     }
 }

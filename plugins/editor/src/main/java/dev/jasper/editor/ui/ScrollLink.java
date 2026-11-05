@@ -37,7 +37,8 @@ final class ScrollLink implements AutoCloseable {
         /** Shows the document from {@code y}. */
         void move(int y);
         /**
-         * @param byUser hears each change of the position or the sizes, with whether the user made it
+         * @param byUser hears each change of the position or the sizes, with whether the user made it; a change the user
+         *     did not make never takes the lead
          * @return the registration, which the link closes when it closes
          */
         Subscription onMoved(Consumer<Boolean> byUser);
@@ -222,7 +223,7 @@ final class ScrollLink implements AutoCloseable {
         }
         else for (int i=0;i<fold.getChildCount();i++) collapsed(fold.getChild(i), target);
     }
-    private void moved(Pane pane) {
+    private void moved(Pane pane, boolean byUser) {
         int y = pane.y();
         Dimension extent = pane.scroller.extent(), size = pane.scroller.size();
         boolean resized = !extent.equals(pane.extent) || !size.equals(pane.size);
@@ -230,7 +231,7 @@ final class ScrollLink implements AutoCloseable {
         if (resized) geometryChanged();
         if (y == pane.lastY) return;
         pane.lastY = y;
-        if (adjusting || replacing || pane.expected != null && pane.expected == y) return;
+        if (adjusting || replacing || !byUser || pane.expected != null && pane.expected == y) return;
         pane.expected = null;
         if (resized) return; // Layout clamping is not user motion.
         leader = pane; pane.sequence++;
@@ -340,7 +341,7 @@ final class ScrollLink implements AutoCloseable {
         Reading reading;
         Pane(Scroller scroller) {
             this.scroller=scroller; lastY=y(); extent=scroller.extent(); size=scroller.size();
-            moves=scroller.onMoved(byUser -> moved(this));
+            moves=scroller.onMoved(byUser -> moved(this, byUser));
         }
         int y() { return scroller.y(); }
         int max() { return scroller.max(); }

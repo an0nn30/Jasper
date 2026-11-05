@@ -137,6 +137,17 @@ class PreviewScriptTest {
             .doesNotContainPattern("typeof\\s+mermaid\\b").doesNotContainPattern("typeof\\s+window\\.mermaid\\b");
     }
 
+    /**
+     * N10: with Whole Word, a regular expression goes in a group between {@code \b} and {@code \b}, so {@code a|b} is a
+     * whole a or a whole b, not {@code \ba|b\b}; the expression is checked alone first, so {@code a)(b} stays refused.
+     */
+    @Test void wholeWordGroupsARegularExpression() throws IOException {
+        String compile = body(script("/dev/jasper/browser/page/find.js"), "compile(command)");
+        assertThat(compile).contains("'\\\\b(?:' + source + ')\\\\b'").doesNotContain("'\\\\b' + text + '\\\\b'");
+        assertThat(compile.indexOf("new RegExp(source, flags)")).as("the expression alone, first")
+            .isNotNegative().isLessThan(compile.indexOf("'\\\\b(?:'"));
+    }
+
     /** The body of the script's function {@code signature}, from its brace to the brace that closes it at its indentation. */
     private static String body(String script, String signature) {
         Matcher function = Pattern.compile("(?s)\n( *)function " + Pattern.quote(signature) + " \\{\n(.*?)\n\\1}\n").matcher(script);

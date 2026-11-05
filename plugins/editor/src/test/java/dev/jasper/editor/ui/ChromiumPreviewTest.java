@@ -1,6 +1,7 @@
 package dev.jasper.editor.ui;
 
 import dev.jasper.browser.api.PreviewEvent;
+import dev.jasper.browser.api.PreviewFind;
 import dev.jasper.browser.api.PreviewTheme;
 import dev.jasper.editor.markdown.MarkdownMode;
 import dev.jasper.editor.markdown.MarkdownRenderer;
@@ -9,6 +10,7 @@ import dev.jasper.editor.markdown.resources.ResourceSession;
 import dev.jasper.editor.testsupport.EdtTests;
 import dev.jasper.editor.testsupport.FakeMarkdownPreviews;
 import dev.jasper.sdk.Variant;
+import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.event.FocusEvent;
 import java.awt.image.BufferedImage;
@@ -178,15 +180,93 @@ class ChromiumPreviewTest {
         assertThat(area.previewFocused()).as("the view's commands go to the preview it focused last").isTrue();
     }
 
-    /** Task 7 replaces these stand-ins; FindBar joins their futures on the UI thread, so they must be complete. */
-    @Test void theFindStandInsAnswerAtOnce() {
-        var context = new SearchContext("Target");
-        assertThat(surface.markAll(context)).isCompletedWithValue(0);
-        assertThat(surface.find(context)).isCompletedWithValue(false);
-        assertThat(surface.selectedText()).isCompletedWithValue("");
-        assertThat(surface.blockY("b0")).isEmpty();
+    /**
+     * The scroller is where the page last said it scrolled to, rounded, and the sizes of its last layout; each Scrolled
+     * is heard with whether the user made it, and a layout's new sizes as not the user's.
+     */
+    @Test void theScrollerFollowsThePagesScrollingAndItsLastLayout() {
+        var scroller = surface.scroller();
+        assertThat(surface.scroller()).as("one for the preview's life").isSameAs(scroller);
+        var heard = new ArrayList<Boolean>();
+        var subscription = scroller.onMoved(heard::add);
+        assertThat(scroller.y()).isZero();
+        assertThat(scroller.max()).isZero();
+        assertThat(scroller.extent()).isEqualTo(new Dimension(0, 0));
+        assertThat(scroller.size()).isEqualTo(new Dimension(0, 0));
+        page.fire(new PreviewEvent.Scrolled(120.6, true));
+        assertThat(scroller.y()).isEqualTo(121);
+        page.fire(new PreviewEvent.Scrolled(40.2, false));
+        assertThat(scroller.y()).isEqualTo(40);
+        assertThat(heard).containsExactly(true, false);
+        installed(TEXT);
+        heard.clear();
+        int hooks = geometry.get();
+        page.fire(new PreviewEvent.Geometry(1, new double[] {0, 50}, 900, 300));
+        assertThat(scroller.max()).isEqualTo(600);
+        assertThat(scroller.extent()).isEqualTo(new Dimension(0, 300));
+        assertThat(scroller.size()).isEqualTo(new Dimension(0, 900));
+        assertThat(heard).as("new sizes, not the user's doing").containsExactly(false);
+        assertThat(geometry).as("the area's geometry hook").hasValue(hooks + 1);
+        page.fire(new PreviewEvent.Geometry(7, new double[] {0}, 5000, 100));
+        assertThat(scroller.max()).as("another revision's layout is dropped").isEqualTo(600);
+        assertThat(heard).containsExactly(false);
+        assertThat(geometry).hasValue(hooks + 1);
+        scroller.move(250);
+        assertThat(page.calls().getLast()).isEqualTo("scrollTo 250.0");
+        assertThat(scroller.y()).as("where it was asked to go, until the page says where it went").isEqualTo(250);
+        subscription.close();
+        page.fire(new PreviewEvent.Scrolled(10, true));
+        assertThat(heard).as("no more once the subscription closes").containsExactly(false);
+        assertThat(scroller.y()).isEqualTo(10);
+    }
+
+    /** Block tops and the document's end come from the page's layout of the installed document, and no other. */
+    @Test void blockTopsAndTheEndComeFromTheInstalledDocumentsLayout() {
+        installed(TEXT);
+        assertThat(surface.blockY("b0")).as("no layout yet").isEmpty();
         assertThat(surface.endY()).isNaN();
-        assertThat(surface.scroller().max()).isZero();
+        page.fire(new PreviewEvent.Geometry(1, new double[] {0, Double.NaN, 75.5}, 900, 300));
+        assertThat(surface.blockY("b0")).hasValue(0);
+        assertThat(surface.blockY("b1")).as("a block with no box").isEmpty();
+        assertThat(surface.blockY("b2")).hasValue(75.5);
+        assertThat(surface.blockY("b3")).as("past the last block").isEmpty();
+        assertThat(surface.blockY("target")).as("not a block's id").isEmpty();
+        assertThat(surface.endY()).isEqualTo(900);
+        surface.install(prepared(TEXT + "\nMore.\n"), style(Variant.LIGHT), area.getFont(), 1);
+        page.fire(new PreviewEvent.Shown(2));
+        assertThat(surface.blockY("b0")).as("the last layout is the older document's").isEmpty();
+        assertThat(surface.endY()).isNaN();
+        page.fire(new PreviewEvent.Geometry(2, new double[] {0, 40}, 950, 300));
+        assertThat(surface.blockY("b1")).hasValue(40);
+        assertThat(surface.endY()).isEqualTo(950);
+    }
+
+    /** Find asks the page with the search context's query and options, and its answers are the page's. */
+    @Test void findAsksThePageWithTheContextsOptionsAndHandsOnItsAnswers() {
+        var context = new SearchContext("Tar.et");
+        context.setMatchCase(true);
+        context.setWholeWord(true);
+        context.setRegularExpression(true);
+        context.setSearchForward(false);
+        var count = surface.markAll(context);
+        var found = surface.find(context);
+        context.setSearchForward(true);
+        context.setRegularExpression(false);
+        surface.find(context);
+        var selected = surface.selectedText();
+        assertThat(page.calls()).containsExactly("markAll Tar.et", "select Tar.et false", "select Tar.et true", "selectedText");
+        assertThat(page.finds()).containsExactly(new PreviewFind("Tar.et", true, true, true), new PreviewFind("Tar.et", true, true, true),
+            new PreviewFind("Tar.et", true, true, false));
+        assertThat(count).isNotDone();
+        page.marks().getFirst().complete(3);
+        page.steps().getFirst().complete(true);
+        page.selections().getFirst().complete("Target");
+        assertThat(count).isCompletedWithValue(3);
+        assertThat(found).isCompletedWithValue(true);
+        assertThat(selected).isCompletedWithValue("Target");
+        assertThat(surface.markAll(new SearchContext(""))).as("nothing to find").isCompletedWithValue(0);
+        assertThat(surface.find(new SearchContext(""))).isCompletedWithValue(false);
+        assertThat(page.calls()).hasSize(4);
     }
 
     /**
