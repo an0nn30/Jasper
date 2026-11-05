@@ -332,22 +332,78 @@ class PagePreviewTest {
         assertThat(waiting.getFirst()).isCancelled();
     }
 
-    /** N-F15: a page that never becomes ready is unavailable ten seconds after its browser exists. */
-    @Test void aPageNotReadyTenSecondsAfterItsBrowserExistsIsUnavailable() throws Exception {
+    /** N-F15 and N16: a page that never becomes ready is unavailable thirty seconds after its browser exists. */
+    @Test void aPageNotReadyThirtySecondsAfterItsBrowserExistsIsUnavailable() throws Exception {
         ui(preview::created);
-        assertThat(delays).containsExactly(Duration.ofSeconds(10));
+        assertThat(delays).containsExactly(Duration.ofSeconds(30));
         ui(() -> List.copyOf(waits).forEach(Runnable::run));
-        assertThat(told).containsExactly(new PreviewEvent.Unavailable(PagePreview.NOT_READY));
+        assertThat(told).containsExactly(new PreviewEvent.Unavailable(PagePreview.NOT_LOADED));
         ui(() -> preview.received("{\"op\":\"ready\"}"));
         assertThat(ran).as("nothing after Unavailable").isEmpty();
     }
 
-    @Test void aPageReadyInTimeStopsItsWatch() throws Exception {
+    /** N16: a page that is ready but never shows the document asked for is unavailable at the same deadline. */
+    @Test void aReadyPageThatNeverShowsTheDocumentAskedForIsUnavailableAtTheDeadline() throws Exception {
+        ui(() -> {
+            preview.created();
+            preview.show(1, "one");
+            preview.received("{\"op\":\"ready\"}");
+        });
+        assertThat(ran).containsExactly("jasperPreview.show(\"1\");");
+        assertThat(waits).as("ready does not end the watch while the document waits").hasSize(1);
+        ui(() -> List.copyOf(waits).forEach(Runnable::run));
+        assertThat(told).containsExactly(new PreviewEvent.Unavailable(PagePreview.NOT_LOADED));
+        ui(() -> {
+            preview.received("{\"op\":\"shown\",\"rev\":\"1\"}");
+            preview.show(2, "two");
+        });
+        assertThat(told).as("nothing after Unavailable").hasSize(1);
+        assertThat(ran).hasSize(1);
+    }
+
+    /** N16: the first document shown ends the watch, also one older than the latest asked for; later ones have none. */
+    @Test void aPageThatShowsADocumentInTimeStopsItsWatch() throws Exception {
+        var waited = new ArrayList<Runnable>();
+        ui(() -> {
+            preview.created();
+            waited.addAll(waits);
+            preview.show(1, "one");
+            preview.received("{\"op\":\"ready\"}");
+            preview.show(2, "two");
+            preview.received("{\"op\":\"shown\",\"rev\":\"1\"}");
+        });
+        assertThat(waits).as("the watch was stopped").isEmpty();
+        ui(() -> {
+            waited.forEach(Runnable::run);
+            preview.show(3, "three");
+        });
+        assertThat(told).as("an older revision's shown is not told, and the deadline passing tells nothing").isEmpty();
+        assertThat(delays).as("no watch for a later document").hasSize(1);
+    }
+
+    /** N16: a page ready by the deadline with no document asked for is not unavailable. */
+    @Test void aReadyPageAskedForNothingIsNotUnavailableAtTheDeadline() throws Exception {
         ui(() -> {
             preview.created();
             preview.received("{\"op\":\"ready\"}");
         });
+        ui(() -> List.copyOf(waits).forEach(Runnable::run));
+        assertThat(told).isEmpty();
+        ui(() -> preview.show(1, "one"));
+        assertThat(ran).as("it still shows what it is asked").containsExactly("jasperPreview.show(\"1\");");
+        assertThat(delays).as("and has no watch for it").hasSize(1);
+    }
+
+    @Test void aPreviewClosedBeforeTheDeadlineTellsNothing() throws Exception {
+        var waited = new ArrayList<Runnable>();
+        ui(() -> {
+            preview.created();
+            waited.addAll(waits);
+            preview.show(1, "one");
+            preview.close();
+        });
         assertThat(waits).as("the watch was stopped").isEmpty();
+        ui(() -> waited.forEach(Runnable::run));
         assertThat(told).isEmpty();
     }
 

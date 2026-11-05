@@ -38,8 +38,10 @@ import javax.swing.Timer;
  *
  * <p><b>Before the page is ready</b> (its script has said {@code ready}), calls wait: on {@code ready} the page is sent the
  * theme, then only the latest document, its images, then the last scroll. A Find or a selection read asked before then
- * answers at once with nothing found, and a reveal does nothing, as the page shows no document yet. A page not ready
- * ten seconds after its browser exists ({@link #created}) is {@link PreviewEvent.Unavailable} (plan 9's N-F15).
+ * answers at once with nothing found, and a reveal does nothing, as the page shows no document yet. Thirty seconds after
+ * its browser exists ({@link #created}), a page that is not ready, or that has shown no document although one was asked
+ * for, is {@link PreviewEvent.Unavailable} (plan 9's N-F15 and N16); the documents after the first it shows have no
+ * deadline.
  *
  * <p><b>Documents</b> are encoded on the background executor, one after another, and each skips once a later one is
  * given; the page is asked to show only the latest. The page announces a document it showed; one older than the latest
@@ -57,10 +59,13 @@ import javax.swing.Timer;
  * a later call returns, and nothing more is told.
  */
 final class PagePreview implements MarkdownPreview {
-    /** How long after its browser exists the page has to say it is ready. */
-    static final Duration READY_WAIT = Duration.ofSeconds(10);
-    /** Why a page that never said it is ready is unavailable. */
-    static final String NOT_READY = "The Markdown preview's page did not load within 10 seconds.";
+    /**
+     * How long after its browser exists the page has to say it is ready and, once a document is asked for, to show one:
+     * long enough for a cold first start of Chromium's renderer, macOS's first check of it, and a loaded machine.
+     */
+    static final Duration LOAD_WAIT = Duration.ofSeconds(30);
+    /** Why a page that was not ready, or showed no document, by then is unavailable. */
+    static final String NOT_LOADED = "The Markdown preview's page did not load within 30 seconds.";
     /** The most UTF-8 a document may hold: 16 MiB. */
     static final int MAX_DOCUMENT = 16 << 20;
 
@@ -98,7 +103,9 @@ final class PagePreview implements MarkdownPreview {
     private final Consumer<PreviewEvent> events;
     private final BiFunction<Duration, Runnable, Runnable> later;
     private final List<Runnable> closes = new ArrayList<>();
-    private boolean ready, closed, unavailable;
+    // Whether the page is ready, whether the preview closed or is unavailable, and whether the page has shown a document
+    // asked for; what stops the page's deadline.
+    private boolean ready, closed, unavailable, showedDocument;
     private Runnable watch = () -> { };
     // The theme's call, the last scroll asked for (NaN for none).
     private String themeCall;
@@ -281,14 +288,15 @@ final class PagePreview implements MarkdownPreview {
     }
 
     /**
-     * The page's browser exists: unless the page says it is ready within {@link #READY_WAIT}, the preview is
-     * unavailable. UI thread.
+     * The page's browser exists: unless, within {@link #LOAD_WAIT}, the page says it is ready and, if a document has
+     * been asked for by then, shows one, the preview is unavailable. UI thread.
      */
     void created() {
-        if (done() || ready) return;
-        watch.run();
-        watch = later.apply(READY_WAIT, () -> {
-            if (!ready) unavailable(NOT_READY);
+        if (done() || showedDocument) return;
+        stopWatch();
+        watch = later.apply(LOAD_WAIT, () -> {
+            watch = () -> { };
+            if (!ready || requested >= 0 && !showedDocument) unavailable(NOT_LOADED);
         });
     }
 
@@ -324,6 +332,11 @@ final class PagePreview implements MarkdownPreview {
         if (!ready) return;
         switch (message) {
             case PreviewMessages.Shown(long revision) -> {
+                // Any document asked for, the latest or not, shows the page works: the deadline ends.
+                if (revision <= requested && !showedDocument) {
+                    showedDocument = true;
+                    stopWatch();
+                }
                 if (revision != requested || revision <= shown) return;
                 shown = revision;
                 events.accept(new PreviewEvent.Shown(revision));
@@ -347,8 +360,6 @@ final class PagePreview implements MarkdownPreview {
     /** The page has loaded: it gets the theme, then the latest document, its images, then the last scroll. */
     private void becomeReady() {
         ready = true;
-        watch.run();
-        watch = () -> { };
         if (themeCall != null) hooks.run().accept(themeCall);
         if (stored >= 0 && stored == requested) hooks.run().accept(showCall(stored));
         for (var image : wanted.entrySet()) {
@@ -441,10 +452,15 @@ final class PagePreview implements MarkdownPreview {
 
     /** Nothing waits any more: the watch stops, and the futures that wait are cancelled. */
     private void stopWaiting() {
-        watch.run();
-        watch = () -> { };
+        stopWatch();
         dropFind();
         dropSelection();
+    }
+
+    /** The page's deadline stops. */
+    private void stopWatch() {
+        watch.run();
+        watch = () -> { };
     }
 
     /** Whether the preview does nothing more: closed, or unavailable. */

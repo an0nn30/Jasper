@@ -53,8 +53,8 @@ class PreviewServiceTest {
             made.get(0).show(1, "<p>One</p>");
         });
         EventQueue.invokeAndWait(() -> pages.get(0).received("{\"op\":\"shown\",\"rev\":\"1\"}"));
-        assertThat(delays).as("created arms the ready watch").containsExactly(PagePreview.READY_WAIT);
-        assertThat(waits).as("which ready stopped").isEmpty();
+        assertThat(delays).as("created arms the page's deadline").containsExactly(PagePreview.LOAD_WAIT);
+        assertThat(waits).as("which the first document shown stopped").isEmpty();
         assertThat(ran).containsExactly("jasperPreview.show(\"1\");");
         assertThat(first).containsExactly(new PreviewEvent.Shown(1));
         EventQueue.invokeAndWait(() -> {
