@@ -94,6 +94,7 @@ public final class EditorTab {
     void markdownMode(MarkdownMode mode, boolean explicit) {
         if (closed || !showingText() || !markdownEligible() || markdown == null) return;
         dismissHiddenFind(mode);
+        chooseEngine(mode);
         retainedMarkdownMode = mode;
         markdown.mode(mode);
         if (explicit && markdownPreferences != null) markdownPreferences.select(mode).whenComplete((ignored, failure) -> {
@@ -113,19 +114,24 @@ public final class EditorTab {
         else if (mode == MarkdownMode.SOURCE) find.paneHidden(document.surface());
     }
     /** @param value the Browser's Markdown previews, while the Browser runs; empty draws every preview on Basic */
-    void chromium(Optional<ChromiumPreviews> value) { chromium = java.util.Objects.requireNonNull(value); chooseEngine(); }
+    void chromium(Optional<ChromiumPreviews> value) { chromium = java.util.Objects.requireNonNull(value); chooseEngine(shownMode()); }
     /**
      * The Markdown preview setting: the view draws its preview with Chromium while it says so, the Browser runs and
      * Chromium can draw, and on Basic otherwise. Settings › Tools › Editor changes it live, through the window's apply.
      */
-    void previewEngine(PreviewEngine value) { engine = java.util.Objects.requireNonNull(value); chooseEngine(); }
-    /** Draws the preview on the surface the setting and Chromium allow; the Chromium one is made once the view shows Markdown. */
-    private void chooseEngine() {
+    void previewEngine(PreviewEngine value) { engine = java.util.Objects.requireNonNull(value); chooseEngine(shownMode()); }
+    private MarkdownMode shownMode() { return markdown == null ? MarkdownMode.SOURCE : markdown.mode(); }
+    /**
+     * Draws the preview on the surface the setting and Chromium allow, for a view about to show {@code showing}. The
+     * Chromium preview is made the first time Split or Preview shows Markdown, so a view that shows only its source, as a
+     * restored workspace's tabs may, makes no page (spec section 19).
+     */
+    private void chooseEngine(MarkdownMode showing) {
         if (closed) return;
         boolean wanted = engine == PreviewEngine.CHROMIUM && !chromiumFailed && chromium.filter(ChromiumPreviews::available).isPresent();
         if (!wanted) { drawOn(document.basic()); return; }
         if (chromiumPreview == null) {
-            if (!markdownEligible()) return;
+            if (showing == MarkdownMode.SOURCE || !markdownEligible()) return;
             chromiumPreview = chromium.orElseThrow().create(document);
             chromiumPreview.onUnavailable(this::chromiumUnavailable);
         }
@@ -138,15 +144,15 @@ public final class EditorTab {
         if (next != chromiumPreview) chromiumPreview = null;
         document.previewEngine(next);
     }
-    private void chromiumUnavailable() { chromiumFailed = true; chooseEngine(); }
+    private void chromiumUnavailable() { chromiumFailed = true; chooseEngine(shownMode()); }
     private void updateMarkdownEligibility() {
         if (markdown == null) return;
         boolean eligible = markdownEligible();
-        if (eligible) chooseEngine();
         if (eligible && (!wasMarkdown || retainedMarkdownMode == null && markdownPreferences != null)) {
             if (retainedMarkdownMode == null && markdownPreferences != null) retainedMarkdownMode = markdownPreferences.current();
             var mode = retainedMarkdownMode == null ? MarkdownMode.SOURCE : retainedMarkdownMode;
-            dismissHiddenFind(mode); markdown.mode(mode);
+            // The surface first, so the view's first preview is laid out on it.
+            dismissHiddenFind(mode); chooseEngine(mode); markdown.mode(mode);
         } else if (!eligible && wasMarkdown) {
             dismissHiddenFind(MarkdownMode.SOURCE);
             markdown.mode(MarkdownMode.SOURCE); document.focusSource(true);

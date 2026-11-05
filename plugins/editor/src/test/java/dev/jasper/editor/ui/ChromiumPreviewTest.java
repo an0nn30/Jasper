@@ -162,13 +162,14 @@ class ChromiumPreviewTest {
     }
 
     @Test void commandsGoToThePageAndItsFocusIsThePreviews() {
+        assertThat(surface.focused()).isFalse();
         surface.copy();
         surface.selectAll();
         surface.focus();
         surface.clearFind();
         assertThat(page.calls()).containsExactly("copy", "selectAll", "focus", "clearFind");
         assertThat(surface.component()).isSameAs(page.component());
-        assertThat(surface.focused()).isFalse();
+        assertThat(surface.focused()).as("the canvas's own focus").isTrue();
         area.mode(MarkdownMode.SPLIT);
         area.focusSource(true);
         assertThat(area.previewFocused()).isFalse();
@@ -188,12 +189,48 @@ class ChromiumPreviewTest {
         assertThat(surface.scroller().max()).isZero();
     }
 
-    @Test void unavailableIsToldAndCloseEndsThePage() {
+    /**
+     * The page may report it from inside the layout that adds its canvas, as one whose client already failed does when it
+     * first shows: the view falls back to Basic once that layout is done, so it is told on a later turn (fix round 1, E1).
+     */
+    @Test void unavailableIsToldOnALaterTurnUnlessThePreviewClosedMeanwhile() {
         var told = new AtomicInteger();
         surface.onUnavailable(told::incrementAndGet);
         page.fire(new PreviewEvent.Unavailable("Chromium stopped"));
+        assertThat(told).as("not from inside the page's report").hasValue(0);
+        nextTurn();
         assertThat(told).hasValue(1);
-        assertThat(surface.closed()).isFalse();
+        var other = new ChromiumPreviews(previews).create(area);
+        var closedTold = new AtomicInteger();
+        other.onUnavailable(closedTold::incrementAndGet);
+        previews.last().fire(new PreviewEvent.Unavailable("Chromium stopped"));
+        other.close();
+        nextTurn();
+        assertThat(closedTold).as("a preview closed since").hasValue(0);
+    }
+
+    /** The surface the view draws on next takes the focus the one it leaves had; the closed one is not asked for it. */
+    @Test void theSurfaceDrawnOnNextTakesTheFocusTheOldOneHad() {
+        area.previewEngine(surface);
+        surface.focus();
+        var next = new ChromiumPreviews(previews).create(area);
+        area.previewEngine(next);
+        assertThat(page.closed()).isTrue();
+        assertThat(page.calls()).as("nothing after its close").containsExactly("focus", "close");
+        assertThat(previews.last().calls()).containsExactly("focus");
+        assertThat(area.surface()).isSameAs(next);
+        area.previewEngine(area.basic());
+        assertThat(previews.last().calls()).containsExactly("focus", "close");
+    }
+
+    /** Runs what the UI thread has queued, from the test's own turn on it. */
+    private static void nextTurn() {
+        var loop = java.awt.Toolkit.getDefaultToolkit().getSystemEventQueue().createSecondaryLoop();
+        java.awt.EventQueue.invokeLater(loop::exit);
+        assertThat(loop.enter()).isTrue();
+    }
+
+    @Test void closeEndsThePage() {
         surface.close();
         surface.close();
         assertThat(surface.closed()).isTrue();

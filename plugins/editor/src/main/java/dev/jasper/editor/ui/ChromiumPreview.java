@@ -10,6 +10,7 @@ import dev.jasper.editor.markdown.resources.ResourceSession;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.ui.SyntaxPalette;
 import java.awt.Dimension;
+import java.awt.EventQueue;
 import java.awt.Font;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
@@ -66,7 +67,10 @@ final class ChromiumPreview implements PreviewSurface {
         preview.component().addFocusListener(focus);
     }
 
-    /** @param action runs when Chromium cannot draw this preview any more, for the rest of Jasper's run */
+    /**
+     * @param action runs, on a later UI turn and unless the preview has closed by then, when Chromium cannot draw this
+     *     preview any more, for the rest of Jasper's run
+     */
     void onUnavailable(Runnable action) { unavailable = Objects.requireNonNull(action); }
 
     private void event(PreviewEvent event) {
@@ -74,7 +78,9 @@ final class ChromiumPreview implements PreviewSurface {
         switch (event) {
             case PreviewEvent.Shown shown -> shown(shown.revision());
             case PreviewEvent.LinkActivated link -> activated(link.id());
-            case PreviewEvent.Unavailable _ -> unavailable.run();
+            // A page whose client already failed says so from inside the add that first shows its canvas: the view
+            // falls back to Basic once that layout is done, not in the middle of it.
+            case PreviewEvent.Unavailable _ -> EventQueue.invokeLater(() -> { if (!closed) unavailable.run(); });
             // Task 7: the page's geometry and scrolling drive scroll sync.
             case PreviewEvent.Geometry _ -> { }
             case PreviewEvent.Scrolled _ -> { }

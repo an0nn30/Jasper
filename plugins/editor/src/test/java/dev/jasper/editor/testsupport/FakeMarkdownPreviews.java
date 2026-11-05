@@ -5,6 +5,7 @@ import dev.jasper.browser.api.MarkdownPreviews;
 import dev.jasper.browser.api.PreviewEvent;
 import dev.jasper.browser.api.PreviewFind;
 import dev.jasper.browser.api.PreviewTheme;
+import java.awt.event.HierarchyEvent;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -22,14 +23,21 @@ import javax.swing.JComponent;
 public final class FakeMarkdownPreviews implements MarkdownPreviews {
     private final List<Recording> made = new ArrayList<>();
     private boolean available = true;
+    private String unavailableWhenShown;
 
     /** @param value what {@link #available()} answers from now on */
     public void available(boolean value) { available = value; }
 
+    /**
+     * Previews made from now on report {@code Unavailable(reason)} at once from inside the layout that first shows their
+     * canvas, as a page whose preview client has already failed does: it asks for the client when its canvas shows.
+     */
+    public void unavailableWhenShown(String reason) { unavailableWhenShown = Objects.requireNonNull(reason); }
+
     @Override public boolean available() { return available; }
 
     @Override public MarkdownPreview create(Consumer<PreviewEvent> events) {
-        var preview = new Recording(events);
+        var preview = new Recording(events, unavailableWhenShown);
         made.add(preview);
         return preview;
     }
@@ -42,18 +50,28 @@ public final class FakeMarkdownPreviews implements MarkdownPreviews {
 
     /**
      * A preview that records each call as a line, such as {@code show 2} or {@code imageReason 0 Loading image}, keeps
-     * the themes and documents it was given, and tells its events once a test fires them, until it closes.
+     * the themes and documents it was given, and tells its events once a test fires them, until it closes. Its canvas
+     * holds the focus from {@link #focus()} until the preview closes, as a canvas that took it would.
      */
     public static final class Recording implements MarkdownPreview {
         private final Consumer<PreviewEvent> events;
-        private final JComponent component = new JComponent() { };
+        private final JComponent component = new JComponent() {
+            @Override public boolean isFocusOwner() { return focused; }
+        };
         private final List<String> calls = new ArrayList<>();
         private final List<PreviewTheme> themes = new ArrayList<>();
         private final Map<Long, String> documents = new HashMap<>();
         private final Map<Integer, BufferedImage> images = new HashMap<>();
-        private boolean closed;
+        private boolean closed, focused, shown;
 
-        Recording(Consumer<PreviewEvent> events) { this.events = Objects.requireNonNull(events); }
+        Recording(Consumer<PreviewEvent> events, String unavailableWhenShown) {
+            this.events = Objects.requireNonNull(events);
+            if (unavailableWhenShown != null) component.addHierarchyListener(event -> {
+                if ((event.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) == 0 || !component.isShowing() || shown) return;
+                shown = true;
+                fire(new PreviewEvent.Unavailable(unavailableWhenShown));
+            });
+        }
 
         /** Tells the preview's caller {@code event}, as Chromium's page would; nothing once the preview has closed. */
         public void fire(PreviewEvent event) { if (!closed) events.accept(event); }
@@ -92,7 +110,7 @@ public final class FakeMarkdownPreviews implements MarkdownPreviews {
         @Override public CompletableFuture<String> selectedText() { call("selectedText"); return CompletableFuture.completedFuture(""); }
         @Override public void copy() { call("copy"); }
         @Override public void selectAll() { call("selectAll"); }
-        @Override public void focus() { call("focus"); }
-        @Override public void close() { call("close"); closed = true; }
+        @Override public void focus() { call("focus"); if (!closed) focused = true; }
+        @Override public void close() { call("close"); closed = true; focused = false; }
     }
 }
