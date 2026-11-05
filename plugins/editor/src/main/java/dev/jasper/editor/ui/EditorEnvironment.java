@@ -3,6 +3,8 @@ package dev.jasper.editor.ui;
 import dev.jasper.editor.session.Question;
 import dev.jasper.sdk.WindowOwner;
 import dev.jasper.sdk.plugin.PluginContext;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
@@ -20,12 +22,24 @@ import java.util.function.Supplier;
  * @param saveVim saves Vim mode to the settings file; completes on any thread
  * @param timers whether the watcher, notice and typing timers run; tests drive them by hand
  * @param markdownPreferences the plugin-wide default and ordered settings writer
+ * @param chromium the Browser's Markdown previews, while the Browser runs; empty draws every preview on Basic
  */
 public record EditorEnvironment(PluginContext context, Executor ui, Function<WindowOwner, Function<Question, String>> askers,
                                 Function<WindowOwner, BiFunction<String, CompletableFuture<Boolean>, Boolean>> waits,
                                 Supplier<EditorSettings> settings, Function<Boolean, CompletableFuture<Void>> saveVim, boolean timers,
-                                MarkdownPreferences markdownPreferences) {
-    /** Environment for embedders without saved Markdown choices. */
+                                MarkdownPreferences markdownPreferences, Optional<ChromiumPreviews> chromium) {
+    /** Rejects a null {@code chromium}. */
+    public EditorEnvironment { Objects.requireNonNull(chromium, "chromium"); }
+
+    /** Environment without the Browser's previews: every preview is Basic. */
+    public EditorEnvironment(PluginContext context, Executor ui, Function<WindowOwner, Function<Question, String>> askers,
+                             Function<WindowOwner, BiFunction<String, CompletableFuture<Boolean>, Boolean>> waits,
+                             Supplier<EditorSettings> settings, Function<Boolean, CompletableFuture<Void>> saveVim, boolean timers,
+                             MarkdownPreferences markdownPreferences) {
+        this(context, ui, askers, waits, settings, saveVim, timers, markdownPreferences, Optional.empty());
+    }
+
+    /** Environment for embedders without saved Markdown choices or the Browser's previews. */
     public EditorEnvironment(PluginContext context, Executor ui, Function<WindowOwner, Function<Question, String>> askers,
                              Function<WindowOwner, BiFunction<String, CompletableFuture<Boolean>, Boolean>> waits,
                              Supplier<EditorSettings> settings, Function<Boolean, CompletableFuture<Void>> saveVim, boolean timers) {
@@ -42,10 +56,15 @@ public record EditorEnvironment(PluginContext context, Executor ui, Function<Win
      * @param context the plugin's context
      * @param ui the UI thread
      * @param settings the declared settings
-     * @return modal dialogs, the nested-loop wait and running timers
+     * @return modal dialogs, the nested-loop wait, running timers and the Browser's previews, while it runs
      */
     public static EditorEnvironment production(PluginContext context, Executor ui, EditorSettings.Declared settings) {
+        Optional<ChromiumPreviews> chromium;
+        // Without the Browser its API's classes are absent, and so may linking the class that names them fail.
+        try { chromium = ChromiumPreviews.find(context.services()); }
+        catch (LinkageError absent) { chromium = Optional.empty(); }
         return new EditorEnvironment(context, ui, owner -> new DialogAsker(context.windows(), context.kit(), owner),
-            owner -> new SaveWait(context.windows(), context.kit(), owner), settings::current, settings::saveVim, true, settings.markdownPreferences());
+            owner -> new SaveWait(context.windows(), context.kit(), owner), settings::current, settings::saveVim, true, settings.markdownPreferences(),
+            chromium);
     }
 }

@@ -2,6 +2,7 @@ package dev.jasper.editor.ui;
 
 import dev.jasper.editor.session.DocumentSession;
 import dev.jasper.editor.markdown.MarkdownMode;
+import dev.jasper.editor.markdown.PreviewEngine;
 import static org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_MARKDOWN;
 import dev.jasper.editor.vim.EditorDefaults;
 import dev.jasper.editor.vim.Vim;
@@ -73,6 +74,14 @@ public final class EditorTab {
     private MarkdownMode retainedMarkdownMode;
     private boolean wasMarkdown;
     private boolean linkedScrolling = true;
+    /** The Browser's Markdown previews, while the Browser runs. */
+    private Optional<ChromiumPreviews> chromium = Optional.empty();
+    /** The Markdown preview setting, as the window last told it; Basic until it does. */
+    private PreviewEngine engine = PreviewEngine.BASIC;
+    /** This view's Chromium preview, while the preview draws on it. */
+    private ChromiumPreview chromiumPreview;
+    /** Chromium could not draw this view's preview: it is Basic for the rest of the run, as Chromium cannot start again. */
+    private boolean chromiumFailed;
     private Runnable modeChanged = () -> {};
     void modeChanged(Runnable value) { modeChanged = value; }
     private Presentation.Icons icons = Presentation.Icons.NEW_UI;
@@ -103,9 +112,37 @@ public final class EditorTab {
         if (mode == MarkdownMode.PREVIEW) find.paneHidden(area());
         else if (mode == MarkdownMode.SOURCE) find.paneHidden(document.surface());
     }
+    /** @param value the Browser's Markdown previews, while the Browser runs; empty draws every preview on Basic */
+    void chromium(Optional<ChromiumPreviews> value) { chromium = java.util.Objects.requireNonNull(value); chooseEngine(); }
+    /**
+     * The Markdown preview setting: the view draws its preview with Chromium while it says so, the Browser runs and
+     * Chromium can draw, and on Basic otherwise. Settings › Tools › Editor changes it live, through the window's apply.
+     */
+    void previewEngine(PreviewEngine value) { engine = java.util.Objects.requireNonNull(value); chooseEngine(); }
+    /** Draws the preview on the surface the setting and Chromium allow; the Chromium one is made once the view shows Markdown. */
+    private void chooseEngine() {
+        if (closed) return;
+        boolean wanted = engine == PreviewEngine.CHROMIUM && !chromiumFailed && chromium.filter(ChromiumPreviews::available).isPresent();
+        if (!wanted) { drawOn(document.basic()); return; }
+        if (chromiumPreview == null) {
+            if (!markdownEligible()) return;
+            chromiumPreview = chromium.orElseThrow().create(document);
+            chromiumPreview.onUnavailable(this::chromiumUnavailable);
+        }
+        drawOn(chromiumPreview);
+    }
+    private void drawOn(PreviewSurface next) {
+        if (document.surface() == next) return;
+        // Find ends on the preview that goes; leaving Chromium closes that preview.
+        if (find != null) find.paneHidden(document.surface());
+        if (next != chromiumPreview) chromiumPreview = null;
+        document.previewEngine(next);
+    }
+    private void chromiumUnavailable() { chromiumFailed = true; chooseEngine(); }
     private void updateMarkdownEligibility() {
         if (markdown == null) return;
         boolean eligible = markdownEligible();
+        if (eligible) chooseEngine();
         if (eligible && (!wasMarkdown || retainedMarkdownMode == null && markdownPreferences != null)) {
             if (retainedMarkdownMode == null && markdownPreferences != null) retainedMarkdownMode = markdownPreferences.current();
             var mode = retainedMarkdownMode == null ? MarkdownMode.SOURCE : retainedMarkdownMode;
@@ -182,6 +219,7 @@ public final class EditorTab {
             vimBar.detach(); vim.close(); vim = null;
         }
         document.close();
+        chromiumPreview = null;
         find = null;
         session.removeListener(refreshing);
         // Last: the listeners above leave the document this view shared, which its other views keep.

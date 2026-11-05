@@ -343,6 +343,13 @@ first time it shows Markdown; tabs already open keep theirs. A choice that canno
 Markdown default view". When **Language…** changes a tab to another language, the bar hides and the tab shows its
 source; changing it back to Markdown brings back the tab's last view.
 
+**Markdown preview** (`markdown_preview`) chooses what draws the preview: **Chromium**, which the
+[Browser](browser.md) plugin runs, or **Basic**, the Editor's own preview, which screen readers can read. Without the
+Browser plugin the preview is Basic. A change applies to open tabs at once, and each keeps its view, divider and
+Synchronize scrolling. When Chromium cannot draw a tab's preview, because it could not start, has stopped or the
+preview's page did not load, that tab's preview is Basic for the rest of Jasper's run; a Chromium that could not start
+also posts "The browser could not start".
+
 ### What the preview shows
 
 The preview renders CommonMark with GitHub's tables, strikethrough (`~~text~~`) and task lists (☑ and ☐): headings,
@@ -630,6 +637,7 @@ A bad value is reported and its default used ([Plugin settings](plugins.md#plugi
 | `soft_wrap` | `false` | | Soft wrap | Files opened afterwards; **Toggle Soft Wrap** changes one file |
 | `vim` | `false` | | Vim mode | Every tab, at once; the Vim status item and **Toggle Vim Mode** set it |
 | `markdown_view_mode` | `"source"` | `source`, `split` (Source and preview), `preview` | Default view | Tabs that show Markdown for the first time; choosing a view in a tab sets it ([Markdown preview](#markdown-preview)) |
+| `markdown_preview` | `"chromium"` | `chromium`, `basic` | Markdown preview | Every tab, at once; Basic without the Browser plugin ([Markdown preview](#markdown-preview)) |
 | `max_file_mib` | `10` | 1–256 MiB | Largest file (MiB) | The next read |
 | `recent_files_days` | `30` | 0–365 days; 0 keeps none | Keep recent files for (days) | At once |
 | `default_editor` | `"jasper"` | `jasper`, `system`, `custom` or an editor's id from the [table](#default-editor) | Default editor | The next file opened; `EDITOR` in shells started afterwards |

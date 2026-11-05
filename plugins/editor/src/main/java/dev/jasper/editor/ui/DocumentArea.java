@@ -9,6 +9,7 @@ import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import dev.jasper.editor.vim.VimTextArea;
 import dev.jasper.editor.markdown.MarkdownMode;
+import dev.jasper.editor.markdown.resources.ResourceSession;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.Variant;
 import dev.jasper.sdk.ui.Appearance;
@@ -32,6 +33,8 @@ final class DocumentArea extends JComponent implements AutoCloseable {
     private final PreviewPane preview;
     final JScrollPane previewScroll;
     private final BasicPreview basic;
+    /** What the preview draws on now: {@link #basic}, or a Chromium preview of this view's own. */
+    private PreviewSurface surface;
     ScrollLink scrollLink;
     private final JSplitPane split;
     private MarkdownMode mode = MarkdownMode.SOURCE;
@@ -115,6 +118,8 @@ final class DocumentArea extends JComponent implements AutoCloseable {
     private Runnable geometryChanged = () -> {};
     Runnable controllerGeometry = () -> {};
     Runnable styleChanged = () -> {};
+    /** Runs once the preview draws on another surface. */
+    Runnable surfaceChanged = () -> {};
     /** @param variant whether the workspace is light or dark */
     record PreviewStyle(Variant variant, TerminalTypography typography, dev.jasper.sdk.ui.WorkspacePalette palette, SyntaxPalette syntax) { }
     private PreviewStyle previewStyle;
@@ -129,19 +134,50 @@ final class DocumentArea extends JComponent implements AutoCloseable {
     /** @return the Basic preview's Swing document view */
     PreviewPane preview() { return preview; }
     /** @return what the preview draws on */
-    PreviewSurface surface() { return basic; }
+    PreviewSurface surface() { return surface; }
+    /** @return the Basic preview, which lives as long as the area */
+    PreviewSurface basic() { return basic; }
     void previewCallbacks(java.util.function.IntConsumer links, Runnable geometry) { activateLink=links;geometryChanged=geometry; }
+    /** The user followed the installed document's link {@code id} in the preview. */
+    void linkActivated(int id) { activateLink.accept(id); }
     double dividerRatio() { return dividerRatio; }
     void mode(MarkdownMode value) {
         if (closed || mode==value) return;
         if (value == MarkdownMode.PREVIEW) sourcePlace = sourceShown();
         else if (mode == MarkdownMode.PREVIEW) restoreSourcePosition = true;
-        mode=value;removeAll();split.setLeftComponent(null);split.setRightComponent(null);
-        if(value==MarkdownMode.SOURCE){surface().cancelInstall();add(scroll,BorderLayout.CENTER);}
-        else if(value==MarkdownMode.PREVIEW)add(surface().component(),BorderLayout.CENTER);
-        else {restoringDivider=true;try{split.setLeftComponent(scroll);split.setRightComponent(surface().component());add(split,BorderLayout.CENTER);}finally{restoringDivider=false;}}
+        mode=value;
+        if(value==MarkdownMode.SOURCE)surface.cancelInstall();
+        layOut();
         scrollLink.split(value == MarkdownMode.SPLIT);
+    }
+    /** Lays out what the mode shows: the source, the preview, or both either side of the divider, which keeps its place. */
+    private void layOut() {
+        removeAll();split.setLeftComponent(null);split.setRightComponent(null);
+        if(mode==MarkdownMode.SOURCE)add(scroll,BorderLayout.CENTER);
+        else if(mode==MarkdownMode.PREVIEW)add(surface.component(),BorderLayout.CENTER);
+        else {restoringDivider=true;try{split.setLeftComponent(scroll);split.setRightComponent(surface.component());add(split,BorderLayout.CENTER);}finally{restoringDivider=false;}}
         revalidate();repaint();
+    }
+    /**
+     * Draws the preview on {@code next} from now on: it takes the old surface's place, in the same mode and at the same
+     * divider, and a new scroll link joins it with the source, linked as the old one was. Leaving a Chromium surface
+     * closes it; the Basic one lives as long as the area. Then the controller renders for {@code next}.
+     */
+    void previewEngine(PreviewSurface next) {
+        if (closed || next == surface) return;
+        var previous = surface;
+        boolean focused = previous.focused(), linked = scrollLink.linked();
+        previous.cancelInstall();
+        scrollLink.close();
+        surface = next;
+        scrollLink = new ScrollLink(this, next, linked);
+        layOut();
+        scrollLink.split(mode == MarkdownMode.SPLIT);
+        // The resource session gives its images to the surface shown: Basic, which stays, lets go of those it was given.
+        if (previous == basic) basic.images(new ResourceSession.Update(true, java.util.Map.of()));
+        else previous.close();
+        if (focused) next.focus();
+        surfaceChanged.run();
     }
     @Override public void doLayout() {
         restoringDivider=true;
@@ -179,6 +215,7 @@ final class DocumentArea extends JComponent implements AutoCloseable {
         previewScroll=new JScrollPane(preview.editor());previewScroll.setBorder(BorderFactory.createEmptyBorder());
         previewScroll.setOpaque(false);previewScroll.getViewport().setOpaque(false);
         basic=new BasicPreview(preview,previewScroll);
+        surface=basic;
         split=new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);split.setOpaque(false);split.setBorder(BorderFactory.createEmptyBorder());split.setResizeWeight(.5);
         split.addPropertyChangeListener(JSplitPane.DIVIDER_LOCATION_PROPERTY,event -> {
             int extent=split.getWidth()-split.getDividerSize();
@@ -207,7 +244,8 @@ final class DocumentArea extends JComponent implements AutoCloseable {
         });
     }
 
-    private void previewGeometry() {
+    /** The preview's layout changed, or an install ended: the controller, scroll sync and the view's own hook hear it. */
+    void previewGeometry() {
         controllerGeometry.run();
         if (scrollLink != null) scrollLink.geometryChanged();
         geometryChanged.run();
@@ -262,7 +300,8 @@ final class DocumentArea extends JComponent implements AutoCloseable {
         area.putClientProperty("jasper.editor.closed", Boolean.TRUE);
         area.getDocument().removeDocumentListener(insertedAtStart);
         scrollLink.close();
-        surface().close();
+        if (surface != basic) surface.close();
+        basic.close();
         removeHierarchyListener(hierarchy);
         if (changes != null) changes.close();
     }

@@ -1,5 +1,6 @@
 package dev.jasper.editor.ui;
 
+import dev.jasper.editor.markdown.PreviewEngine;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.testing.FakePluginHost;
 import java.awt.Font;
@@ -26,7 +27,7 @@ class EditorSettingsTest {
         try (var host = new FakePluginHost(home.resolve("plugins"))) {
             assertThat(start(host, Set.of("Menlo", "JetBrains Mono")).current())
                 .isEqualTo(new EditorSettings("JetBrains Mono", 13, java.util.List.of(), false, 1.0, false, 4, false, 10, false, "workspace"));
-            assertThat(host.declared(ID)).containsExactly("font_family", "font_size", "font_fallback", "font_ligatures", "font_line_height", "follow_terminal_font", "color_scheme", "markdown_view_mode", "tab_size", "soft_wrap", "vim", "max_file_mib", "recent_files_days",
+            assertThat(host.declared(ID)).containsExactly("font_family", "font_size", "font_fallback", "font_ligatures", "font_line_height", "follow_terminal_font", "color_scheme", "markdown_view_mode", "markdown_preview", "tab_size", "soft_wrap", "vim", "max_file_mib", "recent_files_days",
                 "default_editor", "custom_command", "custom_in_terminal", "keep_environment_editor");
             assertThat(host.settingsReports(ID)).isEmpty();
         }
@@ -116,7 +117,7 @@ class EditorSettingsTest {
         try (var host = new FakePluginHost(home.resolve("plugins"))) {
             host.start(INFO, Set.of(), Set.of(), context -> new EditorSettings.Declared(recording(context.settings(), specs), Set.of()));
             assertThat(specs).extracting(spec -> spec.section() + "/" + spec.key()).containsExactly(
-                "Font/font_family", "Font/font_size", "Font/font_fallback", "Font/font_ligatures", "Font/font_line_height", "Font/follow_terminal_font", "Colors/color_scheme", "Markdown/markdown_view_mode", "Editing/tab_size", "Editing/soft_wrap", "Editing/vim", "Files/max_file_mib", "Files/recent_files_days",
+                "Font/font_family", "Font/font_size", "Font/font_fallback", "Font/font_ligatures", "Font/font_line_height", "Font/follow_terminal_font", "Colors/color_scheme", "Markdown/markdown_view_mode", "Markdown/markdown_preview", "Editing/tab_size", "Editing/soft_wrap", "Editing/vim", "Files/max_file_mib", "Files/recent_files_days",
                 "Default editor/default_editor", "Default editor/custom_command", "Default editor/custom_in_terminal",
                 "Default editor/keep_environment_editor");
             assertThat(specs).filteredOn(spec -> spec.kind() instanceof dev.jasper.sdk.settings.SettingKind.Bool)
@@ -127,6 +128,31 @@ class EditorSettingsTest {
             });
             assertThat(specs.getFirst().editor()).as("the font family is the settings font picker").isPresent();
         }
+    }
+
+    /** Browser plan 9: Chromium draws the Markdown preview by default; Basic is the Editor's own, which screen readers read. */
+    @Test void theMarkdownPreviewIsChromiumByDefaultAndChromiumOrBasic() {
+        var specs = new java.util.ArrayList<dev.jasper.sdk.settings.SettingSpec<?>>();
+        try (var host = new FakePluginHost(home.resolve("plugins"))) {
+            var declared = new AtomicReference<EditorSettings.Declared>();
+            host.start(INFO, Set.of(), Set.of(), context -> declared.set(new EditorSettings.Declared(recording(context.settings(), specs), Set.of())));
+            var spec = specs.stream().filter(declaration -> declaration.key().equals("markdown_preview")).findFirst().orElseThrow();
+            assertThat(spec.label()).isEqualTo("Markdown preview");
+            assertThat(spec.description()).isEqualTo("Chromium draws GitHub's look with Mermaid diagrams and needs the Browser plugin; Basic is "
+                + "the Editor's own preview, which screen readers can read. Without the Browser plugin, the preview is Basic.");
+            assertThat(spec.section()).isEqualTo("Markdown");
+            assertThat(spec.keywords()).containsExactly("editor", "markdown", "preview", "chromium", "mermaid", "screen reader");
+            assertThat(declared.get().markdownPreview()).isEqualTo(PreviewEngine.CHROMIUM);
+            assertThat(declared.get().markdownPreferences().engine()).isEqualTo(PreviewEngine.CHROMIUM);
+            host.setSetting(ID, "markdown_preview", "basic");
+            assertThat(declared.get().markdownPreview()).isEqualTo(PreviewEngine.BASIC);
+            assertThat(declared.get().markdownPreferences().engine()).as("the window reads it here").isEqualTo(PreviewEngine.BASIC);
+            assertThat(host.settingsReports(ID)).isEmpty();
+            host.setSetting(ID, "markdown_preview", "webkit");
+            assertThat(declared.get().markdownPreview()).isEqualTo(PreviewEngine.CHROMIUM);
+            assertThat(host.settingsReports(ID)).singleElement(org.assertj.core.api.InstanceOfAssertFactories.STRING).startsWith("markdown_preview:");
+        }
+        assertThat(java.util.Arrays.stream(PreviewEngine.values()).map(PreviewEngine::key)).containsExactly("chromium", "basic");
     }
 
     @Test void fractionalTypographyAndOldIntegerSizesAreReadWithoutRounding() {

@@ -23,6 +23,10 @@
 # Initial mode for new Markdown tabs: source, split, preview. Explicit toolbar choices update this value.
 # markdown_view_mode = "source"
 
+# The Markdown preview: chromium (GitHub's look with Mermaid diagrams, drawn by the Browser plugin) or basic (the
+# Editor's own preview, which screen readers can read). Without the Browser plugin the preview is basic.
+# markdown_preview = "chromium"
+
 # Columns per tab stop, 1 to 16.
 # tab_size = 4
 

@@ -14,10 +14,10 @@ import org.fife.ui.rtextarea.SearchContext;
 
 /**
  * What a view's Markdown preview draws on: the rendered document, its images, the block tops scroll sync reads, Find,
- * and the commands the view sends it. Each {@link DocumentArea} has one. Everything but {@link #prepare} runs on the UI
- * thread.
+ * and the commands the view sends it. Each {@link DocumentArea} draws on one at a time: its {@link BasicPreview}, or a
+ * {@link ChromiumPreview} of its own. Everything but {@link #prepare} runs on the UI thread.
  */
-sealed interface PreviewSurface extends AutoCloseable permits BasicPreview {
+sealed interface PreviewSurface extends AutoCloseable permits BasicPreview, ChromiumPreview {
     /**
      * A rendered document, ready to install.
      *

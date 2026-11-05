@@ -1,10 +1,12 @@
-// A plugin compiles against the SDK only; the application supplies it at run time. RSyntaxTextArea and tomlj
+// A plugin compiles against the SDK and the exported API of plugins it requires (the Browser, optionally, for the
+// Chromium Markdown preview); the application supplies them at run time. RSyntaxTextArea and tomlj
 // (for recent-files.toml) are bundled: stagePlugins copies the runtime classpath beside the plugin jar, and
 // PluginClassLoader loads it.
 plugins { `java-library` }
 
 dependencies {
     compileOnly(project(":jasper-sdk"))
+    compileOnly(project(":jasper-plugin-browser"))
     implementation("com.fifesoft:rsyntaxtextarea:3.6.0")
     implementation("org.tomlj:tomlj:1.1.1")
     implementation("org.commonmark:commonmark:0.30.0")
@@ -19,6 +21,7 @@ dependencies {
     // Headless baseline evidence only; never shipped with the plugin.
     testImplementation(testFixtures(project(":jasper-sdk-testkit")))
     testRuntimeOnly("com.formdev:flatlaf:3.7")
+    testImplementation(project(":jasper-plugin-browser"))
 }
 
 tasks.test {

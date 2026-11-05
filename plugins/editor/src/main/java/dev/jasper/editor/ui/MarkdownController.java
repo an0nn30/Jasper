@@ -92,6 +92,7 @@ final class MarkdownController implements AutoCloseable {
         tab.surface().addHierarchyListener(hierarchy);
         tab.surface().controllerGeometry = this::geometryChanged;
         tab.surface().styleChanged = this::styleChanged;
+        tab.surface().surfaceChanged = this::surfaceChanged;
         rememberSession();
     }
 
@@ -116,6 +117,15 @@ final class MarkdownController implements AutoCloseable {
         if (eligible()) debounce.restart();
     }
     void styleChanged() {
+        if (closed) return;
+        invalidate();
+        if (eligible()) flushDebounce();
+    }
+    /**
+     * The view draws its preview on another surface: what was rendered, installed or given for the old one is dropped,
+     * a render running for it among them, and the new one renders in its own dialect.
+     */
+    void surfaceChanged() {
         if (closed) return;
         invalidate();
         if (eligible()) flushDebounce();
@@ -259,6 +269,7 @@ final class MarkdownController implements AutoCloseable {
         tab.surface().removeHierarchyListener(hierarchy);
         tab.surface().controllerGeometry = () -> {};
         tab.surface().styleChanged = () -> {};
+        tab.surface().surfaceChanged = () -> {};
     }
     private static final class Job {
         final long generation;

@@ -127,6 +127,9 @@ final class ScrollLink implements AutoCloseable {
         result = null; knots = List.of(); geometry = List.of(); epoch++; queued = false; replacing = false;
     }
 
+    /** @return whether the panes follow each other while Split shows both */
+    boolean linked() { return linked; }
+
     void linked(boolean value) {
         if (closed || linked == value) return;
         linked = value;

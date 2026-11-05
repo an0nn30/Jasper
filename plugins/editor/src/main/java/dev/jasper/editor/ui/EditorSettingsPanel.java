@@ -136,7 +136,7 @@ public final class EditorSettingsPanel implements SettingsPanel {
             section(FONT, "Font", fontRows()),
             section(COLORS, "Colors", List.of(schemeRow(host.pending(settings.colorScheme)))),
             section(EDITING, "Editing", List.of(host.row(settings.tabSize), host.row(settings.softWrap), host.row(settings.vim))),
-            section(MARKDOWN, "Markdown", List.of(host.row(settings.markdownViewMode))),
+            section(MARKDOWN, "Markdown", List.of(host.row(settings.markdownViewMode), host.row(settings.markdownPreview))),
             section(FILES, "Files", List.of(host.row(settings.maxFileMib), host.row(settings.recentFilesDays))),
             section(DEFAULT, "Default editor", defaultEditor)));
     }
