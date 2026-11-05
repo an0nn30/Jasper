@@ -6,8 +6,9 @@ import javax.swing.JComponent;
 
 /**
  * One Markdown preview: a canvas on which Chromium draws, in a page of its own, the HTML its caller wrote. Lengths are
- * CSS pixels from the top of the document. UI thread only. After {@link #close()}, every call does nothing, every future
- * that waits is cancelled, as is any future a later call returns, and no event follows.
+ * CSS pixels from the top of the document. UI thread only, and every future it returns completes on the UI thread.
+ * After {@link #close()}, every call does nothing, every future that waits is cancelled, as is any future a later call
+ * returns, and no event follows.
  */
 public interface MarkdownPreview extends AutoCloseable {
     /**
@@ -71,12 +72,12 @@ public interface MarkdownPreview extends AutoCloseable {
     void reveal(String elementId);
 
     /**
-     * Marks every match of {@code find} in the document. A later {@code markAll} or {@link #select} cancels this one if
-     * it still waits.
+     * Marks every match of {@code find} in the document, up to 10,000. A later {@code markAll} or {@link #select}
+     * cancels this one if it still waits.
      *
      * @param find what to find
-     * @return the number of matches; a pattern JavaScript refuses fails it with a
-     *     {@link java.util.regex.PatternSyntaxException} carrying the page's message
+     * @return the number of matches, on the UI thread; a pattern JavaScript refuses fails it with a
+     *     {@link java.util.regex.PatternSyntaxException} naming the pattern
      */
     CompletableFuture<Integer> markAll(PreviewFind find);
 
@@ -86,8 +87,8 @@ public interface MarkdownPreview extends AutoCloseable {
      *
      * @param find what to find
      * @param forward towards the document's end; false for towards its start
-     * @return whether a match was selected; a pattern JavaScript refuses fails it with a
-     *     {@link java.util.regex.PatternSyntaxException} carrying the page's message
+     * @return whether a match was selected, on the UI thread; a pattern JavaScript refuses fails it with a
+     *     {@link java.util.regex.PatternSyntaxException} naming the pattern
      */
     CompletableFuture<Boolean> select(PreviewFind find, boolean forward);
 
@@ -95,9 +96,10 @@ public interface MarkdownPreview extends AutoCloseable {
     void clearFind();
 
     /**
-     * The page's selected text.
+     * The page's selected text, for Find to start from. A later {@code selectedText} cancels this one if it still waits.
      *
-     * @return the text; empty when nothing is selected
+     * @return the text, on the UI thread, when it is one line of at most 1,000 characters; else empty, as when nothing
+     *     is selected
      */
     CompletableFuture<String> selectedText();
 

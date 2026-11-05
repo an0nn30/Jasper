@@ -19,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import org.cef.CefClient;
 import org.cef.browser.CefBrowser;
@@ -79,6 +80,8 @@ public final class Chromium implements AutoCloseable {
     private volatile CefClient previewMade;
     // Given as a page first asks for Chromium, before any page's browser is made; until then jasper-about: answers nothing.
     private volatile Predicate<CefBrowser> pageBrowsers;
+    // Given as a preview first asks for its client, before any preview's browser is made: each preview browser's token.
+    private volatile Function<CefBrowser, String> previewTokens;
 
     /**
      * A Chromium that starts nothing until {@link #client()} is first called.
@@ -109,17 +112,19 @@ public final class Chromium implements AutoCloseable {
 
     /**
      * The client every page is made from. The first call hands Chromium's start to the worker and returns; later calls
-     * return the same future. It completes on the UI thread once Chromium is ready. It fails when the start fails or
-     * has not reached Chromium's initialization within 90 seconds, and when {@link #close()} cuts the start short. After
-     * {@code close()}, or once another Chromium has started in this process, it fails at once and starts nothing. Each
-     * failure but a cut-short start is told to {@code startFailed}, once.
+     * share that start. Each call returns a copy of the one future, which completes, or fails with the same cause, as it
+     * does, so no caller can complete or cancel it for the others. It completes on the UI thread once Chromium is ready.
+     * It fails when the start fails or has not reached Chromium's initialization within 90 seconds, and when
+     * {@link #close()} cuts the start short. After {@code close()}, or once another Chromium has started in this
+     * process, it fails at once and starts nothing. Each failure but a cut-short start is told to {@code startFailed},
+     * once.
      *
      * @return the client, once Chromium is ready
      */
     public CompletableFuture<CefClient> client() {
         var asked = life.ask();
         run(asked.steps());
-        return asked.client();
+        return copy(asked.client());
     }
 
     /**
@@ -140,9 +145,10 @@ public final class Chromium implements AutoCloseable {
      * The client every Markdown preview is made on: a second client of the same Chromium, made on the UI thread once
      * {@link #client()} has completed, and set up only by the installers given to {@link #onPreviewClient}, so none of
      * the pages' handlers reach a preview. Asking for it starts Chromium as {@code client()} does, and never starts a
-     * second one; later calls return the same future. It fails as {@code client()} fails, with the same reason, and when
-     * Chromium closes before it is made; after {@link #close()} it fails at once and starts nothing. Chromium's close
-     * disposes it with the pages' client.
+     * second one; each call returns a copy of the one future, as {@code client()} does. It fails as {@code client()}
+     * fails, with the same reason, and when Chromium closes before it is made; after {@link #close()} it fails at once
+     * and starts nothing. It completes on the UI thread, a failure too. Chromium's close disposes it with the pages'
+     * client.
      *
      * @return the preview client, once it is made
      */
@@ -150,16 +156,20 @@ public final class Chromium implements AutoCloseable {
         CompletableFuture<CefClient> client = client();
         if (client.isCompletedExceptionally()) return client;
         CompletableFuture<CefClient> made;
+        boolean first = false;
         synchronized (previewing) {
-            if (preview != null) return preview;
-            made = preview = new CompletableFuture<>();
+            if (preview == null) {
+                preview = new CompletableFuture<>();
+                first = true;
+            }
+            made = preview;
         }
         // Outside the lock: a client already made runs this at once, and the installers with it.
-        client.whenComplete((ready, failure) -> {
+        if (first) client.whenComplete((ready, failure) -> onUiThread(() -> {
             if (failure != null) made.completeExceptionally(failure);
-            else onUiThread(() -> makePreview(made));
-        });
-        return made;
+            else makePreview(made);
+        }));
+        return copy(made);
     }
 
     /**
@@ -191,12 +201,32 @@ public final class Chromium implements AutoCloseable {
     }
 
     /**
-     * Whether {@code jasper-preview:} answers {@code browser}'s requests: it is on the preview client. Before that client
-     * is made, no browser is. Any thread.
+     * Has {@code jasper-preview:} answer a browser of the preview client only on the origin {@code tokens} names for it
+     * (plan 9's N6): a preview's page loads only its own documents and images. Before this is given, it answers no
+     * browser. Give it as a preview first asks for its client, with the preview client's installers; the last one given
+     * counts.
+     *
+     * @param tokens the token of the origin a browser's preview shows, or null for a browser that shows none; asked on
+     *     Chromium's IO thread, where it must return at once
      */
-    boolean answersPreview(CefBrowser browser) {
+    public void answerPreviewFor(Function<CefBrowser, String> tokens) {
+        previewTokens = Objects.requireNonNull(tokens, "tokens");
+    }
+
+    /**
+     * Whether {@code jasper-preview:} answers {@code browser}'s request for {@code url}: the browser is on the preview
+     * client, and the address on its own preview's origin ({@link #answerPreviewFor}). Before that client is made, no
+     * browser is. Any thread.
+     */
+    boolean answersPreview(CefBrowser browser, String url) {
         CefClient made = previewMade;
-        return made != null && browser != null && browser.getClient() == made;
+        return made != null && browser != null && browser.getClient() == made && onItsOrigin(previewTokens, browser, url);
+    }
+
+    /** Whether {@code url} is on the origin of the preview {@code browser} shows, as {@code tokens} names it; none for no tokens. */
+    static boolean onItsOrigin(Function<CefBrowser, String> tokens, CefBrowser browser, String url) {
+        String token = tokens == null ? null : tokens.apply(browser);
+        return token != null && PreviewScheme.allows(url, token);
     }
 
     /**
@@ -323,6 +353,19 @@ public final class Chromium implements AutoCloseable {
 
     /** Hands the client to its future; generic, so this class casts nothing to a Chromium type. */
     private static <C> void complete(Step.Complete<C> done) { done.client().complete(done.value()); }
+
+    /**
+     * A future of the caller's own that completes as {@code shared} does, on the same thread: with its value, or failing
+     * with the cause it failed with. Generic, so this class names no Chromium type here.
+     */
+    private static <C> CompletableFuture<C> copy(CompletableFuture<C> shared) {
+        var own = new CompletableFuture<C>();
+        shared.whenComplete((value, failure) -> {
+            if (failure == null) own.complete(value);
+            else own.completeExceptionally(failure);
+        });
+        return own;
+    }
 
     /** Hands the start to the worker and arms its time limit: JCEF does not report every failed start. */
     private void handOver() {

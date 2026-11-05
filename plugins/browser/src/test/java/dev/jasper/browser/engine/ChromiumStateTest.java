@@ -97,13 +97,16 @@ class ChromiumStateTest {
     @Test void theFirstClientCallHandsTheStartToTheWorkerAndLaterCallsShareItsFuture() throws Exception {
         Chromium chromium = chromium(recording, LIMIT);
         var client = chromium.client();
-        assertThat(chromium.client()).isSameAs(client);
+        var again = chromium.client();
+        assertThat(again).as("N-F N6: a copy of the one future, which no caller can complete for the others").isNotSameAs(client);
         assertThat(starts).as("one start, on the worker, not run by the caller").hasSize(1);
         assertThat(client).isNotDone();
+        client.cancel(false);
+        assertThat(again).as("a caller's cancel is its own").isNotDone();
         assertThat(chromium.state()).isEqualTo(Chromium.State.STARTING);
         EventQueue.invokeAndWait(chromium::close);
         assertThat(chromium.state()).isEqualTo(Chromium.State.STOPPED);
-        assertThat(failure(client)).isInstanceOf(IllegalStateException.class).hasMessage(Chromium.ONCE);
+        assertThat(failure(again)).isInstanceOf(IllegalStateException.class).hasMessage(Chromium.ONCE);
         flushUi();
         assertThat(tellings).as("a start the close cut short is not a failure to tell").hasValue(0);
     }
@@ -113,7 +116,7 @@ class ChromiumStateTest {
         chromium.close();
         var refused = chromium.client();
         assertThat(failure(refused)).isInstanceOf(IllegalStateException.class).hasMessage(Chromium.ONCE);
-        assertThat(chromium.client()).isSameAs(refused);
+        assertThat(failure(chromium.client())).as("the same failure").isSameAs(failure(refused));
         assertThat(told()).isSameAs(failure(refused));
         flushUi();
         assertThat(tellings).hasValue(1);
@@ -145,7 +148,7 @@ class ChromiumStateTest {
         assertThat(cause).isInstanceOf(TimeoutException.class).hasMessage("Chromium did not start within 90 seconds");
         assertThat(failure(client)).isSameAs(cause);
         assertThat(chromium.state()).isEqualTo(Chromium.State.FAILED);
-        assertThat(chromium.client()).as("a failed start is not tried again").isSameAs(client);
+        assertThat(failure(chromium.client())).as("a failed start is not tried again").isSameAs(cause);
         assertThat(starts).hasSize(1);
         flushUi();
         assertThat(tellings).hasValue(1);
@@ -306,11 +309,13 @@ class ChromiumStateTest {
         var preview = chromium.previewClient();
         assertThat(starts).as("one start, on the worker").hasSize(1);
         assertThat(chromium.client()).as("the client shares that start").isNotDone();
-        assertThat(chromium.previewClient()).isSameAs(preview);
+        var again = chromium.previewClient();
+        assertThat(again).as("N6: a copy of the one future").isNotSameAs(preview);
         assertThat(starts).as("never a second start (R28)").hasSize(1);
         assertThat(preview).isNotDone();
         EventQueue.invokeAndWait(chromium::close);
         assertThat(failure(preview)).isInstanceOf(IllegalStateException.class).hasMessage(Chromium.ONCE);
+        assertThat(failure(again)).isSameAs(failure(preview));
         assertThat(starts).hasSize(1);
         flushUi();
         assertThat(tellings).as("a start the close cut short is not a failure to tell").hasValue(0);
@@ -327,10 +332,14 @@ class ChromiumStateTest {
     @Test void aPreviewClientAskedForDuringAStartThatFailsFailsWithTheSameReason() throws Exception {
         Chromium threw = chromium(recording, LIMIT);
         var waiting = threw.previewClient();
+        var failedOnUi = new AtomicBoolean();
+        waiting.whenComplete((client, failure) -> failedOnUi.set(EventQueue.isDispatchThread()));
         assertThat(threw.enter()).isTrue();
         var missing = new UnsatisfiedLinkError("no Chromium libraries");
         threw.threw(missing);
+        flushUi();
         assertThat(failure(waiting)).as("asked for during the start").isSameAs(missing);
+        assertThat(failedOnUi).as("N6: a failure too completes on the UI thread, though the start failed off it").isTrue();
         assertThat(failure(threw.previewClient())).as("asked for after it").isSameAs(missing);
         assertThat(starts).as("a failed start is not tried again").hasSize(1);
         threw.close();
@@ -372,9 +381,23 @@ class ChromiumStateTest {
     /** N-F12: {@code jasper-preview:} answers no browser before the preview client exists, and no request of none. */
     @Test void jasperPreviewAnswersNoBrowserBeforeThePreviewClientExists() {
         Chromium chromium = chromium(recording, LIMIT);
-        assertThat(chromium.answersPreview(browser())).isFalse();
-        assertThat(chromium.answersPreview(null)).isFalse();
+        String shell = "jasper-preview://0123456789abcdef0123456789abcdef/";
+        CefBrowser preview = browser();
+        chromium.answerPreviewFor(browser -> browser == preview ? "0123456789abcdef0123456789abcdef" : null);
+        assertThat(chromium.answersPreview(preview, shell)).isFalse();
+        assertThat(chromium.answersPreview(null, shell)).isFalse();
         assertThat(starts).isEmpty();
+    }
+
+    /** N6: a preview's browser is answered only on its own origin, as the previews name each browser's token. */
+    @Test void aPreviewsBrowserIsAnsweredOnlyOnItsOwnOrigin() {
+        String token = "0123456789abcdef0123456789abcdef", other = "ffffffffffffffffffffffffffffffff";
+        CefBrowser preview = browser(), page = browser();
+        java.util.function.Function<CefBrowser, String> tokens = browser -> browser == preview ? token : null;
+        assertThat(Chromium.onItsOrigin(tokens, preview, "jasper-preview://" + token + "/preview.js")).isTrue();
+        assertThat(Chromium.onItsOrigin(tokens, preview, "jasper-preview://" + other + "/preview.js")).as("another preview's").isFalse();
+        assertThat(Chromium.onItsOrigin(tokens, page, "jasper-preview://" + token + "/")).as("a browser no preview names").isFalse();
+        assertThat(Chromium.onItsOrigin(null, preview, "jasper-preview://" + token + "/")).as("before the previews name any").isFalse();
     }
 
     /** A browser that is only itself. */

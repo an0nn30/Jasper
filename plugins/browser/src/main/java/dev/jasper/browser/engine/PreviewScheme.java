@@ -35,11 +35,12 @@ public final class PreviewScheme {
     private static final System.Logger LOG = System.getLogger(PreviewScheme.class.getName());
     private static final String PREFIX = NAME + "://";
     private static final Pattern TOKEN = Pattern.compile("[0-9a-f]{32}");
-    // A meta tag cannot carry frame-ancestors, which the header does.
+    // A meta tag cannot carry frame-ancestors, which the header does. The shell's own id holds an upper-case letter, which
+    // no heading id the Editor writes holds (plan 9's N-F18).
     private static final byte[] SHELL = ("<!doctype html><html><head><meta http-equiv=\"Content-Security-Policy\" content=\""
         + POLICY.replace("; frame-ancestors 'none'", "") + "\"><meta charset=\"utf-8\"><meta name=\"color-scheme\" content=\"light dark\">"
         + "<link rel=\"stylesheet\" href=\"/preview.css\"><script src=\"/preview.js\"></script></head>"
-        + "<body><main id=\"content\" class=\"markdown-body\"></main></body></html>").getBytes(StandardCharsets.UTF_8);
+        + "<body><main id=\"Jasper-content\" class=\"markdown-body\"></main></body></html>").getBytes(StandardCharsets.UTF_8);
     // The plugin's files every origin serves, by path, with their resource under dev/jasper/browser/ and their type.
     private static final Map<String, File> FILES = Map.of("/preview.css", new File("preview/preview.css", "text/css"),
         "/preview.js", new File("preview/preview.js", "text/javascript"),

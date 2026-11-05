@@ -1,11 +1,14 @@
 /*
  * The Browser's find in page. Chromium's own find takes no regular expressions, so Jasper runs this in each frame of a
- * page as its find bar asks: this function, called with one command. A command's search is the id Jasper gave it, and
- * each answer goes to Jasper through jasperBridgeQuery, op "find".
+ * page as its find bar asks: this function, called with one command, and, for a Markdown preview, the name of the
+ * preview's message router. A command's search is the id Jasper gave it, and each answer goes to Jasper through that
+ * router, else jasperBridgeQuery, op "find".
  *
- * - {action: "search", search, query, matchCase, regex} finds the query, at most 1,000 characters, in the frame's
- *   visible text: as plain text, whose runs of white space match any, or as a JavaScript regular expression (RegExp,
- *   "i" added when case does not matter). The text is read a block at a time: what one block-level element holds, up
+ * - {action: "search", search, query, matchCase, wholeWord, regex} finds the query, at most 1,000 characters, in the
+ *   frame's visible text: as plain text, whose runs of white space match any, or as a JavaScript regular expression
+ *   (RegExp, "i" added when case does not matter). With wholeWord, plain text matches only where no letter or digit
+ *   comes right before or after it, and a regular expression is put between \b and \b, as the Editor's Find does.
+ *   The text is read a block at a time: what one block-level element holds, up
  *   to a <br> or another block-level element, each run of white space (space, tab, line feed, form feed, carriage
  *   return and no-break space) as one space, so a match may span inline elements and the source's line breaks.
  *   It highlights every match in #FFFF00 with the CSS Custom Highlight API, which leaves the page's nodes and scripts
@@ -18,6 +21,10 @@
  * - {action: "select", search, index} makes match index the current one, in #FF9632: it opens the closed details,
  *   hidden="until-found" elements and regions of collapsed aria-expanded controls that hide it, and scrolls it into
  *   view. -1 makes none current. The search does not see its own changes to the page.
+ * - {action: "step", search, query, matchCase, wholeWord, regex, forward}, the Markdown preview's Next and Previous,
+ *   searches as "search" does unless the search under way already is this one, then selects the first match after the
+ *   frame's selection, or the last before it, wrapping round, makes it the current one, scrolls it into view as little
+ *   as it can, and answers {search, count, invalid} for the step.
  * - {action: "selection", search} answers {search, selection}: the frame's selected text when it is one line of at
  *   most 1,000 characters, else "".
  * - {action: "clear"} removes every highlight and the style this script added, and ends the search. A document that is
@@ -26,13 +33,13 @@
  * Text counts as visible when it shows, or when only those three hide it. Text in scripts, styles, templates, form
  * fields and shadow roots is not searched.
  */
-(function (command) {
+(function (command, router) {
   'use strict';
   const KEY = Symbol.for('dev.jasper.browser.find');
   let find = window[KEY];
   if (!find) {
     if (command.action === 'select' || command.action === 'clear') return;
-    find = make();
+    find = make(typeof router === 'string' ? router : 'jasperBridgeQuery');
     try {
       Object.defineProperty(window, KEY, {value: find});
     } catch (taken) {
@@ -41,7 +48,7 @@
   }
   find.run(command);
 
-  function make() {
+  function make(routerName) {
     const LIMIT = 1000, MATCHES = 10000, QUIET = 300, BUDGET = 250;
     // Jasper takes only a few of a page's requests at a time, and refuses the rest as busy: an answer then waits its turn.
     const BUSY = 5, TRIES = 6;
@@ -56,9 +63,11 @@
     // What collapses: a run of two or more, or one that is not a space; a lone space stays as it is.
     const NBSP = String.fromCharCode(160), WHITE = '[ \\t\\n\\f\\r' + NBSP + ']';
     const COLLAPSING = new RegExp(WHITE + '{2,}|[\\t\\n\\f\\r' + NBSP + ']', 'g'), BLANKS = new RegExp(WHITE + '+', 'g');
+    // What may not come right before or after a whole word of plain text: a letter or a digit, as Java's isLetterOrDigit.
+    const BEFORE = '(?<![\\p{L}\\p{Nd}])', AFTER = '(?![\\p{L}\\p{Nd}])';
     const WATCHED = {childList: true, subtree: true, characterData: true, attributes: true,
       attributeFilter: ['hidden', 'open', 'class', 'style']};
-    const query = window.jasperBridgeQuery;
+    const query = window[routerName];
     const sheet = new CSSStyleSheet();
     sheet.replaceSync('::highlight(' + ALL + ') { background-color: #FFFF00; color: #000000; }\n'
       + '::highlight(' + CURRENT + ') { background-color: #FF9632; color: #000000; }');
@@ -362,29 +371,103 @@
       if (box.top < 0 || box.bottom > window.innerHeight) window.scrollBy({top: box.top - window.innerHeight / 2, behavior: 'instant'});
     }
 
+    // Scrolls the range into view as little as it can: the nearest edge of its element, then the range itself.
+    function near(range) {
+      const element = boxed(range.startContainer.parentElement);
+      if (element === null) return;
+      element.scrollIntoView({behavior: 'instant', block: 'nearest', inline: 'nearest'});
+      const box = range.getBoundingClientRect();
+      if (box.top < 0) window.scrollBy({top: box.top, behavior: 'instant'});
+      else if (box.bottom > window.innerHeight) window.scrollBy({top: box.bottom - window.innerHeight, behavior: 'instant'});
+    }
+
+    // The command's query as a pattern, or null when it is no regular expression.
+    function compile(command) {
+      const text = String(command.query).slice(0, LIMIT);
+      let source, flags = command.matchCase ? 'g' : 'gi';
+      if (command.regex) {
+        source = command.wholeWord === true ? '\\b' + text + '\\b' : text;
+      } else {
+        source = text.replace(BLANKS, ' ').replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
+        if (command.wholeWord === true) {
+          source = BEFORE + source + AFTER;
+          flags += 'u';
+        }
+      }
+      try {
+        return new RegExp(source, flags);
+      } catch (invalid) {
+        return null;
+      }
+    }
+
+    // Starts a search for the pattern, with the command's id: its matches, highlighted and watched.
+    function begin(command, compiled) {
+      end();
+      search = command.search;
+      pattern = compiled;
+      ranges = String(command.query) === '' ? [] : matches();
+      paint();
+      if (!exhausted) {
+        observer = new MutationObserver(changed);
+        observer.observe(document, WATCHED);
+      }
+    }
+
+    // The match a step goes to: the first that starts at or after the selection's end, or the last that ends at or
+    // before its start, round from the end to the start; without a selection, the first or the last.
+    function following(forward) {
+      const selection = window.getSelection();
+      if (selection === null || selection.rangeCount === 0) return forward ? 0 : ranges.length - 1;
+      const selected = selection.getRangeAt(0), point = document.createRange();
+      if (forward) {
+        point.setStart(selected.endContainer, selected.endOffset);
+        for (let at = 0; at < ranges.length; at++) if (ranges[at].compareBoundaryPoints(Range.START_TO_START, point) >= 0) return at;
+        return 0;
+      }
+      point.setStart(selected.startContainer, selected.startOffset);
+      for (let at = ranges.length - 1; at >= 0; at--) if (ranges[at].compareBoundaryPoints(Range.END_TO_END, point) <= 0) return at;
+      return ranges.length - 1;
+    }
+
     return {
       run(command) {
         switch (command.action) {
           case 'search': {
             end();
-            const text = String(command.query).slice(0, LIMIT);
-            const source = command.regex ? text : text.replace(BLANKS, ' ').replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
-            let compiled;
-            try {
-              compiled = new RegExp(source, command.matchCase ? 'g' : 'gi');
-            } catch (invalid) {
+            const compiled = compile(command);
+            if (compiled === null) {
               tell({search: command.search, count: 0, invalid: true}, 0);
               return;
             }
-            search = command.search;
-            pattern = compiled;
-            ranges = text === '' ? [] : matches();
-            paint();
-            if (!exhausted) {
-              observer = new MutationObserver(changed);
-              observer.observe(document, WATCHED);
-            }
+            begin(command, compiled);
             tell({search, count: ranges.length, invalid: false}, 0);
+            return;
+          }
+          case 'step': {
+            const compiled = compile(command);
+            if (compiled === null) {
+              end();
+              tell({search: command.search, count: 0, invalid: true}, 0);
+              return;
+            }
+            const same = pattern !== null && pattern.source === compiled.source && pattern.flags === compiled.flags
+              && ranges.every(range => range.startContainer.isConnected && range.endContainer.isConnected);
+            if (same) search = command.search;
+            else begin(command, compiled);
+            if (ranges.length > 0) {
+              current = following(command.forward === true);
+              paint();
+              reveal(ranges[current]);
+              if (observer !== null) observer.takeRecords();
+              const selection = window.getSelection();
+              if (selection !== null) {
+                selection.removeAllRanges();
+                selection.addRange(ranges[current].cloneRange());
+              }
+              near(ranges[current]);
+            }
+            tell({search: command.search, count: ranges.length, invalid: false}, 0);
             return;
           }
           case 'select':

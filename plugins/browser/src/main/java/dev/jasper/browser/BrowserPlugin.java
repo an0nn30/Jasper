@@ -1,5 +1,6 @@
 package dev.jasper.browser;
 
+import dev.jasper.browser.api.MarkdownPreviews;
 import dev.jasper.browser.dialogs.PageDialogs;
 import dev.jasper.browser.engine.AboutScheme;
 import dev.jasper.browser.engine.Chromium;
@@ -10,6 +11,7 @@ import dev.jasper.browser.item.ErrorPage;
 import dev.jasper.browser.item.SourcePage;
 import dev.jasper.browser.item.WebMenu;
 import dev.jasper.browser.links.PageNavigation;
+import dev.jasper.browser.preview.PreviewService;
 import dev.jasper.browser.restore.BrowserRestore;
 import dev.jasper.browser.routing.BrowserRole;
 import dev.jasper.browser.routing.WebAddressItems;
@@ -33,9 +35,10 @@ import java.util.concurrent.RejectedExecutionException;
  * The Browser: web pages as Jasper items. Its start registers New Browser Tab, New Browser Window and the Browser split
  * item, the globe they show, the Web menu, Settings › Browser, the welcome page, the error page with its Try Again and
  * Continue actions, View Source's page, the Browser as Jasper's web browser,
- * the terminal's Open URL in Split items and the restorer of saved browser items, and makes Chromium's engine, which
- * starts Chromium only when a browser item first shows, so starting the plugin, and restoring its items, loads no
- * Chromium class. After a run that ended while Chromium ran, the items it restores wait to be loaded.
+ * the terminal's Open URL in Split items and the restorer of saved browser items, publishes the Markdown previews'
+ * service ({@link MarkdownPreviews}), and makes Chromium's engine, which starts Chromium only when a browser item or a
+ * Markdown preview first shows, so starting the plugin, and restoring its items, loads no Chromium class. After a run
+ * that ended while Chromium ran, the items it restores wait to be loaded.
  */
 public class BrowserPlugin implements Plugin {
     static final String NEW_TAB = "dev.jasper.browser.new_tab", NEW_WINDOW = "dev.jasper.browser.new_window";
@@ -44,6 +47,7 @@ public class BrowserPlugin implements Plugin {
     private PluginContext context;
     private ExecutorService worker;
     private Chromium chromium;
+    private PreviewService previews;
     private BrowserItems items;
     private SourcePage sources;
     private boolean running;
@@ -62,8 +66,11 @@ public class BrowserPlugin implements Plugin {
         worker = Executors.newSingleThreadExecutor(Thread.ofPlatform().daemon().name("jasper-browser-chromium").factory());
         var about = new AboutScheme();
         // The Markdown previews' origins, which read nothing and make no random source until a preview is first made.
-        var previews = new PreviewScheme();
-        chromium = new Chromium(data, worker, about, previews, this::startFailed);
+        var origins = new PreviewScheme();
+        chromium = new Chromium(data, worker, about, origins, this::startFailed);
+        // Spec section 18: the Editor's Chromium Markdown preview. A preview asks for Chromium only once it first shows.
+        previews = new PreviewService(origins, chromium, context.background());
+        context.services().publish(MarkdownPreviews.class, previews);
         BrowserSettings.Declared settings = BrowserSettings.declare(context.settings());
         // A page is made when its item first shows: the client's handlers are installed then, before any page is made on
         // it, as naming their types loads Chromium's classes.
@@ -115,15 +122,17 @@ public class BrowserPlugin implements Plugin {
 
     /**
      * Jasper quits. The items' favicon fetches and View Source's fetches end. On the UI thread {@link Chromium#close()}
-     * only starts Chromium's dispose. The second close runs on the plugin's background executor and waits for Chromium's
-     * end: Jasper's quit waits for that work within its own shutdown grace, so quitting holds briefly for Chromium and
-     * never hangs on it.
+     * only starts Chromium's dispose, and every Markdown preview still open is then unavailable. The second close runs on
+     * the plugin's background executor and waits for Chromium's end: Jasper's quit waits for that work within its own
+     * shutdown grace, so quitting holds briefly for Chromium and never hangs on it.
      */
     @Override public void stop() {
         running = false;
         if (items != null) items.close();
         if (sources != null) sources.close();
         chromium.close();
+        // Once closed, Chromium is unavailable for the rest of the run.
+        if (previews != null) chromium.unavailable().ifPresent(previews::unavailable);
         try {
             context.background().execute(chromium::close);
         } catch (RejectedExecutionException closed) {
@@ -133,12 +142,13 @@ public class BrowserPlugin implements Plugin {
     }
 
     /**
-     * Chromium cannot serve pages: the reason goes to the plugin's log and, while the plugin runs, to one notification.
-     * UI thread.
+     * Chromium cannot serve pages: the reason goes to the plugin's log and, while the plugin runs, to one notification,
+     * and every live Markdown preview is unavailable. UI thread.
      */
     void startFailed(Throwable cause) {
         context.log().log(System.Logger.Level.WARNING, "The browser could not start: " + reason(cause), cause);
         tell(cause);
+        if (previews != null) previews.unavailable(cause);
     }
 
     /** The plugin's Chromium. */

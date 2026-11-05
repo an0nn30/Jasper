@@ -36,7 +36,7 @@ class PreviewSchemeFactoryTest {
         var origin = scheme.open();
         origin.image(1, new byte[] {1, 2, 3});
         CefBrowser preview = browser();
-        var factory = new PreviewSchemeFactory(scheme, browser -> browser == preview);
+        var factory = new PreviewSchemeFactory(scheme, (browser, url) -> browser == preview);
         var shell = new Response();
         assertThat(body(factory.handler(preview, "GET", origin.shell().toString()), shell)).startsWith("<!doctype html>");
         assertThat(shell.status).isEqualTo(200);
@@ -60,15 +60,22 @@ class PreviewSchemeFactoryTest {
             .containsEntry("Referrer-Policy", "no-referrer");
     }
 
-    /** N-F12: a browser that is no preview's, such as a page's, and a request of no browser, are answered 404. */
+    /**
+     * N-F12: a browser that is no preview's, such as a page's, and a request of no browser, are answered 404; and N6: a
+     * preview's browser only on its own origin.
+     */
     @Test void onlyAPreviewsBrowserIsAnswered() {
         var scheme = new PreviewScheme();
-        String shell = scheme.open().shell().toString();
+        var origin = scheme.open();
+        String shell = origin.shell().toString(), elsewhereShell = scheme.open().shell().toString();
         CefBrowser preview = browser(), page = browser();
-        var factory = new PreviewSchemeFactory(scheme, browser -> browser == preview);
+        var factory = new PreviewSchemeFactory(scheme, (browser, url) -> browser == preview && PreviewScheme.allows(url, origin.token()));
         var answered = new Response();
         body(factory.handler(preview, "GET", shell), answered);
         assertThat(answered.status).isEqualTo(200);
+        var elsewhere = new Response();
+        assertThat(body(factory.handler(preview, "GET", elsewhereShell), elsewhere)).as("another preview's shell").isEmpty();
+        assertThat(elsewhere.status).isEqualTo(404);
         for (CefBrowser other : new CefBrowser[] {page, null}) {
             var refused = new Response();
             assertThat(body(factory.handler(other, "GET", shell), refused)).as(other == null ? "no browser" : "a page's").isEmpty();

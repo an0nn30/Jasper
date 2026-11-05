@@ -15,6 +15,9 @@ import java.awt.Rectangle;
 import java.awt.Toolkit;
 import java.awt.Transparency;
 import java.awt.dnd.DropTarget;
+import java.awt.dnd.DropTargetAdapter;
+import java.awt.dnd.DropTargetDragEvent;
+import java.awt.dnd.DropTargetDropEvent;
 import java.awt.dnd.DropTargetListener;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
@@ -37,6 +40,8 @@ import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 import java.util.function.IntFunction;
 import java.util.function.Predicate;
+import javax.accessibility.AccessibleContext;
+import javax.accessibility.AccessibleRole;
 import javax.swing.JComponent;
 import javax.swing.Timer;
 
@@ -67,6 +72,10 @@ import javax.swing.Timer;
  * <p><b>Showing.</b> While the view does not show (its tab is hidden, or it is out of its window) its page draws one
  * frame a second; showing again restores 60. The page itself is not told it is hidden: its scripts and network work go
  * on.
+ *
+ * <p><b>A preview's canvas.</b> A Markdown preview's {@link PreviewPage} gives its canvas the name and description screen
+ * readers announce ({@link #describe}), the theme's background, which it paints until the page's first frame
+ * ({@link #fill}), and has it refuse drops ({@link #refuseDrops}), as the Editor's Basic preview does.
  */
 public final class PageView extends JComponent {
     static final int SHOWN_FRAME_RATE = 60, HIDDEN_FRAME_RATE = 1;
@@ -93,6 +102,8 @@ public final class PageView extends JComponent {
     volatile PageBrowser browser;
     private volatile LastPress lastPress = LastPress.NONE;
     private final Activation activation = new Activation();
+    // UI thread: whether drops are refused rather than handed to the page, as a preview's canvas refuses them.
+    private boolean dropsRefused;
     private volatile String hoverUrl = "";
     private volatile double scale = 1;
     // The last frame, in device pixels, and the back buffer it is copied to; both written on Chromium's paint thread.
@@ -170,11 +181,63 @@ public final class PageView extends JComponent {
         hooks = Objects.requireNonNull(page, "page");
         ime = Objects.requireNonNull(adapter, "adapter");
         addInputMethodListener(adapter);
-        if (!GraphicsEnvironment.isHeadless()) new DropTarget(this, drops); // the view's drop target from now on
+        // The view's drop target from now on, one that refuses every drag for a preview's canvas.
+        if (!GraphicsEnvironment.isHeadless()) new DropTarget(this, dropsRefused ? new Refusal() : drops);
         rescale();
         PageBrowser target = browser;
         if (isDisplayable() && target != null) target.create();
         showing(isShowing());
+    }
+
+    /**
+     * Has the view refuse every drag and drop, before its page attaches, as a Markdown preview's canvas does: nothing
+     * dropped reaches the page. UI thread.
+     */
+    void refuseDrops() {
+        dropsRefused = true;
+    }
+
+    /**
+     * Gives the view the name and description screen readers announce for it. UI thread.
+     *
+     * @param name what the view is
+     * @param description what a reader of it should know
+     */
+    void describe(String name, String description) {
+        AccessibleContext context = getAccessibleContext();
+        context.setAccessibleName(Objects.requireNonNull(name, "name"));
+        context.setAccessibleDescription(Objects.requireNonNull(description, "description"));
+    }
+
+    /**
+     * Paints {@code background} where the page has not drawn, as before its first frame. UI thread.
+     *
+     * @param background the colour
+     */
+    void fill(Color background) {
+        setBackground(Objects.requireNonNull(background, "background"));
+        repaint();
+    }
+
+    /** The view's accessible context: a canvas, which {@link #describe} names. */
+    @Override public AccessibleContext getAccessibleContext() {
+        if (accessibleContext == null) accessibleContext = new AccessibleJComponent() {
+            @Override public AccessibleRole getAccessibleRole() {
+                return AccessibleRole.CANVAS;
+            }
+        };
+        return accessibleContext;
+    }
+
+    /** A drop target's listener that refuses every drag and drop. */
+    private static final class Refusal extends DropTargetAdapter {
+        @Override public void dragEnter(DropTargetDragEvent event) { event.rejectDrag(); }
+
+        @Override public void dragOver(DropTargetDragEvent event) { event.rejectDrag(); }
+
+        @Override public void dropActionChanged(DropTargetDragEvent event) { event.rejectDrag(); }
+
+        @Override public void drop(DropTargetDropEvent event) { event.rejectDrop(); }
     }
 
     /**

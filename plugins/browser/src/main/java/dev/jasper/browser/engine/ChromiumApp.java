@@ -3,6 +3,7 @@ package dev.jasper.browser.engine;
 import com.jetbrains.cef.JCefAppConfig;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.function.BiPredicate;
 import java.util.function.Predicate;
 import org.cef.CefApp;
 import org.cef.CefClient;
@@ -31,11 +32,12 @@ final class ChromiumApp {
      * @param about the pages {@code jasper-about:} serves
      * @param pageBrowser whether a browser is a page's, whose main-frame requests {@code jasper-about:} answers
      * @param previews the previews' origins {@code jasper-preview:} serves
-     * @param previewBrowser whether a browser is on the preview client, whose requests {@code jasper-preview:} answers
+     * @param previewBrowser whether {@code jasper-preview:} answers a browser's request for an address: a preview's, on
+     *     its own origin
      * @param terminated run once Chromium has ended, on the UI thread
      */
     static ChromiumApp start(Path dataDir, AboutScheme about, Predicate<CefBrowser> pageBrowser, PreviewScheme previews,
-            Predicate<CefBrowser> previewBrowser, Runnable terminated) {
+            BiPredicate<CefBrowser, String> previewBrowser, Runnable terminated) {
         JCefAppConfig config = JCefAppConfig.getInstance();
         CefApp.setIsRemoteEnabled(false);
         SystemBootstrap.setLoader(config.getLoader());

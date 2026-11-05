@@ -1,1 +1,198 @@
-/* The Markdown preview's stylesheet, which jasper-preview: serves at /preview.css. */
+/*
+ * The Markdown preview's stylesheet, which jasper-preview: serves at /preview.css: Jasper's own CSS in GitHub's layout,
+ * with no stylesheet copied. Its colours and fonts are custom properties that preview.js sets on the root from the
+ * Editor's theme (the Browser's PreviewCss): --bg, --fg, --muted, --border, --raised, --sunken, --accent, --selection,
+ * --selection-fg, --success, --warning and --error; --text-font, --code-font, --font-size, --line-height and
+ * --code-ligatures; --tok-<role>, --tok-<role>-weight and --tok-<role>-style for each syntax role; and --alert-<type>.
+ * It loads nothing.
+ */
+:root {
+  background: var(--bg);
+  color: var(--fg);
+  scrollbar-color: var(--border) var(--bg);
+  /* The page moves only as the user or Jasper scrolls it, so scroll sync hears every move. */
+  overflow-anchor: none;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+}
+
+.markdown-body {
+  font-family: var(--text-font);
+  font-size: var(--font-size);
+  line-height: 1.5;
+  padding: 12px 16px;
+  color: var(--fg);
+  overflow-wrap: break-word;
+}
+
+.markdown-body > :first-child { margin-top: 0; }
+.markdown-body > :last-child { margin-bottom: 0; }
+
+/* Blocks: 16px below each. */
+.markdown-body p, .markdown-body blockquote, .markdown-body ul, .markdown-body ol, .markdown-body table, .markdown-body pre,
+.markdown-body .markdown-alert, .markdown-body .mermaid-diagram, .markdown-body .footnotes ol {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+/* Headings: 24px above, 16px below; the first two underlined. */
+.markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4, .markdown-body h5, .markdown-body h6 {
+  margin-top: 24px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+.markdown-body h1 { font-size: 2em; padding-bottom: .3em; border-bottom: 1px solid var(--border); }
+.markdown-body h2 { font-size: 1.5em; padding-bottom: .3em; border-bottom: 1px solid var(--border); }
+.markdown-body h3 { font-size: 1.25em; }
+.markdown-body h4 { font-size: 1em; }
+.markdown-body h5 { font-size: .875em; }
+.markdown-body h6 { font-size: .85em; color: var(--muted); }
+
+.markdown-body blockquote {
+  margin-left: 0;
+  margin-right: 0;
+  padding: 0 1em;
+  color: var(--muted);
+  border-left: .25em solid var(--border);
+}
+
+.markdown-body ul, .markdown-body ol { padding-left: 2em; }
+.markdown-body li + li { margin-top: .25em; }
+.markdown-body li > p { margin-top: 16px; }
+.markdown-body li > p:first-child { margin-top: 0; }
+.markdown-body .task-list-item { list-style-type: none; }
+.markdown-body .task-list-item input { margin: 0 .2em .25em -1.4em; vertical-align: middle; }
+
+/* Code: inline on a tint of the muted colour; blocks sunken, scrolling sideways when wide. */
+.markdown-body code {
+  font-family: var(--code-font);
+  font-size: 85%;
+  font-variant-ligatures: var(--code-ligatures);
+  padding: .2em .4em;
+  margin: 0;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--muted) 20%, transparent);
+}
+.markdown-body pre {
+  font-family: var(--code-font);
+  font-size: 85%;
+  font-variant-ligatures: var(--code-ligatures);
+  line-height: 1.45;
+  padding: 16px;
+  background: var(--sunken);
+  border-radius: 6px;
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow: auto;
+}
+.markdown-body pre code {
+  font-size: 100%;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+}
+
+/* Tables scroll sideways when wide. */
+.markdown-body table {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow: auto;
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+.markdown-body th, .markdown-body td { padding: 6px 13px; border: 1px solid var(--border); }
+.markdown-body th { font-weight: 600; }
+.markdown-body tr { background: var(--bg); }
+.markdown-body tr:nth-child(2n) { background: var(--raised); }
+.markdown-body .align-left { text-align: left; }
+.markdown-body .align-center { text-align: center; }
+.markdown-body .align-right { text-align: right; }
+
+.markdown-body hr {
+  height: .25em;
+  padding: 0;
+  margin: 24px 0;
+  background: var(--border);
+  border: 0;
+}
+
+.markdown-body img { max-width: 100%; box-sizing: content-box; }
+
+/* An image not shown: its alternative text, then why. */
+.markdown-body .image-reason {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--fg);
+}
+.markdown-body .image-reason-text { color: var(--muted); }
+
+/* Alerts: a rule and a title in the alert's colour. */
+.markdown-body .markdown-alert { padding: .5em 1em; border-left: .25em solid var(--alert); }
+.markdown-body .markdown-alert > :last-child { margin-bottom: 0; }
+.markdown-body .markdown-alert-title { margin-bottom: 4px; font-weight: 500; color: var(--alert); }
+.markdown-body .markdown-alert-note { --alert: var(--alert-note); }
+.markdown-body .markdown-alert-tip { --alert: var(--alert-tip); }
+.markdown-body .markdown-alert-important { --alert: var(--alert-important); }
+.markdown-body .markdown-alert-warning { --alert: var(--alert-warning); }
+.markdown-body .markdown-alert-caution { --alert: var(--alert-caution); }
+
+/* Footnotes. */
+.markdown-body .footnote-ref a { font-size: .75em; }
+.markdown-body .footnotes {
+  font-size: .85em;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+.markdown-body .footnote-backref { font-family: var(--text-font); }
+
+/* Diagrams: a source shows as code until Mermaid draws it, and with Mermaid's reason when it cannot. */
+.markdown-body .mermaid-diagram > pre.mermaid { margin-bottom: 0; }
+.markdown-body .mermaid-diagram > .mermaid-svg { text-align: center; overflow: auto; }
+.markdown-body .mermaid-diagram > .mermaid-svg svg { max-width: 100%; height: auto; }
+.markdown-body .mermaid-error { margin-bottom: 8px; color: var(--error); }
+
+/* Links: the accent, underlined on hover, with a focus ring. */
+.markdown-body a { color: var(--accent); text-decoration: none; }
+.markdown-body a:hover { text-decoration: underline; }
+.markdown-body a:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 2px; }
+/* An element reveal focuses only so Tab starts after it. */
+.markdown-body [tabindex="-1"]:focus { outline: none; }
+
+/* The selection, and Find's matches over find.js's own colours. */
+::selection { background: var(--selection); color: var(--selection-fg); }
+::highlight(jasper-find) { background-color: var(--selection) !important; color: var(--selection-fg) !important; }
+
+.markdown-body del { color: var(--muted); }
+
+/* Code's tokens, one class per syntax role. */
+.markdown-body .tok-keyword { color: var(--tok-keyword); font-weight: var(--tok-keyword-weight); font-style: var(--tok-keyword-style); }
+.markdown-body .tok-type { color: var(--tok-type); font-weight: var(--tok-type-weight); font-style: var(--tok-type-style); }
+.markdown-body .tok-function { color: var(--tok-function); font-weight: var(--tok-function-weight); font-style: var(--tok-function-style); }
+.markdown-body .tok-variable { color: var(--tok-variable); font-weight: var(--tok-variable-weight); font-style: var(--tok-variable-style); }
+.markdown-body .tok-constant { color: var(--tok-constant); font-weight: var(--tok-constant-weight); font-style: var(--tok-constant-style); }
+.markdown-body .tok-number { color: var(--tok-number); font-weight: var(--tok-number-weight); font-style: var(--tok-number-style); }
+.markdown-body .tok-string { color: var(--tok-string); font-weight: var(--tok-string-weight); font-style: var(--tok-string-style); }
+.markdown-body .tok-comment { color: var(--tok-comment); font-weight: var(--tok-comment-weight); font-style: var(--tok-comment-style); }
+.markdown-body .tok-doc-comment { color: var(--tok-doc-comment); font-weight: var(--tok-doc-comment-weight); font-style: var(--tok-doc-comment-style); }
+.markdown-body .tok-annotation { color: var(--tok-annotation); font-weight: var(--tok-annotation-weight); font-style: var(--tok-annotation-style); }
+.markdown-body .tok-operator { color: var(--tok-operator); font-weight: var(--tok-operator-weight); font-style: var(--tok-operator-style); }
+.markdown-body .tok-punctuation { color: var(--tok-punctuation); font-weight: var(--tok-punctuation-weight); font-style: var(--tok-punctuation-style); }
+.markdown-body .tok-tag { color: var(--tok-tag); font-weight: var(--tok-tag-weight); font-style: var(--tok-tag-style); }
+.markdown-body .tok-attribute { color: var(--tok-attribute); font-weight: var(--tok-attribute-weight); font-style: var(--tok-attribute-style); }
+.markdown-body .tok-regex { color: var(--tok-regex); font-weight: var(--tok-regex-weight); font-style: var(--tok-regex-style); }
+.markdown-body .tok-error { color: var(--tok-error); font-weight: var(--tok-error-weight); font-style: var(--tok-error-style); }

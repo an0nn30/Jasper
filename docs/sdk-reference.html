@@ -13039,8 +13039,9 @@ depend on: the JDK and the SDK.</p></div>
 <pre class="sig"><code><span class="kw">interface</span> <b>MarkdownPreview</b>
     <span class="kw">extends</span> <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/AutoCloseable.html" title="java.lang.AutoCloseable">AutoCloseable</a></code></pre>
 <div class="doc"><p>One Markdown preview: a canvas on which Chromium draws, in a page of its own, the HTML its caller wrote. Lengths are
-CSS pixels from the top of the document. UI thread only. After <a href="#dev.jasper.browser.api.MarkdownPreview.close()"><code>close()</code></a>, every call does nothing, every future
-that waits is cancelled, as is any future a later call returns, and no event follows.</p></div>
+CSS pixels from the top of the document. UI thread only, and every future it returns completes on the UI thread.
+After <a href="#dev.jasper.browser.api.MarkdownPreview.close()"><code>close()</code></a>, every call does nothing, every future that waits is cancelled, as is any future a later call
+returns, and no event follows.</p></div>
 <h5>Methods</h5>
 <div class="member" id="dev.jasper.browser.api.MarkdownPreview.component()">
 <pre class="sig"><a class="self" href="#dev.jasper.browser.api.MarkdownPreview.component()" aria-label="Link to this member">#</a><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/JComponent.html" title="javax.swing.JComponent">JComponent</a> <b>component</b>()</code></pre>
@@ -13093,10 +13094,10 @@ link after it. An id the document lacks does nothing.</p></div>
 </div>
 <div class="member" id="dev.jasper.browser.api.MarkdownPreview.markAll(PreviewFind)">
 <pre class="sig"><a class="self" href="#dev.jasper.browser.api.MarkdownPreview.markAll(PreviewFind)" aria-label="Link to this member">#</a><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html" title="java.util.concurrent.CompletableFuture">CompletableFuture</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Integer.html" title="java.lang.Integer">Integer</a>&gt; <b>markAll</b>(<a class="tl" href="#dev.jasper.browser.api.PreviewFind">PreviewFind</a> find)</code></pre>
-<div class="doc"><p>Marks every match of <code>find</code> in the document. A later <code>markAll</code> or <a href="#dev.jasper.browser.api.MarkdownPreview.select(PreviewFind,boolean)"><code>select</code></a> cancels this one if
-it still waits.</p></div>
-<dl class="tags"><dt>Parameters</dt><dd><code>find</code> what to find</dd><dt>Returns</dt><dd>the number of matches; a pattern JavaScript refuses fails it with a
-    <a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/regex/PatternSyntaxException.html"><code>PatternSyntaxException</code></a> carrying the page's message</dd></dl>
+<div class="doc"><p>Marks every match of <code>find</code> in the document, up to 10,000. A later <code>markAll</code> or <a href="#dev.jasper.browser.api.MarkdownPreview.select(PreviewFind,boolean)"><code>select</code></a>
+cancels this one if it still waits.</p></div>
+<dl class="tags"><dt>Parameters</dt><dd><code>find</code> what to find</dd><dt>Returns</dt><dd>the number of matches, on the UI thread; a pattern JavaScript refuses fails it with a
+    <a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/regex/PatternSyntaxException.html"><code>PatternSyntaxException</code></a> naming the pattern</dd></dl>
 </div>
 <div class="member" id="dev.jasper.browser.api.MarkdownPreview.select(PreviewFind,boolean)">
 <pre class="sig"><a class="self" href="#dev.jasper.browser.api.MarkdownPreview.select(PreviewFind,boolean)" aria-label="Link to this member">#</a><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html" title="java.util.concurrent.CompletableFuture">CompletableFuture</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Boolean.html" title="java.lang.Boolean">Boolean</a>&gt; <b>select</b>(
@@ -13104,8 +13105,8 @@ it still waits.</p></div>
         <span class="kw">boolean</span> forward)</code></pre>
 <div class="doc"><p>Selects the next or previous match of <code>find</code> from the selection, wrapping at the document's end, and scrolls
 it into view. A later <a href="#dev.jasper.browser.api.MarkdownPreview.markAll(PreviewFind)"><code>markAll</code></a> or <code>select</code> cancels this one if it still waits.</p></div>
-<dl class="tags"><dt>Parameters</dt><dd><code>find</code> what to find</dd><dd><code>forward</code> towards the document's end; false for towards its start</dd><dt>Returns</dt><dd>whether a match was selected; a pattern JavaScript refuses fails it with a
-    <a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/regex/PatternSyntaxException.html"><code>PatternSyntaxException</code></a> carrying the page's message</dd></dl>
+<dl class="tags"><dt>Parameters</dt><dd><code>find</code> what to find</dd><dd><code>forward</code> towards the document's end; false for towards its start</dd><dt>Returns</dt><dd>whether a match was selected, on the UI thread; a pattern JavaScript refuses fails it with a
+    <a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/regex/PatternSyntaxException.html"><code>PatternSyntaxException</code></a> naming the pattern</dd></dl>
 </div>
 <div class="member" id="dev.jasper.browser.api.MarkdownPreview.clearFind()">
 <pre class="sig"><a class="self" href="#dev.jasper.browser.api.MarkdownPreview.clearFind()" aria-label="Link to this member">#</a><code><span class="kw">void</span> <b>clearFind</b>()</code></pre>
@@ -13113,8 +13114,9 @@ it into view. A later <a href="#dev.jasper.browser.api.MarkdownPreview.markAll(P
 </div>
 <div class="member" id="dev.jasper.browser.api.MarkdownPreview.selectedText()">
 <pre class="sig"><a class="self" href="#dev.jasper.browser.api.MarkdownPreview.selectedText()" aria-label="Link to this member">#</a><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html" title="java.util.concurrent.CompletableFuture">CompletableFuture</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a>&gt; <b>selectedText</b>()</code></pre>
-<div class="doc"><p>The page's selected text.</p></div>
-<dl class="tags"><dt>Returns</dt><dd>the text; empty when nothing is selected</dd></dl>
+<div class="doc"><p>The page's selected text, for Find to start from. A later <code>selectedText</code> cancels this one if it still waits.</p></div>
+<dl class="tags"><dt>Returns</dt><dd>the text, on the UI thread, when it is one line of at most 1,000 characters; else empty, as when nothing
+    is selected</dd></dl>
 </div>
 <div class="member" id="dev.jasper.browser.api.MarkdownPreview.copy()">
 <pre class="sig"><a class="self" href="#dev.jasper.browser.api.MarkdownPreview.copy()" aria-label="Link to this member">#</a><code><span class="kw">void</span> <b>copy</b>()</code></pre>

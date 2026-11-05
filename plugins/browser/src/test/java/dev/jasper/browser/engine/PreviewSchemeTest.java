@@ -32,7 +32,7 @@ class PreviewSchemeTest {
             + "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
             + "img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'\">"
             + "<meta charset=\"utf-8\"><meta name=\"color-scheme\" content=\"light dark\"><link rel=\"stylesheet\" href=\"/preview.css\">"
-            + "<script src=\"/preview.js\"></script></head><body><main id=\"content\" class=\"markdown-body\"></main></body></html>");
+            + "<script src=\"/preview.js\"></script></head><body><main id=\"Jasper-content\" class=\"markdown-body\"></main></body></html>");
         assertThat(PreviewScheme.POLICY).as("the meta's policy is the header's but frame-ancestors")
             .isEqualTo(text(shell).replaceFirst("(?s)^.*Content-Security-Policy\" content=\"([^\"]*)\".*$", "$1") + "; frame-ancestors 'none'");
     }
