@@ -9,7 +9,9 @@ import dev.jasper.browser.page.NavigationHistory;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.restore.BrowserRestore;
 import dev.jasper.browser.settings.BrowserSettings;
+import dev.jasper.browser.store.Stores;
 import dev.jasper.sdk.RestoreState;
+import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.WindowOwner;
 import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.ui.ContentCommand;
@@ -49,9 +51,12 @@ import javax.swing.JComponent;
  * address, which the address field shows too, each without a user name or password. The icon, in the tab and at the
  * field's left, is the page's favicon once the page has loaded, Jasper's own icon on Jasper's {@code jasper-about:}
  * pages, and the globe while the page loads and whenever it has no favicon (spec sections 5 and 6). As the user types
- * into the address field, it lists the field's {@link Suggestions} at once and asks the chosen engine for its own 150
- * ms after the last keystroke, each keystroke superseding the request before; Tab or Enter on a suggestion loads it,
- * and Enter with none shown loads what the text resolves to, each then focusing the page. Its content commands
+ * into the address field, it lists the field's {@link Suggestions} at once, with the bookmarks and visited sites that
+ * match ({@link StoreSuggestions}), and asks the chosen engine for its own 150 ms after the last keystroke, each
+ * keystroke superseding the request before; Tab or Enter on a suggestion loads it, and Enter with none shown loads what
+ * the text resolves to, each then focusing the page. The bookmarks and visits load the first time the item shows or its
+ * field is edited, and the list follows them as they change. Its {@link HistoryRecorder} records each page load in
+ * history (spec section 10). Its content commands
  * {@code copy} and {@code paste} are what Jasper's Copy and Paste run in it, and {@code find}, {@code find-next} and
  * {@code find-previous}, on the keys of Editor tabs, what Jasper's Find, Find Next and Find Previous run: its
  * {@link BrowserFindBar}, the view's last row. Its {@code font-bigger}, {@code font-smaller} and {@code font-reset},
@@ -88,11 +93,16 @@ public final class BrowserItem implements AutoCloseable {
     // The longest address the tab's location and status show; a data: address can run to megabytes.
     private static final int SHOWN_ADDRESS = 2_000;
     private final BrowserItems items;
+    // The history and bookmarks the item records into and suggests from, read once, as it opens.
+    private final Stores stores;
     private final Optional<String> target;
     private final Page page;
     private final ErrorPages errors;
     private final SourcePages sources;
-    private final BrowserToolbar toolbar = new BrowserToolbar();
+    private final HistoryRecorder history;
+    private final BrowserToolbar toolbar = new BrowserToolbar(this::storeSuggestions);
+    // The item's listening to its bookmarks and visits, which ends as it closes.
+    private final Subscription bookmarksChanged, visitsChanged;
     private final BrowserFindBar findBar;
     private final UiView view;
     private ContentTab tab;
@@ -112,6 +122,7 @@ public final class BrowserItem implements AutoCloseable {
 
     private BrowserItem(BrowserItems items, URI url, Optional<String> target, OptionalInt zoom, boolean waiting) {
         this.items = items;
+        stores = items.stores();
         this.target = target;
         this.url = url;
         saved = url;
@@ -128,6 +139,7 @@ public final class BrowserItem implements AutoCloseable {
         errors = new ErrorPages(page, items.certificates(), this::load);
         page.onLoadFailure(failure -> { if (!closed) errors.failed(failure); });
         sources = new SourcePages(page, this::load);
+        history = new HistoryRecorder(page, stores, items::later);
         title = TabTitle.of("", host(url.toString()), "", false);
         findBar = new BrowserFindBar(() -> closed ? Optional.empty() : Optional.of(page.find()), this::render, this::focusFind);
         view = items.context().kit().create(spec(), this::event);
@@ -135,6 +147,9 @@ public final class BrowserItem implements AutoCloseable {
         page.view().addHierarchyListener(event -> {
             if ((event.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0 && page.view().isShowing()) shown();
         });
+        // The item draws again as the bookmarks change, and as the visits do while something is typed, for the field's list.
+        bookmarksChanged = stores.bookmarkIndex().onChanged(this::render);
+        visitsChanged = stores.visitIndex().onChanged(() -> { if (toolbar.typing()) render(); });
     }
 
     /**
@@ -174,6 +189,8 @@ public final class BrowserItem implements AutoCloseable {
         try {
             tab = items.context().windows().openTab(restore(url).map(spec::withRestore).orElse(spec), window.orElse(null), view, placement);
         } catch (RuntimeException | Error failure) {
+            bookmarksChanged.close();
+            visitsChanged.close();
             view.close();
             throw failure;
         }
@@ -399,7 +416,24 @@ public final class BrowserItem implements AutoCloseable {
     private void shown() {
         if (asked || closed || waiting) return;
         asked = true;
+        loadIndexes();
         items.start(page);
+    }
+
+    /** The bookmarks and visits load, the first time any item asks. */
+    private void loadIndexes() {
+        stores.bookmarkIndex().load();
+        stores.visitIndex().load();
+    }
+
+    /** The rows of the bookmarks and visits for {@code typed}, as their indexes hold them. */
+    private List<Nodes.Suggestion> storeSuggestions(String typed) {
+        return StoreSuggestions.of(typed, stores.bookmarkIndex().all(), stores.visitIndex().all());
+    }
+
+    /** The plugin stops: the page's last title lands in history, before the stores close. */
+    void flushHistory() {
+        history.flush();
     }
 
     /**
@@ -432,6 +466,9 @@ public final class BrowserItem implements AutoCloseable {
 
     private void closed() {
         closed = true;
+        history.flush();
+        bookmarksChanged.close();
+        visitsChanged.close();
         endSuggestions();
         sources.close();
         if (devTools != null) devTools.close();
@@ -536,6 +573,7 @@ public final class BrowserItem implements AutoCloseable {
     /** The page's address, title, loading state or where it can go changed. */
     private void changed() {
         if (closed) return;
+        history.titled(page.title());
         url = AddressInput.parse(errors.address()).orElse(url);
         render();
         present();
@@ -545,6 +583,7 @@ public final class BrowserItem implements AutoCloseable {
         if (closed || findBar.event(event)) return;
         switch (event) {
             case UiEvent.Edited edited when edited.id().equals(BrowserToolbar.ADDRESS) -> {
+                loadIndexes();
                 toolbar.edited(edited.text());
                 suggest(edited.text());
                 render();

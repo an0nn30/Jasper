@@ -1,5 +1,6 @@
 package dev.jasper.browser.page;
 
+import dev.jasper.browser.store.Reached;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
@@ -80,11 +81,11 @@ class PageCloseTest {
             var started = new ArrayList<String>();
             page.onLoadStart(started::add);
             int before = changes.get();
-            page.loadStarted("https://example.org/");
+            page.loadStarted("https://example.org/", Reached.LINK);
             assertThat(page.title()).isEmpty();
             assertThat(changes.get()).as("told once").isEqualTo(before + 1);
             assertThat(started).containsExactly("https://example.org/");
-            page.loadStarted("https://example.org/again");
+            page.loadStarted("https://example.org/again", Reached.LINK);
             assertThat(changes.get()).as("already blank: nothing to tell").isEqualTo(before + 1);
             page.titleChanged("Example Org");
             assertThat(page.title()).isEqualTo("Example Org");

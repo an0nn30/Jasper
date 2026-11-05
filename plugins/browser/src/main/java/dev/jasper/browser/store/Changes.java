@@ -5,7 +5,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/** A store's change listeners, told on the store's thread once a change has been written. */
+/**
+ * Change listeners: a store's, told on the database's thread once a change has been written, and an index's, told on the
+ * UI thread once it holds the change.
+ */
 final class Changes {
     private static final System.Logger LOG = System.getLogger(Changes.class.getName());
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
@@ -13,7 +16,7 @@ final class Changes {
     /**
      * Adds a listener.
      *
-     * @param listener told after each change, on the store's thread
+     * @param listener told after each change, on the owner's thread
      * @return ends the listening
      */
     Subscription add(Runnable listener) {
@@ -23,7 +26,7 @@ final class Changes {
         return () -> listeners.remove(entry);
     }
 
-    /** Tells every listener. One that throws is logged; the change is written, and the others still hear of it. */
+    /** Tells every listener. One that throws is logged; the change stands, and the others still hear of it. */
     void tell() {
         for (Runnable listener : listeners) {
             try {

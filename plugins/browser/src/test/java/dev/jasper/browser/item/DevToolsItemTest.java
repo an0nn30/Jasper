@@ -4,6 +4,7 @@ import dev.jasper.browser.page.DevTools;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageTestAccess;
 import dev.jasper.browser.settings.BrowserSettings;
+import dev.jasper.browser.store.MemoryStores;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.testing.FakePluginHost;
@@ -39,6 +40,13 @@ class DevToolsItemTest {
     private BrowserItem item;
     private Page page;
     private UUID window;
+
+    // Stores in memory, one for each BrowserItems a test makes.
+    private final MemoryStores memory = new MemoryStores();
+
+    @AfterEach void closeStores() throws Exception {
+        memory.close();
+    }
 
     @AfterEach void closeHost() throws Exception {
         SwingUtilities.invokeAndWait(() -> { if (host != null) host.close(); });
@@ -212,7 +220,7 @@ class DevToolsItemTest {
             context.set(plugin);
             settings.set(BrowserSettings.declare(plugin.settings()));
         });
-        items = new BrowserItems(context.get(), settings.get()::read, started -> { });
+        items = new BrowserItems(context.get(), settings.get()::read, memory.make(), started -> { });
         window = host.addTerminalWindow();
         host.activateTerminalWindow(window);
         item = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());

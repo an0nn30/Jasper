@@ -42,6 +42,10 @@ Start with [`docs/STATUS.md`](docs/STATUS.md): current state, open items, deferr
 - Mouse: `onMouseEvent(column, row, …)` takes 0-based cells and encodes the report itself; SGR right press at (0,0) = `ESC[<2;1;1M`; it already drops MOVED/DRAGGED in click-only mode (1000); a press with the Shift flag sends nothing.
 - `linesDiscardedFromHistory` fires when scrollback overflows; ED 3 and RIS fire `historyCleared` (ED 2 does not); **a width change reflows soft-wrapped lines**; while the alternate screen is active `getHistoryLinesCount()` is 0.
 
+## Verified JCEF behaviour (JBR 25.0.4.1 b635.75; do not re-derive; test if in doubt)
+
+- `CefRequest.TransitionType` is one shared enum constant per source, and `addQualifiers` ORs each load's qualifiers into its value without ever clearing them. The Browser's `PageEvents.Load.onLoadStart` therefore reads `getSource()` and `getQualifiers()` first and clears every `TransitionFlags` before any return. It must stay the only handler given a `TransitionType`. A source JCEF does not map arrives as a null transition.
+
 ## Source hygiene
 
 - Never put raw control, private-use or unpaired surrogate characters in source. Write Java escapes (for example `"\033[1;3D"`) or ASCII casts (`(char) 0xF113`, `(char) 0xD83D`). JediTerm's continuation marker U+E000 is written as the Java escape (backslash, `u`, `E000`), never as the raw character.

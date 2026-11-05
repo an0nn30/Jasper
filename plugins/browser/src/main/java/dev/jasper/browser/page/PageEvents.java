@@ -1,6 +1,7 @@
 package dev.jasper.browser.page;
 
 import dev.jasper.browser.engine.Chromium;
+import dev.jasper.browser.store.Reached;
 import java.awt.EventQueue;
 import java.io.IOException;
 import java.io.InputStream;
@@ -36,9 +37,17 @@ import org.cef.network.CefRequest;
  * ({@link #onMainFrameLoadStart}), and the main frame then runs {@code detect-favicon.js}, which names the document's
  * icon through the opener bridge's router for the page to fetch ({@link Page#faviconDeclared}). Each main-frame load
  * start shows the page at its own zoom again, there and then, as Chromium keeps one zoom per host. A main frame's failed
- * load goes to its page with Chromium's name for the error ({@link Page#onLoadFailure}), for its item's error page. A
- * page that enters fullscreen is told at once to leave it: Jasper refuses fullscreen (spec section 5). A page's
- * {@link DevTools} browser is no page's: none of this reaches it, but for the editing keys.
+ * load goes to its page with Chromium's name for the error ({@link Page#onLoadFailure}), for its item's error page. Each
+ * main-frame load start reaches its page with how the load reached it ({@link #reached}), for its item's history
+ * ({@link Page#onVisit}). A page that enters fullscreen is told at once to leave it: Jasper refuses fullscreen (spec
+ * section 5). A page's {@link DevTools} browser is no page's: none of this reaches it, but for the editing keys.
+ *
+ * <p>JCEF hands every load the same six {@link CefRequest.TransitionType} constants, and ORs each load's qualifiers into
+ * the constant's own value without ever clearing them, so a flag one load set would be read by every later load of that
+ * source. {@link Load#onLoadStart} therefore reads a transition's source and qualifiers before anything else and clears
+ * the qualifiers there and then, whatever the load. It must stay the one handler given a {@code TransitionType}: one
+ * that reads a transition without clearing it, as {@code CefRequest.getTransitionType()} gives it to a request
+ * handler, would read and leave flags of other loads.
  */
 public final class PageEvents {
     private static final Consumer<CefClient> INSTALL = PageEvents::install;
@@ -121,6 +130,40 @@ public final class PageEvents {
     }
 
     /**
+     * How the load {@code transition} names reached its page, read from it, whose qualifiers are then cleared, as JCEF
+     * never clears them itself; JCEF leaves a source it does not map without a transition. Chromium's thread.
+     *
+     * @return the way; {@link Reached#OTHER} without a transition
+     */
+    static Reached reached(CefRequest.TransitionType transition) {
+        if (transition == null) return Reached.OTHER;
+        int source = transition.getSource(), qualifiers = transition.getQualifiers();
+        for (CefRequest.TransitionFlags flag : CefRequest.TransitionFlags.values()) transition.removeQualifier(flag);
+        return reached(source, qualifiers);
+    }
+
+    /**
+     * How a load reached its page, by Chromium's transition: Back or Forward, then a client or server redirect, then the
+     * source decides, a reload, a form submitted, a link or an address typed, which Jasper's own loads are too.
+     *
+     * @param source the transition's source, as {@code getSource()} gives it
+     * @param qualifiers the transition's qualifiers, as {@code getQualifiers()} gives them
+     * @return the way; {@link Reached#OTHER} for any other source
+     */
+    static Reached reached(int source, int qualifiers) {
+        if ((qualifiers & CefRequest.TransitionFlags.TT_FORWARD_BACK_FLAG.getValue()) != 0) return Reached.BACK_FORWARD;
+        int redirects = CefRequest.TransitionFlags.TT_CLIENT_REDIRECT_FLAG.getValue()
+            | CefRequest.TransitionFlags.TT_SERVER_REDIRECT_FLAG.getValue();
+        if ((qualifiers & redirects) != 0) return Reached.REDIRECT;
+        // getSource() masks the qualifiers off, so a constant's source is its own whatever flags it holds.
+        if (source == CefRequest.TransitionType.TT_RELOAD.getSource()) return Reached.RELOAD;
+        if (source == CefRequest.TransitionType.TT_FORM_SUBMIT.getSource()) return Reached.FORM_SUBMIT;
+        if (source == CefRequest.TransitionType.TT_LINK.getSource()) return Reached.LINK;
+        if (source == CefRequest.TransitionType.TT_EXPLICIT.getSource()) return Reached.TYPED;
+        return Reached.OTHER;
+    }
+
+    /**
      * A load of {@code page} in {@code frame} failed with {@code errorCode}: a main frame's failure is handed to the UI
      * thread through {@code ui}, for the page, by Chromium's name for the error, or empty for one it does not name; a
      * sub-frame's, and one without a page or frame, are not. Chromium's thread.
@@ -197,6 +240,7 @@ public final class PageEvents {
         }
 
         @Override public void onLoadStart(CefBrowser browser, CefFrame frame, CefRequest.TransitionType transition) {
+            Reached reached = reached(transition); // first, before any return: it clears the flags JCEF left
             if (frame == null || !frame.isMain()) return;
             if (browser instanceof PageBrowser shown && shown.owner() != null) {
                 List<BiConsumer<PageBrowser, CefFrame>> hooks = LOAD_STARTS.get(browser.getClient());
@@ -209,7 +253,7 @@ public final class PageEvents {
                 }
             }
             String url = frame.getURL();
-            later(browser, page -> page.loadStarted(url));
+            later(browser, page -> page.loadStarted(url, reached));
         }
 
         @Override public void onLoadEnd(CefBrowser browser, CefFrame frame, int httpStatusCode) {

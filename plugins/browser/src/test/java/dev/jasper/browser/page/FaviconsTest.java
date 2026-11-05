@@ -5,6 +5,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import dev.jasper.browser.item.FaviconDecoder;
+import dev.jasper.browser.store.Reached;
 import dev.jasper.sdk.ui.PixelImage;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
@@ -210,7 +211,7 @@ class FaviconsTest {
         Page page = onUi(() -> new Page(at("/page"), changes::incrementAndGet, favicons));
         onUi(() -> {
             long declaredIn = PageTestAccess.document(page);
-            page.loadStarted(at("/next").toString());
+            page.loadStarted(at("/next").toString(), Reached.LINK);
             int before = changes.get();
             PageTestAccess.faviconArrived(page, declaredIn, FaviconDecoder.toPng(png));
             assertThat(page.favicon()).as("dropped").isEmpty();
@@ -240,7 +241,7 @@ class FaviconsTest {
             assertThat(page.declaredFavicon()).as("one icon a document").contains(at("/favicon.ico"));
             assertThat(page.fetchingFavicon()).isFalse();
             int before = changes.get();
-            page.loadStarted(at("/next").toString());
+            page.loadStarted(at("/next").toString(), Reached.LINK);
             assertThat(page.favicon()).as("cleared at the load start").isEmpty();
             assertThat(page.declaredFavicon()).isEmpty();
             assertThat(changes.get()).as("told once").isEqualTo(before + 1);
@@ -254,7 +255,7 @@ class FaviconsTest {
         });
         await(() -> asked.size() == 2, "the next document's request");
         onUi(() -> {
-            page.loadStarted(at("/third").toString());
+            page.loadStarted(at("/third").toString(), Reached.LINK);
             assertThat(page.fetchingFavicon()).as("dropped at the load start").isFalse();
             page.close();
             return null;

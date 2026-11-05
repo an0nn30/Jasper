@@ -3,6 +3,7 @@ package dev.jasper.browser.item;
 import dev.jasper.browser.BrowserPlugin;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.settings.BrowserSettings;
+import dev.jasper.browser.store.MemoryStores;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.testing.FakePluginHost;
 import dev.jasper.sdk.ui.ShortcutContext;
@@ -16,6 +17,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import javax.swing.SwingUtilities;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -39,6 +41,13 @@ class WebMenuTest {
         new Expected(BACK, "Back", "cmd+[", "alt+left"),
         new Expected(FORWARD, "Forward", "cmd+]", "alt+right"),
         new Expected(RELOAD, "Reload Page", "cmd+r", "ctrl+r"));
+
+    // Stores in memory, one for each BrowserItems a test makes.
+    private final MemoryStores memory = new MemoryStores();
+
+    @AfterEach void closeStores() throws Exception {
+        memory.close();
+    }
 
     @Test void eachItemIsAnActionOfTheBrowsersItemsWithTheSpecsKeysOnMacOsAndOnLinuxAndWindows() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
@@ -137,10 +146,10 @@ class WebMenuTest {
     }
 
     /** The items of a started stand-in plugin, whose pages are never made. UI thread. */
-    private static BrowserItems items(FakePluginHost host) {
+    private BrowserItems items(FakePluginHost host) {
         var items = new AtomicReference<BrowserItems>();
         host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(),
-            plugin -> items.set(new BrowserItems(plugin, BrowserSettings.declare(plugin.settings())::read, (Page page) -> { })));
+            plugin -> items.set(new BrowserItems(plugin, BrowserSettings.declare(plugin.settings())::read, memory.make(), (Page page) -> { })));
         return items.get();
     }
 

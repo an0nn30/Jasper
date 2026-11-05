@@ -5,6 +5,10 @@
  * entry for each page load and counts the visits of each host and path, and
  * {@link dev.jasper.browser.store.BookmarkStore} keeps the bookmarks and their tags.
  * {@link dev.jasper.browser.store.Addresses} decides which addresses they keep, without user names and passwords.
+ * {@link dev.jasper.browser.store.Stores} holds a database's two stores and the indexes of them the UI thread reads, the
+ * bookmarks ({@link dev.jasper.browser.store.BookmarkIndex}) and the 10,000 most recently visited sites
+ * ({@link dev.jasper.browser.store.VisitIndex}), which load in the background when first asked and follow the stores'
+ * changes.
  * {@code SqliteOpener} is the one class that names an {@code org.sqlite} type, and only the database's thread loads it,
  * so the plugin's start loads no sqlite-jdbc class; {@code SqliteNatives} chooses the folder sqlite-jdbc extracts its
  * native library into. Depends on the {@code restore} package, the SDK, the JDK and sqlite-jdbc, and names no Chromium

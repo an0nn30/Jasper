@@ -147,7 +147,7 @@ final class Suggestions {
     }
 
     /** {@code text} as a row shows it: its first {@value #SHOWN} characters, then an ellipsis. */
-    private static String shown(String text) {
+    static String shown(String text) {
         return text.length() <= SHOWN ? text : text.substring(0, SHOWN) + "…";
     }
 

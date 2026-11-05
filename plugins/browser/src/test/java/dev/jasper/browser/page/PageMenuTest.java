@@ -4,6 +4,7 @@ import dev.jasper.browser.item.BrowserItem;
 import dev.jasper.browser.item.BrowserItems;
 import dev.jasper.browser.item.ItemTestAccess;
 import dev.jasper.browser.settings.BrowserSettings;
+import dev.jasper.browser.store.MemoryStores;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.testing.FakePluginHost;
 import dev.jasper.sdk.ui.ContentTab;
@@ -43,6 +44,13 @@ class PageMenuTest {
     private BrowserItems items;
     private BrowserItem item;
     private Page page;
+
+    // Stores in memory, one for each BrowserItems a test makes.
+    private final MemoryStores memory = new MemoryStores();
+
+    @AfterEach void closeStores() throws Exception {
+        memory.close();
+    }
 
     @AfterEach void closeHost() throws Exception {
         SwingUtilities.invokeAndWait(() -> { if (host != null) host.close(); });
@@ -418,7 +426,7 @@ class PageMenuTest {
         host = new FakePluginHost();
         var started = new AtomicReference<BrowserItems>();
         host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(),
-            plugin -> started.set(new BrowserItems(plugin, BrowserSettings.declare(plugin.settings())::read, any -> { })));
+            plugin -> started.set(new BrowserItems(plugin, BrowserSettings.declare(plugin.settings())::read, memory.make(), any -> { })));
         items = started.get();
         host.activateTerminalWindow(host.addTerminalWindow());
         item = items.open(URI.create(PAGE), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());

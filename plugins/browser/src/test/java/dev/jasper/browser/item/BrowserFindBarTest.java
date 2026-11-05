@@ -4,6 +4,7 @@ import dev.jasper.browser.json.StrictJson;
 import dev.jasper.browser.page.PageFind;
 import dev.jasper.browser.page.PageTestAccess;
 import dev.jasper.browser.settings.BrowserSettings;
+import dev.jasper.browser.store.MemoryStores;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.testing.FakeKitView;
@@ -23,6 +24,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -39,6 +41,13 @@ class BrowserFindBarTest {
     private final List<Runnable> typing = new ArrayList<>(), typingCancelled = new ArrayList<>();
     private boolean typingHeld;
     private PageFind find;
+
+    // Stores in memory, one for each BrowserItems a test makes.
+    private final MemoryStores memory = new MemoryStores();
+
+    @AfterEach void closeStores() throws Exception {
+        memory.close();
+    }
 
     /**
      * Plan 4b's W10: the bar searches once typing pauses for {@link BrowserFindBar#TYPING_WAIT}, not on every keystroke;
@@ -324,7 +333,7 @@ class BrowserFindBarTest {
             context.set(plugin);
             settings.set(BrowserSettings.declare(plugin.settings()));
         });
-        var item = new BrowserItems(context.get(), settings.get()::read, page -> { })
+        var item = new BrowserItems(context.get(), settings.get()::read, memory.make(), page -> { })
             .open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
         find = PageTestAccess.recordingFind(List.of("main", "child"), Optional.of("main"), ran, waits);
         PageTestAccess.useFind(item.page(), find);

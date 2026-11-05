@@ -5,6 +5,7 @@ import dev.jasper.browser.api.PreviewEvent;
 import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.item.BrowserItems;
 import dev.jasper.browser.restore.BrowserRestore;
+import dev.jasper.browser.store.MemoryStores;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.Variant;
 import dev.jasper.sdk.plugin.PluginContext;
@@ -43,6 +44,38 @@ class BrowserPluginTest {
             host.stopAll();
             plugin.startFailed(new IllegalStateException("late"));
             assertThat(host.notifications().lines()).as("a stopped plugin only logs").hasSize(1);
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /** Plan 5: a database that cannot be used posts one notification with the reason, while the plugin runs. */
+    @Test void historyAndBookmarksThatAreUnavailablePostANotificationWithTheReasonWhileThePluginRuns() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var plugin = new BrowserPlugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            plugin.storesUnavailable(new java.sql.SQLException("[SQLITE_NOTADB] file is not a database"));
+            assertThat(host.notifications().lines())
+                .containsExactly("dev.jasper.browser|WARNING|Browser history and bookmarks are unavailable|[SQLITE_NOTADB] file is not a database");
+            host.stopAll();
+            plugin.storesUnavailable(new java.sql.SQLException("late"));
+            assertThat(host.notifications().lines()).as("a stopped plugin only logs").hasSize(1);
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /**
+     * Spec section 19: the start makes the plugin's history and bookmarks without opening their database, and the stop
+     * closes them, the database never opened.
+     */
+    @Test void theStartMakesTheStoresWithoutOpeningThemAndTheStopClosesThem() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var plugin = new BrowserPlugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            assertThat(MemoryStores.started(plugin.stores())).isFalse();
+            assertThat(plugin.stores().closed()).isNotDone();
+            host.stopAll();
+            assertThat(plugin.stores().closed()).isDone();
+            assertThat(MemoryStores.started(plugin.stores())).isFalse();
             assertThat(host.failures()).isEmpty();
         } });
     }

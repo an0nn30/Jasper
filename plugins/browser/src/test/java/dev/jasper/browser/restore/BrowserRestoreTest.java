@@ -8,6 +8,7 @@ import dev.jasper.browser.item.Zoom;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageTestAccess;
 import dev.jasper.browser.settings.BrowserSettings;
+import dev.jasper.browser.store.MemoryStores;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.RestoreState;
 import dev.jasper.sdk.plugin.PluginContext;
@@ -27,6 +28,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -42,6 +44,13 @@ import static org.assertj.core.api.Assertions.within;
 class BrowserRestoreTest {
     private static final String ID = "dev.jasper.browser";
     private static final URI EXAMPLE = URI.create("https://example.com/docs"), START = URI.create("jasper-about:welcome");
+
+    // Stores in memory, one for each BrowserItems a test makes.
+    private final MemoryStores memory = new MemoryStores();
+
+    @AfterEach void closeStores() throws Exception {
+        memory.close();
+    }
 
     @Test void aUrlOverTheBudgetIsSavedWithoutItsQueryAndFragment() {
         URI url = URI.create("https://example.com/search?q=" + "a".repeat(5_000) + "#results");
@@ -553,17 +562,17 @@ class BrowserRestoreTest {
      * The items of a started stand-in plugin whose pages {@code start} makes, restored as the Browser's restorer restores
      * them, with {@link #START} as the start page. UI thread.
      */
-    private static BrowserItems restoring(FakePluginHost host, Consumer<Page> start) {
+    private BrowserItems restoring(FakePluginHost host, Consumer<Page> start) {
         return restoring(host, start, false);
     }
 
     /** As {@link #restoring(FakePluginHost, Consumer)}; with {@code wait}, as after a run that ended while Chromium ran. */
-    private static BrowserItems restoring(FakePluginHost host, Consumer<Page> start, boolean wait) {
+    private BrowserItems restoring(FakePluginHost host, Consumer<Page> start, boolean wait) {
         var context = new AtomicReference<PluginContext>();
         var items = new AtomicReference<BrowserItems>();
         host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(), started -> {
             context.set(started);
-            items.set(new BrowserItems(started, BrowserSettings.declare(started.settings())::read, start));
+            items.set(new BrowserItems(started, BrowserSettings.declare(started.settings())::read, memory.make(), start));
             started.windows().restorer(BrowserRestore.KIND, request -> {
                 items.get().restore(request.state(), START, request.window(), wait);
                 return Optional.empty();

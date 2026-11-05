@@ -1,6 +1,7 @@
 package dev.jasper.browser.page;
 
 import dev.jasper.browser.engine.Chromium;
+import dev.jasper.browser.store.Reached;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.ui.PixelImage;
 import dev.jasper.sdk.ui.TabPlacement;
@@ -15,6 +16,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -48,6 +50,7 @@ public final class Page implements AutoCloseable {
     // Given the page, reads the HTML its main frame shows: Chromium's, or a test's.
     private Function<Page, CompletableFuture<Optional<String>>> sourceReader = page -> chromiumSource(page.readyBrowser());
     private final List<Consumer<String>> loadStarts = new CopyOnWriteArrayList<>();
+    private final List<BiConsumer<String, Reached>> visits = new CopyOnWriteArrayList<>();
     private final List<Consumer<NavigationButton>> navigationButtons = new CopyOnWriteArrayList<>();
     private final List<IntConsumer> magnifies = new CopyOnWriteArrayList<>();
     private final List<Runnable> closes = new CopyOnWriteArrayList<>();
@@ -78,6 +81,8 @@ public final class Page implements AutoCloseable {
     // changes the address and not the document.
     private Optional<PixelImage> favicon = Optional.empty();
     private long document;
+    // Whether the main frame's document has finished loading: from its load start until its load ends, not.
+    private boolean documentLoaded;
     private URI declaredIcon;
     private CompletableFuture<Optional<PixelImage>> iconFetch;
     // The history as last read; whether a read runs, and whether the history changed since that read began.
@@ -511,6 +516,29 @@ public final class Page implements AutoCloseable {
     }
 
     /**
+     * Tells {@code listener} each time the page's main frame starts loading a document, as {@link #onLoadStart} does, with
+     * how the load reached it: each of the page's visits, for its item's history.
+     *
+     * @param listener told the address it loads and how, on the UI thread
+     * @return the registration; the page's close ends it
+     */
+    public Subscription onVisit(BiConsumer<String, Reached> listener) {
+        Objects.requireNonNull(listener, "listener");
+        visits.add(listener);
+        return () -> visits.remove(listener);
+    }
+
+    /**
+     * Whether the document the page's main frame shows has finished loading, as Chromium reported its load's end: false
+     * from each main-frame load start until that load ends.
+     *
+     * @return whether it has
+     */
+    public boolean documentLoaded() {
+        return documentLoaded;
+    }
+
+    /**
      * Tells {@code listener} each time Chromium reports a new address for the page's main frame: a navigation that
      * commits, to another document or within this one. A load that only starts, or is asked for, tells nothing.
      *
@@ -773,6 +801,7 @@ public final class Page implements AutoCloseable {
         if (closed) return;
         closed = true;
         loadStarts.clear();
+        visits.clear();
         navigationButtons.clear();
         magnifies.clear();
         navigations.clear();
@@ -872,9 +901,11 @@ public final class Page implements AutoCloseable {
         if (!titleRead.isRunning()) titleRead.start();
     }
 
-    /** The main frame finished loading. */
+    /** The main frame finished loading its document. */
     void loadEnded() {
-        if (!closed) readHistory();
+        if (closed) return;
+        documentLoaded = true;
+        readHistory();
     }
 
     /**
@@ -988,21 +1019,24 @@ public final class Page implements AutoCloseable {
     }
 
     /**
-     * The main frame started loading {@code url}: the page has no title until the new document gives one, whatever
-     * Chromium reports for a document without one, and no favicon until the new document names one. A favicon still
-     * being fetched for the document before is dropped, and the find's search ends.
+     * The main frame started loading {@code url}, reached {@code reached}: the page has no title until the new document
+     * gives one, whatever Chromium reports for a document without one, and no favicon until the new document names one. A
+     * favicon still being fetched for the document before is dropped, and the find's search ends.
      */
-    void loadStarted(String url) {
+    void loadStarted(String url, Reached reached) {
         if (closed) return;
         if (find != null) find.dropped();
         document++;
+        documentLoaded = false;
         dropFaviconFetch();
         declaredIcon = null;
         boolean cleared = !title.isEmpty() || favicon.isPresent();
         title = "";
         favicon = Optional.empty();
         if (cleared) changed.run();
-        for (Consumer<String> listener : loadStarts) listener.accept(url == null ? "" : url);
+        String started = url == null ? "" : url;
+        for (Consumer<String> listener : loadStarts) listener.accept(started);
+        for (BiConsumer<String, Reached> listener : visits) listener.accept(started, reached);
     }
 
     /** The icon the current document named, or empty before it names one. */

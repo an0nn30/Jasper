@@ -6,6 +6,7 @@ import dev.jasper.browser.page.NavigationHistory.History;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageTestAccess;
 import dev.jasper.browser.settings.BrowserSettings;
+import dev.jasper.browser.store.MemoryStores;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.testing.FakeKit;
@@ -41,6 +42,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -53,6 +55,13 @@ class BrowserItemTest {
     private static final URI EXAMPLE = URI.create("https://example.com");
     // A PNG as far as the SDK checks one: the plugin hands it on and never decodes it.
     private static final PixelImage ICON = new PixelImage(new byte[] {(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n', 1});
+
+    // Stores in memory, one for each BrowserItems a test makes.
+    private final MemoryStores memory = new MemoryStores();
+
+    @AfterEach void closeStores() throws Exception {
+        memory.close();
+    }
 
     @Test void anItemAsksForItsPageOnceTheFirstTimeItShowsAndNotWhenItOpens() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
@@ -948,18 +957,18 @@ class BrowserItemTest {
      * The items of a started stand-in plugin whose pages {@code start} makes, with the plugin's settings. Their address
      * fields' suggestion delays wait for {@code later} and their engine suggestions come from {@code fetches}. UI thread.
      */
-    private static BrowserItems items(FakePluginHost host, Consumer<Page> start, Later later, Fetches fetches) {
+    private BrowserItems items(FakePluginHost host, Consumer<Page> start, Later later, Fetches fetches) {
         var context = new AtomicReference<PluginContext>();
         var settings = new AtomicReference<BrowserSettings.Declared>();
         host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(), plugin -> {
             context.set(plugin);
             settings.set(BrowserSettings.declare(plugin.settings()));
         });
-        return new BrowserItems(context.get(), settings.get()::read, start, later, fetches);
+        return new BrowserItems(context.get(), settings.get()::read, memory.make(), start, later, fetches);
     }
 
     /** As {@link #items(FakePluginHost, Consumer, Later, Fetches)}, with delays that never end and fetches nobody answers. */
-    private static BrowserItems items(FakePluginHost host, Consumer<Page> start) {
+    private BrowserItems items(FakePluginHost host, Consumer<Page> start) {
         return items(host, start, new Later(), new Fetches());
     }
 

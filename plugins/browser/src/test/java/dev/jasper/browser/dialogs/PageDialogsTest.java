@@ -7,6 +7,7 @@ import dev.jasper.browser.page.DialogPlace;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageTestAccess;
 import dev.jasper.browser.settings.BrowserSettings;
+import dev.jasper.browser.store.MemoryStores;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.files.FileChoice;
 import dev.jasper.sdk.files.FileLocation;
@@ -60,6 +61,13 @@ class PageDialogsTest {
     private static final String ID = "dev.jasper.browser";
     private static final String ALERT = "Web Page Alert", CONFIRM = "Web Page Confirmation";
     private Shown shown;
+
+    // Stores in memory, one for each BrowserItems a test makes.
+    private final MemoryStores memory = new MemoryStores();
+
+    @AfterEach void closeStores() throws Exception {
+        memory.close();
+    }
 
     @AfterEach void closeHost() throws Exception {
         if (shown != null) onUiThread(shown::close);
@@ -504,13 +512,13 @@ class PageDialogsTest {
     }
 
     /** A started stand-in Browser on a fake host, with one browser item open in a window. UI thread. */
-    private static Shown show() throws Exception {
+    private Shown show() throws Exception {
         var result = new AtomicReference<Shown>();
         onUiThread(() -> {
             var host = new FakePluginHost();
             var started = new AtomicReference<BrowserItems>();
             host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(),
-                plugin -> started.set(new BrowserItems(plugin, BrowserSettings.declare(plugin.settings())::read, page -> { })));
+                plugin -> started.set(new BrowserItems(plugin, BrowserSettings.declare(plugin.settings())::read, memory.make(), page -> { })));
             var items = started.get();
             host.activateTerminalWindow(host.addTerminalWindow());
             BrowserItem item = items.open(URI.create("https://example.com"), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());

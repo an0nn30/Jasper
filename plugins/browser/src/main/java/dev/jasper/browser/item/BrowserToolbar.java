@@ -9,8 +9,10 @@ import dev.jasper.sdk.ui.PixelImage;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.function.Function;
 
 /**
  * A browser item's toolbar along the top of its page (spec section 6), as SDK nodes the kit draws: Back and Forward,
@@ -20,8 +22,9 @@ import java.util.OptionalInt;
  * address; while the page is one Jasper goes on to past a certificate error, "Not secure", in the warning colour, stands
  * in its place (spec section 14). The click that brings the focus into the field selects all its text. The toolbar keeps what is typed into
  * the field and the engine's suggestions for it: the field shows the page's address, or a results page's search terms,
- * until something is typed, then that text and its {@link Suggestions}, and the page's again once a load or Escape
- * gives the text up. Its item handles what the nodes report. UI thread.
+ * until something is typed, then that text and its {@link Suggestions}, the rows of Jasper's bookmarks and history for
+ * it last, and the page's again once a load or Escape gives the text up. Its item handles what the nodes report. UI
+ * thread.
  */
 final class BrowserToolbar {
     /** The toolbar's row and its nodes; a button reports its own id. */
@@ -38,11 +41,23 @@ final class BrowserToolbar {
     static final String NOT_SECURE = "browser.address.not-secure";
     /** The site icon's accessible name and tooltip. */
     static final String SITE_ICON = "Site icon - drag to copy URL";
+    // Given the typed text, the rows of Jasper's bookmarks and history for it.
+    private final Function<String, List<Nodes.Suggestion>> stores;
     // What was typed since the field last showed the page's address; null while it shows it.
     private String typed;
     // The engine's suggestions for the typed text, and whether they load.
     private List<String> suggested = List.of();
     private boolean suggesting;
+
+    /**
+     * A toolbar whose field lists {@code stores}' rows for the typed text after its own.
+     *
+     * @param stores given the typed text, the rows of Jasper's bookmarks and history for it, asked only while something
+     *     is typed
+     */
+    BrowserToolbar(Function<String, List<Nodes.Suggestion>> stores) {
+        this.stores = Objects.requireNonNull(stores, "stores");
+    }
 
     /**
      * The toolbar for a page at {@code address}.
@@ -66,7 +81,7 @@ final class BrowserToolbar {
             : new Nodes.Button(RELOAD, ControlState.READY, "", "refresh", Nodes.ButtonKind.GHOST, RELOAD, "Reload");
         String value = typed != null ? typed
             : AddressInput.parse(address).flatMap(page -> SearchEngine.queryOf(page, settings)).orElse(address);
-        List<Nodes.Suggestion> rows = typed == null ? List.of() : Suggestions.rank(typed, settings, suggested, List.of());
+        List<Nodes.Suggestion> rows = typed == null ? List.of() : Suggestions.rank(typed, settings, suggested, stores.apply(typed));
         // The site icon's slot is empty while "Not secure" stands in its place, so it is neither named nor dragged.
         Optional<PixelImage> image = notSecure ? Optional.empty() : icon;
         String glyph = notSecure ? "" : BrowserItems.GLOBE, name = notSecure ? "" : SITE_ICON;
@@ -83,6 +98,11 @@ final class BrowserToolbar {
         children.add(field);
         children.add(menu);
         return new Nodes.Stack(BAR, ControlState.READY, Nodes.LayoutRole.INLINE, children);
+    }
+
+    /** Whether something is typed in the field, which then lists its suggestions. */
+    boolean typing() {
+        return typed != null;
     }
 
     /** The field's text changed: it shows that text from now on, and no suggestions of the engine's yet. */

@@ -19,6 +19,9 @@
  * over its tab, and Chromium shows none; its View Source reads the page's HTML through {@code Page.source}, and its
  * Inspect Element opens the page's {@link dev.jasper.browser.page.DevTools}: a canvas of their own, which the page
  * makes, and Chromium's DevTools browser, which the page's browser makes, on the page's client.
+ * Each main-frame load start reaches its page with how the load reached it, the {@code store} package's
+ * {@link dev.jasper.browser.store.Reached}, read from Chromium's transition, for its item's history
+ * ({@link dev.jasper.browser.page.Page#onVisit}).
  * {@link dev.jasper.browser.page.LinkSchemes} decides which addresses a page's links open, and which a page may open
  * with Jasper's rights, for the {@code links} package and the menu. {@link dev.jasper.browser.page.LoadFailure} is a
  * main frame's failed load, as the load handler hands it to the page for its item's error page, with the

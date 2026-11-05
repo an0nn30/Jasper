@@ -16,6 +16,8 @@ import dev.jasper.browser.restore.BrowserRestore;
 import dev.jasper.browser.routing.BrowserRole;
 import dev.jasper.browser.routing.WebAddressItems;
 import dev.jasper.browser.settings.BrowserSettings;
+import dev.jasper.browser.store.BrowserDatabase;
+import dev.jasper.browser.store.Stores;
 import dev.jasper.sdk.WindowOwner;
 import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.plugin.PluginContext;
@@ -24,9 +26,12 @@ import dev.jasper.sdk.ui.PluginMenu;
 import dev.jasper.sdk.ui.SplitItemSpec;
 import dev.jasper.sdk.ui.StandardMenu;
 import dev.jasper.sdk.ui.TabPlacement;
+import java.awt.EventQueue;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
@@ -38,7 +43,9 @@ import java.util.concurrent.RejectedExecutionException;
  * the terminal's Open URL in Split items and the restorer of saved browser items, publishes the Markdown previews'
  * service ({@link MarkdownPreviews}), and makes Chromium's engine, which starts Chromium only when a browser item or a
  * Markdown preview first shows, so starting the plugin, and restoring its items, loads no Chromium class. After a run
- * that ended while Chromium ran, the items it restores wait to be loaded.
+ * that ended while Chromium ran, the items it restores wait to be loaded. It makes the items' history and bookmarks too,
+ * in {@code browser.sqlite} in its data folder, which opens only once an item first shows or its address field is
+ * edited, so the start opens no database and loads no sqlite-jdbc class (spec section 19).
  */
 public class BrowserPlugin implements Plugin {
     static final String NEW_TAB = "dev.jasper.browser.new_tab", NEW_WINDOW = "dev.jasper.browser.new_window";
@@ -49,6 +56,7 @@ public class BrowserPlugin implements Plugin {
     private Chromium chromium;
     private PreviewService previews;
     private BrowserItems items;
+    private Stores stores;
     private SourcePage sources;
     private boolean running;
 
@@ -72,10 +80,14 @@ public class BrowserPlugin implements Plugin {
         previews = new PreviewService(origins, chromium, context.background());
         context.services().publish(MarkdownPreviews.class, previews);
         BrowserSettings.Declared settings = BrowserSettings.declare(context.settings());
+        // Spec section 12: history and bookmarks in one database, made with no I/O; it opens at its first use. Why it cannot
+        // open is told on its own thread.
+        var database = BrowserDatabase.file(data.resolve("browser.sqlite"), cause -> EventQueue.invokeLater(() -> storesUnavailable(cause)));
+        stores = new Stores(database, EventQueue::invokeLater);
         // A page is made when its item first shows: the client's handlers are installed then, before any page is made on
         // it, as naming their types loads Chromium's classes.
         Chromium engine = chromium;
-        var items = new BrowserItems(context, settings::read, page -> {
+        var items = new BrowserItems(context, settings::read, stores, page -> {
             PageNavigation.prepare(engine);
             PageDialogs.prepare(engine);
             page.start(engine);
@@ -121,24 +133,56 @@ public class BrowserPlugin implements Plugin {
     }
 
     /**
-     * Jasper quits. The items' favicon fetches and View Source's fetches end. On the UI thread {@link Chromium#close()}
-     * only starts Chromium's dispose, and every Markdown preview still open is then unavailable. The second close runs on
-     * the plugin's background executor and waits for Chromium's end: Jasper's quit waits for that work within its own
-     * shutdown grace, so quitting holds briefly for Chromium and never hangs on it.
+     * Jasper quits. The items give history their pages' last titles, then the history and bookmarks close: their database
+     * takes no more work and closes once the work given before has run. The items' favicon fetches and View Source's
+     * fetches end. On the UI thread {@link Chromium#close()} only starts Chromium's dispose, and every Markdown preview
+     * still open is then unavailable. The database's end and Chromium's are waited for on the plugin's background
+     * executor: Jasper's quit waits for that work within its own shutdown grace, so quitting holds briefly for them and
+     * never hangs on them.
      */
     @Override public void stop() {
         running = false;
         if (items != null) items.close();
+        if (stores != null) stores.close();
         if (sources != null) sources.close();
         chromium.close();
         // Once closed, Chromium is unavailable for the rest of the run.
         if (previews != null) chromium.unavailable().ifPresent(previews::unavailable);
         try {
             context.background().execute(chromium::close);
+            if (stores != null) {
+                CompletableFuture<Void> storesClosed = stores.closed();
+                context.background().execute(() -> awaitClosed(storesClosed));
+            }
         } catch (RejectedExecutionException closed) {
-            // Nothing holds the quit for Chromium's end, which comes on its own.
+            // Nothing holds the quit for Chromium's end or the database's, which come on their own.
         }
         worker.shutdown();
+    }
+
+    /**
+     * History and bookmarks cannot be kept in their file: the reason goes to the plugin's log and, while the plugin runs,
+     * to one notification. They are kept in memory until Jasper quits, or not at all. UI thread.
+     */
+    void storesUnavailable(Throwable cause) {
+        context.log().log(System.Logger.Level.WARNING, "Browser history and bookmarks are unavailable: " + reason(cause), cause);
+        if (running) context.notifications().group().warning("Browser history and bookmarks are unavailable", reason(cause));
+    }
+
+    /** The plugin's history and bookmarks. */
+    Stores stores() {
+        return stores;
+    }
+
+    /** Waits, on the background executor, until the database has closed; Jasper's quit may interrupt the wait. */
+    private static void awaitClosed(CompletableFuture<Void> closed) {
+        try {
+            closed.get();
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        } catch (ExecutionException never) {
+            // closed() completes normally: a database whose close failed has logged why.
+        }
     }
 
     /**

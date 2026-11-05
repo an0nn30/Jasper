@@ -1,5 +1,7 @@
 package dev.jasper.browser.page;
 
+import dev.jasper.browser.store.Reached;
+
 /** Test-only access to what Chromium's handlers tell a page, for tests outside this package. */
 public final class PageTestAccess {
     private PageTestAccess() { }
@@ -78,13 +80,35 @@ public final class PageTestAccess {
     }
 
     /**
-     * The page's main frame starts loading {@code url}, as the client's load handler tells it. UI thread.
+     * The page's main frame starts loading {@code url}, reached in a way Chromium does not name ({@link Reached#OTHER}), as
+     * the client's load handler tells it. UI thread.
      *
      * @param page a page
      * @param url what it loads
      */
     public static void loadStarted(Page page, String url) {
-        page.loadStarted(url);
+        page.loadStarted(url, Reached.OTHER);
+    }
+
+    /**
+     * The page's main frame starts loading {@code url}, reached {@code reached}, as the client's load handler tells it.
+     * UI thread.
+     *
+     * @param page a page
+     * @param url what it loads
+     * @param reached how the load reached it
+     */
+    public static void loadStarted(Page page, String url, Reached reached) {
+        page.loadStarted(url, reached);
+    }
+
+    /**
+     * The page's main frame finished loading its document, as the client's load handler tells it. UI thread.
+     *
+     * @param page a page
+     */
+    public static void loadEnded(Page page) {
+        page.loadEnded();
     }
 
     /**
