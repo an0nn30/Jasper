@@ -37,6 +37,8 @@ class PluginZipsTest {
                     .contains("tomlj-1.1.1.jar", "ftpserver-core-1.2.1.jar", "bcpkix-jdk18on-1.85.jar", "sshd-core-2.19.0.jar", "sshd-sftp-2.19.0.jar");
             else if (descriptor.id().equals("dev.jasper.indexer"))
                 assertThat(jars).as("tomlj travels with Project Index").contains("tomlj-1.1.1.jar");
+            else if (descriptor.id().equals("dev.jasper.browser"))
+                assertThat(jars).as("sqlite-jdbc travels with the Browser").contains("sqlite-jdbc-3.53.4.0.jar");
             else assertThat(jars).as(descriptor.id() + " bundles nothing").hasSize(1);
         }
         assertThat(ids).containsExactlyInAnyOrder("dev.jasper.sample", "dev.jasper.snippets", "dev.jasper.history", "dev.jasper.vault", "dev.jasper.remote", "dev.jasper.editor", "dev.jasper.fileserver", "dev.jasper.indexer", "dev.jasper.enterprise", "dev.jasper.browser");
