@@ -196,6 +196,54 @@ class ScrollLinkChromiumTest {
         });
     }
 
+    /**
+     * W1: an edit re-renders the document, and before the next install the page's layout moves its scroll, which the page
+     * reports as not the user's (N15). The install leaves the source where it was, and the source still leads: the
+     * preview is brought to the source's passage, then and on a later layout.
+     */
+    @Test void aScrollThatIsNotTheUsersBetweenAnEditAndTheInstallLeavesTheSourceLeading() throws Exception {
+        double[] tops = tops();
+        installed(tops);
+        int[] kept = new int[1];
+        edt(() -> {
+            source(sourceY(25));
+            echo(tops[25]);
+            kept[0] = source();
+            // The user types at the end of block 25's line, which the source shows.
+            insert(prepared.result().blocks().get(25).sourceEnd(), "x");
+            // The page shows the old document while the new one renders; its layout clamps its scroll.
+            echo(tops[25] - 300);
+        });
+        drain();
+        var edited = surface.prepare(area.area.getText(), EditorThemeTest.syntax(1));
+        // The page tells shown and the layout one after the other, before scroll sync's rebuild runs.
+        edt(() -> {
+            surface.install(edited, new DocumentArea.PreviewStyle(Variant.LIGHT, PreviewPaneTest.TYPE, PreviewPaneTest.palette(false),
+                EditorThemeTest.syntax(1)), area.getFont(), 1);
+            page.fire(new PreviewEvent.Shown(2));
+            area.scrollLink.install(2, edited.result());
+            page.fire(new PreviewEvent.Geometry(2, tops, HEIGHT, VIEWPORT));
+        });
+        drain();
+        edt(() -> {
+            assertThat(source()).as("the source does not move").isEqualTo(kept[0]);
+            assertThat(lastScroll()).as("the preview follows the source").isEqualTo("scrollTo " + tops[25]);
+        });
+        double[] taller = tops.clone();
+        for (int n = 3; n < BLOCKS; n++) taller[n] += 250;
+        edt(() -> page.fire(new PreviewEvent.Geometry(2, taller, HEIGHT + 250, VIEWPORT)));
+        drain();
+        edt(() -> {
+            assertThat(source()).as("still the leader").isEqualTo(kept[0]);
+            assertThat(lastScroll()).isEqualTo("scrollTo " + taller[25]);
+        });
+    }
+
+    private void insert(int offset, String text) {
+        try { area.area.getDocument().insertString(offset, text, null); }
+        catch (Exception impossible) { throw new AssertionError(impossible); }
+    }
+
     @Test void thePreviewsBottomBringsTheSourceToItsBottom() throws Exception {
         installed(tops());
         edt(() -> {

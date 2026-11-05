@@ -119,6 +119,20 @@ class PreviewScriptTest {
             .isLessThan(install.indexOf("content.replaceChildren"));
     }
 
+    /**
+     * N15: an edit's clearImages leaves the images shown in place until the next document, so the page does not shrink
+     * under the user, and a move up to the page's new end because it can scroll less is the layout's, not the user's.
+     */
+    @Test void aLayoutsClampIsNotTheUsersScroll() throws IOException {
+        String script = script("/dev/jasper/browser/preview/preview.js");
+        String clear = body(script, "clearImages()"), scrolled = body(script, "scrolled()");
+        assertThat(clear).as("only the map").contains("images.clear();").doesNotContain("applyImage").doesNotContain("removeAttribute");
+        assertThat(scrolled).contains("max = root.scrollHeight - window.innerHeight")
+            .contains("const clamped = max < reportedMax && y >= max - 1 && y < reportedY;").contains("let user = !clamped;");
+        assertThat(scrolled.indexOf("reportedMax = max;")).as("compared with the last report, then kept")
+            .isGreaterThan(scrolled.indexOf("const clamped"));
+    }
+
     /** A block with no box is written as NaN, so one such block is not read as none (an empty list). */
     @Test void aBlockWithNoBoxIsWrittenAsNaN() throws IOException {
         String geometry = body(script("/dev/jasper/browser/preview/preview.js"), "geometry()");

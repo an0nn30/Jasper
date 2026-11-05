@@ -9,8 +9,9 @@
  *   through a <template>, keeping the scroll position, and sets the known images again. Then it tells Jasper shown, then
  *   where the blocks are, and draws the document's diagrams.
  * - image(id, url) shows the image at url in each image element whose data-image is id; imageReason(id, text) shows,
- *   in its place, a box with its alternative text, or "Image", then text; clearImages() forgets them all. Each holds for
- *   every document after, until clearImages.
+ *   in its place, a box with its alternative text, or "Image", then text. Each holds for every document after, until
+ *   clearImages(), which forgets them all for the documents after: the document shown keeps what it shows until the
+ *   next replaces it.
  * - scrollTo(y) scrolls the page; before the first document is in the page, as when Jasper replays the last scroll on
  *   ready, that document goes there once installed. reveal(id) scrolls the document's element with that id to the top
  *   and puts the caret at its start, so Tab moves to the next link after it.
@@ -24,7 +25,8 @@
  *   numbers, NaN for a block with no box; after each shown, and whenever the layout changes (a resize, an
  *   image or a font loading, a diagram drawn), at most once an animation frame and, after the first, every 100 ms;
  * - {op: "scrolled", y, user}, at most once an animation frame: user is false from a scrollTo until the first scroll
- *   more than 1 px from where it went, and true otherwise;
+ *   more than 1 px from where it went, and for a move up to the page's end because the page can scroll less than at the
+ *   last report (a shorter document, or a taller view, clamps it), and true otherwise;
  * - {op: "link", id}, for a click or a middle click on a [data-link] element, or Enter on a focused one, whose default it
  *   prevents.
  *
@@ -52,6 +54,8 @@
   // Where the last scrollTo went, until the user scrolls elsewhere; and one asked for before the first document, which
   // that document takes.
   let target = null, scrollWaiting = false, pending = null;
+  // The scroll and the most the page could scroll at the last report, to tell a layout's clamp from the user's scroll.
+  let reportedY = 0, reportedMax = 0;
   // Whether geometry waits to be told, and when it was last.
   let geometryWaiting = false, lastGeometry = 0;
   // Mermaid: 'absent' until a document asks for it, then 'loading', 'ready' or 'missing'; its theme, as the JSON text
@@ -125,16 +129,16 @@
     applyImages(String(id));
   }
 
+  // The elements shown keep their images until the next document replaces them, so an edit does not empty the page.
   function clearImages() {
     images.clear();
-    applyImages(null);
   }
 
-  // Applies the images to the elements of one data-image id, or of every id for null.
+  // Applies the images to the elements of one data-image id.
   function applyImages(id) {
     if (content === null) return;
     for (const element of content.querySelectorAll('img[data-image]'))
-      if (id === null || element.getAttribute('data-image') === id) applyImage(element);
+      if (element.getAttribute('data-image') === id) applyImage(element);
   }
 
   function applyImage(element) {
@@ -226,8 +230,12 @@
     scrollWaiting = true;
     requestAnimationFrame(() => {
       scrollWaiting = false;
-      const y = window.scrollY;
-      let user = true;
+      const y = window.scrollY, max = root.scrollHeight - window.innerHeight;
+      // The page can scroll less than at the last report and went up to its new end: the layout moved it, not the user.
+      const clamped = max < reportedMax && y >= max - 1 && y < reportedY;
+      reportedY = y;
+      reportedMax = max;
+      let user = !clamped;
       if (target !== null) {
         if (Math.abs(y - target) <= 1) user = false;
         else target = null;
