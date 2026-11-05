@@ -162,11 +162,25 @@ public class RemotePlugin implements Plugin {
         this.ui = ui; this.agentFactory = agentFactory; this.schedule = schedule; this.sshDir = sshDir;this.transferExecutor=transferExecutor;
     }
 
+    /**
+     * Points sqlite-jdbc at {@code folder} for its native library. A folder that cannot be used, such as one another Linux
+     * user made, does not stop the start: it is logged once, at INFO, with its cause, and sqlite-jdbc extracts its library
+     * into its own default folder, as the Browser's database does.
+     */
+    static void extractSqliteNatives(Path folder, System.Logger log) {
+        try {
+            dev.jasper.remote.transfer.store.SqliteNatives.extractInto(folder);
+        } catch (IOException | RuntimeException notUsed) {
+            log.log(System.Logger.Level.INFO, "SQLite's native library goes to the temporary folder: Jasper's own folder for it"
+                + " could not be used", notUsed);
+        }
+    }
+
     @Override public void start(PluginContext context) throws Exception {
         this.context = context;
         Files.createDirectories(context.dataDirectory());
         // Before the transfer queue opens its store on start: the folder sqlite-jdbc loads its native library from.
-        dev.jasper.remote.transfer.store.SqliteNatives.extractInto(dev.jasper.remote.transfer.store.SqliteNatives.folder());
+        extractSqliteNatives(dev.jasper.remote.transfer.store.SqliteNatives.folder(), context.log());
         settings = new RemoteSettings.Declared(context.settings());
         store = new HostStore(context.dataDirectory().resolve("hosts.toml"), context.background(), ui);
         panelState = new PanelState(context.dataDirectory().resolve("panel-state.toml"));

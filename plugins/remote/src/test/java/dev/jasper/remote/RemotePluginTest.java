@@ -55,6 +55,35 @@ class RemotePluginTest {
         }
     }
 
+    /**
+     * H11: a folder for SQLite's native library that cannot be used, such as one another Linux user made, does not stop
+     * the start. It is logged once, at INFO, with its cause, and sqlite-jdbc keeps its own default folder.
+     */
+    @Test void aNativeFolderThatCannotBeUsedIsLoggedAndDoesNotStopTheStart(@TempDir Path dir) throws Exception {
+        String saved = System.getProperty("org.sqlite.tmpdir");
+        System.clearProperty("org.sqlite.tmpdir");
+        Path inTheWay = Files.writeString(dir.resolve("jasper-sqlite"), "not a folder");
+        var logged = new ArrayList<String>();
+        var log = new System.Logger() {
+            @Override public String getName() { return "remote-test"; }
+            @Override public boolean isLoggable(Level level) { return true; }
+            @Override public void log(Level level, java.util.ResourceBundle bundle, String message, Throwable thrown) {
+                logged.add(level + " " + message + " | " + thrown.getClass().getSimpleName());
+            }
+            @Override public void log(Level level, java.util.ResourceBundle bundle, String format, Object... parameters) {
+                logged.add(level + " " + format);
+            }
+        };
+        try {
+            assertThatCode(() -> RemotePlugin.extractSqliteNatives(inTheWay, log)).doesNotThrowAnyException();
+            assertThat(logged).singleElement().asString().startsWith("INFO ").endsWith("| FileAlreadyExistsException");
+            assertThat(System.getProperty("org.sqlite.tmpdir")).as("sqlite-jdbc's own default").isNull();
+            assertThat(inTheWay).hasContent("not a folder");
+        } finally {
+            if (saved == null) System.clearProperty("org.sqlite.tmpdir"); else System.setProperty("org.sqlite.tmpdir", saved);
+        }
+    }
+
     @Test void aStartPointsSqliteAtJaspersOwnTemporaryFolder(@TempDir Path dir) {
         String saved = System.getProperty("org.sqlite.tmpdir");
         System.clearProperty("org.sqlite.tmpdir");
