@@ -73,11 +73,21 @@ class PreviewCssTest {
         assertThat(codeFont("Monospaced", List.of())).isEqualTo("monospace");
         assertThat(codeFont("DialogInput", List.of("Monospaced", "Menlo"))).as("a generic once in a row")
             .isEqualTo("monospace, \"Menlo\", monospace");
-        assertThat(codeFont(".SF NS Mono", List.of("Serif"))).isEqualTo("monospace, serif, monospace");
-        assertThat(codeFont("Cousine Nerd Font Mono", List.of("Dialog"))).as("a font only Jasper bundles stays a name")
-            .isEqualTo("\"Cousine Nerd Font Mono\", system-ui, monospace");
+        assertThat(codeFont(".SF NS Mono", List.of("Serif"))).as("R2: a logical family in a code list is never proportional")
+            .isEqualTo("monospace");
+        assertThat(codeFont("Cousine Nerd Font Mono", List.of("Dialog", "SansSerif", "Serif", ".Hidden", "Menlo"))).as("a font only Jasper bundles stays a name")
+            .isEqualTo("\"Cousine Nerd Font Mono\", monospace, \"Menlo\", monospace");
         assertThat(StrictJson.object(PreviewCss.mermaid(new PreviewTheme(Variant.DARK, PALETTE, syntax(), ".AppleSystemUIFont", TYPOGRAPHY)), 1)
             .orElseThrow()).containsEntry("fontFamily", "system-ui, sans-serif");
+    }
+
+    /** R3: a colour emoji family follows the generics in both stacks, in order, so digits, # and * in code are not drawn as emoji. */
+    @Test void colourEmojiFamiliesComeAfterTheGenerics() {
+        assertThat(codeFont("Cousine", List.of("Symbols Nerd Font Mono", "Apple Color Emoji"))).as("the Editor's default fallbacks")
+            .isEqualTo("\"Cousine\", \"Symbols Nerd Font Mono\", monospace, \"Apple Color Emoji\"");
+        assertThat(codeFont("Segoe UI Emoji", List.of("Menlo", "NOTO COLOR EMOJI")))
+            .isEqualTo("\"Menlo\", monospace, \"Segoe UI Emoji\", \"NOTO COLOR EMOJI\"");
+        assertThat(textFont("Apple Color Emoji")).isEqualTo("system-ui, sans-serif, \"Apple Color Emoji\"");
     }
 
     private static String textFont(String family) {

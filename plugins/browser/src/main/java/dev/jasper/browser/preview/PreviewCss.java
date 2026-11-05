@@ -124,36 +124,46 @@ final class PreviewCss {
     }
 
     private static String textFont(PreviewTheme theme) {
-        return fonts(List.of(theme.textFamily()), "system-ui", "sans-serif");
+        return fonts(List.of(theme.textFamily()), false, "system-ui", "sans-serif");
     }
 
     private static String codeFont(TerminalTypography typography) {
         List<String> families = new ArrayList<>();
         families.add(typography.family());
         families.addAll(typography.fallback());
-        return fonts(families, "monospace");
+        return fonts(families, true, "monospace");
     }
 
     /**
      * A CSS font list: each of {@code families} as a quoted name, or as the CSS generic it stands for when Chromium
-     * cannot find it by name (plan 9's N17), then {@code generics}. A Java logical family stands for its generic:
-     * {@code Dialog} and {@code SansSerif} for {@code system-ui}, {@code Serif} for {@code serif}, and
-     * {@code DialogInput} and {@code Monospaced} for {@code monospace}, in any case. A hidden system family, whose name
-     * starts with a dot (as the Mac's interface font, {@code .AppleSystemUIFont}), stands for the list's first generic.
-     * A generic is not written twice in a row.
+     * cannot find it by name (plan 9's N17), then {@code generics}, then the colour emoji families. In a text list a
+     * Java logical family stands for its generic: {@code Dialog} and {@code SansSerif} for {@code system-ui},
+     * {@code Serif} for {@code serif}, and {@code DialogInput} and {@code Monospaced} for {@code monospace}, in any
+     * case; in a code list ({@code code}) every one stands for {@code monospace}, so code never turns proportional. A
+     * hidden system family, whose name starts with a dot (as the Mac's interface font, {@code .AppleSystemUIFont}),
+     * stands for the list's first generic. A family whose name contains {@code emoji}, in any case, goes after the
+     * generics in its order: a colour emoji font has glyphs for digits, {@code #}, {@code *} and the space, which
+     * Chromium would otherwise draw in code from it, and it still takes real emoji. A generic is not written twice in
+     * a row.
      */
-    private static String fonts(List<String> families, String... generics) {
+    private static String fonts(List<String> families, boolean code, String... generics) {
         var names = new ArrayList<String>();
+        var emoji = new ArrayList<String>();
         for (String family : families) {
+            if (family.toLowerCase(Locale.ROOT).contains("emoji")) {
+                emoji.add(string(family));
+                continue;
+            }
             String generic = family.startsWith(".") ? generics[0] : switch (family.toLowerCase(Locale.ROOT)) {
-                case "dialog", "sansserif" -> "system-ui";
-                case "serif" -> "serif";
+                case "dialog", "sansserif" -> code ? generics[0] : "system-ui";
+                case "serif" -> code ? generics[0] : "serif";
                 case "dialoginput", "monospaced" -> "monospace";
                 default -> null;
             };
             add(names, generic == null ? string(family) : generic);
         }
         for (String generic : generics) add(names, generic);
+        names.addAll(emoji);
         return String.join(", ", names);
     }
 

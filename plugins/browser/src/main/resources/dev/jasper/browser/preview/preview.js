@@ -231,12 +231,18 @@
     requestAnimationFrame(() => {
       scrollWaiting = false;
       const y = window.scrollY, max = root.scrollHeight - window.innerHeight;
-      // The page can scroll less than at the last report and went up to its new end: the layout moved it, not the user.
-      const clamped = max < reportedMax && y >= max - 1 && y < reportedY;
+      // A clamp: the page can scroll less than it did and went up to its new end, so the layout moved it, not the user.
+      // "Than it did" is the further of the last report and Java's own scrollTo not yet reported (target): the document
+      // can shrink in the frame after that scrollTo, landing the page between the two. A clamp takes the landing place
+      // as the target, so the follow-up scroll event there reads as not the user's (the echo rule). A jump to the end
+      // after a silent shrink, and any scroll that is not up to the new end, stay the user's.
+      const was = target !== null ? Math.max(reportedY, target) : reportedY;
+      const clamped = max < reportedMax && y >= max - 1 && y < was;
       reportedY = y;
       reportedMax = max;
       let user = !clamped;
-      if (target !== null) {
+      if (clamped) target = y;
+      else if (target !== null) {
         if (Math.abs(y - target) <= 1) user = false;
         else target = null;
       }

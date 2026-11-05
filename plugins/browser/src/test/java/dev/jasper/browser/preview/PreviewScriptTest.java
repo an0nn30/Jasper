@@ -128,7 +128,9 @@ class PreviewScriptTest {
         String clear = body(script, "clearImages()"), scrolled = body(script, "scrolled()");
         assertThat(clear).as("only the map").contains("images.clear();").doesNotContain("applyImage").doesNotContain("removeAttribute");
         assertThat(scrolled).contains("max = root.scrollHeight - window.innerHeight")
-            .contains("const clamped = max < reportedMax && y >= max - 1 && y < reportedY;").contains("let user = !clamped;");
+            .contains("const was = target !== null ? Math.max(reportedY, target) : reportedY;")
+            .contains("const clamped = max < reportedMax && y >= max - 1 && y < was;").contains("let user = !clamped;")
+            .as("R1: a clamp is the new target, so its follow-up event is not the user's").contains("if (clamped) target = y;");
         assertThat(scrolled.indexOf("reportedMax = max;")).as("compared with the last report, then kept")
             .isGreaterThan(scrolled.indexOf("const clamped"));
     }
