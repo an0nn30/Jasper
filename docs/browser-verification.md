@@ -272,3 +272,89 @@ The user has no Linux host yet; CI's `linux-packages` job has not run (the Actio
 - A file opened with Jasper from the file manager (Open With), and one dropped on Jasper's launcher, open as files
   (`--url` with a `file:` URL, Q18).
 - The plan's lines 2 to 6, on Linux.
+
+## Plan 9: the Chromium Markdown preview
+
+### Batch 1: the user's check on macOS (pending)
+
+- **How to run it:** with the user's OK, `./gradlew :jasper-app:run` from `claude/browser-markdown-preview` (worktree
+  `.claude/worktrees/browser-4b-4c-e6deab`), on JBR 25.0.4.1 b635.75 with JCEF, with **Markdown preview** at Chromium,
+  the default. Most lines use `plugins/editor/src/test/resources/markdown/github-features.md`, which holds every
+  construct the preview draws.
+- Mermaid is not bundled yet (slice 1b waits for the user's approval of its download), so its parts wait for 1b; until
+  then each `mermaid` fence shows as a plain code block.
+- Each line is recorded pass or fail. Every line is pending.
+
+#### First: what only the GUI can show (ruling N-F38)
+
+1. **A document shows, edits update it, and Find counts** in the Chromium preview. This is where the risks no headless
+   test reaches would show first: `jasper-preview:` registered as not local still fetches `/document/<revision>`
+   (N-F3); the content security policy, as a header and as the shell's first `<meta>` (N-F4), lets `preview.js` and
+   `preview.css` load and run; `executeJavaScript` runs under that policy (the theme, each document, Find); and the
+   scheme answers a preview's browser on its own origin (`Chromium.answersPreview`, whose true side no headless test
+   can make). **If this line fails, `markdown_preview`'s default goes to `basic` before anything is pushed.** Pending.
+
+#### The plan's checklist
+
+1. **The look:** the fixture in Preview shows GitHub's layout in the theme's colours. Switching light and dark changes
+   it in place and keeps the scroll. Cmd+= and Cmd+- change its size. Pending.
+2. **Mermaid:** waits for slice 1b. Then: flowchart, sequence, class, state, ER, gantt, pie, gitGraph and mindmap draw;
+   a broken diagram shows its error and its source; if a type needs `'unsafe-eval'`, stop and ask, and do not add it.
+   Until then: each `mermaid` fence shows as a plain code block. Pending.
+3. **Code:** Java, Python and YAML blocks take the colours the source pane gives them. Pending.
+4. **GitHub's features:** pending.
+   - the five alert kinds;
+   - a footnote reference goes to its note, and ↩ comes back;
+   - autolinks, task lists and aligned tables;
+   - wide code scrolls sideways.
+5. **Scroll sync:** both ways in Split, including after images load (and diagrams, with 1b). Turning it off works.
+   Pending.
+6. **Find:** pending.
+   - Match Case, Whole Word and Regular Expression work, and the count follows edits;
+   - Enter and Shift+Enter move between matches;
+   - Escape gives the focus back.
+7. **Links:** pending.
+   - a web link follows the routing: the "Open in Jasper?" prompt, or the setting's choice;
+   - `#heading` and a relative file work;
+   - Tab and Shift+Tab leave the preview at its ends, and Enter follows the focused link.
+8. **Images:** a relative image shows. A web image shows only after **Load external images**. A failure shows its
+   reason, and **Retry images** works. Pending.
+9. **A hostile file** (the plan's Review Focus 1, with a raw `<img src="http://127.0.0.1:8000/x">`, and with 1b a
+   Mermaid image node pointing at that address), watched by `python3 -m http.server 8000`: pending.
+   - nothing runs or navigates;
+   - neither address is ever requested, before **Load external images** or after;
+   - a Markdown image `![](http://127.0.0.1:8000/y)` is requested only after **Load external images**, once, by
+     Jasper's own loader (Java's user agent in the log).
+10. **Basic:** pending.
+    - **Markdown preview › Basic** and back switches live;
+    - with the Browser plugin off, after a relaunch, the preview is Basic;
+    - VoiceOver reads Basic, and reads the Chromium canvas's name and description.
+11. **Hidden previews:** a preview in a tab you leave stays idle. Closing the tab ends its page. Note the memory with
+    five previews open, for the later benchmark; it is not a benchmark. Pending.
+12. **Copy and Select All** in the preview, including Copy of a Find match. Pending.
+
+#### Lines the task reviews added
+
+Each is pending.
+
+- **The first frame (Task 5):** what shows while a preview's page loads, before it paints its themed background: no
+  flash of another colour, and no animation.
+- **Find's colours (Task 5):** the current match keeps `find.js`'s orange beside the selection colour the other
+  matches take; whether that reads well in light and dark.
+- **Find's steps (Task 5):** Enter and Shift+Enter step through matches that span inline markup (bold, links, code),
+  in order, wrapping at the ends.
+- **Focus (Tasks 5 and 6):** Tab past the last link moves the focus to the next control, and Shift+Tab before the first
+  to the previous one, once each (JCEF moves it, and Jasper only when the canvas still holds it); after a `#heading`
+  link, Tab goes on from the heading; a click in the preview sends Copy, Select All and Find to it.
+- **Scroll sync timing (Task 7):** the page's echo of Jasper's own scroll never moves the source (its 1 px rule);
+  after an edit the passage stays aligned, the page saying shown before it reports the layout; typing in Split with
+  Synchronize scrolling on stays smooth, though each rebuild sends one scroll to the page.
+- **Start-up (ruling N9):** a restored window whose Markdown tabs show only their source starts no Chromium: no
+  Chromium helper process appears until a Split, a Preview or a browser page shows.
+- **Browser pages (Task 5):** every browser page's canvas now has the accessible role of a canvas; what VoiceOver says
+  on a browser page.
+
+### Plan 9 on Windows and Linux (not run)
+
+The user has no Windows or Linux host yet. Every line above waits for each of them too, with Ctrl in place of Cmd, and
+Narrator or NVDA, and Orca, in place of VoiceOver.

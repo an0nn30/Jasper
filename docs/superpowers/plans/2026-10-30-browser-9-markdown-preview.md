@@ -138,7 +138,8 @@ the banners of 4b and 4c bind. The task reviews recorded these deviations from t
   clean over 3,296 Java files. No GUI was launched.
 
 Not run:
-- **Task 9**, the user's GUI check on macOS, with their OK: pending; the GUI-only risks come first
+- **Task 9**, the user's GUI check on macOS, with their OK: pending
+  ([checklist](../../browser-verification.md#plan-9-the-chromium-markdown-preview)); the GUI-only risks come first
   (N-F38): if a document does not show, update and count in Find, `markdown_preview`'s default goes to `basic` before
   anything is pushed.
 - **Windows and Linux** (no hosts), benchmarks and the memory run: deferred.

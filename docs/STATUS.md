@@ -82,7 +82,8 @@ Markdown preview's page did not load within 10 seconds." and "Chromium's page fo
 carried but not shown; an unresolved footnote label would fail the whole render (Task 2's minor, for the final
 review); no JavaScript runs in a test (`preview.js` and `find.js` are checked as text and with `node --check`). Task 9
 (the user's check on macOS, with their OK): pending, F38's GUI-only line first, then the plan's twelve lines and the
-task reviews'; if the first line fails,
+task reviews'
+([checklist](browser-verification.md#plan-9-the-chromium-markdown-preview)); if the first line fails,
 `markdown_preview`'s default goes to `basic` before anything is pushed. Windows and Linux are not run; benchmarks and
 the memory run are deferred.
 
