@@ -59,8 +59,12 @@ final class PreviewSearch {
         try { text = doc.getText(0, doc.getLength()); }
         catch (BadLocationException impossible) { throw new IllegalStateException(impossible); }
         if (context.isRegularExpression()) {
-            String expression = context.getWholeWord() ? "\\b" + query + "\\b" : query;
-            var matcher = Pattern.compile(expression, RSyntaxUtilities.getPatternFlags(context.getMatchCase(), Pattern.MULTILINE)).matcher(text);
+            int flags = RSyntaxUtilities.getPatternFlags(context.getMatchCase(), Pattern.MULTILINE);
+            var pattern = Pattern.compile(query, flags);
+            // Whole Word puts the whole expression between the boundaries, so a|b is a whole a or a whole b; compiled
+            // alone first, an expression such as a)(b stays refused.
+            if (context.getWholeWord()) pattern = Pattern.compile("\\b(?:" + query + ")\\b", flags);
+            var matcher = pattern.matcher(text);
             // Matcher.find advances after an empty match. Source mark-all likewise omits empty ranges.
             while (matcher.find()) if (matcher.start() != matcher.end()) result.add(new Match(matcher.start(), matcher.end()));
         } else {

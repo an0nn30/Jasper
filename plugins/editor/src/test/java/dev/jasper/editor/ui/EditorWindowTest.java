@@ -125,6 +125,60 @@ class EditorWindowTest {
         assertThat(tab.surface().opacity()).isEqualTo(0.7);
     }
 
+    /**
+     * Browser plan 9 (fix round 1, E3): the Markdown preview setting reaches every open view through apply, and a view
+     * opened afterwards lays out the chosen preview first, never Basic's.
+     */
+    @Test void theMarkdownPreviewSettingSwitchesOpenViewsAndANewViewStartsOnIt() throws Exception {
+        var previews = new dev.jasper.editor.testsupport.FakeMarkdownPreviews();
+        var engine = new AtomicReference<>(dev.jasper.editor.markdown.PreviewEngine.BASIC);
+        var preferences = new MarkdownPreferences(() -> dev.jasper.editor.markdown.MarkdownMode.PREVIEW,
+            mode -> CompletableFuture.completedFuture(null), engine::get);
+        window.dispose();
+        window = new EditorWindow(new EditorEnvironment(context, Runnable::run, owner -> Question::dismissed,
+            owner -> (message, saves) -> saves.getNow(false), settings::get, on -> vimSave, false, preferences,
+            Optional.of(new ChromiumPreviews(previews))), () -> windowClosed = true);
+        var first = opened(file("first.md", "# First\n"));
+        var second = opened(file("second.md", "# Second\n"));
+        for (var tab : List.of(first, second)) {
+            assertThat(tab.markdown().mode()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.PREVIEW);
+            assertThat(tab.surface().surface()).isSameAs(tab.surface().basic());
+        }
+        assertThat(previews.made()).isEmpty();
+        engine.set(dev.jasper.editor.markdown.PreviewEngine.CHROMIUM);
+        window.apply();
+        assertThat(previews.made()).hasSize(2);
+        for (var tab : List.of(first, second)) {
+            assertThat(tab.surface().surface()).isInstanceOf(ChromiumPreview.class);
+            assertThat(tab.surface().getComponents()).containsExactly(((ChromiumPreview) tab.surface().surface()).component());
+        }
+        var added = new ArrayList<java.awt.Component>();
+        java.awt.event.AWTEventListener adds = event -> {
+            if (event.getID() == java.awt.event.ContainerEvent.COMPONENT_ADDED) added.add(((java.awt.event.ContainerEvent) event).getChild());
+        };
+        java.awt.Toolkit.getDefaultToolkit().addAWTEventListener(adds, java.awt.AWTEvent.CONTAINER_EVENT_MASK);
+        EditorTab third, beside;
+        try {
+            third = opened(file("third.md", "# Third\n"));
+            // Another view of a file already read is Markdown from its first moment (pane flexibility spec 6).
+            window.splitFile(dev.jasper.sdk.ui.TabPlacement.SPLIT_RIGHT);
+            drain();
+            beside = window.selected().orElseThrow();
+        } finally { java.awt.Toolkit.getDefaultToolkit().removeAWTEventListener(adds); }
+        assertThat(beside).isNotSameAs(third);
+        assertThat(beside.session()).isSameAs(third.session());
+        for (var tab : List.of(third, beside)) {
+            assertThat(tab.markdown().mode()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.PREVIEW);
+            assertThat(tab.surface().surface()).isInstanceOf(ChromiumPreview.class);
+            assertThat(added).as("a new view's first preview is Chromium's").contains(((ChromiumPreview) tab.surface().surface()).component())
+                .doesNotContain(tab.surface().previewScroll);
+        }
+        engine.set(dev.jasper.editor.markdown.PreviewEngine.BASIC);
+        window.apply();
+        for (var tab : List.of(first, second, third, beside)) assertThat(tab.surface().surface()).isSameAs(tab.surface().basic());
+        assertThat(previews.made()).hasSize(4).allSatisfy(preview -> assertThat(preview.closed()).isTrue());
+    }
+
     @Test void aDocumentIsReportedOnceItsFirstReadSucceeds() throws Exception {
         Path file = file("recent.txt", "text\n");
         window.openLocal(file);
@@ -526,7 +580,7 @@ class EditorWindowTest {
         var second = opened(file("commands-b.md", "# Second")); var b = host.contentTabs().getLast();
         old.run().run(); assertThat(window.selected()).containsSame(second);
         assertThat(first.markdown().mode()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.PREVIEW);
-        a.moveToNewWindow(); assertThat(first.focusedContent()).isSameAs(first.surface().preview().editor());
+        a.moveToNewWindow(); assertThat(first.surface().previewFocused()).isTrue();
         b.select();
         host.contentCommands(a).stream().filter(command -> command.id().equals("delete")).findFirst().orElseThrow().run().run();
         assertThat(window.selected()).containsSame(first);
@@ -606,7 +660,7 @@ class EditorWindowTest {
         var handle=host.contentTabs().getLast();
         host.contentCommands(handle).stream().filter(command -> command.id().equals("replace")).findFirst().orElseThrow().run().run();
         assertThat(tab.markdown().mode()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.SPLIT);
-        assertThat(tab.focusedContent()).isSameAs(tab.area());
+        assertThat(tab.surface().previewFocused()).isFalse();
         Kits.type(tab.view(),FindBar.FIND,"One");Kits.type(tab.view(),FindBar.REPLACE,"Changed");Kits.press(tab.view(),FindBar.ALL);
         assertThat(tab.area().getText()).contains("Changed");
         Kits.press(tab.view(),FindBar.CLOSE);

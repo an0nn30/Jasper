@@ -1,6 +1,8 @@
 package dev.jasper.editor.ui;
 
 import dev.jasper.editor.external.KnownEditors;
+import dev.jasper.editor.markdown.PreviewEngine;
+import dev.jasper.sdk.settings.Choice;
 import dev.jasper.sdk.settings.EditorHint;
 import dev.jasper.sdk.settings.PluginSettings;
 import dev.jasper.sdk.settings.Setting;
@@ -63,6 +65,7 @@ public record EditorSettings(String fontFamily, double fontSize, List<String> fo
     public static final class Declared {
         final Setting<String> fontFamily;
         final Setting<dev.jasper.editor.markdown.MarkdownMode> markdownViewMode;
+        final Setting<PreviewEngine> markdownPreview;
         private final MarkdownPreferences markdownPreferences;
         final Setting<Integer> tabSize, maxFileMib, recentFilesDays;
         final Setting<Double> fontSize, fontLineHeight;
@@ -124,7 +127,14 @@ public record EditorSettings(String fontFamily, double fontSize, List<String> fo
                 dev.jasper.sdk.settings.Choice.of("split", "Source and preview", dev.jasper.editor.markdown.MarkdownMode.SPLIT),
                 dev.jasper.sdk.settings.Choice.of("preview", "Preview", dev.jasper.editor.markdown.MarkdownMode.PREVIEW))), dev.jasper.editor.markdown.MarkdownMode.SOURCE)
                 .label("Default view").description("View for newly opened Markdown documents.").section("Markdown").keywords("editor", "markdown", "preview"));
-            markdownPreferences = new MarkdownPreferences(markdownViewMode::get, markdownViewMode::set);
+            markdownPreview = settings.declare(SettingSpec.of("markdown_preview", SettingKind.choice(List.of(
+                    Choice.of("chromium", "Chromium", PreviewEngine.CHROMIUM),
+                    Choice.of("basic", "Basic", PreviewEngine.BASIC))), PreviewEngine.CHROMIUM)
+                .label("Markdown preview")
+                .description("Chromium draws GitHub's look and needs the Browser plugin; Basic is the "
+                    + "Editor's own preview, which screen readers can read. Without the Browser plugin, the preview is Basic.")
+                .section("Markdown").keywords("editor", "markdown", "preview", "chromium", "screen reader"));
+            markdownPreferences = new MarkdownPreferences(markdownViewMode::get, markdownViewMode::set, markdownPreview::get);
             tabSize = settings.declare(SettingSpec.of("tab_size", SettingKind.integer(1, 16), 4)
                 .label("Tab size").description("Columns per tab stop.").section("Editing").keywords("editor", "indent"));
             softWrap = settings.declare(SettingSpec.of("soft_wrap", SettingKind.bool(), false)
@@ -162,6 +172,9 @@ public record EditorSettings(String fontFamily, double fontSize, List<String> fo
             return new EditorSettings(fontFamily.get(), fontSize.get(), fontFallback.get(), fontLigatures.get(), fontLineHeight.get(),
                 followTerminalFont.get(), tabSize.get(), softWrap.get(), maxFileMib.get(), vim.get(), colorScheme.get());
         }
+
+        /** @return {@code markdown_preview}: what should draw the Markdown preview; a view draws with Chromium only while it can */
+        public PreviewEngine markdownPreview() { return markdownPreview.get(); }
 
         /** @return how many days the Recent files list keeps a file it has not seen opened, 0 to 365; 0 keeps none */
         public int recentFilesDays() { return recentFilesDays.get(); }

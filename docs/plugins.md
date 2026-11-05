@@ -47,12 +47,12 @@ and the action's row in Settings › Keymap shows the same text in its tooltip. 
 |---|---|---|---|---|
 | Remote | `dev.jasper.remote` | 0.19.0 | Yes | [Remote](remote.md) |
 | Credential Vault | `dev.jasper.vault` | 0.8.0 | Yes | [Credential Vault](credential-vault.md) |
-| Editor | `dev.jasper.editor` | 0.18.0 | Yes | [Editor](editor.md) |
+| Editor | `dev.jasper.editor` | 0.19.0 | Yes | [Editor](editor.md) |
 | File Server | `dev.jasper.fileserver` | 0.8.0 | Yes | [File Server](file-server.md) |
 | Project Index | `dev.jasper.indexer` | 0.4.0 | Yes | [Project Index](project-index.md) |
 | Shell History | `dev.jasper.history` | 0.4.0 | Yes | [Shell History and Snippets](history-and-snippets.md) |
 | Snippets | `dev.jasper.snippets` | 0.4.0 | Yes | [Shell History and Snippets](history-and-snippets.md) |
-| Browser | `dev.jasper.browser` | 0.1.0 | Yes | [Browser](browser.md) |
+| Browser | `dev.jasper.browser` | 0.2.0 | Yes | [Browser](browser.md) |
 | Enterprise | `dev.jasper.enterprise` | 0.4.0 | No | [The Enterprise look](enterprise.md) |
 | Sample | `dev.jasper.sample` | 0.6.0 | Yes, but inert | [Plugin authoring](plugin-authoring.md) |
 
@@ -94,6 +94,7 @@ files with (or it hands them to another editor you choose), it can set `EDITOR` 
 - **Start with** File › Open in Editor… (Cmd+O / Ctrl+Shift+O).
 - **Capabilities** `palette.contribute`, `terminal.environment`, `editor.provide`, `terminal.open`, `terminal.observe` (the
   other tabs' names in its Move Pane to Tab menu).
+- **Uses, when present** Browser (`>=0.2.0`) to draw the Markdown preview with Chromium.
 - **Exports** `dev.jasper.editor.api`, which Remote and Project Index use to open files.
 
 ### File Server
@@ -142,10 +143,12 @@ Web pages in workspace tabs and panes, drawn by Chromium, which comes with Jaspe
 Forward, Reload and the address field, a Web menu whose keys win in browser tabs, links that open in a new tab or a
 split, and popups that keep a working `window.opener`. It is Jasper's web browser: links you click in a terminal and
 Jasper's own web links can open here, by default after asking "Open in Jasper?", and `jasper URL...` opens here without
-asking. Chromium starts the first time a browser page shows.
+asking. It also draws the Editor's Markdown preview. Chromium starts the first time a browser page or a Markdown
+preview shows.
 
 - **Start with** File › New Browser Tab.
 - **Capabilities** `browser.provide`.
+- **Exports** `dev.jasper.browser.api`, which the Editor uses to draw its Markdown preview.
 
 ### Enterprise
 

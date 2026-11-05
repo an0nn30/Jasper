@@ -951,6 +951,28 @@ class EditorPluginTest {
         return program;
     }
 
+    /**
+     * Browser plan 9 (pre-flight F28): the Browser starts before the Editor, which requires it optionally, and the Editor
+     * finds the Markdown previews it publishes, as production looks them up. Without that requirement it finds none.
+     */
+    @Test void theEditorFindsTheBrowsersMarkdownPreviewsWhenItRequiresTheBrowser() throws Exception {
+        var browser = new PluginInfo("dev.jasper.browser", "Browser", "0.2.0", Set.of("browser.provide"));
+        for (boolean requires : List.of(true, false)) {
+            try (var host = host()) {
+                host.start(browser, Set.of(), Set.of(), new dev.jasper.browser.BrowserPlugin());
+                var environment = new AtomicReference<EditorEnvironment>();
+                host.start(INFO, Set.of(), requires ? Set.of("dev.jasper.browser") : Set.of(), new EditorPlugin(Runnable::run, (context, settings) -> {
+                    environment.set(EditorEnvironment.production(context, Runnable::run, settings));
+                    return environment.get();
+                }));
+                if (requires) assertThat(environment.get().chromium()).as("found").hasValueSatisfying(previews -> assertThat(previews.available()).isTrue());
+                else assertThat(environment.get().chromium()).as("not required").isEmpty();
+                host.stopAll();
+                assertThat(host.failures()).isEmpty();
+            }
+        }
+    }
+
     @Test void theEditorIsJaspersFileEditorAndNamesItselfInEditor() throws Exception {
         try (var host = host()) {
             Path client = home.resolve("Jasper Beta.app").resolve("bin").resolve("jasper");

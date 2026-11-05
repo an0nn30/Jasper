@@ -2,12 +2,19 @@ package dev.jasper.editor.markdown;
 
 import dev.jasper.sdk.ui.SyntaxPalette;
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CancellationException;
+import org.commonmark.ext.autolink.AutolinkExtension;
+import org.commonmark.ext.footnotes.FootnoteDefinition;
+import org.commonmark.ext.footnotes.FootnoteReference;
+import org.commonmark.ext.footnotes.FootnotesExtension;
+import org.commonmark.ext.gfm.alerts.Alert;
+import org.commonmark.ext.gfm.alerts.AlertsExtension;
 import org.commonmark.ext.gfm.strikethrough.Strikethrough;
 import org.commonmark.ext.gfm.strikethrough.StrikethroughExtension;
 import org.commonmark.ext.gfm.tables.TableBlock;
@@ -44,31 +51,49 @@ import org.commonmark.node.ThematicBreak;
 import org.commonmark.parser.IncludeSourceSpans;
 import org.commonmark.parser.Parser;
 
-/** Parses a snapshot into a deliberately small Swing HTML vocabulary and inert destination metadata. */
+/**
+ * Parses a snapshot into one of two deliberately small vocabularies and inert destination metadata. Both dialects
+ * share what is kept here: the block anchors, heading and footnote names, links, images, limits and interruption.
+ */
 public final class MarkdownRenderer {
-    /** Creates a complete bounded result without allocating or touching a Swing document. */
-    public MarkdownResult render(String source, SyntaxPalette palette) {
-        MarkdownLimits.requireSource(source);
-        Objects.requireNonNull(palette);
-        checkInterrupted();
-        var parser = Parser.builder().includeSourceSpans(IncludeSourceSpans.BLOCKS_AND_INLINES)
-            .extensions(List.of(TablesExtension.create(), StrikethroughExtension.create(), TaskListItemsExtension.create())).build();
-        var root = parser.parse(source);
-        var output = new Output(source, palette);
-        output.html.append("<html><body>");
-        output.children(root);
-        output.html.append("</body></html>");
-        return new MarkdownResult(output.html.toString(), output.blocks, output.headings, output.links, output.images);
+    /** The vocabulary a result is written in. */
+    public enum Dialect {
+        /** A document in the Swing HTML subset {@code PreviewPane.prepare} admits, with an empty named anchor per block. */
+        SWING,
+        /** A body fragment in GitHub's markup for the Chromium preview, with each block's anchor on its element. */
+        WEB
     }
 
-    private static void checkInterrupted() {
+    /** Creates a complete bounded result without allocating or touching a Swing document. */
+    public MarkdownResult render(String source, SyntaxPalette palette, Dialect dialect) {
+        MarkdownLimits.requireSource(source);
+        Objects.requireNonNull(palette);
+        Objects.requireNonNull(dialect);
+        checkInterrupted();
+        var parser = Parser.builder().includeSourceSpans(IncludeSourceSpans.BLOCKS_AND_INLINES)
+            .extensions(List.of(TablesExtension.create(), StrikethroughExtension.create(), TaskListItemsExtension.create(),
+                AlertsExtension.create(), FootnotesExtension.create(), AutolinkExtension.create())).build();
+        return write(source, parser.parse(source), palette, dialect);
+    }
+
+    /** Writes {@code root}, the tree parsed from {@code source}, in {@code dialect}. */
+    static MarkdownResult write(String source, Node root, SyntaxPalette palette, Dialect dialect) {
+        var output = new Output(source, palette, root);
+        switch (dialect) {
+            case SWING -> new Swing(output).document(root);
+            case WEB -> new WebMarkup(output).document(root);
+        }
+        return output.result();
+    }
+
+    static void checkInterrupted() {
         if (Thread.currentThread().isInterrupted()) throw new CancellationException("Markdown render interrupted");
     }
 
     /** Escapes visible text incrementally; no escaped copy can grow past the output budget. */
     static void text(MarkdownLimits.Html out, String value) { escape(out, value, false); }
 
-    private static void attribute(MarkdownLimits.Html out, String value) { escape(out, value, true); }
+    static void attribute(MarkdownLimits.Html out, String value) { escape(out, value, true); }
 
     private static void escape(MarkdownLimits.Html out, String value, boolean attribute) {
         int start = 0;
@@ -90,18 +115,21 @@ public final class MarkdownRenderer {
         out.append(value.substring(start));
     }
 
-    private static final class Output {
+    /** What both dialects share: the bounded output, the block anchors, heading and footnote names, links and images. */
+    static final class Output {
+        final MarkdownLimits.Html html = new MarkdownLimits.Html();
+        final SyntaxPalette palette;
+        final Footnotes footnotes;
         private final String source;
         private final int[] lineStarts;
-        private final SyntaxPalette palette;
-        private final MarkdownLimits.Html html = new MarkdownLimits.Html();
         private final List<MarkdownResult.BlockAnchor> blocks = new ArrayList<>();
         private final Map<String, Integer> headings = new LinkedHashMap<>();
         private final List<MarkdownResult.Link> links = new ArrayList<>();
         private final List<MarkdownResult.Image> images = new ArrayList<>();
-        private final HeadingIds headingIds = new HeadingIds();
+        private final Map<Heading, String> headingIds = new IdentityHashMap<>();
+        private boolean anchoring = true;
 
-        Output(String source, SyntaxPalette palette) {
+        Output(String source, SyntaxPalette palette, Node root) {
             this.source = source;
             this.palette = palette;
             int count = 1;
@@ -117,6 +145,179 @@ public final class MarkdownRenderer {
                     lineStarts[line++] = i + 1;
                 } else if (source.charAt(i) == '\n') lineStarts[line++] = i + 1;
             }
+            // Every heading is named once the footnotes are numbered, so a reference in it reads as its number, and
+            // before any footnote, so a footnote never renames a heading.
+            var ids = new HeadingIds();
+            footnotes = new Footnotes(root);
+            for (var heading : footnotes.headings()) {
+                String id = ids.next(visible(heading));
+                headingIds.put(heading, id);
+                headings.put(id, start(heading));
+            }
+            footnotes.name(ids);
+            for (var note : footnotes.notes()) {
+                headings.put(note.id(), start(note.definition()));
+                headings.put(note.referenceId(), start(holder(note.first())));
+            }
+        }
+
+        MarkdownResult result() { return new MarkdownResult(html.toString(), blocks, headings, links, images); }
+
+        String headingId(Heading heading) { return headingIds.get(heading); }
+
+        int link(String destination) {
+            int id = links.size();
+            links.add(new MarkdownResult.Link(id, destination));
+            return id;
+        }
+
+        int image(String destination, String alt) {
+            int id = images.size();
+            images.add(new MarkdownResult.Image(id, destination, alt));
+            return id;
+        }
+
+        /** Anchors a node's source range; the anchor's index, or -1 when the node is not anchored. */
+        int anchor(Node node) {
+            var spans = node.getSourceSpans();
+            if (spans.isEmpty()) return -1;
+            var last = spans.getLast();
+            return anchor(spans.getFirst().getInputIndex(), last.getInputIndex() + last.getLength());
+        }
+
+        private int anchor(int start, int end) {
+            if (!anchoring) return -1;
+            if (blocks.size() >= MarkdownLimits.BLOCKS) throw new PreviewLimitException();
+            blocks.add(new MarkdownResult.BlockAnchor("b" + blocks.size(), start, end));
+            return blocks.size() - 1;
+        }
+
+        /**
+         * Anchors nothing more. The footnote definitions follow, written at the end but taken from anywhere in the
+         * source, and scroll sync needs its anchors in source order.
+         */
+        void stopAnchoring() { anchoring = false; }
+
+        /** Writes one line of a code block, given its anchor (or -1) and whether a newline follows it. */
+        @FunctionalInterface interface CodeLine { void line(String text, int anchor, boolean newline); }
+
+        /** Walks a code block's lines, anchoring each on its content, or on its source line when it is blank. */
+        void codeLines(Block node, String literal, boolean fenced, CodeLine write) {
+            var spans = node.getSourceSpans();
+            int line = 0;
+            int spanCursor = 0;
+            for (int from = 0; from < literal.length(); line++) {
+                checkInterrupted();
+                int end = literal.indexOf('\n', from);
+                if (end < 0) end = literal.length();
+                int sourceLine = spans.getFirst().getLineIndex() + line + (fenced ? 1 : 0);
+                while (spanCursor < spans.size() && spans.get(spanCursor).getLineIndex() < sourceLine) spanCursor++;
+                SourceSpan span = spanCursor < spans.size() && spans.get(spanCursor).getLineIndex() == sourceLine
+                    ? spans.get(spanCursor) : null;
+                int anchor = -1;
+                if (span != null) {
+                    int start = span.getInputIndex();
+                    // Source spans include code indentation; map the content rather than the syntactic prefix.
+                    int extra = fenced ? ((FencedCodeBlock) node).getFenceIndent() : 4;
+                    while (extra > 0 && start < span.getInputIndex() + span.getLength() && source.charAt(start) == ' ') { start++; extra--; }
+                    anchor = anchor(start, span.getInputIndex() + span.getLength());
+                } else if (sourceLine < lineStarts.length) {
+                    // CommonMark omits zero-length source spans. Keep the blank line's source position explicitly.
+                    int start = lineStarts[sourceLine];
+                    int sourceEnd = sourceLine + 1 < lineStarts.length ? lineStarts[sourceLine + 1] : source.length();
+                    while (sourceEnd > start && (source.charAt(sourceEnd - 1) == '\r' || source.charAt(sourceEnd - 1) == '\n')) sourceEnd--;
+                    anchor = anchor(start, sourceEnd);
+                }
+                write.line(literal.substring(from, end), anchor, end < literal.length());
+                from = end + 1;
+            }
+        }
+
+        void text(String value) { MarkdownRenderer.text(html, value); }
+
+        void attribute(String value) { MarkdownRenderer.attribute(html, value); }
+
+        void raw(String literal) {
+            // CommonMark keeps a complete inline/block comment as a literal. Drop comments embedded in HTML blocks too.
+            int from = 0;
+            while (from < literal.length()) {
+                int comment = literal.indexOf("<!--", from);
+                if (comment < 0) { text(literal.substring(from)); return; }
+                text(literal.substring(from, comment));
+                int end = literal.indexOf("-->", comment + 4);
+                if (end < 0) return;
+                from = end + 3;
+            }
+        }
+
+        static boolean hasNonCommentText(String literal) {
+            for (int from = 0; from < literal.length();) {
+                if (literal.startsWith("<!--", from)) {
+                    int end = literal.indexOf("-->", from + 4);
+                    if (end < 0) return false;
+                    from = end + 3;
+                } else if (!Character.isWhitespace(literal.charAt(from++))) return true;
+            }
+            return false;
+        }
+
+        /** An alert's title as GitHub shows it: Note, Tip, Important, Warning or Caution. */
+        static String title(Alert alert) {
+            return AlertsExtension.STANDARD_TYPES.getOrDefault(alert.getType(), alert.getType());
+        }
+
+        /** The text of a footnote reference that points at none of the shown footnotes: {@code [^label]}. */
+        static String literal(FootnoteReference reference) { return "[^" + reference.getLabel() + "]"; }
+
+        static int start(Node node) {
+            var spans = node.getSourceSpans();
+            return spans.isEmpty() ? 0 : spans.getFirst().getInputIndex();
+        }
+
+        /** The anchored node that holds an inline node: its paragraph or heading, or its table row. */
+        static Node holder(Node inline) {
+            Node node = inline.getParent();
+            while (!(node instanceof Block) && !(node instanceof TableRow)) node = node.getParent();
+            return node;
+        }
+
+        /**
+         * The text a node shows, which names a heading and is an image's alternative text: a footnote reference reads
+         * as its number, as GitHub names a heading.
+         */
+        String visible(Node parent) {
+            var text = new StringBuilder();
+            // Use an explicit stack so adversarial inline nesting does not grow the Java call stack.
+            var pending = new java.util.ArrayDeque<Node>();
+            for (Node child = parent.getLastChild(); child != null; child = child.getPrevious()) pending.push(child);
+            while (!pending.isEmpty()) {
+                Node child = pending.pop();
+                if (child instanceof Text value) text.append(value.getLiteral());
+                else if (child instanceof Code value) text.append(value.getLiteral());
+                else if (child instanceof HardLineBreak || child instanceof SoftLineBreak) text.append(' ');
+                else if (child instanceof FootnoteReference reference) {
+                    var note = footnotes.note(reference);
+                    text.append(note == null ? literal(reference) : Integer.toString(note.number()));
+                } else if (child instanceof HtmlInline value) {
+                    if (!value.getLiteral().startsWith("<!--")) text.append(value.getLiteral());
+                } else for (Node nested = child.getLastChild(); nested != null; nested = nested.getPrevious()) pending.push(nested);
+            }
+            return text.toString();
+        }
+    }
+
+    /** The SWING dialect: the HTML subset {@code PreviewPane.prepare} admits, with an empty named anchor per block. */
+    private static final class Swing {
+        private final Output out;
+        private final MarkdownLimits.Html html;
+
+        Swing(Output out) { this.out = out; html = out.html; }
+
+        void document(Node root) {
+            html.append("<html><body>");
+            children(root);
+            footnotes();
+            html.append("</body></html>");
         }
 
         void children(Node parent) {
@@ -129,12 +330,17 @@ public final class MarkdownRenderer {
             switch (node) {
                 case Heading h -> {
                     html.append("<h" + h.getLevel() + ">");
-                    anchor(h);
-                    headings.put(headingIds.next(visible(h)), start(h));
+                    mark(out.anchor(h));
                     children(h);
                     html.append("</h" + h.getLevel() + ">\n");
                 }
-                case Paragraph p -> container("p", p);
+                case Paragraph p -> paragraph(p, null);
+                case Alert alert -> {
+                    // A quote whose first paragraph is the alert's bold title.
+                    html.append("<blockquote>"); mark(out.anchor(alert));
+                    html.append("<p><b>"); out.text(Output.title(alert)); html.append("</b></p>\n");
+                    children(alert); html.append("</blockquote>\n");
+                }
                 case BlockQuote q -> container("blockquote", q);
                 case BulletList list -> container("ul", list);
                 case OrderedList list -> {
@@ -144,29 +350,35 @@ public final class MarkdownRenderer {
                 case ListItem item -> container("li", item);
                 case FencedCodeBlock code -> code(code, code.getLiteral(), code.getInfo(), true);
                 case IndentedCodeBlock code -> code(code, code.getLiteral(), "", false);
-                case ThematicBreak rule -> { anchor(rule); html.append("<hr>\n"); }
+                case ThematicBreak rule -> { mark(out.anchor(rule)); html.append("<hr>\n"); }
                 case HtmlBlock raw -> {
-                    if (hasNonCommentText(raw.getLiteral())) {
-                        html.append("<p>"); anchor(raw); raw(raw.getLiteral()); html.append("</p>\n");
+                    if (Output.hasNonCommentText(raw.getLiteral())) {
+                        html.append("<p>"); mark(out.anchor(raw)); out.raw(raw.getLiteral()); html.append("</p>\n");
                     }
                 }
-                case HtmlInline raw -> raw(raw.getLiteral());
-                case Text text -> text(html, text.getLiteral());
-                case Code code -> { html.append("<code>"); text(html, code.getLiteral()); html.append("</code>"); }
+                case HtmlInline raw -> out.raw(raw.getLiteral());
+                case Text text -> out.text(text.getLiteral());
+                case Code code -> { html.append("<code>"); out.text(code.getLiteral()); html.append("</code>"); }
                 case Emphasis em -> container("em", em);
                 case StrongEmphasis strong -> container("strong", strong);
                 case Strikethrough strike -> container("strike", strike);
                 case HardLineBreak ignored -> html.append("<br>\n");
                 case SoftLineBreak ignored -> html.append("\n");
                 case Link link -> {
-                    int id = links.size();
-                    links.add(new MarkdownResult.Link(id, link.getDestination()));
-                    html.append("<a href=\"jasper-link:" + id + "\">"); children(link); html.append("</a>");
+                    html.append("<a href=\"jasper-link:" + out.link(link.getDestination()) + "\">"); children(link); html.append("</a>");
                 }
                 case Image image -> {
-                    int id = images.size(); String alt = visible(image);
-                    images.add(new MarkdownResult.Image(id, image.getDestination(), alt));
-                    html.append("<img src=\"jasper-image:" + id + "\" alt=\""); attribute(html, alt); html.append("\">");
+                    String alt = out.visible(image);
+                    html.append("<img src=\"jasper-image:" + out.image(image.getDestination(), alt) + "\" alt=\"");
+                    out.attribute(alt); html.append("\">");
+                }
+                case FootnoteReference reference -> {
+                    var note = out.footnotes.note(reference);
+                    if (note == null) out.text(Output.literal(reference));
+                    else {
+                        if (reference == note.first()) name(note.referenceId());
+                        html.append("<a href=\"jasper-link:" + out.link("#" + note.id()) + "\">[" + note.number() + "]</a>");
+                    }
                 }
                 case TableBlock table -> container("table", table);
                 case TableHead head -> children(head);
@@ -177,117 +389,76 @@ public final class MarkdownRenderer {
                     html.append("<" + tag);
                     if (cell.getAlignment() != null) html.append(" align=\"" + cell.getAlignment().name().toLowerCase(Locale.ROOT) + "\"");
                     html.append(">");
-                    if (cell.getPrevious() == null) anchor(cell.getParent());
+                    if (cell.getPrevious() == null) mark(out.anchor(cell.getParent()));
                     children(cell); html.append("</" + tag + ">");
                 }
                 case TaskListItemMarker ignored -> { }
                 case LinkReferenceDefinition ignored -> { }
+                case FootnoteDefinition ignored -> { }
                 default -> children(node);
             }
         }
 
         void container(String tag, Node node) {
             html.append("<" + tag + ">");
-            if (node instanceof Block && !(node instanceof BulletList) && !(node instanceof TableBlock)) anchor(node);
-            if (node instanceof Paragraph && node.getPrevious() instanceof TaskListItemMarker task)
-                html.append(task.isChecked() ? "\u2611 " : "\u2610 ");
+            if (node instanceof Block && !(node instanceof BulletList) && !(node instanceof TableBlock)) mark(out.anchor(node));
             children(node);
-            html.append("</" + tag + ">" + (node instanceof Block || node instanceof TableBlock ? "\n" : ""));
+            html.append("</" + tag + ">" + (node instanceof Block ? "\n" : ""));
         }
 
-        boolean hasNonCommentText(String literal) {
-            for (int from = 0; from < literal.length();) {
-                if (literal.startsWith("<!--", from)) {
-                    int end = literal.indexOf("-->", from + 4);
-                    if (end < 0) return false;
-                    from = end + 3;
-                } else if (!Character.isWhitespace(literal.charAt(from++))) return true;
-            }
-            return false;
+        /** A paragraph, ending with a footnote's back reference when it is the last of the definition being written. */
+        void paragraph(Paragraph p, Footnotes.Note backReference) {
+            html.append("<p>");
+            mark(out.anchor(p));
+            if (p.getPrevious() instanceof TaskListItemMarker task) html.append(task.isChecked() ? "\u2611 " : "\u2610 ");
+            children(p);
+            if (backReference != null) backReference(backReference);
+            html.append("</p>\n");
         }
 
-        void raw(String literal) {
-            // CommonMark keeps a complete inline/block comment as a literal. Drop comments embedded in HTML blocks too.
-            int from = 0;
-            while (from < literal.length()) {
-                int comment = literal.indexOf("<!--", from);
-                if (comment < 0) { text(html, literal.substring(from)); return; }
-                text(html, literal.substring(from, comment));
-                int end = literal.indexOf("-->", comment + 4);
-                if (end < 0) return;
-                from = end + 3;
-            }
-        }
-
-        int start(Node node) {
-            var spans = node.getSourceSpans();
-            return spans.isEmpty() ? 0 : spans.getFirst().getInputIndex();
-        }
-
-        void anchor(Node node) {
-            var spans = node.getSourceSpans();
-            if (spans.isEmpty()) return;
-            var last = spans.getLast();
-            anchor(spans.getFirst().getInputIndex(), last.getInputIndex() + last.getLength());
-        }
-
-        void anchor(int start, int end) {
-            if (blocks.size() >= MarkdownLimits.BLOCKS) throw new PreviewLimitException();
-            String id = "b" + blocks.size();
-            blocks.add(new MarkdownResult.BlockAnchor(id, start, end));
-            html.append("<a name=\"" + id + "\"></a>");
-        }
-
-        void code(Block node, String literal, String language, boolean fenced) {
-            html.append("<pre>"); anchor(node);
-            var highlighter = new CodeHighlighter(language == null ? "" : language, palette);
-            var spans = node.getSourceSpans();
-            int line = 0;
-            int spanCursor = 0;
-            for (int from = 0; from < literal.length(); line++) {
-                checkInterrupted();
-                int end = literal.indexOf('\n', from);
-                if (end < 0) end = literal.length();
-                String value = literal.substring(from, end);
-                int sourceLine = spans.getFirst().getLineIndex() + line + (fenced ? 1 : 0);
-                while (spanCursor < spans.size() && spans.get(spanCursor).getLineIndex() < sourceLine) spanCursor++;
-                SourceSpan span = spanCursor < spans.size() && spans.get(spanCursor).getLineIndex() == sourceLine
-                    ? spans.get(spanCursor) : null;
-                if (span != null) {
-                    int start = span.getInputIndex();
-                    // Source spans include code indentation; map the content rather than the syntactic prefix.
-                    int extra = fenced ? ((FencedCodeBlock) node).getFenceIndent() : 4;
-                    while (extra > 0 && start < span.getInputIndex() + span.getLength() && source.charAt(start) == ' ') { start++; extra--; }
-                    anchor(start, span.getInputIndex() + span.getLength());
-                } else if (sourceLine < lineStarts.length) {
-                    // CommonMark omits zero-length source spans. Keep the blank line's source position explicitly.
-                    int start = lineStarts[sourceLine];
-                    int sourceEnd = sourceLine + 1 < lineStarts.length ? lineStarts[sourceLine + 1] : source.length();
-                    while (sourceEnd > start && (source.charAt(sourceEnd - 1) == '\r' || source.charAt(sourceEnd - 1) == '\n')) sourceEnd--;
-                    anchor(start, sourceEnd);
-                }
-                highlighter.line(value, html);
-                if (end < literal.length()) html.append("\n");
-                from = end + 1;
-            }
+        void code(Block node, String literal, String info, boolean fenced) {
+            html.append("<pre>"); mark(out.anchor(node));
+            var highlighter = new CodeHighlighter(info == null ? "" : info, out.palette, Dialect.SWING);
+            out.codeLines(node, literal, fenced, (line, anchor, newline) -> {
+                mark(anchor);
+                highlighter.line(line, html);
+                if (newline) html.append("\n");
+            });
             html.append("</pre>\n");
         }
 
-        String visible(Node parent) {
-            var text = new StringBuilder();
-            // Use an explicit stack so adversarial inline nesting does not grow the Java call stack.
-            var pending = new java.util.ArrayDeque<Node>();
-            for (Node child = parent.getLastChild(); child != null; child = child.getPrevious()) pending.push(child);
-            while (!pending.isEmpty()) {
-                Node child = pending.pop();
-                if (child instanceof Text value) text.append(value.getLiteral());
-                else if (child instanceof Code value) text.append(value.getLiteral());
-                else if (child instanceof HardLineBreak || child instanceof SoftLineBreak) text.append(' ');
-                else if (child instanceof HtmlInline value) {
-                    if (!value.getLiteral().startsWith("<!--")) text.append(value.getLiteral());
-                } else for (Node nested = child.getLastChild(); nested != null; nested = nested.getPrevious()) pending.push(nested);
+        /** After a rule, the definitions as a numbered list, each named for its fragment. */
+        void footnotes() {
+            var notes = out.footnotes.notes();
+            if (notes.isEmpty()) return;
+            out.stopAnchoring();
+            html.append("<hr>\n<ol>\n");
+            for (var note : notes) {
+                html.append("<li>");
+                name(note.id());
+                Node last = note.definition().getLastChild();
+                for (Node node = note.definition().getFirstChild(); node != null; node = node.getNext()) {
+                    if (node == last && node instanceof Paragraph p) { checkInterrupted(); paragraph(p, note); }
+                    else node(node);
+                }
+                if (!(last instanceof Paragraph)) backReference(note);
+                html.append("</li>\n");
             }
-            return text.toString();
+            html.append("</ol>\n");
+        }
+
+        void backReference(Footnotes.Note note) {
+            html.append(" <a href=\"jasper-link:" + out.link("#" + note.referenceId()) + "\">\u21a9</a>");
+        }
+
+        /** The block anchor at an index the output gave, if it gave one. */
+        void mark(int anchor) {
+            if (anchor >= 0) html.append("<a name=\"b" + anchor + "\"></a>");
+        }
+
+        /** A fragment's named marker. It is not a block anchor, so scroll sync never sees it. */
+        void name(String fragment) {
+            html.append("<a name=\""); out.attribute(fragment); html.append("\"></a>");
         }
     }
 }

@@ -646,11 +646,12 @@ publishes a prerelease that is not marked latest, and it never overwrites a publ
 Every external jar Jasper or a bundled plugin ships needs its exact `group:artifact:version` in a component of
 `jasper-app/src/main/resources/dev/jasper/app/about/licenses/notices.toml`, with its licence text (and its NOTICE, when
 the project publishes one) beside it; `verifyThirdPartyNotices` (in `check`) names any jar without one and any entry
-that no longer ships. A font file a bundled plugin ships is listed in its component's `files` as
-`<plugin id>/<path in its jar>`, and the check names any that is not. Read the new version's licence before updating
-the entry, and look inside the jar for bundled native binaries (DLLs, executables, shared libraries): their own
-licences need components too. The Licenses window reads the same file. A component's `license` is an SPDX id
-that `about.ThirdPartyNotices` maps to the name the window shows; a new licence needs its entry there.
+that no longer ships. A font file a bundled plugin ships, and any file under a `third_party/` folder in its resources,
+is listed in its component's `files` as `<plugin id>/<path in its jar>`, and the check names any that is not. Read the
+new version's licence before updating the entry, and look inside the jar for bundled native binaries (DLLs,
+executables, shared libraries): their own licences need components too. The Licenses window reads the same file. A
+component's `license` is an SPDX id that `about.ThirdPartyNotices` maps to the name the window shows; a new licence
+needs its entry there.
 
 ## Themes
 

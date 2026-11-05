@@ -69,7 +69,7 @@ class EditorSettingsPanelTest {
         assertThat(rows(view, EditorSettingsPanel.FONT)).containsExactly("settings:follow_terminal_font:row", "settings:font_family:row", "settings:font_size:row",
             "settings:font_fallback:row", "settings:font_ligatures:row", "settings:font_line_height:row");
         assertThat(rows(view, EditorSettingsPanel.EDITING)).containsExactly("settings:tab_size:row", "settings:soft_wrap:row", "settings:vim:row");
-        assertThat(rows(view, EditorSettingsPanel.MARKDOWN)).containsExactly("settings:markdown_view_mode:row");
+        assertThat(rows(view, EditorSettingsPanel.MARKDOWN)).containsExactly("settings:markdown_view_mode:row", "settings:markdown_preview:row");
         assertThat(rows(view, EditorSettingsPanel.FILES)).containsExactly("settings:max_file_mib:row", "settings:recent_files_days:row");
         assertThat(rows(view, EditorSettingsPanel.DEFAULT))
             .containsExactly(EditorSettingsPanel.CHOICE + ":row", "settings:keep_environment_editor:row", EditorSettingsPanel.ENVIRONMENT);

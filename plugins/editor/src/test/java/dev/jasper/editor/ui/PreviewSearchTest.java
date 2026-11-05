@@ -100,10 +100,32 @@ class PreviewSearchTest {
         assertThat(pane.editor().getSelectedText()).isEqualTo(selected);
     }
 
+    /** N10: Whole Word puts the whole expression between word boundaries, so {@code a|b} is a whole a or a whole b. */
+    @Test void wholeWordGroupsARegularExpression() throws Exception {
+        var pane=PreviewPaneTest.install(PreviewPaneTest.prepare("cab a b"));
+        SwingUtilities.invokeAndWait(() -> {
+            var search=new PreviewSearch(pane);
+            assertThat(search.markAll(query("a|b",true,true))).as("not \\ba|b\\b, which also finds cab's b").isEqualTo(2);
+            assertThat(search.markAll(query("a|b",true,false))).isEqualTo(4);
+            assertThatThrownBy(() -> search.markAll(query("a)(b",true,true))).as("refused alone, so refused in the group")
+                .isInstanceOf(java.util.regex.PatternSyntaxException.class);
+            var surface=new BasicPreview(pane,new javax.swing.JScrollPane(pane.editor()));
+            var bar=new FindBar(() -> Optional.of(new FindTarget.Preview(surface)), () -> {}, id -> {});
+            bar.open(false);
+            bar.event(new dev.jasper.sdk.ui.UiEvent.Action(FindBar.REGEX));bar.event(new dev.jasper.sdk.ui.UiEvent.Action(FindBar.WORD));
+            bar.event(new dev.jasper.sdk.ui.UiEvent.Edited(FindBar.FIND,"a|b"));
+            assertThat(bar.status()).isEqualTo("2 matches");
+            bar.event(new dev.jasper.sdk.ui.UiEvent.Edited(FindBar.FIND,"a)(b"));
+            assertThat(bar.status()).isEqualTo("Invalid pattern");
+            bar.close();pane.close();
+        });
+    }
+
     @Test void openFindRecomputesMatchesOnlyWhenTheReplacementDocumentIsInstalled() throws Exception {
         var pane=PreviewPaneTest.install(PreviewPaneTest.prepare("old old"));var bar=new FindBar[1];
         SwingUtilities.invokeAndWait(() -> {
-            bar[0]=new FindBar(() -> Optional.of(new FindTarget.Preview(pane)), () -> {}, id -> {});
+            var surface=new BasicPreview(pane,new javax.swing.JScrollPane(pane.editor()));
+            bar[0]=new FindBar(() -> Optional.of(new FindTarget.Preview(surface)), () -> {}, id -> {});
             bar[0].open(false);bar[0].event(new dev.jasper.sdk.ui.UiEvent.Edited(FindBar.FIND,"old"));
             assertThat(bar[0].status()).isEqualTo("2 matches");
         });

@@ -21,7 +21,7 @@ class PreviewPaneTest {
         return new WorkspacePalette(bg,bg.brighter(),bg.darker(),fg,Color.GRAY,Color.GRAY,Color.BLUE,Color.WHITE,
             Color.GRAY,dark?Color.CYAN:Color.BLUE,Color.GREEN,Color.ORANGE,Color.RED);
     }
-    static PreviewPane.Prepared prepare(String source) { return PreviewPane.prepare(new MarkdownRenderer().render(source, EditorThemeTest.syntax(0x668800))); }
+    static PreviewPane.Prepared prepare(String source) { return PreviewPane.prepare(new MarkdownRenderer().render(source, EditorThemeTest.syntax(0x668800), MarkdownRenderer.Dialect.SWING)); }
     static PreviewPane install(PreviewPane.Prepared prepared) throws Exception {
         PreviewPane[] pane={null};
         SwingUtilities.invokeAndWait(() -> {pane[0]=new PreviewPane(id -> {}, () -> {}); pane[0].install(prepared,TYPE,palette(false),EditorThemeTest.syntax(0x668800),new Font("Serif",0,12),1);});
@@ -110,7 +110,7 @@ class PreviewPaneTest {
         SwingUtilities.invokeAndWait(()->{assertThat(geometry.get()).isEqualTo(1);ref.get().close();});
     }
     @Test void preparationObservesWorkerCancellationAndCannotRunOnEdt() throws Exception {
-        var result=new MarkdownRenderer().render("text",EditorThemeTest.syntax(1));
+        var result=new MarkdownRenderer().render("text",EditorThemeTest.syntax(1),MarkdownRenderer.Dialect.SWING);
         Thread.currentThread().interrupt();
         try{assertThatThrownBy(() -> PreviewPane.prepare(result)).isInstanceOf(java.util.concurrent.CancellationException.class);}
         finally{Thread.interrupted();}
@@ -129,6 +129,43 @@ class PreviewPaneTest {
             pane.editor().getTransferHandler().exportToClipboard(pane.editor(),clipboard,TransferHandler.COPY);
             try { assertThat(clipboard.getData(DataFlavor.stringFlavor).toString()).contains("Hello world"); } catch(Exception e) {throw new AssertionError(e);}
             pane.close();
+        });
+    }
+    @Test void theGithubFixtureKeepsItsLinksImagesAnchorsAndAlertTitlesThroughPreparation() throws Exception {
+        String source;
+        try (var in = PreviewPaneTest.class.getResourceAsStream("/markdown/github-features.md")) {
+            source = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        }
+        var prepared = prepare(source);
+        var result = prepared.result();
+        var pane = install(prepared);
+        SwingUtilities.invokeAndWait(() -> {
+            try {
+                var document = (javax.swing.text.html.HTMLDocument) pane.editor().getDocument();
+                var links = new java.util.TreeSet<Integer>();
+                var images = new java.util.TreeSet<Integer>();
+                var bold = new java.util.ArrayList<String>();
+                var iterator = new javax.swing.text.ElementIterator(document);
+                for (var e = iterator.first(); e != null; e = iterator.next()) {
+                    var attributes = e.getAttributes();
+                    if (e.isLeaf() && attributes.getAttribute(javax.swing.text.html.HTML.Tag.A) instanceof javax.swing.text.AttributeSet a
+                        && a.getAttribute(javax.swing.text.html.HTML.Attribute.HREF) instanceof String href)
+                        links.add(PreviewPane.resourceId(href, "jasper-link:"));
+                    if (attributes.getAttribute(javax.swing.text.StyleConstants.NameAttribute) == javax.swing.text.html.HTML.Tag.IMG)
+                        images.add(PreviewPane.resourceId((String) attributes.getAttribute(javax.swing.text.html.HTML.Attribute.SRC), "jasper-image:"));
+                    if (e.isLeaf() && attributes.isDefined(javax.swing.text.html.HTML.Tag.B))
+                        bold.add(document.getText(e.getStartOffset(), e.getEndOffset() - e.getStartOffset()));
+                }
+                assertThat(links).containsExactlyElementsOf(result.links().stream().map(MarkdownResult.Link::id).toList());
+                assertThat(images).containsExactlyElementsOf(result.images().stream().map(MarkdownResult.Image::id).toList());
+                assertThat(bold).contains("Note", "Tip", "Important", "Warning", "Caution");
+                assertThat(result.blocks()).allSatisfy(block -> assertThat(pane.anchor(block.id())).as(block.id()).isPresent());
+                for (String name : List.of("fn-1", "fn-2", "fnref-1", "fnref-2", "tables"))
+                    assertThat(pane.anchor(name)).as(name).isPresent();
+                String text = document.getText(0, document.getLength());
+                assertThat(text).contains("[1]", "[2]", "\u21a9", "sequenceDiagram", "<kbd>").doesNotContain("[^first]", "[!NOTE]", "nothing references");
+            } catch (javax.swing.text.BadLocationException impossible) { throw new AssertionError(impossible); }
+            finally { pane.close(); }
         });
     }
     @Test void obsoleteAndCancelledBuildNeverReplaceInstalledDocument() throws Exception {

@@ -10,7 +10,7 @@ val verificationClasspaths = extra["verificationClasspaths"] as Map<String, org.
 // its own packages, libraries it bundles, and the exported packages of plugins it requires.
 // Every plugins/<name>/ module (settings.gradle.kts discovers them) is checked; a plugin that requires
 // another plugin lists that plugin's exported packages here, and nothing else may be imported.
-val declaredImports = mapOf(":jasper-plugin-history" to listOf("dev.jasper.snippets.api"), ":jasper-plugin-remote" to listOf("dev.jasper.vault.api", "dev.jasper.editor.api"), ":jasper-plugin-fileserver" to listOf("dev.jasper.vault.api"), ":jasper-plugin-indexer" to listOf("dev.jasper.editor.api", "dev.jasper.remote.api"))
+val declaredImports = mapOf(":jasper-plugin-history" to listOf("dev.jasper.snippets.api"), ":jasper-plugin-editor" to listOf("dev.jasper.browser.api"), ":jasper-plugin-remote" to listOf("dev.jasper.vault.api", "dev.jasper.editor.api"), ":jasper-plugin-fileserver" to listOf("dev.jasper.vault.api"), ":jasper-plugin-indexer" to listOf("dev.jasper.editor.api", "dev.jasper.remote.api"))
 // Chromium is the runtime's `jcef` module; only the Browser may name its types (org.cef, com.jetbrains.cef).
 // Which of the Browser's own packages may is ChromiumBoundaryTest's rule.
 val chromiumPlugin = ":jasper-plugin-browser"

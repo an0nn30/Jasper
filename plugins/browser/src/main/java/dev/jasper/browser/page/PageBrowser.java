@@ -32,6 +32,10 @@ import org.cef.callback.CefDragData;
  * browser make ({@link #createDevToolsBrowser}): drawn off screen on the DevTools' own canvas by a renderer of its own,
  * on the page's client, whose handlers take it for no page's, as it has no {@link #owner()}. Chromium's own DevTools
  * window, a top-level one, is never made: JCEF has none for an off-screen browser.
+ *
+ * <p>A Markdown preview's browser is one too, on the preview client, made by its {@link PreviewPage}: it has no
+ * {@link #owner()}, so nothing of a page's reaches it, not even {@code jasper-about:}, and its preview's page is where
+ * the preview client's handlers send its callbacks ({@link #previewOwner()}).
  */
 public final class PageBrowser extends CefBrowserOsrWithHandler {
     private static final System.Logger LOG = System.getLogger(PageBrowser.class.getName());
@@ -49,6 +53,8 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
     private DevTools opening;
     // Set before the native browser is made, so before Chromium calls back for this browser.
     private volatile Page owner;
+    // A preview's browser's page, set as its page is, before the native browser is made; null for any other browser.
+    private volatile PreviewPage previewOwner;
     // Set once Java asks the browser to close: Jasper's close of its page, or JCEF's close of its client's browsers.
     private volatile boolean closeAsked;
 
@@ -187,10 +193,27 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
     }
 
     /**
+     * The Markdown preview's page this browser shows, where the preview client's handlers send its callbacks. Any thread.
+     *
+     * @return the preview's page, or null for a browser that is no preview's
+     */
+    PreviewPage previewOwner() {
+        return previewOwner;
+    }
+
+    /**
+     * Makes {@code page} the preview's page the preview client's handlers send this browser's callbacks to. Before the
+     * native browser exists.
+     */
+    void previewOwner(PreviewPage page) {
+        previewOwner = page;
+    }
+
+    /**
      * JCEF's native code stores the native browser here once it exists. Only from then on do calls such as
      * {@code setWindowVisibility}, {@code setWindowlessFrameRate} and {@code loadURL} take effect, because JCEF drops
      * the ones made earlier. So the view tells the page again whether it shows, and the page loads what it was asked
-     * to meanwhile, on the UI thread.
+     * to meanwhile, on the UI thread; a preview's page is told too.
      */
     @Override public void setNativeRef(String identifier, long nativeRef) {
         super.setNativeRef(identifier, nativeRef);
@@ -199,6 +222,8 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
             target.browserCreated();
             Page page = owner;
             if (page != null) page.created(this);
+            PreviewPage preview = previewOwner;
+            if (preview != null) preview.created(this);
         });
     }
 

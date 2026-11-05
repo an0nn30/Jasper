@@ -24,8 +24,12 @@
  * main frame's failed load, as the load handler hands it to the page for its item's error page, with the
  * {@link dev.jasper.browser.page.ServerCertificate} Chromium could not verify for it, which the {@code links} package's
  * request handler goes on past only when the page's item allows it. The canvas, renderer and browser are adapted from
- * JetBrains' JCEF test classes, as {@code notices.toml} records. {@link dev.jasper.browser.page.LastPress},
- * {@code Favicons} and {@code Page}'s methods name no Chromium type, and none of these classes loads until a browser
- * item opens.
+ * JetBrains' JCEF test classes, as {@code notices.toml} records. {@link dev.jasper.browser.page.PreviewPage} is a
+ * Markdown preview's page, in plain types, for the {@code preview} package: it makes its canvas at once, and its browser,
+ * on Chromium's preview client, only once the canvas first shows; {@code PreviewHandlers} are the preview client's own
+ * handlers and message router, which refuse every navigation but the shell's first load, every request off the
+ * preview's origin, popups, dialogs and the right-click menu, and its Find runs {@code find.js} too.
+ * {@link dev.jasper.browser.page.LastPress}, {@code Favicons}, {@code Page}'s methods and {@code PreviewPage}'s name no
+ * Chromium type, and none of these classes loads until a browser item opens or a Markdown preview is made.
  */
 package dev.jasper.browser.page;

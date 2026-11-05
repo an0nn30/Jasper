@@ -19,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import org.cef.CefClient;
 import org.cef.browser.CefBrowser;
@@ -30,6 +31,9 @@ import org.cef.browser.CefBrowser;
  *
  * <p>Making, closing or asking the state of a Chromium that never started loads no Chromium class: every JCEF call is in
  * {@link ChromiumApp}, which only the start loads, so the plugin's start costs nothing until a page is first shown.
+ *
+ * <p>Pages are made on its client, and Markdown previews on a second client of the same Chromium, its preview client, which
+ * none of the pages' handlers reach.
  *
  * <p>Its {@link RunMarker} marks it in the data directory from the moment its start enters JCEF, before Chromium
  * initializes, until Jasper closes it or it has ended, so a fatal Chromium error that ends Jasper meanwhile leaves the
@@ -59,6 +63,7 @@ public final class Chromium implements AutoCloseable {
     private final Path dataDir;
     private final Executor worker;
     private final AboutScheme about;
+    private final PreviewScheme previews;
     private final Consumer<Throwable> startFailed;
     private final Duration startLimit;
     private final ChromiumLife<CefClient> life;
@@ -67,14 +72,16 @@ public final class Chromium implements AutoCloseable {
     private final AtomicBoolean warned = new AtomicBoolean();
     // Set by the worker before Chromium can initialize, so before any dispose or client is decided.
     private volatile ChromiumApp app;
-    // Guarded by installing: every installer given, those waiting for the client, and the client they ran on.
-    private final Object installing = new Object();
-    private final Set<Consumer<CefClient>> installers = Collections.newSetFromMap(new IdentityHashMap<>());
-    private final List<Consumer<CefClient>> waiting = new ArrayList<>();
-    private boolean installed;
-    private CefClient installedOn;
+    private final Installers pageInstallers = new Installers(), previewInstallers = new Installers();
+    // Guarded by previewing: the preview client's future, made on the first ask.
+    private final Object previewing = new Object();
+    private CompletableFuture<CefClient> preview;
+    // Set on the UI thread as the preview client is made, before any browser is made on it; read on Chromium's IO thread.
+    private volatile CefClient previewMade;
     // Given as a page first asks for Chromium, before any page's browser is made; until then jasper-about: answers nothing.
     private volatile Predicate<CefBrowser> pageBrowsers;
+    // Given as a preview first asks for its client, before any preview's browser is made: each preview browser's token.
+    private volatile Function<CefBrowser, String> previewTokens;
 
     /**
      * A Chromium that starts nothing until {@link #client()} is first called.
@@ -83,17 +90,20 @@ public final class Chromium implements AutoCloseable {
      * @param worker a platform thread of the plugin's own, which runs the start; never the UI thread, which the start
      *     needs free, or a virtual thread
      * @param about the pages {@code jasper-about:} serves
+     * @param previews the Markdown previews' origins {@code jasper-preview:} serves
      * @param startFailed told once, on the UI thread, why Chromium cannot serve pages
      */
-    public Chromium(Path dataDir, Executor worker, AboutScheme about, Consumer<Throwable> startFailed) {
-        this(dataDir, worker, about, startFailed, StartOnce.PROCESS, START_LIMIT);
+    public Chromium(Path dataDir, Executor worker, AboutScheme about, PreviewScheme previews, Consumer<Throwable> startFailed) {
+        this(dataDir, worker, about, previews, startFailed, StartOnce.PROCESS, START_LIMIT);
     }
 
     /** As the public constructor, with the once-per-process guard and the start's time limit given. */
-    Chromium(Path dataDir, Executor worker, AboutScheme about, Consumer<Throwable> startFailed, StartOnce process, Duration startLimit) {
+    Chromium(Path dataDir, Executor worker, AboutScheme about, PreviewScheme previews, Consumer<Throwable> startFailed,
+            StartOnce process, Duration startLimit) {
         this.dataDir = Objects.requireNonNull(dataDir, "dataDir");
         this.worker = Objects.requireNonNull(worker, "worker");
         this.about = Objects.requireNonNull(about, "about");
+        this.previews = Objects.requireNonNull(previews, "previews");
         this.startFailed = Objects.requireNonNull(startFailed, "startFailed");
         this.startLimit = Objects.requireNonNull(startLimit, "startLimit");
         life = new ChromiumLife<>(Objects.requireNonNull(process, "process"));
@@ -102,17 +112,19 @@ public final class Chromium implements AutoCloseable {
 
     /**
      * The client every page is made from. The first call hands Chromium's start to the worker and returns; later calls
-     * return the same future. It completes on the UI thread once Chromium is ready. It fails when the start fails or
-     * has not reached Chromium's initialization within 90 seconds, and when {@link #close()} cuts the start short. After
-     * {@code close()}, or once another Chromium has started in this process, it fails at once and starts nothing. Each
-     * failure but a cut-short start is told to {@code startFailed}, once.
+     * share that start. Each call returns a copy of the one future, which completes, or fails with the same cause, as it
+     * does, so no caller can complete or cancel it for the others. It completes on the UI thread once Chromium is ready.
+     * It fails when the start fails or has not reached Chromium's initialization within 90 seconds, and when
+     * {@link #close()} cuts the start short. After {@code close()}, or once another Chromium has started in this
+     * process, it fails at once and starts nothing. Each failure but a cut-short start is told to {@code startFailed},
+     * once.
      *
      * @return the client, once Chromium is ready
      */
     public CompletableFuture<CefClient> client() {
         var asked = life.ask();
         run(asked.steps());
-        return asked.client();
+        return copy(asked.client());
     }
 
     /**
@@ -126,17 +138,49 @@ public final class Chromium implements AutoCloseable {
      * @param installer what the client needs before any page, such as its display and load handlers
      */
     public void onClient(Consumer<CefClient> installer) {
-        Objects.requireNonNull(installer, "installer");
-        CefClient now;
-        synchronized (installing) {
-            if (!installers.add(installer)) return;
-            if (!installed) {
-                waiting.add(installer);
-                return;
+        pageInstallers.add(installer);
+    }
+
+    /**
+     * The client every Markdown preview is made on: a second client of the same Chromium, made on the UI thread once
+     * {@link #client()} has completed, and set up only by the installers given to {@link #onPreviewClient}, so none of
+     * the pages' handlers reach a preview. Asking for it starts Chromium as {@code client()} does, and never starts a
+     * second one; each call returns a copy of the one future, as {@code client()} does. It fails as {@code client()}
+     * fails, with the same reason, and when Chromium closes before it is made; after {@link #close()} it fails at once
+     * and starts nothing. It completes on the UI thread, a failure too. Chromium's close disposes it with the pages'
+     * client.
+     *
+     * @return the preview client, once it is made
+     */
+    public CompletableFuture<CefClient> previewClient() {
+        CompletableFuture<CefClient> client = client();
+        if (client.isCompletedExceptionally()) return client;
+        CompletableFuture<CefClient> made;
+        boolean first = false;
+        synchronized (previewing) {
+            if (preview == null) {
+                preview = new CompletableFuture<>();
+                first = true;
             }
-            now = installedOn;
+            made = preview;
         }
-        installer.accept(now);
+        // Outside the lock: a client already made runs this at once, and the installers with it.
+        if (first) client.whenComplete((ready, failure) -> onUiThread(() -> {
+            if (failure != null) made.completeExceptionally(failure);
+            else makePreview(made);
+        }));
+        return copy(made);
+    }
+
+    /**
+     * Has {@code installer} set up the preview client before any preview is made on it, as {@link #onClient} does for
+     * the pages' client: once, in the order given, as the client is made and before {@link #previewClient()}'s future
+     * completes, or at once on a client already made. An installer that throws fails the preview client, not Chromium.
+     *
+     * @param installer what the preview client needs before any preview, such as its request and load handlers
+     */
+    public void onPreviewClient(Consumer<CefClient> installer) {
+        previewInstallers.add(installer);
     }
 
     /**
@@ -157,6 +201,35 @@ public final class Chromium implements AutoCloseable {
     }
 
     /**
+     * Has {@code jasper-preview:} answer a browser of the preview client only on the origin {@code tokens} names for it
+     * (plan 9's N6): a preview's page loads only its own documents and images. Before this is given, it answers no
+     * browser. Give it as a preview first asks for its client, with the preview client's installers; the last one given
+     * counts.
+     *
+     * @param tokens the token of the origin a browser's preview shows, or null for a browser that shows none; asked on
+     *     Chromium's IO thread, where it must return at once
+     */
+    public void answerPreviewFor(Function<CefBrowser, String> tokens) {
+        previewTokens = Objects.requireNonNull(tokens, "tokens");
+    }
+
+    /**
+     * Whether {@code jasper-preview:} answers {@code browser}'s request for {@code url}: the browser is on the preview
+     * client, and the address on its own preview's origin ({@link #answerPreviewFor}). Before that client is made, no
+     * browser is. Any thread.
+     */
+    boolean answersPreview(CefBrowser browser, String url) {
+        CefClient made = previewMade;
+        return made != null && browser != null && browser.getClient() == made && onItsOrigin(previewTokens, browser, url);
+    }
+
+    /** Whether {@code url} is on the origin of the preview {@code browser} shows, as {@code tokens} names it; none for no tokens. */
+    static boolean onItsOrigin(Function<CefBrowser, String> tokens, CefBrowser browser, String url) {
+        String token = tokens == null ? null : tokens.apply(browser);
+        return token != null && PreviewScheme.allows(url, token);
+    }
+
+    /**
      * Where Chromium's life stands.
      *
      * @return the state
@@ -172,7 +245,7 @@ public final class Chromium implements AutoCloseable {
     public Optional<Throwable> unavailable() { return life.unavailable(); }
 
     /**
-     * Closes Chromium: its client's every browser, then its app, once, however often this is called. On the UI thread
+     * Closes Chromium: its clients' every browser, then its app, once, however often this is called. On the UI thread
      * it returns at once, and a thread of its own waits for Chromium's end; anywhere else the caller waits. Either wait
      * lasts at most 10 seconds. A Chromium that never started closes at once and touches no Chromium class. Its run
      * marker goes at once, before Chromium has ended.
@@ -190,15 +263,34 @@ public final class Chromium implements AutoCloseable {
 
     /** Runs the installers on the client just made, before it reaches any page; once. UI thread. */
     void install(CefClient made) {
-        List<Consumer<CefClient>> each;
-        synchronized (installing) {
-            if (installed) return;
-            installed = true;
-            installedOn = made;
-            each = List.copyOf(waiting);
-            waiting.clear();
+        pageInstallers.install(made);
+    }
+
+    /** Runs the preview installers on the preview client just made, before it reaches any preview; once. UI thread. */
+    void installPreview(CefClient made) {
+        previewInstallers.install(made);
+    }
+
+    /**
+     * Makes the preview client, which the client's completion asked for, unless Chromium has closed since: then it fails
+     * as {@link #client()} does. UI thread, once.
+     */
+    private void makePreview(CompletableFuture<CefClient> made) {
+        if (state() != State.RUNNING) {
+            made.completeExceptionally(unavailable().orElseGet(() -> new IllegalStateException(ONCE)));
+            return;
         }
-        for (Consumer<CefClient> installer : each) installer.accept(made);
+        CefClient client;
+        try {
+            client = app.createPreviewClient();
+            previewMade = client;
+            installPreview(client);
+        } catch (Throwable failure) { // As for the pages' client: an Error too must fail it, or nobody hears of it.
+            LOG.log(System.Logger.Level.WARNING, "Chromium could not make the Markdown preview's client", failure);
+            made.completeExceptionally(failure);
+            return;
+        }
+        made.complete(client);
     }
 
     /** The client is made. UI thread. */
@@ -212,7 +304,7 @@ public final class Chromium implements AutoCloseable {
         if (!enter()) return;
         ChromiumApp started;
         try {
-            started = ChromiumApp.start(dataDir, about, this::answersAbout, this::terminated);
+            started = ChromiumApp.start(dataDir, about, this::answersAbout, previews, this::answersPreview, this::terminated);
         } catch (Throwable failure) { // JCEF reports a runtime without Chromium's libraries as an Error.
             threw(failure);
             return;
@@ -262,6 +354,19 @@ public final class Chromium implements AutoCloseable {
     /** Hands the client to its future; generic, so this class casts nothing to a Chromium type. */
     private static <C> void complete(Step.Complete<C> done) { done.client().complete(done.value()); }
 
+    /**
+     * A future of the caller's own that completes as {@code shared} does, on the same thread: with its value, or failing
+     * with the cause it failed with. Generic, so this class names no Chromium type here.
+     */
+    private static <C> CompletableFuture<C> copy(CompletableFuture<C> shared) {
+        var own = new CompletableFuture<C>();
+        shared.whenComplete((value, failure) -> {
+            if (failure == null) own.complete(value);
+            else own.completeExceptionally(failure);
+        });
+        return own;
+    }
+
     /** Hands the start to the worker and arms its time limit: JCEF does not report every failed start. */
     private void handOver() {
         try {
@@ -296,5 +401,45 @@ public final class Chromium implements AutoCloseable {
     private static void onUiThread(Runnable task) {
         if (EventQueue.isDispatchThread()) task.run();
         else EventQueue.invokeLater(task);
+    }
+
+    /**
+     * One client's installers: every installer given, those waiting for the client, and the client they ran on. Each
+     * runs once, however often given, in the order given.
+     */
+    private static final class Installers {
+        // Guarded by this.
+        private final Set<Consumer<CefClient>> given = Collections.newSetFromMap(new IdentityHashMap<>());
+        private final List<Consumer<CefClient>> waiting = new ArrayList<>();
+        private boolean installed;
+        private CefClient installedOn;
+
+        /** Runs {@code installer} on the client once it is made, or now on the one made. Any thread. */
+        void add(Consumer<CefClient> installer) {
+            Objects.requireNonNull(installer, "installer");
+            CefClient now;
+            synchronized (this) {
+                if (!given.add(installer)) return;
+                if (!installed) {
+                    waiting.add(installer);
+                    return;
+                }
+                now = installedOn;
+            }
+            installer.accept(now);
+        }
+
+        /** Runs the waiting installers on the client just made; once. UI thread. */
+        void install(CefClient made) {
+            List<Consumer<CefClient>> each;
+            synchronized (this) {
+                if (installed) return;
+                installed = true;
+                installedOn = made;
+                each = List.copyOf(waiting);
+                waiting.clear();
+            }
+            for (Consumer<CefClient> installer : each) installer.accept(made);
+        }
     }
 }

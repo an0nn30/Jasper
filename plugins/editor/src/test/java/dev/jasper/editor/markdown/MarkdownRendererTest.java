@@ -18,7 +18,7 @@ class MarkdownRendererTest {
         for (var role : SyntaxRole.values()) styles.put(role, new SyntaxStyle(new Color(20 + role.ordinal(), 40, 60), false, false));
         return new SyntaxPalette(styles);
     }
-    static MarkdownResult render(String source) { return new MarkdownRenderer().render(source, palette()); }
+    static MarkdownResult render(String source) { return new MarkdownRenderer().render(source, palette(), MarkdownRenderer.Dialect.SWING); }
 
     @Test void headingNamesCannotCollideWithEarlierSuffixes() {
         var ids = new HeadingIds();
@@ -169,6 +169,35 @@ class MarkdownRendererTest {
             assertThat(b.sourceStart()).isEqualTo(28);
             assertThat(b.sourceEnd()).isEqualTo(36);
         });
+    }
+
+    @Test void alertsAreQuotesWithABoldTitle() {
+        var result = render("> [!TIP]\n> Body\n\n> [!CAUTION]\n");
+        assertThat(result.html()).contains("<blockquote><a name=\"b0\"></a><p><b>Tip</b></p>\n<p><a name=\"b1\"></a>Body</p>\n</blockquote>",
+            "<blockquote><a name=\"b2\"></a><p><b>Caution</b></p>\n</blockquote>").doesNotContain("[!TIP]", "class=");
+        assertThat(result.blocks()).hasSize(3);
+    }
+
+    @Test void footnotesAreNumberedLinksAndAListAfterARule() {
+        String source = "b[^y] a[^x] and b again[^y]\n\n[^x]: X\n[^y]: Y\n[^z]: Z\n";
+        var result = render(source);
+        assertThat(result.html()).contains(
+            "<p><a name=\"b0\"></a>b<a name=\"fnref-1\"></a><a href=\"jasper-link:0\">[1]</a> a<a name=\"fnref-2\"></a><a href=\"jasper-link:1\">[2]</a>"
+                + " and b again<a href=\"jasper-link:2\">[1]</a></p>",
+            "<hr>\n<ol>\n<li><a name=\"fn-1\"></a><p>Y <a href=\"jasper-link:3\">\u21a9</a></p>\n</li>\n"
+                + "<li><a name=\"fn-2\"></a><p>X <a href=\"jasper-link:4\">\u21a9</a></p>\n</li>\n</ol>\n</body>")
+            .doesNotContain("Z", "<sup", "<section");
+        assertThat(result.links()).extracting(MarkdownResult.Link::destination)
+            .containsExactly("#fn-1", "#fn-2", "#fn-1", "#fnref-1", "#fnref-2");
+        assertThat(result.headings()).containsOnlyKeys("fn-1", "fn-2", "fnref-1", "fnref-2");
+        assertThat(result.blocks()).hasSize(1);
+    }
+
+    @Test void aFootnoteFirstReferencedInsideAnotherIsListedAfterIt() {
+        var result = render("a[^1]\n\n[^1]: one[^2]\n\n[^2]: two\n\n[^3]: only from itself[^3]\n");
+        assertThat(result.html()).contains("<li><a name=\"fn-1\"></a><p>one<a name=\"fnref-2\"></a><a href=\"jasper-link:1\">[2]</a>",
+            "<li><a name=\"fn-2\"></a><p>two <a href=").doesNotContain("only from itself");
+        assertThat(result.headings()).containsOnlyKeys("fn-1", "fn-2", "fnref-1", "fnref-2");
     }
 
     @Test void interruptCancelsAtABlockBoundary() {

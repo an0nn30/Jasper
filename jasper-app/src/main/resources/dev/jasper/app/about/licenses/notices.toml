@@ -1,8 +1,9 @@
 # Third-party software Jasper ships, for the Licenses window (ThirdPartyNotices) and verifyThirdPartyNotices.
 # One [[component]] per project. modules are the exact group:artifact:version coordinates it covers; the check fails
 # when a shipped jar is in no component or a listed one no longer ships. text and notice are paths relative to this
-# folder, or absolute classpath resources. license is an SPDX id ThirdPartyNotices knows. files are the font files a
-# bundled plugin ships, as <plugin id>/<path in its jar>; the check fails when one is in no component.
+# folder, or absolute classpath resources. license is an SPDX id ThirdPartyNotices knows. files are the font files, and
+# the files under a third_party folder, that a bundled plugin ships, as <plugin id>/<path in its jar>; the check fails
+# when one is in no component.
 
 [[component]]
 name = "ANTLR 4 Runtime"
@@ -46,6 +47,14 @@ license = "Apache-2.0"
 homepage = "https://thrift.apache.org/"
 text = "apache-2.0.txt"
 notice = "thrift.NOTICE.txt"
+
+[[component]]
+name = "autolink-java"
+version = "0.12.0"
+license = "MIT"
+homepage = "https://github.com/robinst/autolink-java"
+modules = ["org.nibor.autolink:autolink:0.12.0"]
+text = "autolink.LICENSE.txt"
 
 [[component]]
 name = "Boost"
@@ -98,7 +107,9 @@ version = "0.30.0"
 license = "BSD-2-Clause"
 homepage = "https://github.com/commonmark/commonmark-java"
 modules = ["org.commonmark:commonmark:0.30.0", "org.commonmark:commonmark-ext-gfm-tables:0.30.0",
-  "org.commonmark:commonmark-ext-gfm-strikethrough:0.30.0", "org.commonmark:commonmark-ext-task-list-items:0.30.0"]
+  "org.commonmark:commonmark-ext-gfm-strikethrough:0.30.0", "org.commonmark:commonmark-ext-task-list-items:0.30.0",
+  "org.commonmark:commonmark-ext-gfm-alerts:0.30.0", "org.commonmark:commonmark-ext-footnotes:0.30.0",
+  "org.commonmark:commonmark-ext-autolink:0.30.0"]
 text = "commonmark.LICENSE.txt"
 
 [[component]]

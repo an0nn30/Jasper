@@ -2,6 +2,7 @@ package dev.jasper.editor.ui;
 
 import dev.jasper.editor.session.DocumentSession;
 import dev.jasper.editor.markdown.MarkdownMode;
+import dev.jasper.editor.markdown.PreviewEngine;
 import static org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_MARKDOWN;
 import dev.jasper.editor.vim.EditorDefaults;
 import dev.jasper.editor.vim.Vim;
@@ -52,7 +53,7 @@ public final class EditorTab {
     void noticeChanged(Runnable value) { noticeChanged = value; }
     Optional<FindTarget> findTarget() {
         if (closed || !showingText()) return Optional.empty();
-        return Optional.of(focusedContent() == area() ? new FindTarget.Source(area()) : new FindTarget.Preview(document.preview()));
+        return Optional.of(document.previewFocused() ? new FindTarget.Preview(document.surface()) : new FindTarget.Source(area()));
     }
 
     private Runnable focusArea = () -> area().requestFocusInWindow();
@@ -73,6 +74,14 @@ public final class EditorTab {
     private MarkdownMode retainedMarkdownMode;
     private boolean wasMarkdown;
     private boolean linkedScrolling = true;
+    /** The Browser's Markdown previews, while the Browser runs. */
+    private Optional<ChromiumPreviews> chromium = Optional.empty();
+    /** The Markdown preview setting, as the window last told it; Basic until it does. */
+    private PreviewEngine engine = PreviewEngine.BASIC;
+    /** This view's Chromium preview, while the preview draws on it. */
+    private ChromiumPreview chromiumPreview;
+    /** Chromium could not draw this view's preview: it is Basic for the rest of the run, as Chromium cannot start again. */
+    private boolean chromiumFailed;
     private Runnable modeChanged = () -> {};
     void modeChanged(Runnable value) { modeChanged = value; }
     private Presentation.Icons icons = Presentation.Icons.NEW_UI;
@@ -85,6 +94,7 @@ public final class EditorTab {
     void markdownMode(MarkdownMode mode, boolean explicit) {
         if (closed || !showingText() || !markdownEligible() || markdown == null) return;
         dismissHiddenFind(mode);
+        chooseEngine(mode);
         retainedMarkdownMode = mode;
         markdown.mode(mode);
         if (explicit && markdownPreferences != null) markdownPreferences.select(mode).whenComplete((ignored, failure) -> {
@@ -101,24 +111,56 @@ public final class EditorTab {
     private void dismissHiddenFind(MarkdownMode mode) {
         if (find == null) return;
         if (mode == MarkdownMode.PREVIEW) find.paneHidden(area());
-        else if (mode == MarkdownMode.SOURCE) find.paneHidden(document.preview().editor());
+        else if (mode == MarkdownMode.SOURCE) find.paneHidden(document.surface());
     }
+    /** @param value the Browser's Markdown previews, while the Browser runs; empty draws every preview on Basic */
+    void chromium(Optional<ChromiumPreviews> value) { chromium = java.util.Objects.requireNonNull(value); chooseEngine(shownMode()); }
+    /**
+     * The Markdown preview setting: the view draws its preview with Chromium while it says so, the Browser runs and
+     * Chromium can draw, and on Basic otherwise. Settings › Tools › Editor changes it live, through the window's apply.
+     */
+    void previewEngine(PreviewEngine value) { engine = java.util.Objects.requireNonNull(value); chooseEngine(shownMode()); }
+    private MarkdownMode shownMode() { return markdown == null ? MarkdownMode.SOURCE : markdown.mode(); }
+    /**
+     * Draws the preview on the surface the setting and Chromium allow, for a view about to show {@code showing}. The
+     * Chromium preview is made the first time Split or Preview shows Markdown, so a view that shows only its source, as a
+     * restored workspace's tabs may, makes no page (spec section 19).
+     */
+    private void chooseEngine(MarkdownMode showing) {
+        if (closed) return;
+        boolean wanted = engine == PreviewEngine.CHROMIUM && !chromiumFailed && chromium.filter(ChromiumPreviews::available).isPresent();
+        if (!wanted) { drawOn(document.basic()); return; }
+        if (chromiumPreview == null) {
+            if (showing == MarkdownMode.SOURCE || !markdownEligible()) return;
+            chromiumPreview = chromium.orElseThrow().create(document);
+            chromiumPreview.onUnavailable(this::chromiumUnavailable);
+        }
+        drawOn(chromiumPreview);
+    }
+    private void drawOn(PreviewSurface next) {
+        if (document.surface() == next) return;
+        // Find ends on the preview that goes; leaving Chromium closes that preview.
+        if (find != null) find.paneHidden(document.surface());
+        if (next != chromiumPreview) chromiumPreview = null;
+        document.previewEngine(next);
+    }
+    private void chromiumUnavailable() { chromiumFailed = true; chooseEngine(shownMode()); }
     private void updateMarkdownEligibility() {
         if (markdown == null) return;
         boolean eligible = markdownEligible();
         if (eligible && (!wasMarkdown || retainedMarkdownMode == null && markdownPreferences != null)) {
             if (retainedMarkdownMode == null && markdownPreferences != null) retainedMarkdownMode = markdownPreferences.current();
             var mode = retainedMarkdownMode == null ? MarkdownMode.SOURCE : retainedMarkdownMode;
-            dismissHiddenFind(mode); markdown.mode(mode);
+            // The surface first, so the view's first preview is laid out on it.
+            dismissHiddenFind(mode); chooseEngine(mode); markdown.mode(mode);
         } else if (!eligible && wasMarkdown) {
             dismissHiddenFind(MarkdownMode.SOURCE);
             markdown.mode(MarkdownMode.SOURCE); document.focusSource(true);
         }
         wasMarkdown = eligible;
     }
-    javax.swing.text.JTextComponent focusedContent() { return document.focusedContent(); }
-    void copy() { focusedContent().copy(); }
-    void selectAll() { focusedContent().selectAll(); }
+    void copy() { if (document.previewFocused()) document.surface().copy(); else area().copy(); }
+    void selectAll() { if (document.previewFocused()) document.surface().selectAll(); else area().selectAll(); }
     void paste() { revealSource(); area().paste(); }
 
     void markdown(MarkdownController value) { markdown = value; updateMarkdownEligibility(); }
@@ -183,6 +225,7 @@ public final class EditorTab {
             vimBar.detach(); vim.close(); vim = null;
         }
         document.close();
+        chromiumPreview = null;
         find = null;
         session.removeListener(refreshing);
         // Last: the listeners above leave the document this view shared, which its other views keep.
@@ -235,7 +278,7 @@ public final class EditorTab {
     /** Restores the last valid source/preview content focus after selection, activation or moves. */
     public void focusContent() {
         if (closed) return;
-        if (showingText()) { if (document.focusedContent() == area()) focusArea.run(); else document.focusedContent().requestFocusInWindow(); }
+        if (showingText()) { if (document.previewFocused()) document.surface().focus(); else focusArea.run(); }
         else focusPending = true;
     }
     void focusAction(Runnable value) { focusArea = value; }
@@ -377,7 +420,7 @@ public final class EditorTab {
         if (markdown != null && markdown.failure().isPresent() && markdown.mode() != dev.jasper.editor.markdown.MarkdownMode.SOURCE) {
             children.add(new Nodes.Stack("document.preview.failure", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
                 new Nodes.Text("document.preview.message", ControlState.READY,
-                    (document.preview().installedResult().isPresent() ? "Preview is out of date. " : "") + markdown.failure().orElseThrow(), Nodes.TextRole.BODY),
+                    (document.surface().installedResult().isPresent() ? "Preview is out of date. " : "") + markdown.failure().orElseThrow(), Nodes.TextRole.BODY),
                 button("document.preview.source", "Source", true), button("document.preview.retry", "Retry", true))));
         }
         boolean banner = session.banner() != DocumentSession.Banner.NONE;

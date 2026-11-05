@@ -1,5 +1,7 @@
 package dev.jasper.browser;
 
+import dev.jasper.browser.api.MarkdownPreviews;
+import dev.jasper.browser.api.PreviewEvent;
 import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.item.BrowserItems;
 import dev.jasper.browser.restore.BrowserRestore;
@@ -13,6 +15,8 @@ import java.awt.Color;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -44,6 +48,45 @@ class BrowserPluginTest {
     }
 
     /**
+     * Spec section 18: a plugin that requires the Browser, optionally, finds the Markdown previews' service; each open
+     * preview hears once when Chromium's start fails, and a closed one hears nothing. Nothing starts Chromium.
+     */
+    @Test void thePluginPublishesTheMarkdownPreviewsAndTellsThemWhenChromiumCannotStart() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var plugin = new BrowserPlugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            MarkdownPreviews previews = previews(host);
+            assertThat(previews.available()).isTrue();
+            List<PreviewEvent> told = new ArrayList<>(), closedTold = new ArrayList<>();
+            var preview = previews.create(told::add);
+            previews.create(closedTold::add).close();
+            plugin.startFailed(new IllegalStateException("Chromium did not start within 90 seconds"));
+            assertThat(told).containsExactly(new PreviewEvent.Unavailable("Chromium did not start within 90 seconds"));
+            assertThat(closedTold).isEmpty();
+            preview.close();
+            assertThat(plugin.chromium().state()).as("nothing asked for Chromium").isEqualTo(Chromium.State.NOT_STARTED);
+            host.stopAll();
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /** Stopping the Browser stops Chromium: every preview still open is unavailable, and no preview is available after. */
+    @Test void stoppingThePluginTellsEachOpenPreviewItIsUnavailable() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var plugin = new BrowserPlugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            MarkdownPreviews previews = previews(host);
+            List<PreviewEvent> told = new ArrayList<>();
+            previews.create(told::add);
+            host.stopAll();
+            assertThat(told).containsExactly(new PreviewEvent.Unavailable(
+                "Chromium can start once each time Jasper runs. Quit and reopen Jasper to use the browser again."));
+            assertThat(previews.available()).isFalse();
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /**
      * Once Chromium cannot serve pages, New Browser Tab, New Browser Window and the split item post the notification of
      * why again, instead of opening an item no page could show. Closing a Chromium that never started touches no
      * Chromium class.
@@ -66,6 +109,14 @@ class BrowserPluginTest {
                 + "Chromium can start once each time Jasper runs. Quit and reopen Jasper to use the browser again.");
             assertThat(host.failures()).isEmpty();
         } });
+    }
+
+    /** The service a plugin that requires the Browser, optionally, as the Editor does, finds. */
+    private static MarkdownPreviews previews(FakePluginHost host) {
+        var found = new AtomicReference<Optional<MarkdownPreviews>>();
+        host.start(new PluginInfo("dev.jasper.consumer", "Consumer", "0.1.0", Set.of()), Set.of(), Set.of(ID),
+            context -> found.set(context.services().find(MarkdownPreviews.class)));
+        return found.get().orElseThrow();
     }
 
     @Test void newBrowserTabAndNewBrowserWindowAreInTheFileMenuWithTheGlobeAndNoDefaultKey() throws Exception {

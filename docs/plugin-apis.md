@@ -1,17 +1,19 @@
 # Bundled plugin APIs
 
-Four bundled plugins export a package of Java types that other plugins compile against and call: Credential Vault
+Five bundled plugins export a package of Java types that other plugins compile against and call: Credential Vault
 hands credentials to Remote and File Server, the Editor opens the files Remote and Project Index find, Remote lists
-projects on saved hosts for Project Index, and Snippets saves commands for Shell History. A plugin of yours uses these
+projects on saved hosts for Project Index, Snippets saves commands for Shell History, and the Browser draws the
+Editor's Markdown preview. A plugin of yours uses these
 APIs, and exports its own, through the same mechanism. Every type below is in the [SDK reference](sdk-reference.html);
 [writing a plugin](plugin-authoring.md) covers the rest of the SDK.
 
 | Package | Provider | Version | Service | Published with | Bundled consumers |
 | --- | --- | --- | --- | --- | --- |
 | [`dev.jasper.vault.api`](sdk-reference.html#package-dev.jasper.vault.api) | Credential Vault, `dev.jasper.vault` | 0.8.0 | [`VaultApi`](sdk-reference.html#dev.jasper.vault.api.VaultApi) | `publishPerConsumer`: each consumer gets its own instance | Remote, File Server |
-| [`dev.jasper.editor.api`](sdk-reference.html#package-dev.jasper.editor.api) | Editor, `dev.jasper.editor` | 0.18.0 | [`Editor`](sdk-reference.html#dev.jasper.editor.api.Editor) | `publish` | Remote, Project Index |
+| [`dev.jasper.editor.api`](sdk-reference.html#package-dev.jasper.editor.api) | Editor, `dev.jasper.editor` | 0.19.0 | [`Editor`](sdk-reference.html#dev.jasper.editor.api.Editor) | `publish` | Remote, Project Index |
 | [`dev.jasper.remote.api`](sdk-reference.html#package-dev.jasper.remote.api) | Remote, `dev.jasper.remote` | 0.19.0 | [`RemoteProjects`](sdk-reference.html#dev.jasper.remote.api.RemoteProjects) | `publish` | Project Index |
 | [`dev.jasper.snippets.api`](sdk-reference.html#package-dev.jasper.snippets.api) | Snippets, `dev.jasper.snippets` | 0.4.0 | [`SnippetService`](sdk-reference.html#dev.jasper.snippets.api.SnippetService) | `publish` | Shell History |
+| [`dev.jasper.browser.api`](sdk-reference.html#package-dev.jasper.browser.api) | Browser, `dev.jasper.browser` | 0.2.0 | [`MarkdownPreviews`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreviews) | `publish` | Editor |
 
 Every bundled consumer declares its provider as an optional requirement and runs without it, except Shell History,
 which fails to start when Snippets is not loaded ([Snippets API](#snippets-api)).
@@ -299,7 +301,7 @@ private void chooseCredential(WindowHandle window, UiView view, Optional<UUID> c
 ## Editor API
 
 Package [`dev.jasper.editor.api`](sdk-reference.html#package-dev.jasper.editor.api), from the Editor
-(`dev.jasper.editor`, 0.18.0). The user's side is in [Editor](editor.md).
+(`dev.jasper.editor`, 0.19.0). The user's side is in [Editor](editor.md).
 
 The Editor publishes one [`Editor`](sdk-reference.html#dev.jasper.editor.api.Editor) for every consumer with `publish`.
 Call it on the UI thread only. Documents open as Editor tabs in a Jasper window; opening a document that is already
@@ -430,7 +432,7 @@ older than 0.11.0, which lack `RelativePaths` ([methods newer than the provider]
 ## Remote API
 
 Package [`dev.jasper.remote.api`](sdk-reference.html#package-dev.jasper.remote.api), from Remote (`dev.jasper.remote`,
-0.18.0). The user's side is in [Remote](remote.md).
+0.19.0). The user's side is in [Remote](remote.md).
 
 Remote publishes one [`RemoteProjects`](sdk-reference.html#dev.jasper.remote.api.RemoteProjects) for every consumer
 with `publish`. Call every method on the UI thread. A stage completes on a worker thread once its remote work has
@@ -492,7 +494,7 @@ private void countFiles(ActionContext invoked) {
 ## Snippets API
 
 Package [`dev.jasper.snippets.api`](sdk-reference.html#package-dev.jasper.snippets.api), from Snippets
-(`dev.jasper.snippets`, 0.3.0). The user's side is in [Shell History and Snippets](history-and-snippets.md).
+(`dev.jasper.snippets`, 0.4.0). The user's side is in [Shell History and Snippets](history-and-snippets.md).
 
 Snippets publishes one [`SnippetService`](sdk-reference.html#dev.jasper.snippets.api.SnippetService) for every consumer
 with `publish`. Call both methods on the UI thread.
@@ -530,6 +532,80 @@ private void save(WindowHandle window, String name, String command) {
             Optional.of(SnippetService.rowId(saved.get().name())));
         else context.notifications().group().warning("Snippet not saved", message.orElseThrow());
     });
+}
+```
+
+## Browser API
+
+Package [`dev.jasper.browser.api`](sdk-reference.html#package-dev.jasper.browser.api), from the Browser
+(`dev.jasper.browser`, 0.2.0). The user's side is in [Editor](editor.md#markdown-preview) and
+[Browser](browser.md#markdown-preview).
+
+The Browser publishes one [`MarkdownPreviews`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreviews) for every
+consumer with `publish`. Call it, and every preview it makes, on the UI thread only; every event and every future
+completes on the UI thread. The API names only JDK and SDK types.
+
+| `MarkdownPreviews` member | Does |
+| --- | --- |
+| [`available()`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreviews.available()) | Whether Chromium can draw previews: false once it failed to start or has stopped, for the rest of Jasper's run. |
+| [`create(events)`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreviews.create(Consumer)) | A [`MarkdownPreview`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview) showing nothing, which asks nothing of Chromium until its component first shows. `events` hears its [`PreviewEvent`](sdk-reference.html#dev.jasper.browser.api.PreviewEvent)s until it closes. |
+
+| `MarkdownPreview` member | Does |
+| --- | --- |
+| [`component()`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.component()) | The canvas, the same `JComponent` each time, for the consumer to lay out. Chromium starts the first time it shows. Its accessible name is "Markdown preview", and its description "Screen readers cannot read this preview. Set Markdown preview to Basic in the Editor's settings to read it." |
+| [`theme(theme)`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.theme(PreviewTheme)) | The look, a [`PreviewTheme`](sdk-reference.html#dev.jasper.browser.api.PreviewTheme): the variant, the workspace and syntax palettes, the text's font family, and a typography for the code's font and the text's size. The page takes it before the next document. |
+| [`show(revision, html)`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.show(long,String)) | Shows a document in place of the one shown, keeping the scroll position. `IllegalArgumentException` for a revision no greater than the last, or for HTML over 16 MiB in UTF-8. A `Shown` with the revision follows once it is laid out, unless a later document replaced it first. |
+| [`image(id, image)`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.image(int,BufferedImage)), [`imageReason(id, reason)`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.imageReason(int,String)), [`clearImages()`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.clearImages()) | Shows an image in each `img` whose `data-image` is `id`, or in its place its alternative text (else "Image") and the reason, in this document and the ones after, until `clearImages`, which forgets them for the documents after: the document shown keeps its images until the next replaces it. |
+| [`scrollTo(y)`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.scrollTo(double)), [`reveal(elementId)`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.reveal(String)) | Scrolls the page to `y`, CSS pixels from the document's top; or brings the element with that id to the top and puts the caret at its start, so Tab goes on from there. |
+| [`markAll(find)`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.markAll(PreviewFind)), [`select(find, forward)`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.select(PreviewFind,boolean)), [`clearFind()`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.clearFind()), [`selectedText()`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.selectedText()) | Find, with a [`PreviewFind`](sdk-reference.html#dev.jasper.browser.api.PreviewFind) (the query, Match Case, Whole Word, and JavaScript's regular expressions): the number of matches, marking at most 10,000; whether the next or previous match from the selection was selected, wrapping round; removing the marks; the selected text when it is one line of at most 1,000 characters, else "". A pattern JavaScript refuses fails the future with a `PatternSyntaxException`; a later `markAll` or `select` cancels one that waits, and a later `selectedText` the one before. Before the page has loaded they answer at once with 0, false and "". |
+| [`copy()`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.copy()), [`selectAll()`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.selectAll()), [`focus()`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.focus()) | Copies the selection, selects the whole document, or gives the canvas the keyboard focus. |
+| [`close()`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreview.close()) | Closes the preview and its page, once. Every call then does nothing, every waiting or later future is cancelled, and no event follows. |
+
+| `PreviewEvent` | Says |
+| --- | --- |
+| [`Shown(revision)`](sdk-reference.html#dev.jasper.browser.api.PreviewEvent.Shown) | That document is in the page and laid out. |
+| [`Geometry`](sdk-reference.html#dev.jasper.browser.api.PreviewEvent.Geometry) | Where the document's blocks are: `top(n)` of the element whose `data-b` is `n` (empty for one with no box), the document's `height()` and the view's `viewport()`. After each `Shown`, and again when the layout changes, as when an image or a font arrives. |
+| [`Scrolled(y, user)`](sdk-reference.html#dev.jasper.browser.api.PreviewEvent.Scrolled) | The page scrolled; `user` is false for the scrolling `scrollTo` asked for. |
+| [`LinkActivated(id)`](sdk-reference.html#dev.jasper.browser.api.PreviewEvent.LinkActivated) | A click, a middle click or Enter on an element whose `data-link` is `id`. The page goes nowhere: the consumer follows the link. |
+| [`Unavailable(reason)`](sdk-reference.html#dev.jasper.browser.api.PreviewEvent.Unavailable) | Chromium cannot draw this preview any more, for the rest of Jasper's run: it could not start or has stopped, the page was not ready, or had shown no document asked for, 30 seconds after its browser started ("The Markdown preview's page did not load within 30 seconds."), or the page stopped ("Chromium's page for the Markdown preview stopped."). Close the preview then too: the Browser keeps it until it closes. |
+
+Later versions of the Browser may add kinds of `PreviewEvent`, so a `switch` over them needs a `default` branch.
+
+**The page.** Each preview's page is its own origin under one content security policy (`default-src 'none'`, scripts
+and styles only from the origin, inline styles allowed): no script in the HTML runs, nothing outside the origin is
+requested, every navigation after the shell's first load is cancelled, and there is no right-click menu, popup or page dialog. Images come only
+from `image`. The HTML goes into a `main` element of class `markdown-body`, whose stylesheet draws GitHub's layout in
+the theme's colours: the ordinary elements, and the classes the Editor writes for alerts (`markdown-alert`,
+`markdown-alert-<type>`, `markdown-alert-title`), task items (`task-list-item`), footnotes (`footnotes`, `footnote-ref`,
+`footnote-backref`), table alignment (`align-left`, `align-center`, `align-right`) and code's tokens (`tok-<role>`, the
+[`SyntaxRole`](sdk-reference.html#dev.jasper.sdk.ui.SyntaxRole)'s name in lower case with `-` for `_`). The page is
+opaque, also in a translucent window.
+
+**Bundled consumer.** The Editor draws its Chromium Markdown preview with it, one preview per view, made the first time
+the view shows Source and preview or Preview, and shows Basic, its own preview, while `available()` is false or after a
+preview reported `Unavailable` ([Editor](editor.md#markdown-preview)). It declares
+`{ id = "dev.jasper.browser", version = ">=0.2.0", optional = true }`.
+
+**Recipe.** Show a short note in Chromium, or nothing while Chromium cannot draw:
+
+```java
+private Optional<MarkdownPreviews> previews = Optional.empty();
+
+// in start
+try { previews = context.services().find(MarkdownPreviews.class); }
+catch (NoClassDefFoundError absent) { previews = Optional.empty(); }
+
+/** UI thread. Lay out the preview's component(), and close the preview with it. */
+private Optional<MarkdownPreview> notePreview() {
+    if (previews.isEmpty() || !previews.get().available()) return Optional.empty();
+    var appearance = context.appearance();
+    MarkdownPreview preview = previews.get().create(event -> {   // UI thread
+        if (event instanceof PreviewEvent.Unavailable gone) context.notifications().group().warning("Preview stopped", gone.reason());
+    });
+    preview.theme(new PreviewTheme(appearance.workspaceVariant(), appearance.workspacePalette(), appearance.syntaxPalette(),
+        "Inter", appearance.terminalTypography()));
+    preview.show(1, "<h1 id=\"notes\" data-b=\"0\">Notes</h1><p data-b=\"1\">Drawn by Chromium.</p>");
+    return Optional.of(preview);
 }
 ```
 

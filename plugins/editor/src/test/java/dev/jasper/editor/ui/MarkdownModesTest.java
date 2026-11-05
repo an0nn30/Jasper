@@ -76,16 +76,16 @@ class MarkdownModesTest {
     @Test void focusTargetsSurviveModeSwitchesAndRememberTheLastSplitPane() {
         var tab = untitled(); tab.session().setStyle(SYNTAX_STYLE_MARKDOWN);
         tab.markdownMode(PREVIEW, true);
-        assertThat(tab.focusedContent()).isSameAs(tab.surface().preview().editor());
+        assertThat(tab.surface().previewFocused()).isTrue();
         tab.focusContent();
         tab.markdownMode(SPLIT, true);
-        assertThat(tab.focusedContent()).isSameAs(tab.area());
+        assertThat(tab.surface().previewFocused()).isFalse();
         var preview = tab.surface().preview().editor();
         for (var listener : preview.getFocusListeners()) listener.focusGained(new java.awt.event.FocusEvent(preview, java.awt.event.FocusEvent.FOCUS_GAINED));
         tab.active(false); tab.active(true); tab.focusContent();
-        assertThat(tab.focusedContent()).isSameAs(preview);
+        assertThat(tab.surface().previewFocused()).isTrue();
         tab.markdownMode(SOURCE, true);
-        assertThat(tab.focusedContent()).isSameAs(tab.area());
+        assertThat(tab.surface().previewFocused()).isFalse();
     }
     @Test void vimAndEditsKeepTheModeAndExistingEditorState() {
         var tab = untitled(); tab.session().setStyle(SYNTAX_STYLE_MARKDOWN);

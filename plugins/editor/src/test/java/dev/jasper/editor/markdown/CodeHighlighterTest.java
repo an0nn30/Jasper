@@ -15,7 +15,7 @@ class CodeHighlighterTest {
         var probe = new MarkdownFixture.Probe(false);
         var out = new MarkdownLimits.Html();
         try (var ignored = MarkdownFixture.lexer(probe)) {
-            var highlighter = new CodeHighlighter(MarkdownFixture.LANGUAGE, MarkdownRendererTest.palette());
+            var highlighter = new CodeHighlighter(MarkdownFixture.LANGUAGE, MarkdownRendererTest.palette(), MarkdownRenderer.Dialect.SWING);
             highlighter.line("/* start", out);
             highlighter.line("end */ int x = 1;", out);
             highlighter.line("int y = 2;", out);
@@ -26,6 +26,24 @@ class CodeHighlighterTest {
             "color=\"#15283c\">int");
     }
 
+    @Test void webTokensAreClassesNamedAfterTheirRoles() {
+        var out = new MarkdownLimits.Html();
+        var highlighter = new CodeHighlighter("java", MarkdownRendererTest.palette(), MarkdownRenderer.Dialect.WEB);
+        highlighter.line("/** doc */ int x = 1; // <end>", out);
+        assertThat(out.toString()).contains("<span class=\"tok-doc-comment\">", "<span class=\"tok-type\">int</span>",
+            "<span class=\"tok-number\">1</span>", "&lt;end&gt;").doesNotContain("<font", "color", "<b>", "<i>");
+    }
+
+    @Test void aMermaidFenceIsNamedByTheFirstWordInAnyCase() {
+        assertThat(CodeHighlighter.mermaid("Mermaid title")).isTrue();
+        assertThat(CodeHighlighter.mermaid("mermaid")).isTrue();
+        assertThat(CodeHighlighter.mermaid("  MERMAID\t{x}")).isTrue();
+        assertThat(CodeHighlighter.mermaid("mermaidx")).isFalse();
+        assertThat(CodeHighlighter.mermaid("text mermaid")).isFalse();
+        assertThat(CodeHighlighter.mermaid("")).isFalse();
+        assertThat(CodeHighlighter.mermaid(null)).isFalse();
+    }
+
     @Test void interruptionDuringTheRealLexerCancelsBeforeMarkupEmission() throws Exception {
         var probe = new MarkdownFixture.Probe(true);
         var failure = new AtomicReference<Throwable>();
@@ -34,7 +52,7 @@ class CodeHighlighterTest {
         String source = "int " + "x".repeat(2_080_000) + ";";
         var out = new MarkdownLimits.Html();
         try (var ignored = MarkdownFixture.lexer(probe)) {
-            var highlighter = new CodeHighlighter(MarkdownFixture.LANGUAGE, MarkdownRendererTest.palette());
+            var highlighter = new CodeHighlighter(MarkdownFixture.LANGUAGE, MarkdownRendererTest.palette(), MarkdownRenderer.Dialect.SWING);
             long started = System.nanoTime();
             var worker = new Thread(() -> {
                 try { highlighter.line(source, out); }

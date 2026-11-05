@@ -35,10 +35,13 @@ constructing ordinary Swing controls, painting, and setting colours, fonts, bord
 on visible components. The Editor's `DocumentArea`, `VimTextArea` and `EditorTheme` are the named exceptions for its
 document surface, with operation-specific exceptions for `EditorTextView`, `EditorTextAreaUI`, `PreviewPane`,
 `PreviewKit` and `PreviewImageView`, and its `SystemClipboard` for Vim registers. The Browser's `PageView` is its
-one canvas, which paints the page and builds no control, and its `Page`, the facade a browser item drives, is the one
-class that makes it. Each exception requires its exact class and matching source file. The Browser (`plugins/browser`) shows Chromium pages through the runtime's `jcef` module, which runs in process;
-only it may name an `org.cef` or `com.jetbrains.cef` type, and only in its `engine`, `page`, `links` and `dialogs`
-packages (`ChromiumBoundaryTest`). A plugin built elsewhere is not checked at build time;
+one canvas, which paints the page and builds no control, and its `Page`, the facade a browser item drives, and
+`PreviewPage`, a Markdown preview's page, are the classes that make it. Each exception requires its exact class and
+matching source file. The Browser (`plugins/browser`) shows Chromium pages through the runtime's `jcef` module, which
+runs in process; only it may name an `org.cef` or `com.jetbrains.cef` type, and only in its `engine`, `page`, `links`
+and `dialogs` packages (`ChromiumBoundaryTest`). It exports `dev.jasper.browser.api`, the Markdown previews Chromium
+draws, which names no JCEF type; the Editor optionally consumes it, and only its `ChromiumPreview` and
+`ChromiumPreviews` name it (`EditorBrowserBoundaryTest`). A plugin built elsewhere is not checked at build time;
 at run time the SDK has no way to mount an ordinary control, and custom content admission (below) refuses one.
 
 ## Launch

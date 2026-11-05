@@ -16,8 +16,10 @@ public final class PluginPresentationCheck {
 
     // The Browser's one canvas: it paints the page Chromium renders off screen, and builds no control but its own superclass.
     private static final String PAGE = "dev/jasper/browser/page/PageView";
-    // The Browser's page facade, the one class that makes the canvas; it builds nothing else.
-    private static final String PAGE_OWNER = "dev/jasper/browser/page/Page";
+    // The Browser's page facades, the classes that make the canvas: a browser item's page and a Markdown preview's. They
+    // build nothing else.
+    private static final String PAGE_OWNER = "dev/jasper/browser/page/Page", PREVIEW_PAGE = "dev/jasper/browser/page/PreviewPage";
+    private static final Set<String> PAGE_OWNERS = Set.of(PAGE_OWNER, PREVIEW_PAGE);
     private static final Set<String> CANVASES = Set.of("dev/jasper/editor/ui/DocumentArea", "dev/jasper/editor/vim/VimTextArea", PAGE);
     private static final String PREVIEW = "dev/jasper/editor/ui/PreviewPane";
     private static final String PREVIEW_KIT = "dev/jasper/editor/ui/PreviewKit";
@@ -93,7 +95,7 @@ public final class PluginPresentationCheck {
                 boolean visible = visible(owner, models, new HashSet<>());
                 if (member.equals("<init>") && visible) {
                     boolean allowed = exactSource && sourceOwner.equals("dev/jasper/editor/ui/EditorTab") && owner.equals("dev/jasper/editor/ui/DocumentArea")
-                        || exactSource && sourceOwner.equals(PAGE_OWNER) && owner.equals(PAGE)
+                        || exactSource && PAGE_OWNERS.contains(sourceOwner) && owner.equals(PAGE)
                         || canvas && (sourceOwner.endsWith("/DocumentArea") ? DOCUMENT_CONSTRUCTORS.contains(owner)
                         : sourceOwner.equals(PAGE) ? owner.equals("javax/swing/JComponent")
                         : Set.of("org/fife/ui/rsyntaxtextarea/RSyntaxTextArea", TEXT_UI).contains(owner))
@@ -251,6 +253,7 @@ public final class PluginPresentationCheck {
         cases.put(PAGE, "class PageView extends javax.swing.JComponent { Object create(){return new javax.swing.JButton();} }");
         cases.put("dev/jasper/browser/page/PageRenderer", "class PageRenderer { void paint(java.awt.Graphics g){g.drawLine(0,0,1,1);} }");
         cases.put(PAGE_OWNER, "class Page { Object create(){return new javax.swing.JButton();} }");
+        cases.put(PREVIEW_PAGE, "class PreviewPage { Object create(){return new javax.swing.JButton();} }");
         var failures = new ArrayList<String>();
         for (var fixture : cases.entrySet()) {
             Path classes = compile(root.resolve(fixture.getKey().replace('/', '_')), fixture.getKey(), fixture.getValue());
@@ -290,6 +293,14 @@ public final class PluginPresentationCheck {
         String canvas = "class PageView extends javax.swing.JComponent { }", made = PAGE_OWNER + " constructs visible control " + PAGE;
         var pageOwnerProblems = check(compile(root.resolve("page_owner"), Map.of(PAGE, canvas, PAGE_OWNER, "class Page { Object view = new PageView(); }")));
         if (!pageOwnerProblems.isEmpty()) failures.add("Rejected the page facade making its canvas: " + pageOwnerProblems);
+        var previewPageProblems = check(compile(root.resolve("preview_page"), Map.of(PAGE, canvas,
+            PREVIEW_PAGE, "class PreviewPage { Object view = new PageView(); }")));
+        if (!previewPageProblems.isEmpty()) failures.add("Rejected the preview's page facade making its canvas: " + previewPageProblems);
+        // A third class of the package, even one that names the preview, may not make the canvas.
+        var third = check(compile(root.resolve("page_third"), Map.of(PAGE, canvas,
+            "dev/jasper/browser/page/PreviewHandlers", "class PreviewHandlers { Object view = new PageView(); }")));
+        if (third.stream().noneMatch(p -> p.contains("dev/jasper/browser/page/PreviewHandlers constructs visible control " + PAGE)))
+            failures.add("Accepted the page canvas made by a third class of the page package: " + third);
         var sibling = check(compile(root.resolve("page_sibling"), Map.of(PAGE, canvas,
             "dev/jasper/browser/page/PageEvents", "class PageEvents { Object view = new PageView(); }")));
         if (sibling.stream().noneMatch(p -> p.contains("dev/jasper/browser/page/PageEvents constructs visible control " + PAGE)))

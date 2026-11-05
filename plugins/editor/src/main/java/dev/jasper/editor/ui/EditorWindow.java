@@ -508,6 +508,7 @@ public final class EditorWindow {
             tab.settings(settings);
             tab.typography(environment.typography());
             tab.vim(vimOn() ? Optional.of(vim) : Optional.empty());
+            tab.previewEngine(environment.markdownPreferences().engine());
         }
         readVimrcOnce();
         refreshStatus();
@@ -1055,6 +1056,9 @@ public final class EditorWindow {
         EditorSettings settings = environment.settings().get();
         var tab = new EditorTab(context.kit(), session, this::closeTab, environment.timers(), sharing);
         tab.previews(context.background(), environment.ui(), imageLoader);
+        // Before the view's first mode, so the preview it lays out is the one the setting chooses.
+        tab.chromium(environment.chromium());
+        tab.previewEngine(environment.markdownPreferences().engine());
         tab.markdownPreferences(environment.markdownPreferences(), failed -> environment.ui().execute(() -> {
             if (!disposed) context.notifications().group().error("Could not save the Markdown default view", failed);
         }));
