@@ -359,11 +359,13 @@ Each is pending.
 Each is pending.
 
 - **Typing near the end (W1, ruling N15):** type near the end of a Markdown document with images in Split with
-  Synchronize scrolling on; the source does not move, and images do not flicker.
+  Synchronize scrolling on; the source does not move, and the images return promptly after each edit (a brief gap is accepted, N22).
 - **The first preview (W3, ruling N16):** the first Markdown preview after a fresh install, or after a restart of the
   Mac, shows the document, not Basic.
 - **Fonts (W4, ruling N17):** the Chromium preview's text is the system font and its code a monospace font with default
-  settings.
+  settings; digits, `#` and `*` in a code block are drawn in the code font, not as emoji.
+- **Switching tabs near the end (R1, ruling N23):** with Synchronize scrolling on in Split, switch to another tab and
+  back while the preview is near the end of a document with images; the source does not move.
 
 ### Plan 9 on Windows and Linux (not run)
 

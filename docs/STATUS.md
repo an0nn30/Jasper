@@ -87,6 +87,13 @@ where it applied):
   check.
 - N20: plan 9 merges into local `main` without slice 1b; Mermaid lands on top of `main` once the user approves its
   download.
+- N21: the docs review's Important needs no change: the reason text carries the image's file name in both previews.
+- N22: the clamp rule also requires the page to have moved up since the last report; a short image gap after each edit
+  may remain, and a hidden view's page keeps its images until its next document.
+- N23: one targeted round after the wave: R1 (a clamp after Java's own scroll), R2 (code font lists never
+  proportional), R3 (emoji families after the generics) and R4 (docs).
+- N24: the page's messages are parsed on Chromium's UI thread (AppKit's main thread on macOS), bounded by the 4 MiB
+  message limit, and recorded as a known gap.
 
 The final review ("With fixes", base `420bfd63a`, head `11e04ff16`) and the docs review (Approved, one Important) were
 answered by one fix wave, W1-W10 (the banner has each): the page reports a layout's clamp of its scroll as not the
@@ -102,6 +109,12 @@ Editor 5,387 with 4 skipped, Browser 609 with 1 skipped), Task 8's 14,722 and th
 external plugin's `check pluginZip` passes (1 test, up to date); `sdkReference` was rerun; source hygiene is clean over
 3,296 Java files. No GUI was launched.
 
+The re-review of the wave found each item addressed and one targeted round followed (N23, `21b3b42f2`): a clamp
+after Java's own scroll down reads as not the user's (R1); in a code font list every Java logical and dot-prefixed
+family is `monospace` (R2); a colour emoji family follows the generics in both lists (R3). Verification:
+`./gradlew check --continue` (9m 30s): **14,733 tests, 0 failures, 0 errors, 103 skipped** (Browser 610 with 1 skipped,
+the rest as above); the example external plugin's `check pluginZip` passes; source hygiene is clean.
+
 Known gaps and follow-ups (the banner has them all, with the deferred minors by task): Mermaid waits for 1b, and after
 it the guides and the setting name Mermaid again and the first `/mermaid.min.js` read should leave Chromium's IO thread;
 `autolink.LICENSE.txt` is unverified (N2); memory does not go back when previews close (in-process Chromium cannot
@@ -110,7 +123,7 @@ shows its background for up to 30 seconds first (N16); regex Whole Word differs 
 for an alternation (N11); **Line height** spaces only Basic's lines; a font only Jasper bundles falls back to the
 system's in Chromium, and serving the bundled fonts is the user's call (N17); Find's current match in Chromium is
 orange in every theme (N19); after an edit the next document's images show once the Editor sets them again, and a
-hidden view's page keeps its images until its next document (W1's cost); every browser page's canvas now has the
+hidden view's page keeps its images until its next document (W1's cost); the page's messages are parsed on Chromium's UI thread, AppKit's main thread on macOS (N24); every browser page's canvas now has the
 accessible role of a canvas (Task 5's side effect); the `Unavailable` reasons "The Markdown preview's page did not load
 within 30 seconds." and "Chromium's page for the Markdown preview stopped." are carried but not shown; no JavaScript
 runs in a test (`preview.js` and `find.js` are checked as text and with `node --check`). Task 9 (the user's check on

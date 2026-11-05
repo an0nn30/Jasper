@@ -8,9 +8,9 @@ fix wave; slice 1b (Mermaid) waits for the user's approval of its download, and 
 the user's GUI check on macOS, is pending** (branch `claude/browser-markdown-preview`, worktree
 `.claude/worktrees/browser-4b-4c-e6deab`, cut from local `main` `420bfd63a`, which has plans 4a, 4b and 4c merged; the
 plan `1364c1dc3`, then commits `8676bfab4` to `a38f29813`, the docs `ea57ab1af` and the checklist `11e04ff16`, then the
-fix wave `af2f1e1ed` to `8031cee59` and its docs; not merged or pushed; see `docs/STATUS.md`). Executed with per-task
+fix wave `af2f1e1ed` to `8031cee59` and its docs, then the targeted round `21b3b42f2` and its docs (N23); not merged or pushed; see `docs/STATUS.md`). Executed with per-task
 subagents and reviews. The pre-flight scan's findings F1-F38 were adopted as rulings (N0, cited N-F*n*), and the
-controller's further rulings are N1-N20; plan 4a's R0-R48, its sandbox ruling and the banners of 4b and 4c bind. The
+controller's further rulings are N1-N24; plan 4a's R0-R48, its sandbox ruling and the banners of 4b and 4c bind. The
 task reviews and the final review recorded these deviations from the plan's text, each with its ruling:
 - **Versions:** no SDK change (`JasperSdk.VERSION` stays 0.28.0, every bundled range `>=0.28.0, <0.29`); the Browser
   is 0.2.0 and exports `dev.jasper.browser.api` (no `@since`); the Editor is 0.19.0 and requires
@@ -179,6 +179,21 @@ task reviews and the final review recorded these deviations from the plan's text
     Snippets 0.4.0 in Plugin APIs, the Editor's `terminal.observe` in the SDK reference's overview, and `WebMarkup`'s
     anchoring comment;
   - the wave's counts are below the deferred minors.
+- **The re-review's targeted round** (`21b3b42f2`, N23; N21 and N22 settle the wave's two open points):
+  - N21: the docs review's Important (W2) needs no change: the reason text carries the file name, and both previews
+    show it, so the guide is right;
+  - N22: W1's clamp rule also requires the page to have moved up since the last report, so a jump to the end after a
+    silent shrink stays the user's; a short image gap after each edit may remain (the new document's images get their
+    source when the page reports shown), and a hidden view's page keeps its images until its next document, outside
+    the Editor's 64 MiB budget; `ChromiumPreview`'s switch stays exhaustive;
+  - R1: a clamp is measured from the further of the last report and Java's own unreported `scrollTo`, and a clamp
+    becomes the page's target, so a clamp after Java's scroll down, and its follow-up event, are not the user's;
+  - R2: in a code font list every Java logical family and dot-prefixed family stands for `monospace`, so code never
+    turns proportional; a text list keeps its mapping;
+  - R3: in both lists a family whose name contains `emoji` goes after the generics, so digits, `#` and `*` in code are
+    not drawn from Apple Color Emoji (the Editor's default fallbacks put it before `monospace`);
+  - tests: `PreviewCssTest` (a logical fallback in a code list; emoji last in both lists, the default fallbacks'
+    stack) and `PreviewScriptTest`; RED: with `PreviewCss` as before, both tests failed.
 
 Not run:
 - **Task 9**, the user's GUI check on macOS, with their OK: pending (checklist `11e04ff16`, with the fix wave's three
@@ -194,6 +209,9 @@ Known gaps and follow-ups:
   Mermaid again (N8), and the first `/mermaid.min.js` read (about 3 MB) should be answered off Chromium's IO thread, as
   `AboutSchemeFactory` does.
 - **`autolink.LICENSE.txt`** is unverified against upstream (N2); it is checked before any push (N14).
+- **The page's messages are parsed on Chromium's UI thread** (N24): `PreviewPage.received` parses geometry there,
+  which on macOS is AppKit's main thread and also feeds AWT's input; the 4 MiB message limit bounds the work, at the
+  cost of input latency on a huge geometry message.
 - **Memory does not go back** when previews close: in-process Chromium cannot restart (4a's R28), and the preview client
   lives as long as Chromium (N-F32, inherited from 4a).
 - **The fallback is silent:** a view that falls back to Basic says nothing unless Chromium's start failed; the
@@ -238,6 +256,12 @@ example plugin's: jasper-app 5,256 with 90 skipped, Editor 5,387 with 4 skipped,
 131, jasper-sdk-testkit 295), Task 8's 14,722 and the wave's ten new tests; the example external plugin's `check
 pluginZip` against `build/sdk-release` passes (1 test, up to date: the SDK is unchanged); `sdkReference` was rerun;
 source hygiene is clean over 3,296 Java files; `preview.js` passes `node --check`. No GUI was launched.
+
+The targeted round's verification: `./gradlew check --continue` (JBR 25.0.4.1 b635.75 jcef, 9m 30s):
+**14,733 tests, 0 failures, 0 errors, 103 skipped** (1,324 classes, without the example plugin's: jasper-app 5,256 with
+90 skipped, Editor 5,387 with 4 skipped, Browser 610 with 1 skipped), the wave's 14,732 and one new test; the example
+external plugin's `check pluginZip` passes (up to date); source hygiene is clean; `preview.js` passes `node --check`.
+No GUI was launched.
 
 **Goal:** The Editor's Markdown preview drawn by Chromium, through the Browser's exported API:
 - Mermaid diagrams, highlighted code and GitHub's layout in Jasper's theme colours, following light and dark;

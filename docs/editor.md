@@ -379,7 +379,7 @@ sideways, and in Chromium's that code block or table does.
 Text is in the interface font's family at the tab's font size, with larger headings; code is in the Editor's font,
 with its fallback fonts and ligatures. Chromium draws only the fonts installed on the computer: in its preview, text in
 a font only Jasper bundles is in the system's interface font, and code in one, such as the default Cousine Nerd Font
-Mono, in the system's monospace font. In Basic, **Line height** spaces the preview's lines too. Colours come from the
+Mono, in the system's monospace font; colour emoji fonts come last, so digits and `#` in code are never drawn as emoji. In Basic, **Line height** spaces the preview's lines too. Colours come from the
 UI theme ([Theme colours](#theme-colours)). A change of theme or font applies to the preview at once.
 
 The preview cannot be edited. Copy copies the text selected in it, and **Select All** in the tab menu selects all of it
