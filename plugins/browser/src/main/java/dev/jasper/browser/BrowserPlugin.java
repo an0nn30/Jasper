@@ -13,6 +13,7 @@ import dev.jasper.browser.item.SourcePage;
 import dev.jasper.browser.item.WebMenu;
 import dev.jasper.browser.links.PageNavigation;
 import dev.jasper.browser.pages.AboutPages;
+import dev.jasper.browser.pages.BookmarksPage;
 import dev.jasper.browser.pages.HistoryPage;
 import dev.jasper.browser.preview.PreviewService;
 import dev.jasper.browser.restore.BrowserRestore;
@@ -102,12 +103,15 @@ public class BrowserPlugin implements Plugin {
         var welcome = new WelcomePage(context.appearance());
         about.register(WelcomePage.NAME, welcome::html);
         about.registerAction(WelcomePage.SETTINGS, () -> { if (running) items.showSettings(); });
-        // Jasper's pages built from their templates, in the workspace theme. Spec section 10: the history page, whose
-        // queries are answered from the history; the asking browser is not needed yet.
+        // Jasper's pages built from their templates, in the workspace theme. Spec section 10: the history and bookmarks
+        // pages, whose queries are answered from the history and the bookmarks; the asking browser is not needed yet.
         var pages = new AboutPages(context.appearance(), about);
         var history = stores.history();
         about.register(HistoryPage.NAME, () -> pages.render(HistoryPage.NAME, Map.of()));
         about.registerQueries(HistoryPage.NAME, (browser, request) -> HistoryPage.answer(history, request));
+        var bookmarks = stores.bookmarks();
+        about.register(BookmarksPage.NAME, () -> pages.render(BookmarksPage.NAME, Map.of()));
+        about.registerQueries(BookmarksPage.NAME, (browser, request) -> BookmarksPage.answer(bookmarks, request));
         // Spec section 14: a failed load's page, and what its Try Again and Continue ask of the item whose page it is.
         var errors = new ErrorPage(context.appearance());
         about.register(ErrorPage.NAME, errors::html);
