@@ -10,7 +10,7 @@ worktree `.claude/worktrees/browser-4b-4c-e6deab`, cut from local `main` `68265a
 merged; the plan `4930f00b6`, then commits `6240e693d` to `986462e5c`, the docs `01dae94a0` and `4659c642e`, and the fix
 wave `1e9f2f717` to `032fbdcc3` and its docs; not merged or pushed; see `docs/STATUS.md`). Executed with per-task
 subagents and reviews. The pre-flight scan's findings F1-F39 were adopted as rulings (H0, cited H-F*n*) except where
-H1-H6 decide otherwise, and the controller's further rulings are H1-H39; plan 4a's R0-R48, its sandbox ruling and the
+H1-H6 decide otherwise, and the controller's further rulings are H1-H41; plan 4a's R0-R48, its sandbox ruling and the
 banners of 4b, 4c and 9 bind. The task reviews recorded these deviations from the plan's text, each with its ruling:
 - **Versions:** `JasperSdk.VERSION` 0.28.0 to 0.29.0, every bundled range `>=0.29.0, <0.30` (Task 6a). New SDK members,
   each `@since 0.29.0`: 6b's token field (`Nodes.TokenField`, `TokenField.kept`, `UiEvent.TokensChanged`, and the
@@ -166,8 +166,9 @@ banners of 4b, 4c and 9 bind. The task reviews recorded these deviations from th
     takes the restriction as a `Runnable` (`engine` names no `store` type), and `BrowserDatabase.file` takes the
     `DataFolder`;
   - `691b62cee` "Browser: Paste and Run presses Return only where text went" (W2, H38): `insert-text.js` answers
-    `inserted`, `unreachable` or `not-editable` (`Page.Insertion`), and only `unreachable` is typed into
-    (`Input.insertText`) and gets Return; a main-frame load start after the insertion began skips both. A closed
+    `inserted`, `unreachable` or `not-editable` (`Page.Insertion`): `inserted` gets Return when asked, and only
+    `unreachable` falls back to typing with `Input.insertText`, then Return when asked; `not-editable` gets neither,
+    and a main-frame load start after the insertion began skips both. A closed
     shadow root is told by the focused element: one a shadow root can be attached to, with no open root, no tabindex,
     not editable and not scrolling, so it cannot hold the focus itself. Number joins the text-entry types; a number
     field or an editable element whose document refuses `execCommand` takes nothing (text that is no number would
@@ -205,6 +206,25 @@ banners of 4b, 4c and 9 bind. The task reviews recorded these deviations from th
     `sdkReference` was rerun; source hygiene is clean over 3,361 Java files, and a byte scan of every file the wave
     touched finds no raw U+00A0, U+2028 or U+2029 (the 8 raw characters the review named are escapes). No GUI was
     launched.
+- **The re-review's round** (the re-review found W1-W13 addressed; rulings H40 and H41):
+  - H40 accepted the wave's four calls: W2's closed-shadow-root heuristic, so a closed root whose host has a tabindex or
+    scrolls gets no snippet; an editable element or a number field whose document refuses the text takes nothing; W1
+    takes the group's and others' permissions instead of setting `rwx------`, so a folder its owner made read-only
+    stays so; and W7's hand-off of the background executor through `Page` to `PageText.of` has no headless test;
+  - `802d0f327` "Browser: a new browser.sqlite is its owner's alone, and a refused parse ends its run" (H41): a missing
+    `browser.sqlite` is made `rw-------` after the writability checks and before SQLite opens it, where POSIX applies,
+    so the `-wal` and `-shm` SQLite makes take 0600 too, and an open that cannot use the file it made deletes it; and
+    `PageText` hands the parse to the background executor itself, a refusal, as after the plugin stops, failing the run.
+    JBR 25's `CompletableFuture` already failed an async stage whose executor refuses it (`uniApply` catches what
+    `claim()` throws), so the test of a refusing executor passed before the change too; the change makes explicit what
+    no specification promises;
+  - Verification: the new `BrowserDatabaseTest` case failed before the change (`expected: "rw-------" but was:
+    "rw-r--r--"` for a fresh `browser.sqlite`) and passes; `PageTextTest`'s refusing-executor case passes before and
+    after, as said. `./gradlew check --continue` (10m 41s, after the code and the docs but for these counts): **15,078
+    tests, 0 failures, 0 errors, 103 skipped** (1,352 classes; Browser 901 with 1 skipped, the wave's 899 and the
+    round's 2; jasper-app 5,280, Editor 5,387, Remote 659, up to date from the wave's check); the example plugin's
+    `check pluginZip` passes (1 test, up to date: no SDK change); source hygiene is clean over 3,361 Java files, and no
+    file the round touched holds a raw U+00A0, U+2028 or U+2029.
 
 Not run:
 - **Task 14**, the user's GUI check on macOS, with their OK: pending
@@ -228,7 +248,8 @@ Known gaps and follow-ups:
 - **What H38 leaves to the page:** a focus in a frame of another origin or a closed shadow root still gets the
   snippet through `Input.insertText` and Return, so a page that puts the focus on a control in one of them gets Return
   there; a focused element that could host a shadow root and cannot hold the focus itself is taken for a closed root's
-  host, and a scrolling one or one with a tabindex for a control that takes no text.
+  host, and a scrolling one or one with a tabindex for a control that takes no text (H40); and an inserted field's
+  Return goes wherever the page has moved the focus by then, as the user's own Return would.
 - **What H36 leaves:** a read that ran in the page but answered too late, or failed, consumed the change and keeps no
   text, so the selection it read is copied only once the user changes the selection.
 - **Kept from the final review** (its items 12-15): a bookmark's title outlives the bookmark in the palette's recents,

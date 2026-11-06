@@ -258,8 +258,9 @@ Jasper looks for the focused field from the page's top document, through frames 
 roots: an input that takes text (text, search, URL, telephone, email, number, or password, as a snippet may be a user
 name or a code), a text area or an editable element, not disabled or read-only. The snippet replaces the field's
 selection, as typing would. When the focus is where the search cannot follow it, in a frame of another origin or a
-closed shadow root, Jasper types the snippet there with Chromium's DevTools (`Input.insertText`). The clipboard is never
-used.
+closed shadow root, Jasper types the snippet there with Chromium's DevTools (`Input.insertText`). Jasper tells a closed
+shadow root by its host, which cannot hold the focus itself, so a closed root whose host has a tabindex or scrolls gets
+no snippet. The clipboard is never used.
 
 When the focus takes no text, Jasper does nothing: nothing is typed and Paste and run presses no Return, which would
 press the page's control. That is so for a button, a link, a checkbox, a disabled or read-only field, the page itself

@@ -472,8 +472,9 @@ Each is pending.
   that navigates while the snippet goes in gets nothing more.
 - **Copy on select on a slow page (H36):** a selection finished while the page's script is busy (a loop of a few
   seconds started from its DevTools console), then a second one, copies the second once the page is free.
-- **The data folder (H37):** once a page has loaded, `ls -ld` shows `drwx------` for `plugins/dev.jasper.browser/data`
-  and `ls -l` shows `-rw-------` for `browser.sqlite`, also when they had wider permissions before the launch.
+- **The data folder (H37, H41):** once a page has loaded, `ls -ld` shows `drwx------` for
+  `plugins/dev.jasper.browser/data` and `ls -l` shows `-rw-------` for `browser.sqlite` and its `-wal` and `-shm`, in a
+  fresh data folder and when they had wider permissions before the launch.
 - **Quitting with Edit Bookmark open:** tags typed in the open panel are kept after Cmd+Q, and after turning the
   Browser off in Settings › Plugins.
 - **The bookmarks page:** with a tag chosen, removing it from its last bookmark in Edit Bookmark, then a new search or

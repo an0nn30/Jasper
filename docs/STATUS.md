@@ -2,8 +2,8 @@
 
 **Browser plan 5: history, bookmarks and Jasper integrations — 2026-11-06** (`claude/browser-history-bookmarks`,
 worktree `.claude/worktrees/browser-4b-4c-e6deab`, from local `main` `68265a983`, which has plans 4a, 4b, 4c and 9
-merged; the plan `4930f00b6`, commits `6240e693d` to `986462e5c`, the docs, and the final fix wave `1e9f2f717` to
-`032fbdcc3` and its docs; not merged or pushed;
+merged; the plan `4930f00b6`, commits `6240e693d` to `986462e5c`, the docs, the final fix wave `1e9f2f717` to
+`032fbdcc3` and its docs, and the re-review's round `802d0f327` and its docs; not merged or pushed;
 [plan](superpowers/plans/2026-10-30-browser-5-history-bookmarks.md), whose banner lists every deviation by task,
 [spec](superpowers/specs/2026-10-26-jasper-browser-plugin-design.md) sections 6, 7, 10, 12, 14, 15 and 23,
 [guide](browser.md#history); executed with per-task subagents and reviews, Task 6 as 6a and 6b; the final review passed
@@ -50,12 +50,13 @@ pages, the welcome and onboarding pages, the Files table and the data folder's p
 scopes), Shell History and Snippets (Insert in pages), the terminal and configuration guides (Copy on select in pages),
 Plugins (the Browser's capabilities), Remote (the SQLite folder), the docs index, the README, the SDK reference's
 overview and the regenerated reference, the root `package-info`, the plan's banner and this entry; the SDK guides came
-with Tasks 6b, 7 and 10, and the testkit's README and the testing guide's setter with the fix wave. After the fix
-wave, `./gradlew check --continue` (JBR 25.0.4.1 b635.75 jcef, 14m 32s): **15,076 tests, 0 failures, 0 errors, 103
-skipped** (1,352 classes in the 16 build folders, without the example plugin's: jasper-app 5,280 with 90 skipped,
-Editor 5,387 with 4 skipped, Browser 899 with 1 skipped, jasper-ui 1,020, Remote 659, jasper-sdk 135, jasper-sdk-testkit
-304), that is, the 15,063 of the check after the docs (Task 13) and the wave's 13 Browser tests; the example external
-plugin's `check pluginZip` against `build/sdk-release` passes (1 test); `sdkReference` was rerun; the node harnesses of
+with Tasks 6b, 7 and 10, and the testkit's README and the testing guide's setter with the fix wave. After the
+re-review's round, `./gradlew check --continue` (JBR 25.0.4.1 b635.75 jcef, 10m 41s): **15,078 tests, 0 failures, 0
+errors, 103 skipped** (1,352 classes in the 16 build folders, without the example plugin's: jasper-app 5,280 with 90
+skipped, Editor 5,387 with 4 skipped, Browser 901 with 1 skipped, jasper-ui 1,020, Remote 659, jasper-sdk 135,
+jasper-sdk-testkit 304), that is, the 15,063 of the check after the docs (Task 13), the fix wave's 13 Browser tests and
+the round's 2; the example external plugin's `check pluginZip` against `build/sdk-release` passes (1 test);
+`sdkReference` was rerun with the wave; the node harnesses of
 `insert-text.js` (43 cases), `selection.js` (57) and `bookmarks.js` (9) pass; source hygiene is clean over 3,361 Java
 files, and no file the wave touched holds a raw U+00A0, U+2028 or U+2029. No GUI was launched.
 
@@ -115,12 +116,20 @@ it applied):
   a kind of its own; a read that ran but failed keeps nothing (built in the fix wave).
 - H37: the Browser's data folder is `rwx------`, and an existing `browser.sqlite` `rw-------`, where POSIX allows, on
   the store's thread and before Chromium writes its profile; a failure is logged once.
-- H38: `insert-text.js` answers inserted, unreachable or not editable; only unreachable is typed into and gets Return,
-  and a main-frame load start during the insertion skips both.
+- H38: `insert-text.js` answers inserted, unreachable or not editable; an inserted field gets Return when asked, only an
+  unreachable focus falls back to typing with `Input.insertText` and then Return, and a main-frame load start during
+  the insertion skips both.
 - H39: the testkit's setter is `setCopyOnSelect(boolean)`, beside `setDefaultBrowser`.
+- H40: the fix wave's four calls are accepted: the closed-shadow-root heuristic (a host with a tabindex or that scrolls
+  is a control, and its root gets no snippet); an editable element or a number field that refuses the text takes
+  nothing; the data folder loses the group's and others' permissions, keeping the owner's; and `Page`'s hand-off of the
+  background executor to `PageText.of` has no headless test.
+- H41: a missing `browser.sqlite` is made `rw-------` before SQLite opens it, so its `-wal` and `-shm` are too, and
+  deleted again if that open fails; a parse the stopped plugin's executor refuses fails its run.
 
 Known gaps and follow-ups (the banner has them all, with the deferred minors by task): a focus in a frame of another
-origin or a closed shadow root still gets the snippet through `Input.insertText` and Return (H38); a selection read that
+origin or a closed shadow root still gets the snippet through `Input.insertText` and Return (H38), and an inserted
+field's Return goes wherever the page has moved the focus by then, as the user's own would; a selection read that
 ran but answered too late is copied only once the selection changes (H36); a bookmark's title outlives the bookmark in
 the palette's recents; the Visited scope lowercases its 10,000 rows on each keystroke, for the benchmarks to measure;
 the plan's What follows holds plan 6's handoff (routing Jasper's pages' queries by browser through a concurrent map,
