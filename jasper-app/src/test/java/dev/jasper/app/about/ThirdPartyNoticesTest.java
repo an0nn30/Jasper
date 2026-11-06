@@ -5,7 +5,9 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
+import org.tomlj.Toml;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -41,6 +43,27 @@ class ThirdPartyNoticesTest {
         assertThat(autolink.notice()).isEmpty();
         assertThat(ThirdPartyNotices.read(autolink.text())).contains("Robin Stocker",
             "Permission is hereby granted, free of charge", "THE SOFTWARE IS PROVIDED \"AS IS\"");
+    }
+
+    /**
+     * Browser plan 9's slice 1b: the Browser ships npm's {@code mermaid.min.js} unmodified, listed in the component's
+     * files, with Mermaid's MIT licence and a notice naming the packages the file bundles.
+     */
+    @Test void mermaidIsListedWithItsFileItsMitLicenseAndWhatItBundles() {
+        var mermaid = ThirdPartyNotices.thirdParty().stream().filter(c -> c.name().equals("Mermaid")).findFirst().orElseThrow();
+        assertThat(mermaid.title()).isEqualTo("Mermaid 11.17.2");
+        assertThat(mermaid.license()).isEqualTo("MIT");
+        assertThat(mermaid.homepage()).isEqualTo("https://mermaid.js.org/");
+        assertThat(mermaid.modules()).isEmpty();
+        assertThat(ThirdPartyNotices.read(mermaid.text())).startsWith("The MIT License (MIT)\n\nCopyright (c) 2014 - 2022 Knut Sveidqvist\n")
+            .contains("Permission is hereby granted, free of charge", "THE SOFTWARE IS PROVIDED \"AS IS\"");
+        assertThat(ThirdPartyNotices.read(mermaid.notice().orElseThrow())).contains("mermaid-11.17.2.tgz", "package/dist/mermaid.min.js",
+            "581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8", "dompurify", "(MPL-2.0 OR Apache-2.0)", "d3-sankey",
+            "BSD-3-Clause", "khroma", "MIT © Fabio Spampinato, Andrew Maney", "@mermaid-js/parser", "DOMPurify 3.4.12", "lodash-es");
+        var table = Toml.parse(ThirdPartyNotices.read("notices.toml")).getArrayOrEmpty("component");
+        var files = IntStream.range(0, table.size()).mapToObj(table::getTable)
+            .filter(component -> "Mermaid".equals(component.getString("name"))).findFirst().orElseThrow().getArrayOrEmpty("files");
+        assertThat(files.toList()).containsExactly("dev.jasper.browser/dev/jasper/browser/third_party/mermaid.min.js");
     }
 
     @Test void jasperComesFirstThenTheRestByNameIgnoringCase() {

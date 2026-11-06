@@ -292,7 +292,7 @@ class ChromiumStateTest {
     /** A marker that cannot be written fails neither the start nor the close, and is a warning. */
     @Test void aMarkerThatCannotBeWrittenFailsNothing() throws Exception {
         Path notADirectory = Files.createFile(data.resolve("file"));
-        Chromium chromium = new Chromium(notADirectory, () -> { }, recording, new AboutScheme(), new PreviewScheme(),
+        Chromium chromium = new Chromium(notADirectory, () -> { }, recording, new AboutScheme(), new PreviewScheme(Runnable::run),
             cause -> tellings.incrementAndGet(), process, LIMIT);
         var client = chromium.client();
         assertThat(chromium.enter()).isTrue();
@@ -446,7 +446,7 @@ class ChromiumStateTest {
 
     private Chromium chromium(Executor worker, Duration limit) {
         return new Chromium(data, () -> restricted.add(Files.exists(marker()) ? "after the marker" : "before the marker"), worker,
-            new AboutScheme(), new PreviewScheme(), cause -> {
+            new AboutScheme(), new PreviewScheme(Runnable::run), cause -> {
             tellings.incrementAndGet();
             toldOnUi.set(EventQueue.isDispatchThread());
             told.complete(cause);
