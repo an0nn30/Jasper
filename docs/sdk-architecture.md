@@ -252,7 +252,7 @@ where the look draws one (`TitleInset`).
   window or a shown modal dialog it owns, directly or through a dialog, or while `WindowInput.showsModal` finds the
   window's root marked by an overlay or a visible modal dialog owned by its native window, Jasper's own included.
 - **Anchors and popovers.** `UiView.anchor(id)` mints a `UiAnchor` only for a mounted, visible, enabled, not busy
-  `Button` or PICKER `Choice`. Hiding, disabling, busying, removing, retyping or reparenting the control, closing its
+  `Button`, `MenuButton` or PICKER `Choice`. Hiding, disabling, busying, removing, retyping or reparenting the control, closing its
   surface or stopping the plugin invalidates it for good; a refresh of the same control keeps it. `Windows.popover`
   attaches non-modal content from the anchor's own plugin; an anchor also owns a `DialogSpec` dialog above the
   surface that shows it. Neither passes view ownership to another plugin.

@@ -1635,7 +1635,7 @@ A modeless dialog whose content is a <a href="#dev.jasper.sdk.ui.Nodes.FormKind.
 a window's size, can be resized and remembers its bounds.</li>
 <li><a href="#dev.jasper.sdk.ui.Windows.overlay(OverlaySpec)"><code>Windows.overlay(OverlaySpec)</code></a>: progress content centred inside a Jasper window, one per window. Escape and
 outside clicks do not dismiss it, so give it a Cancel action.</li>
-<li><a href="#dev.jasper.sdk.ui.Windows.popover(UiAnchor)"><code>Windows.popover(UiAnchor)</code></a>: a popup below (or above) a button or picker, from <a href="#dev.jasper.sdk.ui.UiView.anchor(String)"><code>UiView.anchor(String)</code></a>;
+<li><a href="#dev.jasper.sdk.ui.Windows.popover(UiAnchor)"><code>Windows.popover(UiAnchor)</code></a>: a popup below (or above) a button, menu button or picker, from <a href="#dev.jasper.sdk.ui.UiView.anchor(String)"><code>UiView.anchor(String)</code></a>;
 Escape and clicks outside close it.</li>
 </ul>
 <p><a href="#dev.jasper.sdk.ui.Windows.hasModal(WindowOwner)"><code>Windows.hasModal(WindowOwner)</code></a> tells whether a Jasper window shows a modal now: a modal dialog over it,
@@ -1853,7 +1853,7 @@ views close when it stops.</p>
 <tr><td><a href="#dev.jasper.sdk.ui.UiView.focus(String)"><code>UiView.focus(String)</code></a>, <a href="#dev.jasper.sdk.ui.UiView.reveal(String)"><code>UiView.reveal(String)</code></a></td><td>Focus a node; scroll one into view without moving focus.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.UiView.selectAll(String)"><code>UiView.selectAll(String)</code></a></td><td>Select a field's text without editing it or moving focus.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.UiView.composing(String)"><code>UiView.composing(String)</code></a></td><td>Whether an input method holds uncommitted text in a field; leave keys to it while true.</td></tr>
-<tr><td><a href="#dev.jasper.sdk.ui.UiView.anchor(String)"><code>UiView.anchor(String)</code></a></td><td>A <a href="#dev.jasper.sdk.ui.UiAnchor"><code>UiAnchor</code></a> on a mounted button or PICKER choice, for a popover or a dialog attached to it.</td></tr>
+<tr><td><a href="#dev.jasper.sdk.ui.UiView.anchor(String)"><code>UiView.anchor(String)</code></a></td><td>A <a href="#dev.jasper.sdk.ui.UiAnchor"><code>UiAnchor</code></a> on a mounted button, menu button (since 0.29.0) or PICKER choice, for a popover or a dialog attached to it.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.UiView.withSecret(String,Consumer)"><code>UiView.withSecret(String, Consumer)</code></a>, <a href="#dev.jasper.sdk.ui.UiView.clearSecret(String)"><code>UiView.clearSecret(String)</code></a>, <a href="#dev.jasper.sdk.ui.UiView.replaceSecret(String,char[])"><code>UiView.replaceSecret(String, char[])</code></a></td><td>Read a secret field's characters (erased after the callback), clear it, or set it without an edit event.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.UiView.registerContent(CustomContent)"><code>UiView.registerContent(CustomContent)</code></a></td><td>Fill a <a href="#dev.jasper.sdk.ui.Nodes.Custom"><code>Nodes.Custom</code></a> node with a component; see below.</td></tr>
 </tbody>
@@ -11281,7 +11281,8 @@ for good) or removed one (Backspace with nothing typed, or a token's remove butt
 </div>
 <div class="member" id="dev.jasper.sdk.ui.UiView.anchor(String)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.UiView.anchor(String)" aria-label="Link to this member">#</a><code><a class="tl" href="#dev.jasper.sdk.ui.UiAnchor">UiAnchor</a> <b>anchor</b>(<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> nodeId)</code></pre>
-<div class="doc"><p>Mint attachment authority from an eligible mounted action or PICKER.</p></div>
+<div class="doc"><p>Mint attachment authority from an eligible mounted action or PICKER: a <a href="#dev.jasper.sdk.ui.Nodes.Button"><code>Nodes.Button</code></a>, a PICKER
+<a href="#dev.jasper.sdk.ui.Nodes.Choice"><code>Nodes.Choice</code></a> or, since 0.29.0, a <a href="#dev.jasper.sdk.ui.Nodes.MenuButton"><code>Nodes.MenuButton</code></a>, whose popovers attach to its button.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>nodeId</code> control id</dd><dt>Returns</dt><dd>scoped capability</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.ui.UiView.spec()">

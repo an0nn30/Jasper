@@ -93,11 +93,15 @@ public final class KitView extends JPanel implements AutoCloseable {
         for (var child : ControlRegistry.children(node)) if (namesList(child, listId)) return true;
         return false;
     }
-    /** Host attachment seam: only live enabled PICKER/action controls may issue an attachment. */
+    /**
+     * Host attachment seam: only live enabled PICKER/action controls may issue an attachment: a button, a menu button
+     * (its main button) or a PICKER.
+     */
     public JComponent anchorTarget(String id) {
         requireOpen();
         var control = reconciler.control(Objects.requireNonNull(id));
-        if (!(control.node instanceof Nodes.Button || control.node instanceof Nodes.Choice c && c.kind() == Nodes.ChoiceKind.PICKER)
+        if (!(control.node instanceof Nodes.Button || control.node instanceof Nodes.MenuButton
+                || control.node instanceof Nodes.Choice c && c.kind() == Nodes.ChoiceKind.PICKER)
                 || !eligible(spec.root(), id, true)) throw new IllegalArgumentException("Not an eligible attachment control");
         return control.focusTarget();
     }

@@ -10,10 +10,27 @@ import static org.assertj.core.api.Assertions.*;
 class HostedAnchorTest {
     @Test void popupFitsBelowOrAboveTheOwnerAndClampsToUsableScreen() {
         var screen=new java.awt.Rectangle(10,20,300,200);
-        assertThat(HostedPopover.fit(new java.awt.Rectangle(40,30,190,22),new java.awt.Dimension(220,100),screen)).isEqualTo(new java.awt.Rectangle(40,52,220,100));
-        assertThat(HostedPopover.fit(new java.awt.Rectangle(250,190,190,22),new java.awt.Dimension(220,100),screen)).isEqualTo(new java.awt.Rectangle(90,90,220,100));
-        assertThat(HostedPopover.fit(new java.awt.Rectangle(40,100,190,22),new java.awt.Dimension(500,400),screen)).isEqualTo(new java.awt.Rectangle(10,20,300,200));
-        assertThat(HostedPopover.fit(new java.awt.Rectangle(40,30,190,22),new java.awt.Dimension(150,100),screen)).as("as wide as its anchor").isEqualTo(new java.awt.Rectangle(40,52,190,100));
+        assertThat(HostedPopover.fit(new java.awt.Rectangle(40,30,190,22),new java.awt.Dimension(220,100),screen,screen)).isEqualTo(new java.awt.Rectangle(40,52,220,100));
+        assertThat(HostedPopover.fit(new java.awt.Rectangle(250,190,190,22),new java.awt.Dimension(220,100),screen,screen)).isEqualTo(new java.awt.Rectangle(90,90,220,100));
+        assertThat(HostedPopover.fit(new java.awt.Rectangle(40,100,190,22),new java.awt.Dimension(500,400),screen,screen)).isEqualTo(new java.awt.Rectangle(10,20,300,200));
+        assertThat(HostedPopover.fit(new java.awt.Rectangle(40,30,190,22),new java.awt.Dimension(150,100),screen,screen)).as("as wide as its anchor").isEqualTo(new java.awt.Rectangle(40,52,190,100));
+    }
+
+    /**
+     * H21: a popover starts at its control's left edge while its window has room to the right; else its right edge meets
+     * the control's, as Chrome's bookmark bubble under its menu button and IntelliJ's popups do, inside the window.
+     */
+    @Test void popupKeepsInsideItsAnchorsWindowRightAligningWhereTheWindowHasNoRoomToTheRight() {
+        var screen=new java.awt.Rectangle(0,0,1000,800);
+        var window=new java.awt.Rectangle(100,100,600,400);
+        assertThat(HostedPopover.fit(new java.awt.Rectangle(300,120,30,22),new java.awt.Dimension(240,150),screen,window))
+            .as("room to the right").isEqualTo(new java.awt.Rectangle(300,142,240,150));
+        assertThat(HostedPopover.fit(new java.awt.Rectangle(660,120,30,22),new java.awt.Dimension(240,150),screen,window))
+            .as("a menu button at the window's right edge").isEqualTo(new java.awt.Rectangle(450,142,240,150));
+        assertThat(HostedPopover.fit(new java.awt.Rectangle(110,120,30,22),new java.awt.Dimension(650,150),screen,window))
+            .as("no room to the control's left either: at the window's left edge").isEqualTo(new java.awt.Rectangle(100,142,650,150));
+        assertThat(HostedPopover.fit(new java.awt.Rectangle(960,120,30,22),new java.awt.Dimension(240,150),screen,new java.awt.Rectangle(900,100,100,400)))
+            .as("a window at the screen's edge: the screen still bounds it").isEqualTo(new java.awt.Rectangle(760,142,240,150));
     }
 
     static ViewSpec picker(ControlState state) { return new ViewSpec(new Nodes.Choice("pick",state,Nodes.ChoiceKind.PICKER,List.of(),"","Credential","pick")); }

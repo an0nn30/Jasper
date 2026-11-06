@@ -37,16 +37,24 @@ final class HostedPopover implements PluginPopover {
     @Override public void show(){kit.guard();if(closed||!anchor.isOpen())throw new IllegalArgumentException("Expired anchor");if(content==null)throw new IllegalStateException("Missing popup content");shown=true;anchor.expanded(true);anchor.target.putClientProperty("Jasper.pickerDismiss",dismiss);
         if(!GraphicsEnvironment.isHeadless()){refit();var p=anchor.target.getLocationOnScreen();var bounds=placement();popup.show(anchor.target,bounds.x-p.x,bounds.y-p.y);refit();}
     }
-    /** Fitting is host geometry only; no producer descriptor values enter attachment authority. */
-    static Rectangle fit(Rectangle anchor,Dimension preferred,Rectangle usable){
+    /**
+     * Fitting is host geometry only; no producer descriptor values enter attachment authority. The popover goes below
+     * the control, or above it where the screen has no room below; its left edge is the control's while the control's
+     * window has room to the right, and otherwise its right edge is the control's, as Chrome's bookmark bubble under its
+     * menu button and IntelliJ's popups sit, though never left of the window. The usable screen bounds it last.
+     */
+    static Rectangle fit(Rectangle anchor,Dimension preferred,Rectangle usable,Rectangle window){
         // A popover is at least as wide as the control that opened it (a picker matches its face).
         int width=Math.min(Math.max(preferred.width,anchor.width),usable.width),height=Math.min(preferred.height,usable.height);
         int below=anchor.y+anchor.height;
         int y=below+height<=usable.y+usable.height?below:anchor.y-height;
-        return new Rectangle(Math.max(usable.x,Math.min(anchor.x,usable.x+usable.width-width)),Math.max(usable.y,Math.min(y,usable.y+usable.height-height)),width,height);
+        int x=anchor.x+width<=window.x+window.width?anchor.x:Math.max(window.x,anchor.x+anchor.width-width);
+        return new Rectangle(Math.max(usable.x,Math.min(x,usable.x+usable.width-width)),Math.max(usable.y,Math.min(y,usable.y+usable.height-height)),width,height);
     }
     private Rectangle screen(){var gc=anchor.target.getGraphicsConfiguration();var bounds=new Rectangle(gc.getBounds());var insets=Toolkit.getDefaultToolkit().getScreenInsets(gc);bounds.x+=insets.left;bounds.y+=insets.top;bounds.width-=insets.left+insets.right;bounds.height-=insets.top+insets.bottom;return bounds;}
-    private Rectangle placement(){var p=anchor.target.getLocationOnScreen();return fit(new Rectangle(p,anchor.target.getSize()),content.component().getPreferredSize(),screen());}
+    private Rectangle placement(){var p=anchor.target.getLocationOnScreen();return fit(new Rectangle(p,anchor.target.getSize()),content.component().getPreferredSize(),screen(),window());}
+    /** The anchor's window on the screen; the usable screen when it has none. */
+    private Rectangle window(){var window=SwingUtilities.getWindowAncestor(anchor.target);return window==null||!window.isShowing()?screen():new Rectangle(window.getLocationOnScreen(),window.getSize());}
     private void refit(){
         if(closed||!shown||fitting||content==null||GraphicsEnvironment.isHeadless()||!anchor.isOpen())return;
         fitting=true;try{

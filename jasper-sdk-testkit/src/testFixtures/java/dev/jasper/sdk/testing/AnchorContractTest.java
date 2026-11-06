@@ -44,6 +44,21 @@ public abstract class AnchorContractTest {
    view.update(KitContractTest.tables("card",false));assertThat(closed).hasValue(1);assertThat(view.anchor("tunnels.new").isOpen()).isTrue();
   }
  });}
+ static ViewSpec menu(ControlState state,String item){return new ViewSpec(new Nodes.MenuButton("menu",state,"","menu",Nodes.ButtonKind.GHOST,"",
+    List.of(new MenuItem(item,item,"",item,true,false)),"Menu"));}
+ /** Since 0.29.0 a menu button issues an anchor too, as a browser's menu button opens its bookmark panel; new items keep it. */
+ @Test void aMenuButtonAnchorsAPopoverWhichNewItemsKeepAndDisablingCloses()throws Exception{SwingUtilities.invokeAndWait(()->{
+  try(var f=fixture()){
+   var source=f.endpoint("source");var view=source.kit().create(menu(ControlState.READY,"add"),e->{});mount(source,view,"source");var anchor=view.anchor("menu");
+   var popup=source.windows().popover(anchor);var content=source.kit().create(actions(),e->{});popup.setContent(content);popup.show();
+   var closed=new AtomicInteger();popup.onClosed(closed::incrementAndGet);
+   view.update(menu(ControlState.READY,"remove"));assertThat(anchor.isOpen()).as("the same menu button with other items").isTrue();assertThat(closed).hasValue(0);
+   view.update(menu(new ControlState(true,false,false,""),"remove"));assertThat(anchor.isOpen()).isFalse();assertThat(closed).hasValue(1);
+   assertThatThrownBy(content::spec).isInstanceOf(IllegalStateException.class);
+   view.update(new ViewSpec(new Nodes.Text("menu",ControlState.READY,"text",Nodes.TextRole.BODY)));
+   assertThatThrownBy(()->view.anchor("menu")).as("text issues none").isInstanceOf(IllegalArgumentException.class);
+  }
+ });}
  @Test void movingTheSameControlToAnotherDescriptorParentInvalidates()throws Exception{SwingUtilities.invokeAndWait(()->{
   try(var f=fixture()){var source=f.endpoint("source");var button=picker(ControlState.READY).root();
    var view=source.kit().create(new ViewSpec(new Nodes.Stack("first",ControlState.READY,Nodes.LayoutRole.VERTICAL,List.of(button))),e->{});mount(source,view,"source");var anchor=view.anchor("pick");

@@ -387,7 +387,7 @@ These `KitView` methods serve the app's native hosts; none is part of the plugin
 | `setFieldTrailing(fieldId, button)` | An owned action inside a TEXT or SEARCH field |
 | `setTreeRowPresentation`, `setButtonValuePresentation`, `setButtonKeycaps`, `attachTreeDetail` | Keymap rows: locked rows and keycaps, the shortcut recorder face, keycap values and a detail below a tree leaf (`TreeDetailHandle`) |
 | `setArtworkPresentation(iconId, …)` | Identity row or header treatment for an icon |
-| `anchorTarget(id)` | The component a host attaches a popup to: a visible, enabled, idle `Button` or PICKER `Choice` |
+| `anchorTarget(id)` | The component a host attaches a popup to: a visible, enabled, idle `Button`, `MenuButton` (its main button) or PICKER `Choice` |
 | `panelHeader`, `setPanelHostActions`, `setPanelHostHeader` | Borrowed panel headers (see [Panels](#panels)) |
 
 ### Shells, dialogs and surfaces

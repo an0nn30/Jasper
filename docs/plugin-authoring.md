@@ -565,10 +565,12 @@ modal now: a modal dialog over it, Jasper's or any plugin's, or an overlay insid
 
 ### Popovers
 
-`view.anchor(nodeId)` mints a [`UiAnchor`](sdk-reference.html#dev.jasper.sdk.ui.UiAnchor) from a mounted `Button` or
-PICKER `Choice` whose ancestors are visible, enabled and not busy. `windows().popover(anchor)` returns a
+`view.anchor(nodeId)` mints a [`UiAnchor`](sdk-reference.html#dev.jasper.sdk.ui.UiAnchor) from a mounted `Button`,
+`MenuButton` (since 0.29.0; the popover attaches to its button) or PICKER `Choice` whose ancestors are visible, enabled
+and not busy. `windows().popover(anchor)` returns a
 [`PluginPopover`](sdk-reference.html#dev.jasper.sdk.ui.PluginPopover): set a view of the plugin's and `show()` it
-below the control (above when there is no room), at least as wide. It does not block; Escape or a click outside closes
+below the control (above when there is no room), at least as wide. Its left edge is the control's, or, when the
+control's window has no room to the right, its right edge is. It does not block; Escape or a click outside closes
 it and its content. Hiding, disabling, removing, retyping or moving the control, closing its surface or stopping the
 plugin closes the anchor for good; `onClosed` hears it. Credential Vault's credential picker opens over another
 plugin's anchor this way ([plugin APIs](plugin-apis.md)).
