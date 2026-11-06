@@ -79,7 +79,7 @@ public final class MemoryStores {
      * @return whether it started
      */
     public static boolean started(Stores stores) {
-        return stores.started();
+        return stores.opened();
     }
 
     /**

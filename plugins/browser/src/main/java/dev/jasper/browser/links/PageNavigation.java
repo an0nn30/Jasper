@@ -81,7 +81,6 @@ public final class PageNavigation {
         client.addLifeSpanHandler(new Popups());
     }
 
-
     /**
      * Links Chromium would open in a new tab or window, or download: Jasper places them itself. A main frame's navigation
      * response also goes to the opener bridge, which keeps the limits its opener and content security policies set.

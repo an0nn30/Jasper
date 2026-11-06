@@ -33,6 +33,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class ChromiumStateTest {
     private static final Duration LIMIT = Duration.ofSeconds(90);
+    // JCEF's name for a request context's native handle.
+    private static final String NATIVE = "CefRequestContext";
     @TempDir Path data;
     private final Queue<Runnable> starts = new ConcurrentLinkedQueue<>();
     private final Executor recording = starts::add;
@@ -544,37 +546,91 @@ class ChromiumStateTest {
         assertThat(starts).isEmpty();
     }
 
-    /**
-     * Plan 6: an in-memory context Chromium made is released once, however often asked, on Swing's thread; the dispose's
-     * sweep takes those still kept, a context made after the sweep is disposed at once and its ask fails, and after the
-     * close a release touches nothing. The contexts are stand-ins, as none can be made without Chromium.
-     */
-    @Test void aKeptContextIsReleasedOnceTheSweepTakesTheRestAndNothingIsTouchedAfterTheClose() throws Exception {
+    /** Plan 6: a group's kept context is released once, however often its group's close asks. */
+    @Test void aKeptContextIsReleasedOnceHoweverOftenAsked() throws Exception {
         Chromium chromium = chromium(recording, LIMIT);
-        var made = new java.util.ArrayDeque<RecordingContext>(List.of(new RecordingContext(1), new RecordingContext(2),
-            new RecordingContext(3)));
-        chromium.makeContextsWith(made::poll);
-        chromium.client();
-        assertThat(chromium.enter()).isTrue();
-        var first = chromium.inMemoryContext();
-        var second = chromium.inMemoryContext();
-        var third = chromium.inMemoryContext();
-        Thread.ofPlatform().start(chromium::contextInitialized).join(TimeUnit.SECONDS.toMillis(10));
-        var one = (RecordingContext) first.get(10, TimeUnit.SECONDS);
-        var two = (RecordingContext) second.get(10, TimeUnit.SECONDS);
-        var three = (RecordingContext) third.get(10, TimeUnit.SECONDS);
+        RecordingContext one = kept(chromium, new RecordingContext(1)).getFirst();
         EventQueue.invokeAndWait(() -> {
             chromium.release(one);
             chromium.release(one);
         });
-        assertThat(one.disposals()).as("released once").isEqualTo(1);
+        assertThat(one.disposals()).isEqualTo(1);
+        end(chromium);
+    }
+
+    /**
+     * V12: a browser's creation, queued for Chromium's thread, reads its context object's handle only when it runs, so a
+     * group that closes while a browser still holds an object over its kept context keeps that context until JCEF has
+     * disposed the object, as the browser closes; whichever comes last disposes the kept context, once, and a disposed
+     * object carries no handle.
+     */
+    @Test void aGroupThatClosesWhileABrowserHoldsItsContextKeepsItUntilThatBrowsersObjectIsDisposed() throws Exception {
+        Chromium chromium = chromium(recording, LIMIT);
+        List<RecordingContext> kept = kept(chromium, new RecordingContext(7), new RecordingContext(8));
+        RecordingContext closesFirst = kept.get(0), browserFirst = kept.get(1);
+
+        org.cef.browser.CefRequestContext held = chromium.browserContext(closesFirst);
+        chromium.release(closesFirst);
+        assertThat(closesFirst.disposals()).as("a browser still holds it").isZero();
+        assertThat(held.getNativeRef(NATIVE)).isEqualTo(7);
+        held.dispose();
+        assertThat(closesFirst.disposals()).as("its last object went: now").isEqualTo(1);
+        assertThat(held.getNativeRef(NATIVE)).as("a disposed object carries no handle").isZero();
+        held.dispose();
+        chromium.release(closesFirst);
+        assertThat(closesFirst.disposals()).as("once").isEqualTo(1);
+
+        org.cef.browser.CefRequestContext first = chromium.browserContext(browserFirst), second = chromium.browserContext(browserFirst);
+        first.dispose();
+        second.dispose();
+        assertThat(browserFirst.disposals()).as("its group is still open").isZero();
+        chromium.release(browserFirst);
+        assertThat(browserFirst.disposals()).as("the group's close comes last: now").isEqualTo(1);
+        end(chromium);
+    }
+
+    /**
+     * V12: JCEF hands a page's DevTools browser the page's own context object and disposes it again as the DevTools
+     * close, so the DevTools get an object of their own, counted the same way; Chromium's global context, which a
+     * persistent page's DevTools are handed, stays as it is.
+     */
+    @Test void aPagesDevToolsGetAContextObjectOfTheirOwnCountedTheSame() throws Exception {
+        Chromium chromium = chromium(recording, LIMIT);
+        RecordingContext group = kept(chromium, new RecordingContext(9)).getFirst();
+        org.cef.browser.CefRequestContext page = chromium.browserContext(group);
+        org.cef.browser.CefRequestContext devTools = Chromium.anotherContext(page);
+        assertThat(devTools).isNotSameAs(page).isNotSameAs(group);
+        assertThat(devTools.getNativeRef(NATIVE)).isEqualTo(9);
+        chromium.release(group);
+        page.dispose();
+        assertThat(group.disposals()).as("the DevTools still hold it").isZero();
+        devTools.dispose();
+        assertThat(group.disposals()).isEqualTo(1);
+        var global = new RecordingContext(10);
+        assertThat(Chromium.anotherContext(global)).as("not an in-memory group's").isSameAs(global);
+        assertThat(Chromium.anotherContext(null)).isNull();
+        end(chromium);
+    }
+
+    /**
+     * V12 at Chromium's close: the dispose's sweep disposes at once the kept contexts no browser holds, and each other one
+     * as soon as JCEF has disposed the last object over it, which JCEF's shutdown does as it closes the browsers, before
+     * CEF shuts down; a context made after the sweep is disposed at once and its ask fails.
+     */
+    @Test void theSweepDisposesWhatNoBrowserHoldsAndTheRestAsTheirBrowsersClose() throws Exception {
+        Chromium chromium = chromium(recording, LIMIT);
+        List<RecordingContext> kept = kept(chromium, new RecordingContext(1), new RecordingContext(2), new RecordingContext(3));
+        RecordingContext held = kept.get(0), free = kept.get(1), closed = kept.get(2);
+        org.cef.browser.CefRequestContext browser = chromium.browserContext(held);
+        chromium.release(closed);
+        assertThat(closed.disposals()).isEqualTo(1);
         EventQueue.invokeAndWait(chromium::close);
-        EventQueue.invokeAndWait(() -> chromium.release(two));
-        assertThat(two.disposals()).as("released after the close: nothing touched").isZero();
         EventQueue.invokeAndWait(chromium::disposeContexts);
-        assertThat(two.disposals()).as("the dispose's sweep").isEqualTo(1);
-        assertThat(three.disposals()).isEqualTo(1);
-        assertThat(one.disposals()).as("released already").isEqualTo(1);
+        assertThat(free.disposals()).as("held by no browser").isEqualTo(1);
+        assertThat(held.disposals()).as("its browser has not closed").isZero();
+        assertThat(closed.disposals()).as("released already").isEqualTo(1);
+        browser.dispose();
+        assertThat(held.disposals()).as("its last browser closed, before CEF shuts down").isEqualTo(1);
         chromium.terminated();
 
         // Another process's Chromium, as one Chromium starts once in each.
@@ -589,6 +645,43 @@ class ChromiumStateTest {
         assertThat(failure(asked)).as("made as the dispose ran").isInstanceOf(IllegalStateException.class).hasMessage(Chromium.ONCE);
         assertThat(after.disposals()).as("disposed at once").isEqualTo(1);
         end(late);
+    }
+
+    /**
+     * V12 on the plugin's stop: a group closing after Chromium's close began follows the same rule, disposing its kept
+     * context once nothing holds it, while CEF still runs; once Chromium has ended, nothing native is touched.
+     */
+    @Test void theStopPathFollowsTheSameRuleAndNothingIsTouchedOnceChromiumHasEnded() throws Exception {
+        Chromium chromium = chromium(recording, LIMIT);
+        List<RecordingContext> kept = kept(chromium, new RecordingContext(5), new RecordingContext(6));
+        RecordingContext free = kept.get(0), held = kept.get(1);
+        org.cef.browser.CefRequestContext browser = chromium.browserContext(held);
+        EventQueue.invokeAndWait(chromium::close);
+        chromium.release(free);
+        chromium.release(held);
+        assertThat(free.disposals()).as("closed after Chromium's close began, held by nothing").isEqualTo(1);
+        assertThat(held.disposals()).isZero();
+        chromium.terminated();
+        browser.dispose();
+        assertThat(held.disposals()).as("Chromium has ended: nothing native is touched").isZero();
+        assertThat(browser.getNativeRef(NATIVE)).isZero();
+    }
+
+    /**
+     * The in-memory contexts {@code made} are, made by {@code chromium} as pages would ask for them, on its thread as
+     * its context initializes; stand-ins, as none can be made without Chromium. Its start has entered, never initialized.
+     */
+    private List<RecordingContext> kept(Chromium chromium, RecordingContext... made) throws Exception {
+        var queue = new java.util.ArrayDeque<>(List.of(made));
+        chromium.makeContextsWith(queue::poll);
+        chromium.client();
+        assertThat(chromium.enter()).isTrue();
+        var asked = new java.util.ArrayList<CompletableFuture<org.cef.browser.CefRequestContext>>();
+        for (int each = 0; each < made.length; each++) asked.add(chromium.inMemoryContext());
+        Thread.ofPlatform().start(chromium::contextInitialized).join(TimeUnit.SECONDS.toMillis(10));
+        var kept = new java.util.ArrayList<RecordingContext>();
+        for (var context : asked) kept.add((RecordingContext) context.get(10, TimeUnit.SECONDS));
+        return kept;
     }
 
     /**

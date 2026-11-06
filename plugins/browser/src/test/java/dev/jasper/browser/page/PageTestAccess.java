@@ -323,6 +323,28 @@ public final class PageTestAccess {
     }
 
     /**
+     * The page's client and its context object {@code context} are ready, as its start waits for them, with a client
+     * that stands for none: for the cases that make no browser, which a test can reach without Chromium.
+     *
+     * @param page a page
+     * @param chromium the plugin's Chromium
+     * @param context the context object handed out for the page's browser
+     */
+    public static void make(Page page, dev.jasper.browser.engine.Chromium chromium, CefRequestContext context) {
+        page.make(chromium, null, context);
+    }
+
+    /**
+     * Whether the page has made its browser.
+     *
+     * @param page a page
+     * @return whether it has one
+     */
+    public static boolean hasBrowser(Page page) {
+        return page.hasBrowser();
+    }
+
+    /**
      * Has {@code context} asked for as a page made with it asks, as it starts: a context object of the page's own, over
      * the group's kept context, which is asked of {@code chromium} the first time.
      *

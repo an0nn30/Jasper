@@ -1,6 +1,7 @@
 package dev.jasper.browser.page;
 
 import com.jetbrains.cef.JCefAppConfig;
+import dev.jasper.browser.engine.Chromium;
 import java.awt.EventQueue;
 import java.awt.Point;
 import java.awt.datatransfer.DataFlavor;
@@ -124,7 +125,9 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
     /**
      * The DevTools browser for the DevTools {@link #openDevTools(DevTools, Point)} opens, which JCEF then makes: drawn on
      * their canvas by a renderer of its own, as a page's browser is on the page's, and on {@code client}, the page's, as
-     * Chromium makes DevTools on their page's client. UI thread.
+     * Chromium makes DevTools on their page's client. JCEF hands it {@code context}, the page's own context object, and
+     * disposes the DevTools browser's object as it closes, so a /dev/null page's DevTools get an object of their own over
+     * the same kept context ({@link Chromium#anotherContext}, V12). UI thread.
      *
      * @throws IllegalStateException when asked other than through {@link #openDevTools(DevTools, Point)}
      */
@@ -133,7 +136,14 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
         DevTools tools = opening;
         if (tools == null) throw new IllegalStateException("A page's DevTools open only through its Inspect Element");
         PageView canvas = tools.canvas();
-        var made = new PageBrowser(client, url, context, new PageRenderer(canvas), canvas, this, inspectAt, tools);
+        CefRequestContext own = Chromium.anotherContext(context);
+        PageBrowser made;
+        try {
+            made = new PageBrowser(client, url, own, new PageRenderer(canvas), canvas, this, inspectAt, tools);
+        } catch (RuntimeException | Error failure) {
+            if (own != context) own.dispose(); // made for a browser that never was
+            throw failure;
+        }
         made.attach();
         tools.made(made);
         return made;

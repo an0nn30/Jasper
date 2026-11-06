@@ -93,6 +93,32 @@ class PageContextTest {
         });
     }
 
+    /**
+     * V12: a context object handed out for a page that then makes no browser, as its page closed meanwhile or Chromium
+     * stopped, goes back at once, so it holds its group's kept context no longer; no browser is made then.
+     */
+    @Test void aContextObjectForABrowserNeverMadeGoesBackAtOnce() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            Chromium chromium = chromium();
+            var kept = new RecordingContext(11);
+            var context = new PageContext(true, any -> CompletableFuture.completedFuture(kept), (any, released) -> { });
+            var closedPage = new Page(java.net.URI.create("https://example.com/"), () -> { }, PageTestAccess.noFavicons(), Runnable::run, context);
+            CefRequestContext unused = context.context(chromium).join();
+            closedPage.close();
+            PageTestAccess.make(closedPage, chromium, unused);
+            assertThat(unused.getNativeRef(NATIVE)).as("handed back").isZero();
+            assertThat(PageTestAccess.hasBrowser(closedPage)).isFalse();
+
+            var openPage = new Page(java.net.URI.create("https://example.com/"), () -> { }, PageTestAccess.noFavicons(), Runnable::run, context);
+            CefRequestContext late = context.context(chromium).join();
+            chromium.close();
+            PageTestAccess.make(openPage, chromium, late);
+            assertThat(late.getNativeRef(NATIVE)).as("Chromium has stopped: handed back").isZero();
+            assertThat(PageTestAccess.hasBrowser(openPage)).isFalse();
+            assertThat(kept.disposals()).isZero();
+        });
+    }
+
     @Test void aContextClosedBeforeChromiumMadeItIsReleasedOnceMadeAndOneNeverAskedForReleasesNothing() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var made = new CompletableFuture<CefRequestContext>();

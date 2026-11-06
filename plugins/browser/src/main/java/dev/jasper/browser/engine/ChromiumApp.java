@@ -85,14 +85,17 @@ final class ChromiumApp {
     }
 
     /**
-     * Hands {@code task} to Chromium's own UI thread: the global cookie manager's {@code flushStore}, which has no other
-     * effect, calls back there. Once JCEF has initialized; any thread.
+     * What hands a task to Chromium's own UI thread: the global cookie manager's {@code flushStore}, which has no other
+     * effect, calls back there, and answers whether it will. The manager is got once, now: getting it takes {@code CefApp}'s
+     * class monitor and its initialization listeners' monitor, which JCEF holds as it runs its listeners, so getting it
+     * under {@code ChromiumThread}'s lock, which those listeners take, could deadlock; {@code flushStore} takes neither.
+     * Once JCEF has initialized, in its initialization listener.
      *
-     * @return whether Chromium will call back
+     * @return the hand-over
      */
-    boolean onChromiumThread(Runnable task) {
+    Predicate<Runnable> handOver() {
         CefCookieManager cookies = CefCookieManager.getGlobalManager();
-        return cookies != null && cookies.flushStore(task::run);
+        return task -> cookies != null && cookies.flushStore(task::run);
     }
 
     /**

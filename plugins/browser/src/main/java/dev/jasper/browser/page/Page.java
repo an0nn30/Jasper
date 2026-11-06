@@ -210,14 +210,14 @@ public final class Page implements AutoCloseable {
         CompletableFuture<?> ready = before.handle((done, failure) -> null);
         CompletableFuture.allOf(client, inContext, ready).whenComplete((all, failure) -> {
             if (failure == null) {
-                // Nothing native is touched once Chromium has stopped: no browser is made then.
-                EventQueue.invokeLater(() -> {
-                    if (chromium.state() != Chromium.State.STOPPED) make(client.join(), inContext.join());
-                });
-            } else if (!client.isCompletedExceptionally() && chromium.state() != Chromium.State.STOPPED) {
-                // A client that fails, the plugin tells once; a context that fails while Chromium runs, the log.
-                LOG.log(System.Logger.Level.WARNING, "A page's request context could not be made", failure);
+                EventQueue.invokeLater(() -> make(chromium, client.join(), inContext.join()));
+                return;
             }
+            // A context object handed out for a browser that is not made goes back at once (V12).
+            if (!inContext.isCompletedExceptionally()) unused(inContext.join());
+            // A client that fails, the plugin tells once; a context that fails while Chromium runs, the log.
+            if (!client.isCompletedExceptionally() && chromium.state() != Chromium.State.STOPPED)
+                LOG.log(System.Logger.Level.WARNING, "A page's request context could not be made", failure);
         });
     }
 
@@ -1114,15 +1114,32 @@ public final class Page implements AutoCloseable {
 
     /**
      * The client and the request context are ready: makes the browser in that context, null for Chromium's global one,
-     * which loads what the page was last asked to.
+     * which loads what the page was last asked to. A page closed meanwhile, or a Chromium that has stopped, makes none,
+     * as nothing native is touched then, and the context object handed out for it goes back at once (V12).
      */
-    private void make(CefClient client, CefRequestContext requestContext) {
-        if (closed) return;
+    void make(Chromium chromium, CefClient client, CefRequestContext requestContext) {
+        if (closed || chromium.state() == Chromium.State.STOPPED) {
+            unused(requestContext);
+            return;
+        }
         made = requested.toString();
         PageBrowser page = new PageBrowser(client, made, requestContext, new PageRenderer(view), view);
         page.owner(this);
         browser = page;
         page.attach();
+    }
+
+    /** Whether the page has made its browser. */
+    boolean hasBrowser() {
+        return browser != null;
+    }
+
+    /**
+     * A context object handed out for a browser that is not made goes back: JCEF, which disposes a browser's object as
+     * the browser closes, never has it. Null, Chromium's global context, needs nothing.
+     */
+    private static void unused(CefRequestContext context) {
+        if (context != null) context.dispose();
     }
 
     /** The browser's native browser exists: from now on it hears what it is asked, and loads what it missed. */
