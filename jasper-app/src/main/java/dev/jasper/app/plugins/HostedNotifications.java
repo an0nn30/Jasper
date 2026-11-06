@@ -30,6 +30,8 @@ import java.util.function.Consumer;
  *   <li>Actions and default actions that run inside the plugin's containment.</li>
  *   <li>A cause recorded as the plugin's incident.</li>
  *   <li>Expiry of everything it posted when it stops.</li>
+ *   <li>Removal: the center folds a post with the same text into an earlier entry (a repeat), so an entry can have
+ *     several handles; it leaves history once each of them has been removed.</li>
  * </ul>
  * The center is reached on the UI thread; the handles' bookkeeping lives there too.
  */
@@ -46,7 +48,10 @@ final class HostedNotifications implements Notifications {
     private final BooleanSupplier onUi;
     private final Group defaultGroup;
     private final Map<String, Group> declared = new ConcurrentHashMap<>();
-    /** The handles of every live notification posted, by the center's id. UI thread. */
+    /**
+     * The handles not yet removed on each entry the plugin posted that is still in history, live or expired, by the
+     * center's id; a repeat's handle joins its entry's. UI thread.
+     */
     private final Map<UUID, List<Handle>> posted = new HashMap<>();
     private final Subscription listening;
     private volatile boolean closed;
@@ -85,14 +90,17 @@ final class HostedNotifications implements Notifications {
         return group;
     }
 
-    /** UI thread: the plugin stopped. Everything it posted expires, and later posts are refused. */
+    /**
+     * UI thread: the plugin stopped. Everything it posted expires, and later posts are refused; removing a handle still
+     * takes its entry out of history.
+     */
     void close() {
         if (closed) return;
         closed = true;
         listening.close();
-        for (UUID id : List.copyOf(posted.keySet())) host.center().expire(id);
+        for (UUID id : List.copyOf(posted.keySet()))
+            if (host.center().find(id).filter(entry -> !entry.expired()).isPresent()) host.center().expire(id);
         posted.values().forEach(handles -> handles.forEach(Handle::markExpired));
-        posted.clear();
     }
 
     private void requireOpen() {
@@ -123,7 +131,7 @@ final class HostedNotifications implements Notifications {
     private void changed(NotificationCenter.Change change) {
         switch (change) {
             case NotificationCenter.Change.Upserted upserted when upserted.notification().expired() -> expired(upserted.notification().id());
-            case NotificationCenter.Change.Removed removed -> expired(removed.id());
+            case NotificationCenter.Change.Removed removed -> left(removed.id());
             case NotificationCenter.Change.Cleared cleared -> {
                 posted.values().forEach(handles -> handles.forEach(Handle::markExpired));
                 posted.clear();
@@ -132,9 +140,24 @@ final class HostedNotifications implements Notifications {
         }
     }
 
+    /** UI thread: the entry expired; its handles stay, so that removing them takes it out of history. */
     private void expired(UUID id) {
+        List<Handle> handles = posted.get(id);
+        if (handles != null) handles.forEach(Handle::markExpired);
+    }
+
+    /** UI thread: the entry left history. */
+    private void left(UUID id) {
         List<Handle> handles = posted.remove(id);
         if (handles != null) handles.forEach(Handle::markExpired);
+    }
+
+    /** UI thread: {@code handle} was removed; its entry leaves history once no handle on it is left. Idempotent. */
+    private void drop(UUID id, Handle handle) {
+        List<Handle> handles = posted.get(id);
+        if (handles == null || !handles.remove(handle) || !handles.isEmpty()) return;
+        posted.remove(id);
+        host.center().remove(id);
     }
 
     private static dev.jasper.app.notifications.Severity severity(Severity value) {
@@ -169,21 +192,31 @@ final class HostedNotifications implements Notifications {
             var handle = new Handle();
             if (spec.cause().isPresent())
                 host.caused().accept(new PluginRuntime.CausedNotice(pluginId, request, spec.cause().get(), handle::posted));
-            else onUiThread(() -> handle.posted(closed ? Optional.empty() : host.center().post(request)));
+            // A handle removed before its post is made leaves nothing to make: no card shows, and no repeat is counted.
+            else onUiThread(() -> handle.posted(closed || handle.removed ? Optional.empty() : host.center().post(request)));
             return handle;
         }
     }
 
-    /** One post's handle: it learns the center's id on the UI thread, and may be expired before that. */
+    /** One post's handle: it learns the center's id on the UI thread, and may be expired or removed before that. */
     private final class Handle implements NotificationHandle {
         private volatile UUID id;
-        private volatile boolean expired;
+        private volatile boolean expired, removed;
 
         @Override public void expire() {
             if (expired) return;
             expired = true;
             UUID known = id;
             if (known != null) onUiThread(() -> host.center().expire(known));
+        }
+
+        /** SDK 0.30.0: a handle removed before its post lands is dropped as it lands ({@link #posted}). */
+        @Override public void remove() {
+            if (removed) return;
+            removed = true;
+            expired = true;
+            UUID known = id;
+            if (known != null) onUiThread(() -> drop(known, this));
         }
 
         @Override public boolean expired() { return expired; }
@@ -193,12 +226,12 @@ final class HostedNotifications implements Notifications {
             if (landed.isEmpty()) { expired = true; return; }
             UUID known = landed.get();
             id = known;
-            if (closed || expired) {
+            posted.computeIfAbsent(known, key -> new ArrayList<>()).add(this);
+            if (removed) drop(known, this);
+            else if (closed || expired) {
                 expired = true;
                 host.center().expire(known);
-                return;
             }
-            posted.computeIfAbsent(known, key -> new ArrayList<>()).add(this);
         }
 
         void markExpired() { expired = true; }

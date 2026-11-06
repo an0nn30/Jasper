@@ -689,7 +689,7 @@ public final class TabRegistry {
     public boolean restores(String plugin, String kind) { return restorers.getOrDefault(plugin, Map.of()).containsKey(kind); }
 
     /**
-     * Tells {@code listener} whenever a tab's restore state changes (workspace tabs spec 13).
+     * Tells {@code listener} whenever a tab's restore state or saved title changes (workspace tabs spec 13).
      *
      * @param listener told on the EDT; it replaces the one before
      */

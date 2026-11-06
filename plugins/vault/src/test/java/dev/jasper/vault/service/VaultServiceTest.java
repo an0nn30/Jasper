@@ -303,7 +303,10 @@ class VaultServiceTest {
         assertThat(api.credential(PROD)).isCompletedWithValue(Optional.empty());
         assertThat(api.pick(window)).isCompletedWithValue(Optional.empty());
         String noVault = "dev.jasper.vault|WARNING|No vault yet|Create a vault in Credential Vault first (Open Vault...)";
-        assertThat(notifications.lines()).containsExactly(noVault, noVault, noVault);
+        assertThat(notifications.posts()).as("each posts it, counted on one notification").singleElement().satisfies(post -> {
+            assertThat(post.line()).isEqualTo(noVault);
+            assertThat(post.count()).isEqualTo(3);
+        });
         assertThat(unlocks).isEmpty();
         populate();
         CompletableFuture<Optional<Credential>> fetch = api.credential(PROD);

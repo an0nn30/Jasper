@@ -182,8 +182,11 @@ class BrowserPluginTest {
                     BrowserPlugin.SPLIT.downAction() })
                 assertThat(host.invoke(action, window, null)).as(action).isTrue();
             assertThat(host.contentTabs()).as("no more items").hasSize(1);
-            assertThat(host.notifications().lines()).hasSize(4).containsOnly("dev.jasper.browser|ERROR|The browser could not start|"
-                + "Chromium can start once each time Jasper runs. Quit and reopen Jasper to use the browser again.");
+            assertThat(host.notifications().posts()).as("each posts it again, counted on one notification").singleElement().satisfies(post -> {
+                assertThat(post.line()).isEqualTo("dev.jasper.browser|ERROR|The browser could not start|"
+                    + "Chromium can start once each time Jasper runs. Quit and reopen Jasper to use the browser again.");
+                assertThat(post.count()).isEqualTo(4);
+            });
             assertThat(host.failures()).isEmpty();
         } });
     }

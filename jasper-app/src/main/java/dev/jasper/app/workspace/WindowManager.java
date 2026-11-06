@@ -1114,8 +1114,8 @@ public final class WindowManager {
 
     /**
      * What a tab needs to come back (workspace tabs spec 13): a terminal tab's name, directory and profile; a plugin's tab,
-     * content or session, its restore state while its plugin restores that kind; a placeholder what was saved for it. An
-     * app-owned tab and any other plugin's tab is not saved.
+     * content or session, its restore state while its plugin restores that kind, under its saved title; a placeholder
+     * what was saved for it. An app-owned tab and any other plugin's tab is not saved.
      */
     private Optional<WorkspaceFile.TabRecord> tabRecord(Tab tab) {
         if (tab.content() instanceof PlaceholderContent placeholder) return Optional.of(placeholder.saved());
@@ -1125,7 +1125,7 @@ public final class WindowManager {
             return tab.content() instanceof TerminalContent terminal ? terminal.record().map(WorkspaceFile.TabRecord.class::cast) : Optional.empty();
         if (plugin.get().equals(TabRegistry.APP_OWNER)) return Optional.empty();
         return tab.restore().filter(state -> model.tabs().restores(plugin.get(), state.kind()))
-            .map(state -> new WorkspaceFile.TabRecord.Content(tab.title(), plugin.get(), state.kind(), state.state()));
+            .map(state -> new WorkspaceFile.TabRecord.Content(tab.savedTitle(), plugin.get(), state.kind(), state.state()));
     }
 
     /**

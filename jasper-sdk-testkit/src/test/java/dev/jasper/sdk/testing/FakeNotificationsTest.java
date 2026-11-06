@@ -31,6 +31,38 @@ class FakeNotificationsTest {
         assertThat(notifications.runAction("Saved", "Nothing")).isFalse();
     }
 
+    /**
+     * SDK 0.30.0: as in Jasper, a post with the same text less than a minute after another counts on that post, which
+     * moves last and takes the newest spec; it leaves history once each of its handles has been removed, and stays listed
+     * as removed.
+     */
+    @Test void aRepeatCountsOnItsPostWhichLeavesHistoryOnceEachHandleIsRemoved() {
+        var notifications = new FakeNotifications();
+        var group = notifications.group("dev.example.tool");
+        var first = group.info("Same", "text");
+        group.info("Other", "");
+        var again = group.post(NotificationSpec.of(Severity.INFO, "Same").withContent("text")
+            .withAction(NotificationAction.of("Open", () -> { })));
+        assertThat(notifications.lines()).containsExactly("dev.example.tool|INFO|Other|", "dev.example.tool|INFO|Same|text");
+        var same = notifications.posts().getLast();
+        assertThat(same.spec().actions()).as("the newest post's").extracting(NotificationAction::label).containsExactly("Open");
+        assertThat(same.count()).isEqualTo(2);
+        assertThat(notifications.posts().getFirst().count()).isEqualTo(1);
+        first.remove();
+        assertThat(first.expired()).as("a removed handle").isTrue();
+        assertThat(again.expired()).isFalse();
+        assertThat(same.removed()).isFalse();
+        again.remove();
+        again.remove();
+        assertThat(same.removed()).isTrue();
+        assertThat(same.expired()).isTrue();
+        assertThat(notifications.runAction("Same", "Open")).as("its links stop working").isFalse();
+        assertThat(notifications.posts()).as("still listed").hasSize(2);
+        group.info("Same", "text");
+        assertThat(notifications.posts()).as("a repeat of a removed post is a new post").hasSize(3);
+        assertThat(notifications.posts().getLast().removed()).isFalse();
+    }
+
     @Test void aStandaloneGroupLetsAThrowingActionReachTheTest() {
         var notifications = new FakeNotifications();
         notifications.group("dev.example.tool").post(NotificationSpec.of(Severity.INFO, "t")

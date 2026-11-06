@@ -284,7 +284,8 @@ restarts; an exception or a false decision keeps the content. Repeated requests 
 disposes once without asking, for plugin shutdown. `WindowHandle.tabs()` lists content tabs as items, and the
 active-pane APIs report terminal panes only, so a plugin sees an empty active pane while one of its tabs is active.
 
-A tab carries its plugin's restore state (`Tab.restore()`, the app's `layout.TabRestore`), and the registry keeps
+A tab carries its plugin's restore state (`Tab.restore()`, the app's `layout.TabRestore`) and the title it is saved
+with (`Tab.savedTitle()`, which `ContentTab.setSavedTitle` sets, else its title), and the registry keeps
 each plugin's restorers (`Windows.restorer`). `WindowManager.snapshot()` saves a plugin's tab as a `TabRecord.Content`
 of its window while its plugin has a restorer for its kind, never Jasper's own tabs, and leaves out tabs, plugins'
 first, when the file would pass `WorkspaceFile.MAX_BYTES`. Restoring a window, `WindowContent.restore`
@@ -521,7 +522,10 @@ context, turns the SDK spec into a `NotificationRequest` with the plugin id as i
 body in containment, and posts from any thread. A spec with a cause goes to `PluginRuntime.NotificationHost.caused`,
 which the application wires to `IncidentNotices.pluginNotice`: the trace is captured on the posting thread and
 recorded as the plugin's incident, named after the title, and the notification gains Show more…. A handle learns its
-entry's id on the UI thread and expires with it; teardown expires everything the plugin posted.
+entry's id on the UI thread and expires with it; teardown expires everything the plugin posted. The center counts a
+repeat on its earlier entry, so an entry can have several handles: `remove()` takes the entry out of history
+(`NotificationCenter.remove`) once each of them has been removed, also after teardown, and a handle removed before its
+post is made posts nothing.
 `PluginRuntime.problems()` lists what kept plugins from running at launch, and `application.PluginProblemNotices`
 posts each in Plugin problems with Open Plugins.
 

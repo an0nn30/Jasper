@@ -113,7 +113,8 @@ its scripts emit, so a shell without them produces no notifications. `0` turns t
 
 Plugins post notifications in their own groups, so you can tell them apart from Jasper's. When an error a plugin
 reports has an exception behind it, its notification offers **Show more…**, which opens the Errors tab at it. The
-notifications a plugin posted itself expire when it stops.
+notifications a plugin posted itself expire when it stops. A plugin can also remove one it posted: its card closes and it
+leaves the panel.
 
 When a plugin's background work ends, Jasper posts the outcome in the plugin's activities group: information when it
 succeeded, an error when it failed, titled after the work with its details. Clicking it runs the plugin's action for

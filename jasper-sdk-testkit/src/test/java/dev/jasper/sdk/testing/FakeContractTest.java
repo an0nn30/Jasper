@@ -87,6 +87,7 @@ class FakeContractTest extends PluginContractTest {
             @Override public java.util.Optional<java.util.UUID> restoreTab(String pluginId, java.util.UUID windowId, String title,
                     dev.jasper.sdk.RestoreState state) { return host.restoreTab(pluginId, windowId, title, state); }
             @Override public java.util.Optional<dev.jasper.sdk.RestoreState> restoreState(java.util.UUID tabId) { return host.restoreState(tabId); }
+            @Override public String savedTitle(java.util.UUID tabId) { return host.content(tabId).map(host::savedTitle).orElseThrow(); }
             @Override public String contentIcon(java.util.UUID tabId) {
                 return host.contentPresentation(tabId).map(shown -> shown.image().isPresent() ? "image" : shown.icon() == null ? "-" : "icon:" + shown.icon()).orElse("-");
             }
@@ -106,7 +107,9 @@ class FakeContractTest extends PluginContractTest {
             @Override public String completeStep(String scopeId, String rowId, String verbId, java.util.UUID windowId, java.util.UUID paneIdOrNull, java.util.Map<String, String> values) { return host.completeStep(scopeId, rowId, verbId, windowId, paneIdOrNull, values); }
             @Override public void executeInScope(String scopeId, String rowId, String verbId, java.util.UUID windowId, java.util.UUID paneIdOrNull) { host.executeInScope(scopeId, rowId, verbId, windowId, paneIdOrNull); }
             @Override public List<String> paletteOpens() { return host.paletteOpens(); }
-            @Override public List<String> notifications() { return host.notifications().posts().stream().map(FakeContractTest::contractLine).toList(); }
+            @Override public List<String> notifications() {
+                return host.notifications().posts().stream().filter(post -> !post.removed()).map(FakeContractTest::contractLine).toList();
+            }
             @Override public List<String> notificationGroups() { return host.notifications().groups(); }
             @Override public boolean runNotificationAction(String title, String label) { return host.notifications().runAction(title, label); }
             @Override public boolean clickNotification(String title) { return host.notifications().click(title); }

@@ -186,7 +186,9 @@ runs one beside the item.</p>
 ({@link ContentSpec#withRestore(RestoreState)}, later {@link ContentTab#setRestore(Optional)}) and the plugin registered a
 {@link TabRestorer} for its kind with {@link Windows#restorer(String,TabRestorer)}. The restorer gets a
 {@link RestoreRequest} on the UI thread, opens the tab as the plugin always does without blocking or asking the user
-anything, and returns empty, or why the tab cannot come back, which its placeholder then says.</p>
+anything, and returns empty, or why the tab cannot come back, which its placeholder then says. Jasper saves the tab's
+title with it; {@link ContentTab#setSavedTitle(Optional)} saves another in its place, for a tab whose title should not
+reach the disk.</p>
 
 <h3>File choosers and places</h3>
 <p>{@link Windows#chooseFiles(WindowOwner,String,Optional)}, {@link Windows#chooseDirectory(WindowOwner,String,Optional)}
@@ -228,7 +230,9 @@ deploys.post(NotificationSpec.of(Severity.WARNING, "Deploy checks failed")
 during {@code start}, which the user can set to show cards, sticky cards, history only or nothing in Settings ›
 Appearance &amp; Behavior › Notifications. Text is plain: a title of up to 200 characters, content up to 4,000, and up to eight actions.
 {@link NotificationGroup#error(String,Throwable)} attaches the failure, which Jasper records as the plugin's incident and
-offers with <b>Show more…</b>. Plugins cannot see other notifications. See <a href="notifications.md">notifications</a>.</p>
+offers with <b>Show more…</b>. The {@link NotificationHandle} a post returns expires the notification
+({@link NotificationHandle#expire()}), which then stays in history, or removes it ({@link NotificationHandle#remove()}).
+Plugins cannot see other notifications. See <a href="notifications.md">notifications</a>.</p>
 
 <h3>Activities and connections</h3>
 <pre><code class="language-java">context.background().execute(() -&gt; {

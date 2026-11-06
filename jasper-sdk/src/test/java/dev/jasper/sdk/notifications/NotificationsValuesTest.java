@@ -15,6 +15,7 @@ class NotificationsValuesTest {
             posted.add(spec);
             return new NotificationHandle() {
                 @Override public void expire() { }
+                @Override public void remove() { }
                 @Override public boolean expired() { return false; }
             };
         }

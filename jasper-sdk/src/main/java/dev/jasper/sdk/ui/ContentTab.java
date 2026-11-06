@@ -55,6 +55,15 @@ public interface ContentTab extends WindowOwner, AutoCloseable {
      */
     void setRestore(java.util.Optional<dev.jasper.sdk.RestoreState> state);
     /**
+     * The title Jasper saves the tab with when it saves its windows, in place of the title the tab shows, for a tab
+     * whose title should not reach the disk; its restorer then gets it as {@link RestoreRequest#title()}. Empty, the
+     * default, saves the title the tab shows. Ignored once the tab is closed.
+     *
+     * @param title the title to save, or empty
+     * @since 0.30.0
+     */
+    void setSavedTitle(java.util.Optional<String> title);
+    /**
      * Lets other plugins insert text into the tab, such as a snippet from the command palette. While {@code insertion}
      * is present and the tab is its window's current item, a palette query with no terminal pane as its origin names
      * the tab as its {@link TextTarget}, and each {@link TextTarget#insert} hands {@code insertion} the text, on the UI

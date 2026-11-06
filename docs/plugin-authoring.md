@@ -679,6 +679,9 @@ when the tab comes to stand for something else, and register the restorer for th
 A restore state holds a kind and at most 32 entries and 4,096 characters in all (keys and values); a larger state, or a
 key holding a lone surrogate, throws `IllegalArgumentException`. It is written into `workspace.toml`: keep it small, and
 never put a secret in it. A tab without one is not saved, and neither is one whose plugin has no restorer for its kind.
+The tab's title is written there too: `ContentTab.setSavedTitle(Optional.of(title))` (SDK 0.30.0) writes that title in
+place of the one the tab shows, for a tab whose title should not reach the disk, and `Optional.empty()`, the default,
+writes the title it shows.
 
 The restorer gets a [`RestoreRequest`](sdk-reference.html#dev.jasper.sdk.ui.RestoreRequest) (the window being
 restored, the saved title and the state) on the UI thread, before its window shows or when the user presses Retry, and
@@ -720,7 +723,10 @@ sync.error("Could not sync", "prod: connection refused", failure);
   `new NotificationAction(label, run, false)`; `withActivate` for a click on the body; `withIcon`; `withWindow` to show
   the card in a particular window (otherwise the window used last).
 - The returned [`NotificationHandle`](sdk-reference.html#dev.jasper.sdk.notifications.NotificationHandle) expires the
-  notification. It also expires when the user removes it, when its group drops it, and when the plugin stops.
+  notification with `expire()`: its card closes and its links stop working, and it stays in history. It also expires
+  when the user removes it, when its group drops it, and when the plugin stops. `remove()` (SDK 0.30.0) also takes it
+  out of history. A post with the same text as one less than a minute before counts on that notification
+  ([notifications](notifications.md)), which then leaves history once each of its handles has been removed.
 - A group id starts with the plugin id and a dot, at most 160 characters; its name is one line of at most 80.
   `<plugin id>.activities` is Jasper's. A group's display mode (`CARD`, `STICKY`, `HISTORY`, `OFF`) is a default: the
   user's choice in Settings › Notifications or `[notifications.groups]` wins ([notifications](notifications.md)).
@@ -1485,7 +1491,7 @@ try (var host = new FakePluginHost()) {
 | Commands and chrome | `actions()`, `actionSpec(id)`, `invoke(id, windowId, paneIdOrNull)`, `toolbar()`, `toolbarViews(windowId)`, `menu("TOOLS")`, `menuBar(windowId)` (the plugin menus a window's menu bar shows), `contextMenu(paneId)`, `chooseFromContextMenu(paneId, actionId)`, `status()`, `progress()`, `rail()` |
 | Tool windows and dialogs | `panels()` (each tool window's id, title, anchor, split and toggle action), `openPanel` (in the most recently active window, or `openPanel(panelId, windowId)`), `panelView`, `panelHeader`, `placePanel` (moves the tool window as a drag would, to a `PanelPlacement`; one that is not open is built there), `closePanel`; `windows()` (the open dialogs and overlays), `windowView`, `dialogPresentation`, `dialogSwatch`, `popoverViews`, `requestClose`, `requestQuit`; `queueFileSelection`, `queuePathSelection`, `queueFileChoice`, `fileChoices` |
 | Terminals | `addTerminalWindow()`, `addTerminalTab`, `addTerminalPane` (a terminal tab's one pane), `addContentTab`, `moveTab`, `closeTab`, `windowTabs(windowId)` (a window's tabs, each its items pane by pane), `focusTerminalPane`, `closeTerminalPane`, `holdPane` (a local pane that waits, `NOT_STARTED`, until its tab is shown), `setPaneInfo`, `setSelection`, `setForegroundJob`, `setShellProfiles`; `sent(paneId)`, `openRequests()`; `commandStarted`, `commandFinished`, `titleChanged`, `cwdChanged`, `remoteCwdChanged`, `sessionExited`, `bell` |
-| Restoring | `restoreState(tab)` (the restore state a tab gives), `restoreTab(pluginId, windowId, title, state)` (runs the plugin's restorer as Jasper does: the tab is placed in that window, not shown, and a session's tab waits, `NOT_STARTED`, until it is shown), `declinedRestores()` (the reasons restorers gave when no tab came back) |
+| Restoring | `restoreState(tab)` (the restore state a tab gives), `savedTitle(tab)` (the title Jasper saves it with), `restoreTab(pluginId, windowId, title, state)` (runs the plugin's restorer as Jasper does: the tab is placed in that window, not shown, and a session's tab waits, `NOT_STARTED`, until it is shown), `declinedRestores()` (the reasons restorers gave when no tab came back) |
 | Provided sessions | `sessionState(paneId)`, `typeIntoSession`, `sessionOutput`, `cancelSession`, `reconnectSession`, `pumpSessions` |
 | Palette scopes | `scopes()`, `scopePresentation(id)`, `scopesInAll()`, `scopesInRecents()`, `searchScope`, `availableInScope`, `stepInScope`, `completeStep`, `executeInScope`, `paletteOpens()`; `addTextTarget(windowId)` (a content tab that takes text, its window's current item, which a query with no pane names as its text target) and `insertedText(tabId)`; `insertText(tab, text)` (runs a plugin tab's insertion) |
 | Everything else | `notifications()`, `clipboard()`, `activityLog()`, `connectionLog()`, `openedInEditor()`, `openedFiles()`, `browsed()`, `contentTabs()` with `contentStatus(tab)` and `contentCommands(tab)`, `contentMenu(tab)` (the right-click menu `showContextMenu` shows), `chooseFromContentMenu(tab, path...)`, `dismissContentMenu(tab)`, `contentTab(pluginId, title)` and `contentView(pluginId, title)`, `fileSources()`, `connectFileSource`, `declareSubcommand(pluginId, name, summary)` before `start` (the fake reads no `plugin.toml`), then `call(name, arguments, folder)`, `setCommandClient(path)` (what `CommandLine.client()` returns), `setDefaultBrowser(jasper)` (what `Platform.isDefaultBrowser()` returns; a change runs the `onDefaultBrowserChanged` handlers), `setCopyOnSelect(on)` (what `Platform.copyOnSelect()` returns), `declareBundled(pluginId)` (a bundled plugin's file editor and web browser registrations win), `shellEnvironment(map)`, `edit(file, line, windowId)`, `openLink(address, origin, placement, target, windowId)`, `browserPlugin()`, `publishApp(topic, payload)`, `setVariant`, `setWorkspace` |

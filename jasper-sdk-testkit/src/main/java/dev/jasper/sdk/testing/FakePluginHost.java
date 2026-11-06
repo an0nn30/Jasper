@@ -2230,6 +2230,19 @@ public final class FakePluginHost implements AutoCloseable {
     public java.util.Optional<dev.jasper.sdk.RestoreState> restoreState(dev.jasper.sdk.ui.ContentTab tab) { return ((FakeContent) tab).restore; }
 
     /**
+     * The title Jasper saves a plugin's content tab with when it saves its windows: the one the plugin gave with
+     * {@code setSavedTitle}, else the title the tab shows. Call it on the UI thread.
+     *
+     * @param tab a content tab from this host
+     * @return the saved title
+     * @since 0.30.0
+     */
+    public String savedTitle(dev.jasper.sdk.ui.ContentTab tab) {
+        var content = (FakeContent) tab;
+        return content.savedTitle.orElse(content.presentation.title());
+    }
+
+    /**
      * Restores one saved tab as Jasper does when it restores its windows: the plugin's restorer for
      * {@code state}'s kind runs, and the first content tab it opens, whatever window or placement it named, or the first
      * provided session it opens in window {@code windowId}, is the saved tab, in that window, where it stays while the

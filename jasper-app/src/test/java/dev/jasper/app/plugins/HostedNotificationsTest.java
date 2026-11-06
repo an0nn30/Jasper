@@ -49,6 +49,33 @@ class HostedNotificationsTest {
         });
     }
 
+    /**
+     * SDK 0.30.0: a handle removed before its post lands leaves nothing in history: a plain post is not made, so a repeat
+     * does not count on its earlier notification again, and a post with a cause, which lands as its incident is
+     * recorded, is removed as it lands.
+     */
+    @Test void aRemoveBeforeThePostLandsRemovesItWhenItLands() {
+        var hosted = new HostedNotifications("dev.example.tool", "Tool", new PluginRuntime.NotificationHost(fixture.center,
+            caused -> queued.add(() -> caused.posted().accept(fixture.center.post(caused.request()))), (title, details) -> { }),
+            new Containment(() -> true), queued::add, () -> false, name -> new javax.swing.ImageIcon(), name -> {});
+        var kept = hosted.group().info("Same", "");
+        runQueued();
+        var plain = hosted.group().info("Saved", "");
+        var repeat = hosted.group().info("Same", "");
+        var caused = hosted.group().error("Could not save", new IllegalStateException("disk full"));
+        plain.remove();
+        repeat.remove();
+        caused.remove();
+        assertThat(List.of(plain, repeat, caused)).allSatisfy(handle -> assertThat(handle.expired()).isTrue());
+        runQueued();
+        assertThat(fixture.center.history()).as("the earlier notification alone, not counted again").singleElement().satisfies(entry -> {
+            assertThat(entry.request().title()).isEqualTo("Same");
+            assertThat(entry.count()).isEqualTo(1);
+            assertThat(entry.expired()).isFalse();
+        });
+        assertThat(kept.expired()).isFalse();
+    }
+
     @Test void aPostThatLandsAfterThePluginStoppedExpiresAtOnce() {
         var hosted = hosted();
         var handle = hosted.group().info("Late", "");
