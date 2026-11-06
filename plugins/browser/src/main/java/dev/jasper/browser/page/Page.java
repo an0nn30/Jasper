@@ -51,7 +51,7 @@ public final class Page implements AutoCloseable {
     private Function<Page, CompletableFuture<Optional<String>>> sourceReader = page -> chromiumSource(page.readyBrowser());
     // Given the page and a text, puts the text into the field the user is typing in, or types it where the focus is; given
     // the page, presses Return in it: through its browser's DevTools, or a test's.
-    private BiFunction<Page, String, CompletableFuture<Boolean>> fieldInserter =
+    private BiFunction<Page, String, CompletableFuture<Insertion>> fieldInserter =
         (page, typed) -> page.pageText().map(text -> text.insertIntoField(typed)).orElseGet(Page::noBrowser);
     private BiFunction<Page, String, CompletableFuture<Void>> textInserter =
         (page, typed) -> page.pageText().map(text -> text.insertText(typed)).orElseGet(Page::noBrowser);
@@ -306,18 +306,19 @@ public final class Page implements AutoCloseable {
     /**
      * Puts {@code text} into the field the user is typing in on the page, as text another plugin inserts into its item
      * asks (spec section 15). {@link PageText} runs {@code insert-text.js} in an isolated world of the main frame. The
-     * script follows the focus through same-origin frames and open shadow roots to an {@code <input>} that takes text, a
-     * {@code <textarea>} or an editable element, and inserts the text there as typing would. It completes on any thread.
+     * script follows the focus through same-origin frames and open shadow roots to an {@code <input>} of a type that takes
+     * text (text, search, url, tel, email, number or password), a {@code <textarea>} or an editable element, neither
+     * disabled nor read-only, and inserts the text there as typing would. It completes on any thread.
      *
      * @param text the text
-     * @return true when the focused field took the text; false when the script found no such field focused, as with the
-     *     focus in a cross-origin frame. It fails before the page has its browser, after {@link #close()}, and when a
-     *     DevTools call is late, refused or answered with an error, as the text may still go in or nothing can tell
+     * @return what became of the text ({@link Insertion}). It fails before the page has its browser, after
+     *     {@link #close()}, and when a DevTools call is late, refused or answered with an error, as the text may still go
+     *     in or nothing can tell
      */
-    public CompletableFuture<Boolean> insertIntoField(String text) {
+    public CompletableFuture<Insertion> insertIntoField(String text) {
         Objects.requireNonNull(text, "text");
         if (closed) return noBrowser();
-        CompletableFuture<Boolean> inserted = fieldInserter.apply(this, text);
+        CompletableFuture<Insertion> inserted = fieldInserter.apply(this, text);
         return inserted == null ? noBrowser() : inserted;
     }
 
@@ -345,6 +346,23 @@ public final class Page implements AutoCloseable {
      */
     public void pressReturn() {
         if (!closed) returnPresser.accept(this);
+    }
+
+    /** What became of text put into the field the user is typing in, as {@link #insertIntoField} answers (H38). */
+    public enum Insertion {
+        /** The focused field took the text. */
+        INSERTED,
+        /**
+         * The focus is where Jasper's world cannot reach: in a frame of another origin, or inside a closed shadow root,
+         * which the script tells by a focused element that could host one and cannot take the focus itself.
+         */
+        UNREACHABLE,
+        /**
+         * The focus takes no text: nothing is focused, or the page's body is; a button, a link, a checkbox or any other
+         * element that takes no text; a field disabled or read-only; or a number field or an editable element whose
+         * document refused the text.
+         */
+        NOT_EDITABLE
     }
 
     /** What is selected in a page, as {@link #selectedText} reads it. */
@@ -1130,7 +1148,7 @@ public final class Page implements AutoCloseable {
     }
 
     /** Has the page put text into its focused field with {@code replacement} from now on, as a test's answering one. */
-    void useFieldInserter(BiFunction<Page, String, CompletableFuture<Boolean>> replacement) {
+    void useFieldInserter(BiFunction<Page, String, CompletableFuture<Insertion>> replacement) {
         fieldInserter = Objects.requireNonNull(replacement, "replacement");
     }
 

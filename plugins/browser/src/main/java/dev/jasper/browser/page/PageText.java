@@ -47,8 +47,9 @@ import org.cef.browser.CefDevToolsClient;
  * and only for the first run in a document. While it is enabled, which takes a moment, the page could notice that
  * DevTools is attached.
  *
- * <p>Only the script's own answer is an answer: true or false for an insertion, and for a read the selected text, a
- * frame of another origin, or nothing. Every call times out after five seconds, and a late call, an error answer, a
+ * <p>Only the script's own answer is an answer: for an insertion, that the field took the text, that the focus is where
+ * the world cannot reach, or that it takes no text (H38); for a read, the selected text, a frame of another origin, or
+ * nothing. Every call times out after five seconds, and a late call, an error answer, a
  * refused call and an answer that cannot be read each fail the run, as the text may still go in or nothing can tell.
  * DevTools' answers are read as untrusted input, within bounds, as the page's own scripts can shape the frame tree and
  * the selection.
@@ -148,10 +149,10 @@ final class PageText {
      * has ended.
      *
      * @param text the text
-     * @return true when the field took the text; false when the script found no field it reaches focused. It fails when
-     *     any call is late, refused or answered with an error, or its answer cannot be read
+     * @return what became of the text, as the script answered. It fails when any call is late, refused or answered with
+     *     an error, or its answer cannot be read
      */
-    CompletableFuture<Boolean> insertIntoField(String text) {
+    CompletableFuture<Page.Insertion> insertIntoField(String text) {
         Objects.requireNonNull(text, "text");
         return inWorld(INSERT_TEXT + "\n(" + StrictJson.quote(text) + ");", PageText::answered);
     }
@@ -360,17 +361,22 @@ final class PageText {
     }
 
     /**
-     * What the script answered in DevTools' answer to {@code Runtime.evaluate}: its {@code result}, a boolean by value,
-     * when nothing threw.
+     * What {@code insert-text.js} answered in DevTools' answer to {@code Runtime.evaluate}: its {@code result}, a string
+     * by value, when nothing threw: {@code inserted}, {@code unreachable} or {@code not-editable} (H38).
      *
      * @param answer what DevTools answered
-     * @return whether the field took the text; empty for anything else, and never an exception
+     * @return what became of the text; empty for anything else, and never an exception
      */
-    static Optional<Boolean> answered(String answer) {
+    static Optional<Page.Insertion> answered(String answer) {
         Map<String, Object> root = object(answer).orElse(null);
         if (root == null || root.containsKey("exceptionDetails") || !(root.get("result") instanceof Map<?, ?> result)
-            || !"boolean".equals(result.get("type")) || !(result.get("value") instanceof Boolean value)) return Optional.empty();
-        return Optional.of(value);
+            || !"string".equals(result.get("type")) || !(result.get("value") instanceof String value)) return Optional.empty();
+        return switch (value) {
+            case "inserted" -> Optional.of(Page.Insertion.INSERTED);
+            case "unreachable" -> Optional.of(Page.Insertion.UNREACHABLE);
+            case "not-editable" -> Optional.of(Page.Insertion.NOT_EDITABLE);
+            default -> Optional.empty();
+        };
     }
 
     /**

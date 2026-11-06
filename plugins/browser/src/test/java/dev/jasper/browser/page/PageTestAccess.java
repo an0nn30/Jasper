@@ -135,14 +135,14 @@ public final class PageTestAccess {
 
     /**
      * Has {@code page} put text into its focused field with {@code inserter} from now on, which is told the page and each
-     * text and answers whether a field took it, as the page's script would: a test's, as a page without Chromium inserts
+     * text and answers what became of it, as the page's script would: a test's, as a page without Chromium inserts
      * nothing.
      *
      * @param page a page
      * @param inserter answers each insertion
      */
     public static void useFieldInserter(Page page, java.util.function.BiFunction<Page, String,
-            java.util.concurrent.CompletableFuture<Boolean>> inserter) {
+            java.util.concurrent.CompletableFuture<Page.Insertion>> inserter) {
         page.useFieldInserter(inserter);
     }
 

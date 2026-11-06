@@ -88,8 +88,9 @@ import javax.swing.JComponent;
  * DevTools, inspecting the element under the pointer, in the item's one {@link DevToolsItem}, a pane below its own,
  * which closes with it. Text another plugin inserts into the item, such as a snippet from the command palette (spec
  * section 15), goes into the page's focused field ({@link Page#insertIntoField}), then Return when asked. When the
- * page's script finds no field it reaches focused, as with the focus in a cross-origin frame, the text is typed where the
- * focus is ({@link Page#insertText}), then Return when asked; the clipboard is never touched. While Copy on select is on
+ * page's script cannot reach the focus, as in a cross-origin frame, the text is typed where the focus is
+ * ({@link Page#insertText}), then Return when asked; a focus that takes no text gets neither; the clipboard is never
+ * touched. While Copy on select is on
  * ({@code Platform.copyOnSelect()}, spec section 15), each selection the user finishes in the page is copied
  * ({@link Page#onSelectionGesture}, {@link Page#selectedText}), except one in a frame of another origin. UI thread.
  */
@@ -311,27 +312,34 @@ public final class BrowserItem implements AutoCloseable {
     }
 
     /**
-     * Text another plugin inserts into the item, as the tab's insertion receives it (H30). It goes into the page's
-     * focused field, then Return when {@code inserted} asks. When the page's script answers that no field it reaches has
-     * the focus, the text is typed where the focus is, then Return when asked. Each answer comes back to the UI thread,
-     * and an item closed by then does nothing. Any other outcome does nothing more: a page without its browser yet, or a
-     * DevTools call that is late, refused or answered with an error, as the text may still go in.
+     * Text another plugin inserts into the item, as the tab's insertion receives it (H30, H38). It goes into the page's
+     * focused field, then Return when {@code inserted} asks. When the page's script answers that the focus is where it
+     * cannot reach, in a frame of another origin or a closed shadow root, the text is typed there, then Return when
+     * asked. When it answers that the focus takes no text, as a button, a link or a read-only field does, nothing more
+     * happens: Return is trusted input, and would press the control the page put the focus on. Each answer comes back to
+     * the UI thread, and nothing more happens once the item has closed or the page has started another main-frame load
+     * since the insertion began. Any other outcome does nothing more: a page without its browser yet, or a DevTools call
+     * that is late, refused or answered with an error, as the text may still go in.
      */
     private void insert(InsertedText inserted) {
         if (closed) return;
         String text = inserted.text();
-        page.insertIntoField(text).whenComplete((taken, failure) -> EventQueue.invokeLater(() -> {
+        long started = loadStarts;
+        page.insertIntoField(text).whenComplete((answer, failure) -> EventQueue.invokeLater(() -> {
             if (closed) return;
             if (failure != null) {
                 items.context().log().log(System.Logger.Level.DEBUG, "Text could not be put into a page's field", failure);
-            } else if (taken) {
-                if (inserted.submit()) page.pressReturn();
-            } else {
-                page.insertText(text).whenComplete((typed, notTyped) -> EventQueue.invokeLater(() -> {
+                return;
+            }
+            if (loadStarts != started) return; // another document now: nothing is typed or pressed there
+            switch (answer) {
+                case INSERTED -> { if (inserted.submit()) page.pressReturn(); }
+                case UNREACHABLE -> page.insertText(text).whenComplete((typed, notTyped) -> EventQueue.invokeLater(() -> {
                     if (closed) return;
                     if (notTyped != null) items.context().log().log(System.Logger.Level.DEBUG, "Text could not be typed into a page", notTyped);
-                    else if (inserted.submit()) page.pressReturn();
+                    else if (inserted.submit() && loadStarts == started) page.pressReturn();
                 }));
+                case NOT_EDITABLE -> { }
             }
         }));
     }

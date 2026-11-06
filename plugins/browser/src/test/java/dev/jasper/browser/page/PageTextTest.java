@@ -25,12 +25,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * event that {@code Runtime.enable} reports, and {@code Runtime.disable} follows. {@code insert-text.js} then runs in
  * that unique context only, so a navigation in between cannot run it in another document's world.
  *
- * <p>Only the script's answered true or false is an answer. A late call, an error answer, a refused call and an answer
- * that cannot be read each fail the insertion, so its item does nothing more. {@code Input.insertText} types the text
- * without the clipboard, and Return is a key down then a key up. Copy on select's read runs {@code selection.js} the same
- * way, one run at a time with the insertions. The world's unique id is kept for the document, so only the first run in a
- * document enables Runtime, whose console objects are released after it (H33). A recording DevTools stands in for Chromium's, and calls time out after
- * {@value #TIMEOUT_MILLIS} ms. The scripts themselves are checked by hand (Task 14).
+ * <p>Only the script's three answers are answers: inserted, unreachable and not editable (H38). A late call, an error
+ * answer, a refused call and an answer that cannot be read each fail the insertion, so its item does nothing more.
+ * {@code Input.insertText} types the text without the clipboard, and Return is a key down then a key up. Copy on select's
+ * read runs {@code selection.js} the same way, one run at a time with the insertions. The world's unique id is kept for
+ * the document, so only the first run in a document enables Runtime, whose console objects are released after it (H33).
+ * A recording DevTools stands in for Chromium's, and calls time out after {@value #TIMEOUT_MILLIS} ms. The scripts
+ * themselves are checked by hand (Task 14).
  */
 class PageTextTest {
     private static final long TIMEOUT_MILLIS = 100;
@@ -43,8 +44,10 @@ class PageTextTest {
     private static final String WORLD = "{\"executionContextId\":12}";
     // Jasper's world, as Runtime.enable reports it.
     private static final String CREATED = created(12, PageText.WORLD, UNIQUE, false, FRAME);
+    // The insertion script's three answers, by value; and a boolean, which no script of Jasper's answers.
+    private static final String INSERTED = inserted("inserted"), UNREACHABLE = inserted("unreachable"),
+        NOT_EDITABLE = inserted("not-editable");
     private static final String TRUE = "{\"result\":{\"type\":\"boolean\",\"value\":true}}";
-    private static final String FALSE = "{\"result\":{\"type\":\"boolean\",\"value\":false}}";
 
     // The order the first run in a document asks in; a later run in it asks only Runtime.evaluate (H33).
     private static final List<String> ORDER = List.of("Page.getFrameTree", "Page.createIsolatedWorld", "Runtime.enable",
@@ -53,7 +56,7 @@ class PageTextTest {
     private final PageText text = made(devTools, Duration.ofMillis(TIMEOUT_MILLIS));
 
     @Test void theInsertionAsksInOrderAndRunsTheScriptInTheWorldsUniqueContext() throws Exception {
-        assertThat(text.insertIntoField("ls -la").get(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(text.insertIntoField("ls -la").get(5, TimeUnit.SECONDS)).isEqualTo(Page.Insertion.INSERTED);
         assertThat(devTools.methods()).isEqualTo(ORDER);
         assertThat(devTools.parameters("Page.createIsolatedWorld"))
             .containsExactly(Map.entry("frameId", FRAME), Map.entry("worldName", PageText.WORLD));
@@ -64,9 +67,12 @@ class PageTextTest {
         assertThat((String) evaluated.get("expression")).isEqualTo(PageText.INSERT_TEXT + "\n(" + StrictJson.quote("ls -la") + ");");
     }
 
-    @Test void anAnsweredFalseIsFalse() throws Exception {
-        devTools.answer("Runtime.evaluate", FALSE);
-        assertThat(text.insertIntoField("ls").get(5, TimeUnit.SECONDS)).isFalse();
+    /** H38: the script answers that the focus is where its world cannot reach, or that it takes no text. */
+    @Test void theScriptsOtherAnswersAreTheFocusUnreachableAndTheFocusNotEditable() throws Exception {
+        devTools.answer("Runtime.evaluate", UNREACHABLE);
+        assertThat(text.insertIntoField("ls").get(5, TimeUnit.SECONDS)).isEqualTo(Page.Insertion.UNREACHABLE);
+        devTools.answer("Runtime.evaluate", NOT_EDITABLE);
+        assertThat(text.insertIntoField("ls").get(5, TimeUnit.SECONDS)).isEqualTo(Page.Insertion.NOT_EDITABLE);
     }
 
     /** A late answer may still come, and the text with it: the insertion fails, so nothing else types it. */
@@ -146,12 +152,12 @@ class PageTextTest {
         PageText waiting = made(patient, Duration.ofSeconds(5));
         var pending = new CompletableFuture<String>();
         patient.answers.put("Runtime.evaluate", parameters -> pending);
-        CompletableFuture<Boolean> first = waiting.insertIntoField("one"), second = waiting.insertIntoField("two");
+        CompletableFuture<Page.Insertion> first = waiting.insertIntoField("one"), second = waiting.insertIntoField("two");
         assertThat(patient.methods()).as("the second waits").isEqualTo(ORDER);
-        patient.answer("Runtime.evaluate", FALSE);
-        pending.complete(TRUE);
-        assertThat(first.get(5, TimeUnit.SECONDS)).isTrue();
-        assertThat(second.get(5, TimeUnit.SECONDS)).isFalse();
+        patient.answer("Runtime.evaluate", NOT_EDITABLE);
+        pending.complete(INSERTED);
+        assertThat(first.get(5, TimeUnit.SECONDS)).isEqualTo(Page.Insertion.INSERTED);
+        assertThat(second.get(5, TimeUnit.SECONDS)).isEqualTo(Page.Insertion.NOT_EDITABLE);
         assertThat(patient.methods()).as("the second run in the same document asks only the evaluation").isEqualTo(withEvaluation(ORDER));
     }
 
@@ -222,18 +228,22 @@ class PageTextTest {
             assertThat(PageText.uniqueId(event, FRAME, 12)).as(String.valueOf(event)).isEmpty();
     }
 
-    @Test void onlyABooleanByValueIsTheScriptsAnswer() {
-        assertThat(PageText.answered(TRUE)).contains(true);
-        assertThat(PageText.answered(FALSE)).contains(false);
-        for (String answer : new String[] {null, "", "{}", "{\"result\":{\"type\":\"string\",\"value\":\"true\"}}",
-            "{\"result\":{\"type\":\"boolean\"}}", "{\"result\":{\"type\":\"boolean\",\"value\":true},\"exceptionDetails\":{}}",
-            TRUE + " x", "{\"result\":{\"type\":\"boolean\",\"value\":true},\"x\":\"" + "a".repeat(PageText.MAX_ANSWER) + "\"}"})
+    /** H38: the script's answer is one of three strings by value; anything else, a boolean included, is none. */
+    @Test void onlyOneOfTheThreeStringsByValueIsTheScriptsAnswer() {
+        assertThat(PageText.answered(INSERTED)).contains(Page.Insertion.INSERTED);
+        assertThat(PageText.answered(UNREACHABLE)).contains(Page.Insertion.UNREACHABLE);
+        assertThat(PageText.answered(NOT_EDITABLE)).contains(Page.Insertion.NOT_EDITABLE);
+        for (String answer : new String[] {null, "", "{}", TRUE, "{\"result\":{\"type\":\"boolean\",\"value\":false}}",
+            inserted("true"), inserted("Inserted"), inserted("not_editable"), inserted(""), "{\"result\":{\"type\":\"string\"}}",
+            "{\"result\":{\"type\":\"object\",\"value\":\"inserted\"}}", "{\"result\":{\"type\":\"string\",\"value\":7}}",
+            "{\"result\":{\"type\":\"string\",\"value\":\"inserted\"},\"exceptionDetails\":{}}", INSERTED + " x",
+            "{\"result\":{\"type\":\"string\",\"value\":\"inserted\"},\"x\":\"" + "a".repeat(PageText.MAX_ANSWER) + "\"}"})
             assertThat(PageText.answered(answer)).as(String.valueOf(answer)).isEmpty();
     }
 
     @Test void theScriptIsAFunctionOfTheText() {
-        assertThat(PageText.INSERT_TEXT).startsWith("/*").contains("(function (text) {", "execCommand('insertText'", "setRangeText")
-            .endsWith("})");
+        assertThat(PageText.INSERT_TEXT).startsWith("/*").contains("(function (text) {", "execCommand('insertText'", "setRangeText",
+            "'inserted'", "'unreachable'", "'not-editable'").endsWith("})");
     }
 
     /**
@@ -286,12 +296,12 @@ class PageTextTest {
         PageText waiting = made(patient, Duration.ofSeconds(5));
         var pending = new CompletableFuture<String>();
         patient.answers.put("Runtime.evaluate", parameters -> pending);
-        CompletableFuture<Boolean> inserted = waiting.insertIntoField("one");
+        CompletableFuture<Page.Insertion> inserted = waiting.insertIntoField("one");
         CompletableFuture<Page.Selection> read = waiting.selectedText();
         assertThat(patient.methods()).as("the read waits").isEqualTo(ORDER);
         patient.answer("Runtime.evaluate", selected("{\"kind\":\"none\"}"));
-        pending.complete(TRUE);
-        assertThat(inserted.get(5, TimeUnit.SECONDS)).isTrue();
+        pending.complete(INSERTED);
+        assertThat(inserted.get(5, TimeUnit.SECONDS)).isEqualTo(Page.Insertion.INSERTED);
         assertThat(read.get(5, TimeUnit.SECONDS)).isEqualTo(new Page.Selection.None());
         assertThat(patient.methods()).isEqualTo(withEvaluation(ORDER));
     }
@@ -316,7 +326,7 @@ class PageTextTest {
 
     /** H33: the world's unique id is kept for the document, so a second run asks only the evaluation, in that context. */
     @Test void aSecondRunInTheSameDocumentAsksOnlyTheEvaluation() throws Exception {
-        assertThat(text.insertIntoField("one").get(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(text.insertIntoField("one").get(5, TimeUnit.SECONDS)).isEqualTo(Page.Insertion.INSERTED);
         devTools.answer("Runtime.evaluate", selected("{\"kind\":\"none\"}"));
         assertThat(text.selectedText().get(5, TimeUnit.SECONDS)).isEqualTo(new Page.Selection.None());
         assertThat(devTools.methods()).isEqualTo(withEvaluation(ORDER));
@@ -325,7 +335,7 @@ class PageTextTest {
 
     /** H33: each main-frame load start of the page begins a new document for its text runs. */
     @Test void aMainFrameLoadStartBeginsANewDocument() throws Exception {
-        var runs = new ArrayList<CompletableFuture<Boolean>>();
+        var runs = new ArrayList<CompletableFuture<Page.Insertion>>();
         javax.swing.SwingUtilities.invokeAndWait(() -> {
             var page = new Page(java.net.URI.create("https://example.com/"), () -> { }, PageTestAccess.noFavicons());
             page.usePageText(text);
@@ -334,7 +344,7 @@ class PageTextTest {
             runs.add(text.insertIntoField("two"));
             page.close();
         });
-        for (var run : runs) assertThat(run.get(5, TimeUnit.SECONDS)).isTrue();
+        for (var run : runs) assertThat(run.get(5, TimeUnit.SECONDS)).isEqualTo(Page.Insertion.INSERTED);
         var twice = new ArrayList<>(ORDER);
         twice.addAll(ORDER);
         assertThat(devTools.methods()).isEqualTo(twice);
@@ -358,15 +368,15 @@ class PageTextTest {
         for (String failure : List.of("error", "late", "unreadable")) {
             var devTools = new DevTools();
             PageText text = made(devTools, Duration.ofMillis(TIMEOUT_MILLIS));
-            assertThat(text.insertIntoField("one").get(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(text.insertIntoField("one").get(5, TimeUnit.SECONDS)).isEqualTo(Page.Insertion.INSERTED);
             switch (failure) {
                 case "error" -> devTools.fail("Runtime.evaluate");
                 case "late" -> devTools.never("Runtime.evaluate");
                 default -> devTools.answer("Runtime.evaluate", "{}");
             }
             assertThatThrownBy(() -> text.insertIntoField("two").get(5, TimeUnit.SECONDS)).as(failure).isInstanceOf(ExecutionException.class);
-            devTools.answer("Runtime.evaluate", TRUE);
-            assertThat(text.insertIntoField("three").get(5, TimeUnit.SECONDS)).isTrue();
+            devTools.answer("Runtime.evaluate", INSERTED);
+            assertThat(text.insertIntoField("three").get(5, TimeUnit.SECONDS)).isEqualTo(Page.Insertion.INSERTED);
             var expected = withEvaluation(ORDER);
             expected.addAll(ORDER);
             assertThat(devTools.methods()).as(failure).isEqualTo(expected);
@@ -380,15 +390,15 @@ class PageTextTest {
             for (String event : devTools.events) text.event("Runtime.executionContextCreated", event);
             return enabled;
         });
-        CompletableFuture<Boolean> first = text.insertIntoField("one");
+        CompletableFuture<Page.Insertion> first = text.insertIntoField("one");
         text.newDocument();
         enabled.complete("{}");
-        assertThat(first.get(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(first.get(5, TimeUnit.SECONDS)).isEqualTo(Page.Insertion.INSERTED);
         devTools.answers.put("Runtime.enable", parameters -> {
             for (String event : devTools.events) text.event("Runtime.executionContextCreated", event);
             return CompletableFuture.completedFuture("{}");
         });
-        assertThat(text.insertIntoField("two").get(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(text.insertIntoField("two").get(5, TimeUnit.SECONDS)).isEqualTo(Page.Insertion.INSERTED);
         var twice = new ArrayList<>(ORDER);
         twice.addAll(ORDER);
         assertThat(devTools.methods()).isEqualTo(twice);
@@ -430,6 +440,11 @@ class PageTextTest {
     @Test void theSelectionScriptCopiesSpacesAndFollowsAnyFrameElement() {
         String script = PageText.SELECTION;
         assertThat(script).contains(".replace(/\\u00a0/g, ' ')", "'contentDocument' in element").doesNotContain("localName === 'iframe'");
+    }
+
+    /** {@code value}, a string, as {@code Runtime.evaluate} answers the insertion script's string by value. */
+    private static String inserted(String value) {
+        return "{\"result\":{\"type\":\"string\",\"value\":" + StrictJson.quote(value) + "}}";
     }
 
     /** {@code value}, a JSON object, as {@code Runtime.evaluate} answers a script's object by value. */
@@ -491,7 +506,7 @@ class PageTextTest {
         DevTools() {
             answer("Page.getFrameTree", TREE);
             answer("Page.createIsolatedWorld", WORLD);
-            answer("Runtime.evaluate", TRUE);
+            answer("Runtime.evaluate", INSERTED);
             answers.put("Runtime.enable", parameters -> {
                 for (String event : events) owner.event("Runtime.executionContextCreated", event);
                 return CompletableFuture.completedFuture("{}");

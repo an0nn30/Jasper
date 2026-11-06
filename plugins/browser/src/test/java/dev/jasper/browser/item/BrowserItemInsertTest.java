@@ -25,10 +25,12 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Spec section 15's Snippets in page fields, as a browser item takes text another plugin inserts (H30). The text goes
- * into the page's focused field through the isolated world's script, then Return when asked. When the script answers
- * that no field it reaches has the focus, as in a cross-origin frame, the text is typed with DevTools'
- * {@code Input.insertText}, then Return. Any other outcome inserts nothing more, and the clipboard is never touched. The
+ * Spec section 15's Snippets in page fields, as a browser item takes text another plugin inserts (H30, H38). The text
+ * goes into the page's focused field through the isolated world's script, then Return when asked. When the script
+ * answers that the focus is where it cannot reach, as in a cross-origin frame, the text is typed with DevTools'
+ * {@code Input.insertText}, then Return. When it answers that the focus takes no text, as a button's or a read-only
+ * field's, nothing more happens: Return would press the page's control. A main-frame load start after the insertion
+ * began skips the typing and Return. Any other outcome inserts nothing more, and the clipboard is never touched. The
  * page is made by a stand-in, as a page cannot be made without Chromium: the test answers its script and its typing,
  * and records its Returns.
  */
@@ -37,7 +39,7 @@ class BrowserItemInsertTest {
     private final MemoryStores memory = new MemoryStores();
     private final List<String> log = new CopyOnWriteArrayList<>();
     // The answers the page gives its next script and its next typing.
-    private CompletableFuture<Boolean> script = new CompletableFuture<>();
+    private CompletableFuture<Page.Insertion> script = new CompletableFuture<>();
     private CompletableFuture<Void> typing = CompletableFuture.completedFuture(null);
     private FakePluginHost host;
 
@@ -52,7 +54,7 @@ class BrowserItemInsertTest {
 
     @Test void aFieldThatTakesTheTextGetsReturnOnceWhenAskedAndNothingIsTyped() throws Exception {
         BrowserItem item = open(true);
-        script = CompletableFuture.completedFuture(true);
+        script = CompletableFuture.completedFuture(Page.Insertion.INSERTED);
         assertThat(onUi(() -> host.insertText(item.tab(), new InsertedText("ls -la", true)))).as("the item takes text").isTrue();
         settle();
         assertThat(log).containsExactly("field:ls -la", "return");
@@ -62,9 +64,9 @@ class BrowserItemInsertTest {
         assertThat(onUi(() -> host.failures())).isEmpty();
     }
 
-    @Test void withNoFieldTheScriptReachesTheTextIsTypedThenReturnIsPressed() throws Exception {
+    @Test void aFocusTheScriptCannotReachIsTypedIntoThenReturnIsPressed() throws Exception {
         BrowserItem item = open(true);
-        script = CompletableFuture.completedFuture(false);
+        script = CompletableFuture.completedFuture(Page.Insertion.UNREACHABLE);
         onUi(() -> host.insertText(item.tab(), new InsertedText("make deploy", true)));
         settle();
         assertThat(log).containsExactly("field:make deploy", "type:make deploy", "return");
@@ -74,10 +76,47 @@ class BrowserItemInsertTest {
         assertThat(onUi(() -> host.failures())).isEmpty();
     }
 
+    /**
+     * H38: a focus that takes no text, as a button, a link, a read-only field or the page's body, gets no typing and no
+     * Return.
+     */
+    @Test void aFocusThatTakesNoTextGetsNoTypingAndNoReturn() throws Exception {
+        BrowserItem item = open(true);
+        script = CompletableFuture.completedFuture(Page.Insertion.NOT_EDITABLE);
+        onUi(() -> host.insertText(item.tab(), new InsertedText("make deploy", true)));
+        settle();
+        assertThat(log).containsExactly("field:make deploy");
+        assertThat(onUi(() -> host.failures())).isEmpty();
+    }
+
+    /** H38: a main-frame load start after the insertion began skips the typing, and Return in the next document. */
+    @Test void aLoadStartDuringTheInsertionSkipsTheTypingAndReturn() throws Exception {
+        BrowserItem item = open(true);
+        onUi(() -> host.insertText(item.tab(), new InsertedText("make deploy", true)));
+        onUi(() -> PageTestAccess.loadStarted(item.page(), "https://example.com/next"));
+        onUi(() -> script.complete(Page.Insertion.UNREACHABLE));
+        settle();
+        assertThat(log).as("no typing").containsExactly("field:make deploy");
+        script = new CompletableFuture<>();
+        onUi(() -> host.insertText(item.tab(), new InsertedText("ls", true)));
+        onUi(() -> PageTestAccess.loadStarted(item.page(), "https://example.com/later"));
+        onUi(() -> script.complete(Page.Insertion.INSERTED));
+        settle();
+        assertThat(log).as("no Return after a field took it").containsExactly("field:make deploy", "field:ls");
+        script = CompletableFuture.completedFuture(Page.Insertion.UNREACHABLE);
+        typing = new CompletableFuture<>();
+        onUi(() -> host.insertText(item.tab(), new InsertedText("pwd", true)));
+        settle();
+        onUi(() -> PageTestAccess.loadStarted(item.page(), "https://example.com/last"));
+        onUi(() -> typing.complete(null));
+        settle();
+        assertThat(log).as("no Return after the typing").containsExactly("field:make deploy", "field:ls", "field:pwd", "type:pwd");
+    }
+
     /** Return waits for the typing, and typing that fails, late or refused, gets none. */
     @Test void typingThatFailsGetsNoReturn() throws Exception {
         BrowserItem item = open(true);
-        script = CompletableFuture.completedFuture(false);
+        script = CompletableFuture.completedFuture(Page.Insertion.UNREACHABLE);
         typing = CompletableFuture.failedFuture(new TimeoutException());
         onUi(() -> host.insertText(item.tab(), new InsertedText("make deploy", true)));
         settle();
@@ -105,7 +144,7 @@ class BrowserItemInsertTest {
         BrowserItem item = open(true);
         onUi(() -> host.insertText(item.tab(), new InsertedText("make deploy", true)));
         onUi(item::close);
-        onUi(() -> script.complete(false));
+        onUi(() -> script.complete(Page.Insertion.UNREACHABLE));
         settle();
         assertThat(log).containsExactly("field:make deploy");
         assertThat(onUi(() -> host.insertText(item.tab(), new InsertedText("pwd", true)))).as("a closed item takes no text").isFalse();
@@ -114,7 +153,7 @@ class BrowserItemInsertTest {
 
     @Test void anItemClosedBeforeTheTypingAnswersPressesNothing() throws Exception {
         BrowserItem item = open(true);
-        script = CompletableFuture.completedFuture(false);
+        script = CompletableFuture.completedFuture(Page.Insertion.UNREACHABLE);
         typing = new CompletableFuture<>();
         onUi(() -> host.insertText(item.tab(), new InsertedText("make deploy", true)));
         settle();

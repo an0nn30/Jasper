@@ -14,8 +14,8 @@
  * {@code find.js} runs in each of the page's frames, highlights the matches and answers its count through the
  * {@code links} package's message router, and the {@code json} package writes the query into the script.
  * {@code PageText} puts text another plugin inserts where the user is typing in a page, through DevTools and never the
- * clipboard: {@code insert-text.js} runs in an isolated world of the main frame, else {@code Input.insertText} types the
- * text where the focus is, and Return is pressed through DevTools too
+ * clipboard: {@code insert-text.js} runs in an isolated world of the main frame, and for a focus it cannot reach
+ * {@code Input.insertText} types the text where the focus is; Return is pressed through DevTools too
  * ({@link dev.jasper.browser.page.Page#insertIntoField}, {@link dev.jasper.browser.page.Page#insertText},
  * {@link dev.jasper.browser.page.Page#pressReturn}). For copy on select, the canvas tells the page once the user has
  * finished a selection with the mouse or the keyboard ({@link dev.jasper.browser.page.Page#onSelectionGesture}), and
