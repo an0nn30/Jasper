@@ -377,8 +377,9 @@ class BrowserItemTest {
             assertThat(root).isInstanceOfSatisfying(dev.jasper.sdk.ui.Nodes.Split.class, split -> {
                 assertThat(split.kind()).isEqualTo(dev.jasper.sdk.ui.Nodes.SplitKind.DOCUMENT);
                 assertThat(split.children()).extracting(dev.jasper.sdk.ui.Nodes.Node::id)
-                    .containsExactly(BrowserToolbar.BAR, BrowserItem.PAGE, BrowserFindBar.ROOT);
-                assertThat(split.children().get(1)).isInstanceOfSatisfying(dev.jasper.sdk.ui.Nodes.Custom.class, page -> {
+                    .containsExactly(BrowserToolbar.BAR, AudioBar.BAR, BrowserItem.PAGE, BrowserFindBar.ROOT);
+                assertThat(split.children().get(1).state().visible()).as("the audio bar, until a page's sound is muted").isFalse();
+                assertThat(split.children().get(2)).isInstanceOfSatisfying(dev.jasper.sdk.ui.Nodes.Custom.class, page -> {
                     assertThat(page.kind()).isEqualTo(dev.jasper.sdk.ui.Nodes.CustomKind.PREVIEW);
                     assertThat(page.contentId()).isEqualTo(BrowserItem.CONTENT);
                 });
@@ -873,9 +874,9 @@ class BrowserItemTest {
             var view = host.contentView(ID, "example.com").orElseThrow();
             var root = (Nodes.Split) view.spec().root();
             assertThat(root.children()).extracting(Nodes.Node::id)
-                .containsExactly(BrowserToolbar.BAR, BrowserItem.PAGE, BrowserItem.WAITING, BrowserFindBar.ROOT);
-            assertThat(root.children().get(1).state().visible()).as("the page's canvas").isFalse();
-            assertThat(root.children().get(2)).isInstanceOfSatisfying(Nodes.Empty.class, placeholder -> {
+                .containsExactly(BrowserToolbar.BAR, AudioBar.BAR, BrowserItem.PAGE, BrowserItem.WAITING, BrowserFindBar.ROOT);
+            assertThat(root.children().get(2).state().visible()).as("the page's canvas").isFalse();
+            assertThat(root.children().get(3)).isInstanceOfSatisfying(Nodes.Empty.class, placeholder -> {
                 assertThat(placeholder.state().visible()).isTrue();
                 assertThat(placeholder.title()).isEqualTo("Jasper closed while this page was open.");
                 assertThat(placeholder.actions()).singleElement().isInstanceOfSatisfying(Nodes.Button.class, button -> {
@@ -916,8 +917,9 @@ class BrowserItemTest {
                 assertThat(item.waiting()).isFalse();
                 assertThat(asked).containsExactly(item.page());
                 var root = (Nodes.Split) view.spec().root();
-                assertThat(root.children()).extracting(Nodes.Node::id).containsExactly(BrowserToolbar.BAR, BrowserItem.PAGE, BrowserFindBar.ROOT);
-                assertThat(root.children().get(1).state().visible()).isTrue();
+                assertThat(root.children()).extracting(Nodes.Node::id).containsExactly(BrowserToolbar.BAR, AudioBar.BAR, BrowserItem.PAGE,
+                    BrowserFindBar.ROOT);
+                assertThat(root.children().get(2).state().visible()).isTrue();
                 assertThat(item.page().address()).as("what it loads").isEqualTo("https://example.com");
                 parent.remove(item.pageView());
                 parent.add(item.pageView());

@@ -32,7 +32,10 @@
  * page's main frame runs {@code notifications.js}, which stands in for {@code window.Notification} in the page's own
  * world, given the permission the item's store holds for the document's site through {@code PagePrivacy}, or denied
  * for a /dev/null page and outside a secure context, and asks Jasper through the {@code links} package's privacy
- * router; no sub-frame runs it, and no challenge frame ({@code ChallengeFrames}). {@code PageMenu} is the client's
+ * router; no sub-frame runs it, and no challenge frame ({@link dev.jasper.browser.page.ChallengeFrames}). Every frame
+ * but a challenge frame runs {@code audio.js}, which mutes the document's sound and tells the privacy router of its
+ * first, in the audio mode the item's store holds for the page's top-level site, which its sub-frames follow; the
+ * item mutes and unmutes every frame through {@code PagePrivacy}. {@code PageMenu} is the client's
  * one context-menu handler: Jasper shows the page's right-click menu, {@code PageMenuItems} for what is under the
  * pointer, at the
  * {@link dev.jasper.browser.page.MenuPlace} the item gives, over its tab, and Chromium shows none; its View Source

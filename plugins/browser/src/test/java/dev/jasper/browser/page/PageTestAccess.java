@@ -105,6 +105,17 @@ public final class PageTestAccess {
     }
 
     /**
+     * The page's main frame starts a document in {@code mode}, as its frame scripts set it on Chromium's thread from its
+     * item's store: the mode its sub-frames start in, until the page is muted or unmuted. Any thread.
+     *
+     * @param page a page
+     * @param mode the document's audio mode
+     */
+    public static void audioDocumentStarted(Page page, dev.jasper.browser.permissions.AudioMode mode) {
+        page.privacy().documentStarted(mode);
+    }
+
+    /**
      * The page's main frame finished loading its document, as the client's load handler tells it. UI thread.
      *
      * @param page a page

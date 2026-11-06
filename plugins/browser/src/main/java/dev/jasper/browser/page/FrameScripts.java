@@ -2,12 +2,16 @@ package dev.jasper.browser.page;
 
 import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.json.StrictJson;
+import dev.jasper.browser.permissions.AudioMode;
 import dev.jasper.browser.permissions.Decision;
 import dev.jasper.browser.permissions.Origins;
 import dev.jasper.browser.permissions.Permission;
+import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.function.Consumer;
 import org.cef.CefClient;
+import org.cef.browser.CefBrowser;
 import org.cef.browser.CefFrame;
 
 /**
@@ -21,16 +25,26 @@ import org.cef.browser.CefFrame;
  * ({@code links.PrivacyQueries}). A sub-frame keeps Chromium's own, which CEF asks no one about and so denies, and so
  * does a challenge frame ({@link ChallengeFrames}), even as a main frame: Jasper's page scripts stay out of those (spec
  * section 5). A script of the page that ran before the stand-in keeps Chromium's {@code Notification} too, and a
- * service worker's {@code showNotification} is not Jasper's. Both hooks are given to the client once, when a page first
- * starts, as {@link PageEvents#prepare} gives its handlers.
+ * service worker's {@code showNotification} is not Jasper's.
+ *
+ * <p>Every frame but a challenge frame then runs {@code audio.js}, which mutes the document's sound, in the page's own
+ * world too, called with an audio mode ({@link #audio}). Audio follows the page's top-level site (the plan's call): the
+ * main frame's document starts in the mode its item's store holds for its site ({@link #audioMode}), a /dev/null item's
+ * store in memory included (ruling V20), and that becomes the page's current mode ({@link PagePrivacy#audioMode}),
+ * which every sub-frame starting a document is given, so an embedded player is muted with its page. Muting the page
+ * runs {@code setMuted} in each frame ({@link #everyFrame(CefBrowser, String)}). The muting is cooperative: the page's
+ * own scripts can undo it, and an {@code AudioContext} made before the script ran is not tracked. Both hooks are given
+ * to the client once, when a page first starts, as {@link PageEvents#prepare} gives its handlers.
  */
 final class FrameScripts {
     /** The notifications stand-in: a function of the document's permission. */
     static final String NOTIFICATIONS = PageEvents.script("notifications.js");
+    /** The audio muting: a function of the document's audio mode. */
+    static final String AUDIO = PageEvents.script("audio.js");
     /** The permission a document is given: Allowed, Blocked or none stored. */
     static final String GRANTED = "granted", DENIED = "denied", DEFAULT = "default";
-    // The name the script goes by in a page's console and stack traces.
-    private static final String NOTIFICATIONS_URL = "jasper-about:notifications.js";
+    // The names the scripts go by in a page's console and stack traces.
+    private static final String NOTIFICATIONS_URL = "jasper-about:notifications.js", AUDIO_URL = "jasper-about:audio.js";
     private static final Consumer<CefClient> INSTALL = FrameScripts::install;
     private static final System.Logger LOG = System.getLogger(FrameScripts.class.getName());
 
@@ -51,8 +65,9 @@ final class FrameScripts {
     }
 
     /**
-     * {@code frame} of a page's {@code browser} starts loading a document: it runs the scripts {@link #script} gives it.
-     * A browser that is no page's runs none. Chromium's thread; it never throws.
+     * {@code frame} of a page's {@code browser} starts loading a document: a main frame's document starts in its site's
+     * audio mode, which becomes the page's current one, and the frame runs the scripts {@link #scripts} gives it. A
+     * browser that is no page's runs none. Chromium's thread; it never throws.
      *
      * @param browser the page's browser
      * @param frame the frame, which is not disposed here
@@ -61,25 +76,38 @@ final class FrameScripts {
         Page page = browser.owner();
         if (page == null) return;
         try {
-            // A sub-frame runs none of these scripts, so its address is not read.
-            if (!frame.isMain()) return;
-            script(true, frame.getURL(), page).ifPresent(script -> frame.executeJavaScript(script, NOTIFICATIONS_URL, 0));
+            boolean main = frame.isMain();
+            String address = frame.getURL();
+            if (main) page.privacy().documentStarted(audioMode(address, page));
+            for (Script script : scripts(main, address, page)) frame.executeJavaScript(script.text(), script.url(), 0);
         } catch (RuntimeException failure) {
-            LOG.log(System.Logger.Level.WARNING, "A page's notifications script could not run", failure);
+            LOG.log(System.Logger.Level.WARNING, "A page's privacy scripts could not run", failure);
         }
     }
 
     /**
-     * What a frame starting to load the document at {@code address} runs.
+     * A script a frame runs, and the address it goes by in the page's console.
+     *
+     * @param url the address it goes by
+     * @param text the script
+     */
+    record Script(String url, String text) { }
+
+    /**
+     * What a frame starting to load the document at {@code address} runs, in order. A main frame's document has started
+     * in its audio mode first.
      *
      * @param mainFrame whether it is its page's main frame
      * @param address the document's address
-     * @param page the page, whose privacy hooks give its item's stored decisions
-     * @return the notifications stand-in for a main frame that is no challenge frame; empty for any other
+     * @param page the page, whose privacy hooks give its item's stored decisions and its current audio mode
+     * @return for a main frame that is no challenge frame, the notifications stand-in and the audio muting; for a
+     *     sub-frame that is none, the audio muting in the page's current mode; none for a challenge frame
      */
-    static Optional<String> script(boolean mainFrame, String address, Page page) {
-        if (!mainFrame || ChallengeFrames.is(address)) return Optional.empty();
-        return Optional.of(notifications(state(address, page)));
+    static List<Script> scripts(boolean mainFrame, String address, Page page) {
+        if (ChallengeFrames.is(address)) return List.of();
+        Script audio = new Script(AUDIO_URL, audio(page.privacy().audioMode()));
+        if (!mainFrame) return List.of(audio);
+        return List.of(new Script(NOTIFICATIONS_URL, notifications(state(address, page))), audio);
     }
 
     /**
@@ -98,6 +126,77 @@ final class FrameScripts {
         if (origin.isEmpty()) return DENIED;
         return page.privacy().storedDecision(origin.get(), Permission.NOTIFICATIONS)
             .map(decision -> decision == Decision.ALLOWED ? GRANTED : DENIED).orElse(DEFAULT);
+    }
+
+    /**
+     * The audio mode a main-frame document at {@code address} starts in: what its item's store holds for its site, the
+     * address's origin, secure context or not, as muting is a protection; a document without a site has no choice to
+     * ask for or store, and is muted. Any thread.
+     *
+     * @param address the document's address
+     * @param page the page, whose privacy hooks give its item's stored decisions
+     * @return {@link AudioMode#ALLOW} for Allowed, {@link AudioMode#BLOCK} for Blocked and for an address without a site,
+     *     and {@link AudioMode#ASK} when none is stored
+     */
+    static AudioMode audioMode(String address, Page page) {
+        return Origins.of(address).map(origin -> AudioMode.of(page.privacy().storedDecision(origin, Permission.AUDIO_PLAYBACK)))
+            .orElse(AudioMode.BLOCK);
+    }
+
+    /**
+     * The audio muting, called with {@code mode} quoted, in lower case.
+     *
+     * @param mode the document's audio mode; null is {@link AudioMode#BLOCK}
+     * @return the script
+     */
+    static String audio(AudioMode mode) {
+        AudioMode known = mode == null ? AudioMode.BLOCK : mode;
+        return AUDIO + "\n(" + StrictJson.quote(known.name().toLowerCase(Locale.ROOT)) + ");";
+    }
+
+    /**
+     * Runs {@code script} in each frame of {@code page}'s browser but challenge frames, as
+     * {@link #everyFrame(CefBrowser, String)} does; nothing before the browser is ready. UI thread.
+     *
+     * @param page the page
+     * @param script what each frame runs
+     */
+    static void everyFrame(Page page, String script) {
+        PageBrowser ready = page.readyBrowser();
+        if (ready != null) everyFrame((CefBrowser) ready, script);
+    }
+
+    /**
+     * Runs {@code script} in each frame {@code browser} lists but challenge frames, by their addresses now, then
+     * releases each handle: a frame gone meanwhile, or one that fails, which is logged, stops none of the others. Any
+     * thread; it never throws.
+     *
+     * @param browser the page's browser
+     * @param script what each frame runs
+     */
+    static void everyFrame(CefBrowser browser, String script) {
+        List<String> frames;
+        try {
+            frames = browser.getFrameIdentifiers();
+        } catch (RuntimeException failure) {
+            LOG.log(System.Logger.Level.WARNING, "A page's frames could not be listed", failure);
+            return;
+        }
+        if (frames == null) return;
+        for (String id : frames) {
+            if (id == null) continue;
+            try {
+                CefFrame frame = browser.getFrameByIdentifier(id);
+                if (frame == null) continue;
+                try {
+                    if (frame.isValid() && !ChallengeFrames.is(frame.getURL())) frame.executeJavaScript(script, AUDIO_URL, 0);
+                } finally {
+                    frame.dispose();
+                }
+            } catch (RuntimeException failure) {
+                LOG.log(System.Logger.Level.WARNING, "A page's frame could not be muted or unmuted", failure);
+            }
+        }
     }
 
     /**

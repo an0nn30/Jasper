@@ -10,9 +10,10 @@ import java.util.Optional;
  * Turnstile's {@code challenges.cloudflare.com}; hCaptcha's {@code hcaptcha.com} and its subdomains; reCAPTCHA's paths
  * under {@code /recaptcha/} on {@code www.google.com} and {@code www.recaptcha.net}; and the subdomains of Arkose Labs'
  * {@code arkoselabs.com} and {@code funcaptcha.com}. The host is the one Chromium reads from the address
- * ({@link Origins#of}), in any case and with a trailing dot or not. Pure; any thread.
+ * ({@link Origins#of}), in any case and with a trailing dot or not. The {@code links} package's privacy router refuses
+ * a challenge frame's report of sound, which only a page's own script can send there. Pure; any thread.
  */
-final class ChallengeFrames {
+public final class ChallengeFrames {
     private ChallengeFrames() { }
 
     /**
@@ -21,7 +22,7 @@ final class ChallengeFrames {
      * @param address a frame's address, as Chromium names it
      * @return true for an http or https address of one of the providers; false for any other, and for none
      */
-    static boolean is(String address) {
+    public static boolean is(String address) {
         Optional<String> origin = Origins.of(address);
         if (origin.isEmpty() || !origin.get().startsWith("http")) return false;
         String host = host(origin.get());

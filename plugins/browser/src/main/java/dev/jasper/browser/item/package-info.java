@@ -15,9 +15,11 @@
  * its own request context and history and bookmarks in memory, which closes with the last item of the group; the links
  * and popups an item's page opens open in its store, and Jasper's pages answer from the store of the browser that asks.
  * Each store keeps its site permissions through the {@code permissions} package, and the menu button's
- * {@code PrivacyMenu} resets those of the page's site. An item's {@code SitePermissions} answers its page's camera,
- * microphone and notification requests from its store, or with the {@code dialogs} package's prompt, and the
- * notifications its page shows are Jasper's, in the plugin's group for them
+ * {@code PrivacyMenu} resets those of the page's site. It also holds the item's {@code AudioGate}: the first sound of
+ * a page whose site has no stored choice mutes it and shows the {@code AudioBar}, whose Always answers are stored in
+ * the item's store, and the menu offers Unmute Current Page while the page is muted. An item's
+ * {@code SitePermissions} answers its page's camera, microphone and notification requests from its store, or with the
+ * {@code dialogs} package's prompt, and the notifications its page shows are Jasper's, in the plugin's group for them
  * ({@link dev.jasper.browser.item.PageNotifications}); a /dev/null item denies notifications.
  * View Source shows
  * {@link dev.jasper.browser.item.SourcePage}, a page's source fetched again through the {@code http} package or as the

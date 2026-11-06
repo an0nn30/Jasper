@@ -21,6 +21,7 @@ import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import javax.swing.SwingUtilities;
@@ -37,13 +38,17 @@ import static org.assertj.core.api.Assertions.assertThat;
  * holds Allowed for its site, whatever the script claims; a permission request is answered from the store without a
  * prompt, or else asks the item, and a dismissed prompt answers "default". A /dev/null page (ruling V20), a document
  * outside a secure context (ruling V21) and one a sandbox made opaque (ruling V22) have no site that may: a request is
- * denied and nothing shows. Each page is a recording stand-in whose
- * privacy hooks record what reaches its item; the router meets Chromium's browsers, frames and callbacks as proxies.
- * Pages run on the UI thread, as Jasper's do. No Chromium.
+ * denied and nothing shows. A page's report that it plays sound ({@code audio.playing}, plan 6 Task 7) comes from any
+ * frame but a challenge frame, where {@code audio.js} never runs, and the router hands at most one of each document's to
+ * the UI thread. Each page is a recording stand-in whose privacy hooks record what reaches its item; the router meets
+ * Chromium's browsers, frames and callbacks as proxies. Pages run on the UI thread, as Jasper's do. No Chromium.
  */
 class PrivacyQueriesTest {
     private static final String SITE = "https://chat.example", ROOM = SITE + "/room";
     private static final String REQUEST = "{\"op\":\"notification.request\"}";
+    private static final String PLAYING = "{\"op\":\"audio.playing\"}";
+    private static final List<String> CHALLENGES = List.of("https://challenges.cloudflare.com/turnstile/if/ov2/av0",
+        "https://www.google.com/recaptcha/api2/anchor", "https://newassets.hcaptcha.com/captcha/v1/static/hcaptcha.html");
     private final PrivacyQueries queries = new PrivacyQueries();
     // The client's opener bridge, whose record of each page's document the router reads.
     private final OpenerBridge bridge = new OpenerBridge();
@@ -360,6 +365,122 @@ class PrivacyQueriesTest {
         assertThat(late.calls).as("not even a refusal").isEmpty();
     }
 
+    /**
+     * Plan 6 Task 7: {@code audio.js} runs in every frame but challenge frames, so a report of sound from any other frame,
+     * of any site, reaches the item, and one from a challenge frame, which only a page's own script can send, is refused.
+     * A report with any member but its op is malformed, from the top frame or a sub-frame; what is no request at all is
+     * malformed from the top frame and refused from a sub-frame, as before.
+     */
+    @Test void aReportOfSoundFromAnyFrameButAChallengeFrameReachesTheItem() throws Exception {
+        var site = onUi(() -> new Site(ROOM));
+        assertThat(ask(site, true, ROOM, PLAYING)).containsExactly(PrivacyQueries.DONE);
+        assertThat(ask(site, false, "https://player.example/embed", PLAYING)).containsExactly(PrivacyQueries.DONE);
+        assertThat(ask(site, false, "http://insecure.example/", PLAYING)).as("any site").containsExactly(PrivacyQueries.DONE);
+        assertThat(ask(site, true, "about:blank", PLAYING)).as("no site").containsExactly(PrivacyQueries.DONE);
+        assertThat(site.played).hasValue(4);
+        for (String challenge : CHALLENGES)
+            for (boolean main : new boolean[] {true, false})
+                assertThat(ask(site, main, challenge, PLAYING)).as(challenge).extracting(Answer::code).containsExactly(PrivacyQueries.REFUSED);
+        for (String request : List.of("{\"op\":\"audio.playing\",\"x\":1}", "{\"op\":\"audio.playing\",\"origin\":\"https://other.example\"}"))
+            for (boolean main : new boolean[] {true, false})
+                assertThat(ask(site, main, ROOM, request)).as(request).containsExactly(malformed());
+        for (String request : List.of("{\"op\":\"audio.playing\",\"op\":\"audio.playing\"}", PLAYING + " trailing")) {
+            assertThat(ask(site, true, ROOM, request)).as(request).containsExactly(malformed());
+            assertThat(ask(site, false, ROOM, request)).as(request).extracting(Answer::code).containsExactly(PrivacyQueries.REFUSED);
+        }
+        assertThat(site.played).hasValue(4);
+        assertThat(site.asked).isEmpty();
+
+        var closed = onUi(() -> {
+            var page = new Site(ROOM);
+            page.page.close();
+            return page;
+        });
+        assertThat(ask(closed, true, ROOM, PLAYING)).as("a closed page's item hears nothing").containsExactly(PrivacyQueries.DONE);
+        assertThat(closed.played).hasValue(0);
+    }
+
+    /**
+     * On Chromium's thread the router refuses a challenge frame's report of sound at once, and hands on at most one of
+     * each document's, from whichever frame reports first, until its page's main frame starts loading another: a page
+     * cannot flood the UI thread. A later one is answered there and then. A sub-frame's request of any other op, or a
+     * report of sound with anything more, is refused at once, as before.
+     */
+    @Test void theRouterHandsOnOneReportOfSoundPerDocumentAndRefusesAChallengeFramesAtOnce() throws Exception {
+        var site = onUi(() -> new Site(ROOM));
+        var another = onUi(() -> new Site(ROOM));
+        CefBrowser browser = browser(), second = browser();
+        var ui = new ArrayDeque<Runnable>();
+        var router = new PrivacyQueries.Router(queries, bridge, shown -> shown == browser ? site.page : shown == second ? another.page : null,
+            ui::add, () -> false);
+        var replies = new Replies();
+        for (String challenge : CHALLENGES) router.onQuery(browser, frame(challenge, false), 1, PLAYING, false, replies);
+        assertThat(replies.calls).containsExactly("failure 2", "failure 2", "failure 2");
+        assertThat(ui).as("a challenge frame's takes nothing from the document").isEmpty();
+        replies.calls.clear();
+
+        router.onQuery(browser, frame("https://player.example/embed", false), 2, PLAYING, false, replies);
+        assertThat(ui).hasSize(1);
+        router.onQuery(browser, frame(ROOM, true), 3, PLAYING, false, replies);
+        for (int id = 4; id < 104; id++) router.onQuery(browser, frame("https://player.example/embed", false), id, PLAYING, false, replies);
+        assertThat(ui).as("one per document").hasSize(1);
+        assertThat(replies.calls).as("the later ones answered there and then").hasSize(101).containsOnly("success ");
+        runOnUi(ui);
+        assertThat(replies.calls).hasSize(102).containsOnly("success ");
+        assertThat(site.played).hasValue(1);
+
+        var elsewhere = new Replies();
+        router.onQuery(second, frame(ROOM, true), 200, PLAYING, false, elsewhere);
+        assertThat(ui).as("another page's document").hasSize(1);
+        runOnUi(ui);
+        assertThat(another.played).hasValue(1);
+        assertThat(elsewhere.calls).containsExactly("success ");
+
+        router.documentStarted(browser);
+        router.documentStarted(browser());
+        var next = new Replies();
+        router.onQuery(browser, frame(ROOM, true), 201, PLAYING, false, next);
+        router.onQuery(browser, frame(ROOM, true), 202, PLAYING, false, next);
+        assertThat(ui).as("the next document's first").hasSize(1);
+        runOnUi(ui);
+        assertThat(site.played).hasValue(2);
+        assertThat(another.played).hasValue(1);
+
+        var refused = new Replies();
+        router.documentStarted(browser);
+        for (String request : List.of(REQUEST, "{\"op\":\"notification.close\",\"id\":\"1\"}", "{\"op\":\"audio.playing\",\"x\":1}",
+                "{\"op\":\"audio.playing\"" + " ".repeat(100) + "}", "not json"))
+            router.onQuery(browser, frame("https://player.example/embed", false), 300, request, false, refused);
+        assertThat(refused.calls).containsExactly("failure 2", "failure 2", "failure 2", "failure 2", "failure 2");
+        assertThat(ui).isEmpty();
+        router.onQuery(browser, frame(ROOM, true), 301, "{\"op\":\"audio.playing\",\"x\":1}", false, refused);
+        runOnUi(ui);
+        assertThat(refused.calls).as("from the top frame, malformed on the UI thread").last().isEqualTo("failure 1");
+        assertThat(site.played).hasValue(2);
+        router.onQuery(browser, frame(ROOM, false), 302, PLAYING, false, refused);
+        assertThat(ui).as("none of those took the document's one report").hasSize(1);
+    }
+
+    /** A report of sound the page cancels is never answered; nor is one once Chromium has stopped (ruling F43). */
+    @Test void aCancelledReportOfSoundAndOneAfterChromiumStoppedAreNeverAnswered() throws Exception {
+        var site = onUi(() -> new Site(ROOM));
+        CefBrowser browser = browser();
+        var ui = new ArrayDeque<Runnable>();
+        var stopped = new AtomicBoolean();
+        var router = new PrivacyQueries.Router(queries, bridge, shown -> shown == browser ? site.page : null, ui::add, stopped::get);
+        var cancelled = new Replies();
+        router.onQuery(browser, frame(ROOM, true), 1, PLAYING, false, cancelled);
+        router.onQueryCanceled(browser, frame(ROOM, true), 1);
+        runOnUi(ui);
+        assertThat(cancelled.calls).isEmpty();
+        stopped.set(true);
+        var late = new Replies();
+        router.onQuery(browser, frame(ROOM, true), 2, PLAYING, false, late);
+        router.onQuery(browser, frame("https://challenges.cloudflare.com/turnstile", false), 3, PLAYING, false, late);
+        runOnUi(ui);
+        assertThat(late.calls).isEmpty();
+    }
+
     /** A request that the UI thread would not take is refused, not thrown. */
     @Test void aRequestTheUiThreadCannotTakeIsRefused() throws Exception {
         Page page = onUi(PrivacyQueriesTest::page);
@@ -415,6 +536,7 @@ class PrivacyQueriesTest {
         final List<Consumer<Boolean>> answers = new CopyOnWriteArrayList<>();
         final List<PagePrivacy.Notice> shown = new CopyOnWriteArrayList<>();
         final List<String> closed = new CopyOnWriteArrayList<>();
+        final AtomicInteger played = new AtomicInteger();
         volatile boolean shows = true;
         volatile RuntimeException breaking;
 
@@ -435,6 +557,7 @@ class PrivacyQueriesTest {
                 if (shows) shown.add(notice);
                 return shows;
             }, closed::add);
+            page.privacy().onAudioPlaying(played::incrementAndGet);
         }
     }
 

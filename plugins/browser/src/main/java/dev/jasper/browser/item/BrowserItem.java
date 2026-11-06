@@ -77,9 +77,10 @@ import javax.swing.JComponent;
  * menu offered them for and reload the store's items that show the site; the menu follows the store's permissions as
  * they change. Its page's requests for the camera, the microphone and notifications are answered from its store, or
  * asked of the user ({@link SitePermissions}), and its page's notifications show as Jasper's in the item's window
- * ({@link PageNotifications}), but for a /dev/null item, which denies them. It saves its URL, its own zoom and its
- * target with Jasper's workspace ({@link BrowserRestore}): what it loads first until it shows, then where each committed
- * navigation takes its page.
+ * ({@link PageNotifications}), but for a /dev/null item, which denies them. The first sound of a page whose site has no
+ * stored choice mutes it, and the audio bar between the toolbar and the page asks; the menu offers Unmute Current Page
+ * while the page is muted ({@link PrivacyMenu}). It saves its URL, its own zoom and its target with Jasper's workspace
+ * ({@link BrowserRestore}): what it loads first until it shows, then where each committed navigation takes its page.
  * Restored after a run that ended while Chromium ran, an item waits: in place of the canvas it says that Jasper closed
  * while the page was open, and it asks for its page only once the user loads it, with its Load Page button, Enter in the
  * address field, Reload or {@link #load}.
@@ -187,7 +188,7 @@ public final class BrowserItem implements AutoCloseable {
         page.onLoadStart(address -> loadStarts++);
         page.onSelectionGesture(this::selectionFinished);
         errors = new ErrorPages(page, store.allowance(), this::load);
-        privacy = new PrivacyMenu(store, items, errors::address, this::reloadForPermissions);
+        privacy = new PrivacyMenu(store, items, errors::address, this::reloadForPermissions, page);
         sitePermissions = new SitePermissions(page, store, items::closed);
         // The page's notifications are Jasper's, in the item's window, until it closes; a new document's names are its own.
         // A /dev/null item shows none, as Chrome's Incognito (ruling V20).
@@ -847,7 +848,8 @@ public final class BrowserItem implements AutoCloseable {
                 endWait();
                 page.focus();
             }
-            // A Reset item of the menu, or an entry of Back's or Forward's hold menu.
+            // A Reset item or Unmute Current Page of the menu, an answer of the audio bar, or an entry of Back's or
+            // Forward's hold menu.
             default -> {
                 if (!privacy.choose(action)) NavigationHistory.entryId(action).ifPresent(page::goToHistoryEntry);
             }
@@ -987,7 +989,8 @@ public final class BrowserItem implements AutoCloseable {
         // A waiting item keeps the canvas's slot, hidden: a slot that leaves the view closes its content, the page.
         Nodes.Node canvas = new Nodes.Custom(PAGE, waiting ? HIDDEN : ControlState.READY, CONTENT, Nodes.CustomKind.PREVIEW, "Web page");
         return new ViewSpec(new Nodes.Split(ROOT, ControlState.READY, Nodes.SplitKind.DOCUMENT,
-            waiting ? List.of(bar, canvas, placeholder(), findBar.node()) : List.of(bar, canvas, findBar.node())));
+            waiting ? List.of(bar, privacy.audioBar(), canvas, placeholder(), findBar.node())
+                : List.of(bar, privacy.audioBar(), canvas, findBar.node())));
     }
 
     /** What a waiting item shows in place of its page: why it waits, and Load Page. */

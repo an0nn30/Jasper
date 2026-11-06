@@ -48,7 +48,7 @@ public final class Page implements AutoCloseable {
     static final int TITLE_READ_MILLIS = 250;
     private static final System.Logger LOG = System.getLogger(Page.class.getName());
     private final PageView view = new PageView();
-    private final PagePrivacy privacy = new PagePrivacy();
+    private final PagePrivacy privacy = new PagePrivacy(this::inEveryFrame);
     private final Runnable changed;
     private final Favicons favicons;
     // Where the answers of the page's DevTools runs are read: the plugin's background executor.
@@ -1241,6 +1241,14 @@ public final class Page implements AutoCloseable {
     /** The page's browser once it hears what it is asked; null before. */
     PageBrowser readyBrowser() {
         return ready ? browser : null;
+    }
+
+    /**
+     * Runs {@code script} in each of the page's frames but challenge frames; nothing before its browser is ready. The
+     * page hands itself over, not its browser, so that loading this class loads no Chromium type.
+     */
+    private void inEveryFrame(String script) {
+        if (readyBrowser() != null) FrameScripts.everyFrame(this, script);
     }
 
     /**

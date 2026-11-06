@@ -1,16 +1,21 @@
 package dev.jasper.browser.links;
 
 import dev.jasper.browser.engine.Chromium;
+import dev.jasper.browser.page.ChallengeFrames;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageBrowser;
+import dev.jasper.browser.page.PageEvents;
 import dev.jasper.browser.page.PagePrivacy;
 import dev.jasper.browser.permissions.Decision;
 import dev.jasper.browser.permissions.Origins;
 import dev.jasper.browser.permissions.Permission;
 import dev.jasper.browser.permissions.PermissionRequest;
 import java.awt.EventQueue;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -28,8 +33,9 @@ import org.cef.handler.CefMessageRouterHandlerAdapter;
  * The page scripts' privacy channel to Java (spec section 12): the pages' client's own message router, whose page
  * function is {@value #QUERY} and whose cancel is {@value #CANCEL}, beside the opener bridge's and Jasper's pages'. The
  * {@code page} package's {@code notifications.js}, which stands in for a page's {@code window.Notification}, asks
- * through it, and each answer comes from the asking page's {@link PagePrivacy}: its item's stored decisions, its
- * item's prompt and its item's notifications.
+ * through it, and so does its {@code audio.js}, which tells of a document's first sound; each answer comes from the
+ * asking page's {@link PagePrivacy}: its item's stored decisions, its item's prompt, its item's notifications and its
+ * item's audio bar.
  *
  * <p>It is a router of its own because a permission request can wait minutes for the user's answer. The opener bridge
  * trusts each op separately, from the frames the op names, but keeps only a few of a page's requests waiting, and then
@@ -41,14 +47,17 @@ import org.cef.handler.CefMessageRouterHandlerAdapter;
  * the function that the page runs in Jasper. A request is one flat JSON object of at most {@value #LONGEST_REQUEST}
  * characters, {@code {"op": …}} with only its op's members. On Chromium's thread a query that stays open for more
  * answers, one from a browser that is no page's or from no frame, one from a sub-frame, where the stand-in never runs,
- * and more than {@value #WAITING_LIMIT} of one page's waiting are refused, with {@value #REFUSED}, and one too long or
- * none is malformed, with {@value #MALFORMED}, there and then; the rest goes to the UI thread with the address of the
- * frame that asked, read as Chromium names it for the query, whose origin is the site the request is judged for (ruling
- * V16: the main frame's is the page's top-level site), and with whether a sandbox made that document's origin opaque,
- * as the client's {@link OpenerBridge} recorded the document then. A document has no site that may have notifications
- * in a /dev/null page (ruling V20), outside a secure context, a {@code file:} page included (ruling V21), or with an
- * opaque origin (ruling V22). There an unknown op or member is malformed and a request the page may not make is
- * refused. Nothing a page sends makes it throw. The ops:
+ * but for a report of sound, and more than {@value #WAITING_LIMIT} of one page's waiting are refused, with
+ * {@value #REFUSED}, and one too long or none is malformed, with {@value #MALFORMED}, there and then. A report of sound
+ * from a challenge frame, where {@code audio.js} never runs, is refused there and then too, and of the others only the
+ * first of each document goes on, from whichever frame sends it, until the page's main frame starts loading another: a
+ * later one is answered there and then, so a page cannot flood the UI thread. The rest goes to the UI thread with the
+ * address of the frame that asked, read as Chromium names it for the query, whose origin is the site the request is
+ * judged for (ruling V16: the main frame's is the page's top-level site), and with whether a sandbox made that
+ * document's origin opaque, as the client's {@link OpenerBridge} recorded the document then. A document has no site
+ * that may have notifications in a /dev/null page (ruling V20), outside a secure context, a {@code file:} page included
+ * (ruling V21), or with an opaque origin (ruling V22). There an unknown op or member is malformed and a request the
+ * page may not make is refused. Nothing a page sends makes it throw. The ops:
  * <ul>
  *   <li>{@code notification.request}: a document without a site that may is {@code "denied"}, asking nothing; the
  *   decision the item's store holds answers at once, {@code "granted"} or {@code "denied"}; otherwise the item is
@@ -57,6 +66,8 @@ import org.cef.handler.CefMessageRouterHandlerAdapter;
  *   <li>{@code notification.show {id, title, body}}: shown only when the item's store holds Allowed for the site, and
  *   the item shows it; otherwise refused, whatever the script claims.</li>
  *   <li>{@code notification.close {id}}: the item takes away the notification the document named so.</li>
+ *   <li>{@code audio.playing}: from any frame but a challenge frame, of any site, the item hears that the page plays
+ *   sound, and its audio decisions follow the page's top-level site.</li>
  * </ul>
  * A query its page cancels, or that ends as its document goes, is never answered, and none is once Chromium has
  * stopped (ruling F43). {@link PageNavigation}'s installer adds the router to the pages' client, never the preview
@@ -69,6 +80,8 @@ final class PrivacyQueries {
     static final int LONGEST_REQUEST = 65_536;
     /** The most of one page's requests that wait for their answers at once. */
     static final int WAITING_LIMIT = 16;
+    /** The longest report of sound read on Chromium's thread, in characters: {@code {"op":"audio.playing"}} and room. */
+    static final int LONGEST_REPORT = 64;
     /** Why a request failed, as the page's script is told: not a request Jasper knows, or not allowed. */
     static final int MALFORMED = 1, REFUSED = 2;
     /** What a request that succeeds with nothing to say is answered. */
@@ -82,6 +95,7 @@ final class PrivacyQueries {
         TOO_MANY = new Answer(REFUSED, "Too many of this page's requests are waiting."),
         NOT_ALLOWED = new Answer(REFUSED, "This site may not show notifications."),
         NOT_SHOWN = new Answer(REFUSED, "Jasper did not show the notification."),
+        CHALLENGE = new Answer(REFUSED, "Jasper takes no report of sound from a challenge frame."),
         UNANSWERED = new Answer(REFUSED, "Jasper could not answer this request.");
     private static final System.Logger LOG = System.getLogger(PrivacyQueries.class.getName());
     /** The ops, which a router hands each request it takes. */
@@ -97,9 +111,10 @@ final class PrivacyQueries {
      * @param chromium the plugin's Chromium, whose stop ends every answer
      */
     static void install(CefClient client, OpenerBridge bridge, Chromium chromium) {
-        client.addMessageRouter(CefMessageRouter.create(new CefMessageRouter.CefMessageRouterConfig(QUERY, CANCEL),
-            new Router(new PrivacyQueries(), bridge, PrivacyQueries::page, EventQueue::invokeLater,
-                () -> chromium.state() == Chromium.State.STOPPED)));
+        var router = new Router(new PrivacyQueries(), bridge, PrivacyQueries::page, EventQueue::invokeLater,
+            () -> chromium.state() == Chromium.State.STOPPED);
+        client.addMessageRouter(CefMessageRouter.create(new CefMessageRouter.CefMessageRouterConfig(QUERY, CANCEL), router));
+        PageEvents.onMainFrameLoadStart(client, (browser, frame) -> router.documentStarted(browser));
     }
 
     /** The page {@code browser} shows; null for a browser that is not a page's. Chromium's thread. */
@@ -122,7 +137,7 @@ final class PrivacyQueries {
 
     /** What a request asks, by its {@code op}. */
     private enum Op {
-        REQUEST("notification.request"), SHOW("notification.show"), CLOSE("notification.close");
+        REQUEST("notification.request"), SHOW("notification.show"), CLOSE("notification.close"), PLAYING("audio.playing");
 
         private final String name;
 
@@ -136,6 +151,15 @@ final class PrivacyQueries {
             for (Op op : values()) if (op.name.equals(name)) return op;
             return null;
         }
+
+        /**
+         * Whether {@code text} is a report of sound and nothing more, read strictly: short enough to read on Chromium's
+         * thread.
+         */
+        static boolean reportsSound(String text) {
+            return text != null && text.length() <= LONGEST_REPORT
+                && BridgeJson.object(text).filter(request -> request.size() == 1 && of(request) == PLAYING).isPresent();
+        }
     }
 
     /**
@@ -144,8 +168,8 @@ final class PrivacyQueries {
      * makes it throw.
      *
      * @param page the page that asked
-     * @param mainFrame whether its main frame asked; the router refuses a sub-frame's itself and always passes true, so
-     *     false comes from tests only
+     * @param mainFrame whether its main frame asked; a sub-frame may send only a report of sound, and the router refuses
+     *     its others itself
      * @param address the address of the frame that asked, as Chromium's thread read it
      * @param opaque whether a sandbox made that document's origin opaque, as the opener bridge recorded it then
      * @param text the request, as the page's script sent it
@@ -154,13 +178,13 @@ final class PrivacyQueries {
     void request(Page page, boolean mainFrame, String address, boolean opaque, String text, Consumer<Answer> reply) {
         Consumer<Answer> once = once(reply);
         try {
-            if (!mainFrame) {
-                once.accept(SUB_FRAME);
-                return;
-            }
             Map<String, Object> request = text == null || text.length() > LONGEST_REQUEST ? null
                 : BridgeJson.object(text).orElse(null);
             Op op = request == null ? null : Op.of(request);
+            if (!mainFrame && op != Op.PLAYING) {
+                once.accept(SUB_FRAME);
+                return;
+            }
             if (op == null) {
                 once.accept(MALFORMED_REQUEST);
                 return;
@@ -171,6 +195,7 @@ final class PrivacyQueries {
                 case REQUEST -> permission(privacy, origin, request, once);
                 case SHOW -> once.accept(show(privacy, origin, request));
                 case CLOSE -> once.accept(close(privacy, request));
+                case PLAYING -> once.accept(playing(privacy, address, request));
             }
         } catch (RuntimeException failure) {
             LOG.log(System.Logger.Level.WARNING, "A page's privacy request could not be answered", failure);
@@ -234,6 +259,17 @@ final class PrivacyQueries {
         return DONE;
     }
 
+    /**
+     * {@code audio.playing}: the item hears the page plays sound, from any frame of any site but a challenge frame, as
+     * audio decisions follow the page's top-level site, which the item knows.
+     */
+    private static Answer playing(PagePrivacy privacy, String address, Map<String, Object> request) {
+        if (!only(request)) return MALFORMED_REQUEST;
+        if (ChallengeFrames.is(address)) return CHALLENGE;
+        privacy.audioPlaying();
+        return DONE;
+    }
+
     /** Whether {@code request} has no member but {@code op} and those named, and has each of those. */
     private static boolean only(Map<String, Object> request, String... names) {
         if (request.size() != names.length + 1) return false;
@@ -253,9 +289,9 @@ final class PrivacyQueries {
     }
 
     /**
-     * The client's one handler for the page function: on Chromium's thread it answers at once what it refuses, as the
-     * class says, and hands the rest to the UI thread. Every query is answered once, unless it is cancelled first or
-     * Chromium has stopped.
+     * The client's one handler for the page function: on Chromium's thread it answers at once what it refuses, and each
+     * document's reports of sound but its first, as the class says, and hands the rest to the UI thread. Every query is
+     * answered once, unless it is cancelled first or Chromium has stopped.
      */
     static final class Router extends CefMessageRouterHandlerAdapter {
         private final PrivacyQueries queries;
@@ -266,6 +302,8 @@ final class PrivacyQueries {
         // The queries not yet answered or cancelled, by Chromium's id; and how many of each page's wait.
         private final Map<Long, Asked> waiting = new ConcurrentHashMap<>();
         private final Map<Page, Integer> counts = new ConcurrentHashMap<>();
+        // The pages whose main frame's document has reported its sound, held weakly, until its next document starts.
+        private final Set<Page> reported = Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
 
         /**
          * A router handing its queries to {@code queries}.
@@ -299,8 +337,13 @@ final class PrivacyQueries {
                     asked.reply(MALFORMED_REQUEST);
                     return true;
                 }
-                if (!frame.isMain()) {
+                boolean sound = Op.reportsSound(request);
+                if (!sound && !frame.isMain()) {
                     asked.reply(SUB_FRAME);
+                    return true;
+                }
+                if (sound) {
+                    heard(page, frame, queryId, request, asked);
                     return true;
                 }
                 if (!admit(page)) {
@@ -324,6 +367,39 @@ final class PrivacyQueries {
                 asked.reply(UNANSWERED);
             }
             return true;
+        }
+
+        /**
+         * A report of sound from {@code frame} of {@code page}: a challenge frame's is refused, and a document's after its
+         * first is answered, there and then; the first goes on to the UI thread. Chromium's thread.
+         */
+        private void heard(Page page, CefFrame frame, long queryId, String request, Asked asked) {
+            String address = frame.getURL();
+            if (ChallengeFrames.is(address)) {
+                asked.reply(CHALLENGE);
+                return;
+            }
+            if (!reported.add(page)) {
+                asked.reply(DONE);
+                return;
+            }
+            boolean main = frame.isMain();
+            waiting.put(queryId, asked);
+            ui.execute(() -> queries.request(page, main, address, false, request, answer -> {
+                waiting.remove(queryId, asked);
+                asked.reply(answer);
+            }));
+        }
+
+        /**
+         * The main frame of {@code browser}'s page starts loading a document, whose first report of sound goes on to the
+         * UI thread. Chromium's thread, before the document's scripts run.
+         *
+         * @param browser the browser, which may be no page's
+         */
+        void documentStarted(CefBrowser browser) {
+            Page page = browser == null ? null : pages.apply(browser);
+            if (page != null) reported.remove(page);
         }
 
         /** The page cancelled the query, or it ended with its document: it is never answered. */

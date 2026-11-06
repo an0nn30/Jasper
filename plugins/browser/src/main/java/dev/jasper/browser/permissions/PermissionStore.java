@@ -128,8 +128,7 @@ public final class PermissionStore {
      *     none is stored
      */
     public AudioMode audioMode(String origin) {
-        return decision(origin, Permission.AUDIO_PLAYBACK).map(decision -> decision == Decision.ALLOWED ? AudioMode.ALLOW : AudioMode.BLOCK)
-            .orElse(AudioMode.ASK);
+        return AudioMode.of(decision(origin, Permission.AUDIO_PLAYBACK));
     }
 
     /**

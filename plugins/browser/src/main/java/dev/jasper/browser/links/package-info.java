@@ -14,7 +14,8 @@
  * {@code find.js} found to the page's {@link dev.jasper.browser.page.PageFind}, from any frame of the page.
  * {@code PrivacyQueries} is the client's privacy router, apart from the bridge's as its permission requests can wait
  * minutes, which the same installer adds: the {@code page} package's {@code notifications.js} asks through it, from a
- * page's top frame, and each request, untrusted, is answered from the page's
+ * page's top frame, and its {@code audio.js} tells of a document's first sound, from any frame but a challenge frame,
+ * once per document; each request, untrusted, is answered from the page's
  * {@link dev.jasper.browser.page.PagePrivacy}, judged for the site of the document that asked, as the
  * {@code permissions} package names it; a /dev/null page, a document outside a secure context and one whose origin a
  * sandbox made opaque, as the bridge recorded it, have none that may have notifications. Depends on {@code engine},

@@ -1,5 +1,6 @@
 package dev.jasper.browser.page;
 
+import dev.jasper.browser.permissions.AudioMode;
 import dev.jasper.browser.permissions.Decision;
 import dev.jasper.browser.permissions.Permission;
 import dev.jasper.browser.permissions.PermissionRequest;
@@ -17,8 +18,10 @@ import java.util.function.Predicate;
  * item. Its site's permission requests, such as for the camera, which Chromium's handlers make on Chromium's thread, go
  * to the item on the UI thread, and the item answers each once, from its store or after asking the user. The decisions
  * its item's store holds are read on any thread, as a document starts loading and as its scripts ask. The notifications
- * its scripts show and close go to the item on the UI thread. A page whose item gave no handler, or that has closed, is
- * refused, and has no stored decision. Every method runs on the UI thread, except where it says otherwise.
+ * its scripts show and close go to the item on the UI thread. So does each report that the page plays sound, and its
+ * item mutes and unmutes the page's frames through it; the audio mode the page's frames start their documents in, its
+ * current mode, is read on any thread. A page whose item gave no handler, or that has closed, is refused, and has no
+ * stored decision. Every method runs on the UI thread, except where it says otherwise.
  */
 public final class PagePrivacy {
     private static final System.Logger LOG = System.getLogger(PagePrivacy.class.getName());
@@ -27,6 +30,12 @@ public final class PagePrivacy {
     private volatile BiFunction<String, Permission, Optional<Decision>> decisions;
     private Predicate<Notice> shows;
     private Consumer<String> closes;
+    private Runnable playing;
+    // Runs a script in each of the page's frames but challenge frames, while the page has its browser.
+    private final Consumer<String> frames;
+    // The audio mode a frame starting a document now is given: the main frame's document's, or its muting's since. Read
+    // and written on Chromium's thread too.
+    private volatile AudioMode audio = AudioMode.BLOCK;
     private volatile boolean closed;
 
     /**
@@ -47,8 +56,15 @@ public final class PagePrivacy {
         }
     }
 
-    /** The hooks of a page; its item gives the handlers. */
-    PagePrivacy() { }
+    /**
+     * The hooks of a page; its item gives the handlers.
+     *
+     * @param frames runs a script in each of the page's frames but challenge frames, once the page has its browser, and
+     *     nothing before
+     */
+    PagePrivacy(Consumer<String> frames) {
+        this.frames = Objects.requireNonNull(frames, "frames");
+    }
 
     /**
      * Has {@code handler} answer each permission request of the page, on the UI thread: it is told the request and what
@@ -138,6 +154,71 @@ public final class PagePrivacy {
     }
 
     /**
+     * Has {@code handler} hear that the page plays sound, on the UI thread: at most once for each of its documents, as
+     * the {@code links} package's router hands the reports on. It replaces the one before; the page's close ends it.
+     *
+     * @param handler told the page plays sound
+     */
+    public void onAudioPlaying(Runnable handler) {
+        Objects.requireNonNull(handler, "handler");
+        if (!closed) playing = handler;
+    }
+
+    /**
+     * A frame of the page reports its document's first sound, as its {@code audio.js} heard it: the item is told, unless
+     * the page has closed. A handler that throws is logged.
+     */
+    public void audioPlaying() {
+        Runnable handler = closed ? null : playing;
+        if (handler == null) return;
+        try {
+            handler.run();
+        } catch (RuntimeException failure) {
+            LOG.log(System.Logger.Level.WARNING, "A page's sound could not be told to its item", failure);
+        }
+    }
+
+    /**
+     * Mutes every frame of the page, or plays their sound: each runs {@code setMuted} in its {@code audio.js}, and frames
+     * that start a document from now on start it so, {@link AudioMode#BLOCK} or {@link AudioMode#ALLOW}, until the main
+     * frame's next document starts in its site's stored mode. Challenge frames run none; nothing once the page has
+     * closed.
+     *
+     * @param muted whether the page's sound is muted
+     */
+    public void mute(boolean muted) {
+        if (closed) return;
+        audio = muted ? AudioMode.BLOCK : AudioMode.ALLOW;
+        frames.accept(setMuted(muted));
+    }
+
+    /**
+     * What a frame runs to be muted or to play: its {@code audio.js}'s {@code setMuted}, when it has one.
+     *
+     * @param muted whether the frame's sound is muted
+     * @return the script
+     */
+    static String setMuted(boolean muted) {
+        return "(function (audio) { if (audio && typeof audio.setMuted === 'function') audio.setMuted(" + muted + "); })"
+            + "(window[Symbol.for('dev.jasper.browser.audio')]);";
+    }
+
+    /**
+     * The audio mode a frame of the page starting a document now is given: the one its main frame's document started in,
+     * or what {@link #mute} made it since. Any thread.
+     *
+     * @return the mode; {@link AudioMode#BLOCK} before the main frame's first document
+     */
+    public AudioMode audioMode() {
+        return audio;
+    }
+
+    /** The page's main frame starts a document in {@code mode}, its site's stored one. Chromium's thread. */
+    void documentStarted(AudioMode mode) {
+        audio = Objects.requireNonNull(mode, "mode");
+    }
+
+    /**
      * The page's site asks for {@code request}: on the UI thread the handler is told, and {@code answer} is told whether
      * it is allowed, once, on the thread the handler answers on. With no handler, a closed page or a handler that throws,
      * the answer is false. Any thread.
@@ -165,13 +246,17 @@ public final class PagePrivacy {
         }
     }
 
-    /** The page closed: its requests are refused from now on, and it has no stored decision and shows nothing. */
+    /**
+     * The page closed: its requests are refused from now on, and it has no stored decision, shows nothing, hears no sound
+     * and mutes nothing.
+     */
     void close() {
         closed = true;
         permissions = null;
         decisions = null;
         shows = null;
         closes = null;
+        playing = null;
     }
 
     /** {@code answer}, told the first answer only, a null one as false. */
