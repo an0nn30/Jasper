@@ -87,8 +87,8 @@ class PreviewPageTest {
     }
 
     private PreviewPage page() {
-        var chromium = new Chromium(data, task -> { throw new AssertionError("Chromium started"); }, new AboutScheme(), new PreviewScheme(),
-            cause -> heard.add("startFailed"));
+        var chromium = new Chromium(data, () -> { }, task -> { throw new AssertionError("Chromium started"); }, new AboutScheme(),
+            new PreviewScheme(), cause -> heard.add("startFailed"));
         return new PreviewPage(chromium, SHELL, () -> heard.add("created"), request -> {
             read.add((EventQueue.isDispatchThread() ? "ui " : "off ") + request);
             if (request.equals("nothing")) return Optional.empty();

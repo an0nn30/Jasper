@@ -22,7 +22,8 @@ import java.util.function.Consumer;
  * <p>A file that cannot be used is left as it was, and the database runs in memory for the rest of the run instead:
  * one the plugin cannot read or write, that fails SQLite's quick check, that a later Jasper wrote ({@code user_version}
  * above 1), or that another program holds past the 2-second busy timeout. The file's checks come before anything is
- * written to it, so a file that fails one is never changed. When SQLite's native library does not load there is no
+ * written to it, so a file that fails one is never changed but for its permissions: before the file opens, its folder and
+ * it are made their owner's alone ({@link DataFolder#restrict}). When SQLite's native library does not load there is no
  * database at all, in a file or in memory, and every call fails. Either way the file's database is told why once.
  */
 public final class BrowserDatabase implements AutoCloseable {
@@ -72,7 +73,7 @@ public final class BrowserDatabase implements AutoCloseable {
     private static final int VERSION = 1;
     private static final String MEMORY = "jdbc:sqlite::memory:";
 
-    private final Optional<Path> file;
+    private final Optional<Place> place;
     private final Consumer<Throwable> unavailable;
     private final Opener opener;
     private final Object lock = new Object();
@@ -84,26 +85,36 @@ public final class BrowserDatabase implements AutoCloseable {
     private Connection connection;
     private Throwable failure;
 
-    private BrowserDatabase(Optional<Path> file, Consumer<Throwable> unavailable, Opener opener) {
-        this.file = file;
+    /** Where a file's database lives: its file, in the folder made its owner's alone before the file opens. */
+    private record Place(DataFolder folder, Path file) { }
+
+    private BrowserDatabase(Optional<Place> place, Consumer<Throwable> unavailable, Opener opener) {
+        this.place = place;
         this.unavailable = Objects.requireNonNull(unavailable, "unavailable");
         this.opener = Objects.requireNonNull(opener, "opener");
     }
 
     /**
-     * The database in {@code file}, opened at the first call.
+     * The database in {@code browser.sqlite} in {@code folder}, opened at the first call, once the folder is its owner's
+     * alone ({@link DataFolder#restrict}).
      *
-     * @param file the database's file; its folder is made if it is missing
+     * @param folder the plugin's data folder, made if it is missing
      * @param unavailable told once, on the database's thread, why the file cannot be used, and then the database runs in
      *     memory; or why SQLite cannot run at all, and then every call fails
      * @return the database, not yet opened
      */
-    public static BrowserDatabase file(Path file, Consumer<Throwable> unavailable) {
+    public static BrowserDatabase file(DataFolder folder, Consumer<Throwable> unavailable) {
+        return new BrowserDatabase(Optional.of(new Place(folder, folder.database())), unavailable, BrowserDatabase::sqlite);
+    }
+
+    /** As {@link #file(DataFolder, Consumer)}, the database in {@code file}, in a data folder of its own. */
+    static BrowserDatabase file(Path file, Consumer<Throwable> unavailable) {
         return file(file, unavailable, BrowserDatabase::sqlite);
     }
 
     static BrowserDatabase file(Path file, Consumer<Throwable> unavailable, Opener opener) {
-        return new BrowserDatabase(Optional.of(file), unavailable, opener);
+        Path absolute = file.toAbsolutePath();
+        return new BrowserDatabase(Optional.of(new Place(new DataFolder(absolute.getParent()), absolute)), unavailable, opener);
     }
 
     /**
@@ -198,9 +209,9 @@ public final class BrowserDatabase implements AutoCloseable {
             LOG.log(System.Logger.Level.INFO, "SQLite's native library goes to the temporary folder: Jasper's own folder for it"
                 + " could not be used", notMade);
         }
-        if (file.isPresent()) {
+        if (place.isPresent()) {
             try {
-                connection = fileConnection(file.get());
+                connection = fileConnection(place.get());
                 return;
             } catch (Throwable unusable) { // As in run: an UnsatisfiedLinkError from the native library too.
                 failure = unusable;
@@ -214,9 +225,11 @@ public final class BrowserDatabase implements AutoCloseable {
         }
     }
 
-    private Connection fileConnection(Path file) throws IOException, SQLException {
-        Path absolute = file.toAbsolutePath(), folder = absolute.getParent();
+    private Connection fileConnection(Place place) throws IOException, SQLException {
+        Path absolute = place.file().toAbsolutePath(), folder = absolute.getParent();
         Files.createDirectories(folder);
+        // H37: no other user may read the history, and SQLite gives its log and shared memory the file's permissions.
+        place.folder().restrict();
         // SQLite opens a file it cannot write for reading only and fails only at the first write, so a folder or file
         // that cannot be written is refused here, before SQLite makes anything beside it.
         if (!Files.isWritable(folder)) throw new AccessDeniedException(folder.toString(), null, "The folder cannot be written");

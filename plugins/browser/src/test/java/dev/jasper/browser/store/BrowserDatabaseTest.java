@@ -241,6 +241,52 @@ class BrowserDatabaseTest {
         assertThat(unavailable).isEmpty();
     }
 
+    /** H37: the first open makes the data folder its owner's alone, so no other user of the computer reads the history. */
+    @Test @DisabledOnOs(OS.WINDOWS) void theFirstOpenMakesTheDataFolderItsOwnersAlone() throws Exception {
+        Path folder = Files.createDirectory(data.resolve("data"));
+        Files.setPosixFilePermissions(folder, PosixFilePermissions.fromString("rwxr-xr-x"));
+        BrowserDatabase database = BrowserDatabase.file(new DataFolder(folder), this::unavailable);
+        opened.add(database);
+        assertThat(permissions(folder)).as("made, not opened").isEqualTo("rwxr-xr-x");
+        done(database.call(connection -> null));
+        assertThat(permissions(folder)).isEqualTo("rwx------");
+        assertThat(folder.resolve("browser.sqlite")).isRegularFile();
+        assertThat(unavailable).isEmpty();
+    }
+
+    /**
+     * H37: a file an earlier run left readable by others is its owner's alone before SQLite opens it, and the write-ahead
+     * log and shared memory SQLite then makes beside it, which take the file's permissions, are too.
+     */
+    @Test @DisabledOnOs(OS.WINDOWS) void aFileOthersCouldReadIsItsOwnersAloneBeforeItOpens() throws Exception {
+        Path file = data.resolve("browser.sqlite");
+        written(file);
+        Files.setPosixFilePermissions(file, PosixFilePermissions.fromString("rw-r--r--"));
+        BrowserDatabase database = file(file);
+        assertThat(done(database.<String>call(connection -> text(connection, "PRAGMA journal_mode")))).isEqualTo("wal");
+        assertThat(permissions(file)).isEqualTo("rw-------");
+        for (String suffix : List.of("-wal", "-shm"))
+            assertThat(permissions(file.resolveSibling(file.getFileName() + suffix))).as(suffix).isEqualTo("rw-------");
+        assertThat(unavailable).isEmpty();
+    }
+
+    /** H37: a folder whose permissions cannot be set is logged once, as a warning, and the database opens all the same. */
+    @Test void aDataFolderWhosePermissionsCannotBeSetIsLoggedOnceAndStillOpens() throws Exception {
+        var folder = new DataFolder(data, path -> { throw new IOException("Operation not permitted"); });
+        try (var log = new CapturedLog(DataFolder.class)) {
+            BrowserDatabase database = BrowserDatabase.file(folder, this::unavailable);
+            opened.add(database);
+            assertThat(done(database.<String>call(connection -> text(connection, "PRAGMA journal_mode")))).isEqualTo("wal");
+            folder.restrict(); // as Chromium's start would, later
+            assertThat(log.records()).singleElement().satisfies(record -> {
+                assertThat(record.getLevel()).isEqualTo(java.util.logging.Level.WARNING);
+                assertThat(record.getThrown()).hasMessage("Operation not permitted");
+            });
+        }
+        assertThat(data.resolve("browser.sqlite")).isRegularFile();
+        assertThat(unavailable).isEmpty();
+    }
+
     @Test void closingBeforeAnyCallStartsNoThreadAndClosesAtOnce() {
         BrowserDatabase database = file(data.resolve("browser.sqlite"));
         database.close();
@@ -307,6 +353,10 @@ class BrowserDatabaseTest {
     private static Connection other(Path file) throws Exception {
         SqliteNatives.extractInto(SqliteNatives.folder());
         return SqliteOpener.open("jdbc:sqlite:" + file.toAbsolutePath());
+    }
+
+    private static String permissions(Path path) throws IOException {
+        return PosixFilePermissions.toString(Files.getPosixFilePermissions(path));
     }
 
     private static List<String> sidecars(Path file) {

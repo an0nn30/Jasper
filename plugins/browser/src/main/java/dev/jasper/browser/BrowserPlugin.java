@@ -28,6 +28,7 @@ import dev.jasper.browser.routing.BrowserRole;
 import dev.jasper.browser.routing.WebAddressItems;
 import dev.jasper.browser.settings.BrowserSettings;
 import dev.jasper.browser.store.BrowserDatabase;
+import dev.jasper.browser.store.DataFolder;
 import dev.jasper.browser.store.Stores;
 import dev.jasper.sdk.WindowOwner;
 import dev.jasper.sdk.plugin.Plugin;
@@ -88,14 +89,17 @@ public class BrowserPlugin implements Plugin {
         var about = new AboutScheme();
         // The Markdown previews' origins, which read nothing and make no random source until a preview is first made.
         var origins = new PreviewScheme();
-        chromium = new Chromium(data, worker, about, origins, this::startFailed);
+        // H37: the data folder holds the history and Chromium's cookies, so it is made its owner's alone, with no I/O
+        // now: on the database's thread before it opens, or on Chromium's worker before Chromium writes there.
+        var folder = new DataFolder(data);
+        chromium = new Chromium(data, folder::restrict, worker, about, origins, this::startFailed);
         // Spec section 18: the Editor's Chromium Markdown preview. A preview asks for Chromium only once it first shows.
         previews = new PreviewService(origins, chromium, context.background());
         context.services().publish(MarkdownPreviews.class, previews);
         BrowserSettings.Declared settings = BrowserSettings.declare(context.settings());
         // Spec section 12: history and bookmarks in one database, made with no I/O; it opens at its first use. Why it cannot
         // open is told on its own thread.
-        var database = BrowserDatabase.file(data.resolve("browser.sqlite"), cause -> EventQueue.invokeLater(() -> storesUnavailable(cause)));
+        var database = BrowserDatabase.file(folder, cause -> EventQueue.invokeLater(() -> storesUnavailable(cause)));
         stores = new Stores(database, EventQueue::invokeLater);
         // Spec section 15: "Bookmark Removed" and "Bookmark Deleted" post in a group of their own, which Settings lists.
         context.notifications().group(BookmarkPanel.GROUP);

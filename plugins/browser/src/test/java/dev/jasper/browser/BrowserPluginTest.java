@@ -13,6 +13,7 @@ import dev.jasper.sdk.ui.Nodes;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -20,11 +21,14 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
@@ -82,6 +86,28 @@ class BrowserPluginTest {
             assertThat(MemoryStores.started(plugin.stores())).isFalse();
             assertThat(host.failures()).isEmpty();
         } });
+    }
+
+    /**
+     * Plan 5's H37: the data folder, which holds the history and Chromium's cookies, is its owner's alone once the
+     * database first opens; the start leaves it as it was.
+     */
+    @Test @DisabledOnOs(OS.WINDOWS) void theDataFolderIsItsOwnersAloneOnceTheDatabaseOpens(@TempDir Path root) throws Exception {
+        Path data = Files.createDirectories(root.resolve(ID).resolve("data"));
+        Files.setPosixFilePermissions(data, PosixFilePermissions.fromString("rwxr-xr-x"));
+        var plugin = new BrowserPlugin();
+        var host = new AtomicReference<FakePluginHost>();
+        SwingUtilities.invokeAndWait(() -> {
+            host.set(new FakePluginHost(root));
+            host.get().start(INFO, Set.of(), Set.of(), plugin);
+        });
+        try {
+            assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(data))).as("after the start").isEqualTo("rwxr-xr-x");
+            plugin.stores().bookmarks().all().get(10, TimeUnit.SECONDS);
+            assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(data))).isEqualTo("rwx------");
+        } finally {
+            SwingUtilities.invokeAndWait(() -> host.get().close());
+        }
     }
 
     /** Spec section 11: the start registers the Bookmarks and Browser History scopes, which read nothing until searched. */
