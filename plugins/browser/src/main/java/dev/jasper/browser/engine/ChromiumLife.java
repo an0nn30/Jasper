@@ -144,6 +144,33 @@ final class ChromiumLife<C> {
         synchronized (lock) { return end(); }
     }
 
+    /** How a clearing of Chromium's data goes now (plan 6 Task 8). */
+    enum Clearing {
+        /** No start has entered JCEF, and one may still come: the profile is no Chromium's, and the clearing is done on it. */
+        BEFORE_START,
+        /** A start has entered JCEF and is under way, or Chromium runs: the clearing waits for the client, then is live. */
+        LIVE,
+        /** The start failed, or Chromium is closed: the marker waits for the next start. */
+        MARK_ONLY
+    }
+
+    /**
+     * How a clearing goes now. Asked on the worker, which alone enters the start, so a start not entered when this
+     * answers enters only after the clearing's work on the worker.
+     */
+    Clearing clearing() {
+        synchronized (lock) {
+            if (!entered && (state == Chromium.State.NOT_STARTED || state == Chromium.State.STARTING)) return Clearing.BEFORE_START;
+            if (entered && (state == Chromium.State.STARTING || state == Chromium.State.RUNNING)) return Clearing.LIVE;
+            return Clearing.MARK_ONLY;
+        }
+    }
+
+    /** The future the client is given through, without asking for it: null before the first ask. */
+    CompletableFuture<C> current() {
+        synchronized (lock) { return client; }
+    }
+
     /** Where the life stands. */
     Chromium.State state() {
         synchronized (lock) { return state; }

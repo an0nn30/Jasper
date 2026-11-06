@@ -15,6 +15,7 @@ import dev.jasper.browser.item.ErrorPage;
 import dev.jasper.browser.item.PageNotifications;
 import dev.jasper.browser.item.SourcePage;
 import dev.jasper.browser.item.WebMenu;
+import dev.jasper.browser.item.WebsiteData;
 import dev.jasper.browser.links.PageNavigation;
 import dev.jasper.browser.palette.BookmarksScope;
 import dev.jasper.browser.palette.PaletteOpener;
@@ -32,6 +33,7 @@ import dev.jasper.browser.restore.BrowserRestore;
 import dev.jasper.browser.routing.BrowserRole;
 import dev.jasper.browser.routing.WebAddressItems;
 import dev.jasper.browser.settings.BrowserSettings;
+import dev.jasper.browser.settings.BrowserSettingsPanel;
 import dev.jasper.browser.store.BrowserDatabase;
 import dev.jasper.browser.store.DataFolder;
 import dev.jasper.browser.store.Stores;
@@ -39,11 +41,17 @@ import dev.jasper.sdk.WindowOwner;
 import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.ui.ActionSpec;
+import dev.jasper.sdk.ui.ControlState;
+import dev.jasper.sdk.ui.DialogSpec;
+import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.PluginMenu;
 import dev.jasper.sdk.ui.SplitItemSpec;
 import dev.jasper.sdk.ui.StandardMenu;
 import dev.jasper.sdk.ui.TabPlacement;
+import dev.jasper.sdk.ui.UiEvent;
+import dev.jasper.sdk.ui.ViewSpec;
 import java.awt.EventQueue;
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -53,10 +61,13 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * The Browser: web pages as Jasper items. Its start registers New Browser Tab, New Browser Window and the Browser split
- * item, the globe they show, the Web menu, Settings › Browser, the Bookmarks and Page notifications groups, the welcome
+ * item, the globe they show, the Web menu, Settings › Tools › Browser, its own page, whose Clear Cookies and Clear Website
+ * Data clear the persistent store after a prompt over the active window, as the Indexer's, and whose Manage Site
+ * Permissions opens the persistent store's permissions page, the Bookmarks and Page notifications groups, the welcome
  * page and the onboarding pages, the history, bookmarks and site permissions pages and their queries, the Bookmarks and
  * Browser History palette scopes, the error page with its Try Again and Continue actions, View Source's page, the
  * Browser as Jasper's web browser, the terminal's Open URL in Split items and the restorer of saved browser items,
@@ -72,6 +83,8 @@ import java.util.concurrent.RejectedExecutionException;
  */
 public class BrowserPlugin implements Plugin {
     static final String NEW_TAB = "dev.jasper.browser.new_tab", NEW_WINDOW = "dev.jasper.browser.new_window";
+    /** The prompts of the Settings page: the form and its two buttons. */
+    static final String PROMPT = "dev.jasper.browser.prompt", PROMPT_OK = PROMPT + ".ok", PROMPT_CANCEL = PROMPT + ".cancel";
     /** The Browser split item: Split Right with Browser and Split Down with Browser. */
     static final SplitItemSpec SPLIT = SplitItemSpec.of("dev.jasper.browser.browser", "Browser").withIcon(BrowserItems.GLOBE);
     private PluginContext context;
@@ -138,6 +151,12 @@ public class BrowserPlugin implements Plugin {
         });
         this.items = items;
         about.registerAction(WelcomePage.SETTINGS, () -> { if (running) items.showSettings(); });
+        // Plan 6 Task 8: Settings › Tools › Browser is the Browser's own page: the declared rows by section, and the
+        // persistent store's Clear Cookies, Clear Website Data and Manage Site Permissions. Making it opens nothing.
+        var websiteData = new WebsiteData(chromium, dataStores.persistent(), () -> persistentAddresses(items, dataStores),
+            EventQueue::invokeLater, this::notCleared);
+        context.settings().page(new BrowserSettingsPanel(context.kit(), settings, new BrowserSettingsPanel.Actions(websiteData::clearCookies,
+            websiteData::clearAll, this::managePermissions, this::show)));
         // Jasper's pages built from their templates, in the workspace theme. Spec section 10: the history and bookmarks
         // pages, whose queries are answered from the history and the bookmarks of the asking browser's store, so a
         // /dev/null item's pages show its group's own; a browser with no store is refused.
@@ -249,6 +268,72 @@ public class BrowserPlugin implements Plugin {
      */
     void permissionsUnsaved(Throwable cause) {
         if (running) context.notifications().group().error(PermissionStore.UNSAVED, reason(cause));
+    }
+
+    /**
+     * A clearing of the Settings page failed: one notification says so, with the reason, while the plugin runs; the
+     * clearing has logged it. UI thread.
+     */
+    void notCleared(String title, Throwable cause) {
+        if (running) context.notifications().group().error(title, reason(cause));
+    }
+
+    /**
+     * Manage Site Permissions: {@code jasper-about:permissions} in a new tab of the active window, in the persistent store,
+     * whatever the /dev/null setting (the plan's call). Once Chromium cannot serve pages, the notification of why is
+     * posted again instead. UI thread.
+     */
+    void managePermissions() {
+        if (!running) return;
+        Optional<Throwable> unavailable = chromium.unavailable();
+        if (unavailable.isPresent()) tell(unavailable.get());
+        else items.open(PermissionsPage.ADDRESS, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), dataStores.persistent());
+    }
+
+    /**
+     * Shows a prompt of the Settings page as the Indexer shows its own, as a sheet in a modal dialog over the active
+     * window: a question with Cancel and OK, whose OK alone runs what it asks, or a message with OK. Nothing while the
+     * plugin is stopped, or without an active window. UI thread.
+     */
+    void show(BrowserSettingsPanel.Prompt prompt) {
+        if (!running) return;
+        context.terminals().activeWindow().ifPresent(window -> {
+            var dialog = context.windows().dialog(new DialogSpec(prompt.title(), window, true));
+            var closed = new AtomicBoolean();
+            var ok = new Nodes.Button(PROMPT_OK, ControlState.READY, "OK", "", Nodes.ButtonKind.PRIMARY, PROMPT_OK, "");
+            List<Nodes.Button> buttons = prompt.question()
+                ? List.of(new Nodes.Button(PROMPT_CANCEL, ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, PROMPT_CANCEL, ""), ok)
+                : List.of(ok);
+            var view = context.kit().create(new ViewSpec(new Nodes.Form(PROMPT, ControlState.READY, Nodes.FormKind.SHEET, prompt.title(),
+                Optional.empty(), List.of(new Nodes.Text(PROMPT + ".message", ControlState.READY, prompt.message(), Nodes.TextRole.BODY)),
+                Optional.empty(), buttons, prompt.question() ? PROMPT_CANCEL : PROMPT_OK)), event -> {
+                if (closed.get() || !(event instanceof UiEvent.Action action)) return;
+                switch (action.id()) {
+                    case PROMPT_OK -> {
+                        closed.set(true);
+                        dialog.close();
+                        prompt.accepted().run();
+                    }
+                    case PROMPT_CANCEL -> {
+                        closed.set(true);
+                        dialog.close();
+                    }
+                    default -> { }
+                }
+            });
+            dialog.setContent(view);
+            dialog.onClosed(() -> {
+                closed.set(true);
+                view.close();
+            });
+            dialog.show();
+        });
+    }
+
+    /** The addresses of the persistent store's open items, for Clear Website Data. UI thread. */
+    private static List<URI> persistentAddresses(BrowserItems items, DataStores stores) {
+        DataStore persistent = stores.persistent();
+        return items.items().stream().filter(item -> item.store() == persistent).map(item -> item.url()).toList();
     }
 
     /** The plugin's history and bookmarks. */

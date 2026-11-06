@@ -99,6 +99,30 @@ class BrowserSettingsTest {
         } });
     }
 
+    /**
+     * Plan 6 Task 8: the Browser's own Settings page shows the declared settings by section, as the generated page did,
+     * so each declaration is recorded under its section. The sections run General, Link Opening, Search Engine, Privacy
+     * &amp; Data, Ad Blocking and Proxy, and one without a setting is left out.
+     */
+    @Test void theDeclaredSettingsAreRecordedBySectionInTheSectionsOrder() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var declared = new AtomicReference<BrowserSettings.Declared>();
+            host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(),
+                plugin -> declared.set(BrowserSettings.declare(plugin.settings())));
+            List<BrowserSettings.Section> sections = declared.get().sections();
+            assertThat(sections).extracting(BrowserSettings.Section::title)
+                .containsExactly("General", "Link Opening", "Search Engine", "Privacy & Data");
+            assertThat(sections).extracting(section -> section.settings().stream().map(Setting::key).toList()).containsExactly(
+                List.of("start_page", "page_zoom"), List.of("open_links_from_terminal", "open_local_web_files"),
+                List.of("search_engine", "custom_search_url", "custom_suggestions_url"), List.of("devnull_mode"));
+            assertThat(BrowserSettings.SECTIONS).containsExactly("General", "Link Opening", "Search Engine", "Privacy & Data",
+                "Ad Blocking", "Proxy");
+            assertThatThrownBy(() -> sections.getFirst().settings().clear()).as("a snapshot no caller changes")
+                .isInstanceOf(UnsupportedOperationException.class);
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
     @Test void devNullModeIsReadFromItsKey() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
             var declared = new AtomicReference<BrowserSettings.Declared>();

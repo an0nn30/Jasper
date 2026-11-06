@@ -3,7 +3,10 @@ package dev.jasper.browser.engine;
 import com.jetbrains.cef.JCefAppConfig;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.BiPredicate;
+import java.util.function.BooleanSupplier;
 import java.util.function.Predicate;
 import org.cef.CefApp;
 import org.cef.CefClient;
@@ -19,16 +22,19 @@ import org.cef.network.CefRequest;
 
 /**
  * The JCEF side of {@link Chromium}: the in-process {@link CefApp}, its pages' client, its previews' client, its
- * in-memory request contexts, the hand-over to its own UI thread and its dispose. Only Chromium's start loads this class,
- * so a plugin start that never shows a page loads no Chromium class.
+ * clearing client, which only the helper browser of a live Clear Website Data uses ({@link ProfileClearing}), its
+ * in-memory request contexts, its cookies' deletion, the hand-over to its own UI thread and its dispose. Only Chromium's
+ * start loads this class, so a plugin start that never shows a page loads no Chromium class.
  */
 final class ChromiumApp {
     private final CefApp app;
     // Serves jasper-about: to the global context as its scheme handler factory, and to in-memory contexts' pages through
     // their request handler (F1): the factory is registered on the global context alone.
     private final AboutSchemeFactory about;
-    private CefClient client, preview;
+    private CefClient client, preview, clearing;
     private boolean disposed;
+    // The global cookie manager, got once JCEF has initialized, as the hand-over is.
+    private volatile CefCookieManager cookies;
 
     private ChromiumApp(CefApp app, AboutSchemeFactory about) {
         this.app = app;
@@ -94,8 +100,36 @@ final class ChromiumApp {
      * @return the hand-over
      */
     Predicate<Runnable> handOver() {
-        CefCookieManager cookies = CefCookieManager.getGlobalManager();
-        return task -> cookies != null && cookies.flushStore(task::run);
+        CefCookieManager manager = CefCookieManager.getGlobalManager();
+        cookies = manager;
+        return task -> manager != null && manager.flushStore(task::run);
+    }
+
+    /**
+     * Deletes every cookie of the global context, the persistent store's ({@link ProfileClearing#clearCookies}). Any
+     * thread, once JCEF has initialized.
+     *
+     * @return the domains the cookies had, once the deletion is saved; failed when Chromium refuses it
+     */
+    CompletableFuture<Set<String>> clearCookies() {
+        return ProfileClearing.clearCookies(cookies);
+    }
+
+    /**
+     * Clears the browser cache and the storage of each of {@code origins} in the global context, through a helper
+     * browser on the clearing client, which is made the first time ({@link ProfileClearing#clearStorage}). UI thread,
+     * while Chromium runs.
+     *
+     * @param origins the origins
+     * @param running whether Chromium still runs
+     * @return completes once they are cleared
+     */
+    CompletableFuture<Void> clearStorage(List<String> origins, BooleanSupplier running) {
+        if (clearing == null) {
+            clearing = app.createClient();
+            ProfileClearing.install(clearing);
+        }
+        return ProfileClearing.clearStorage(clearing, origins, running);
     }
 
     /**
@@ -139,8 +173,8 @@ final class ChromiumApp {
     }
 
     /**
-     * Disposes the previews' client and the pages' client, which closes their every browser, then the app; once, on the
-     * UI thread. Chromium ends later, on its own thread.
+     * Disposes the previews' client, the clearing client and the pages' client, which closes their every browser, then
+     * the app; once, on the UI thread. Chromium ends later, on its own thread.
      */
     void dispose() {
         if (disposed) return;
@@ -149,9 +183,13 @@ final class ChromiumApp {
             if (preview != null) preview.dispose();
         } finally {
             try {
-                if (client != null) client.dispose();
+                if (clearing != null) clearing.dispose();
             } finally {
-                app.dispose();
+                try {
+                    if (client != null) client.dispose();
+                } finally {
+                    app.dispose();
+                }
             }
         }
     }

@@ -9,6 +9,7 @@ import dev.jasper.browser.page.PageTestAccess;
 import dev.jasper.browser.permissions.Decision;
 import dev.jasper.browser.permissions.Permission;
 import dev.jasper.browser.restore.BrowserRestore;
+import dev.jasper.browser.settings.BrowserSettingsPanel;
 import dev.jasper.browser.store.CapturedLog;
 import dev.jasper.browser.store.MemoryStores;
 import dev.jasper.browser.store.Reached;
@@ -475,6 +476,91 @@ class BrowserPluginTest {
         } finally {
             SwingUtilities.invokeAndWait(() -> host.get().close());
         }
+    }
+
+    /**
+     * Plan 6 Task 8: Settings › Tools › Browser is the Browser's own page, and its prompts show as the Indexer's do, as a
+     * sheet over the active window: a question with Cancel and OK, whose OK alone runs what was asked, and a message
+     * with OK alone. A stopped plugin shows none.
+     */
+    @Test void theSettingsPageIsTheBrowsersOwnAndItsPromptsAskOverTheActiveWindow() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            UUID window = host.addTerminalWindow();
+            host.activateTerminalWindow(window);
+            var plugin = new BrowserPlugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            assertThat(host.settingsPanel(ID)).as("the Browser's own page").isPresent();
+            var accepted = new java.util.concurrent.atomic.AtomicInteger();
+            var question = new BrowserSettingsPanel.Prompt("Clear Cookies", "This will remove all cookies from all websites. Continue?",
+                true, accepted::incrementAndGet);
+            plugin.show(question);
+            var sheet = host.windowView(ID, "Clear Cookies").orElseThrow();
+            var form = (Nodes.Form) sheet.spec().root();
+            assertThat(form.kind()).isEqualTo(Nodes.FormKind.SHEET);
+            assertThat(form.title()).isEqualTo("Clear Cookies");
+            assertThat(form.sections()).singleElement().isInstanceOfSatisfying(Nodes.Text.class,
+                text -> assertThat(text.text()).isEqualTo("This will remove all cookies from all websites. Continue?"));
+            assertThat(form.actions()).extracting(Nodes.Button::label, Nodes.Button::kind)
+                .containsExactly(tuple("Cancel", Nodes.ButtonKind.SECONDARY), tuple("OK", Nodes.ButtonKind.PRIMARY));
+            assertThat(form.cancelAction()).isEqualTo(BrowserPlugin.PROMPT_CANCEL);
+            sheet.emit(new dev.jasper.sdk.ui.UiEvent.Action(BrowserPlugin.PROMPT_CANCEL));
+            assertThat(host.windowView(ID, "Clear Cookies")).as("Cancel closes it").isEmpty();
+            assertThat(accepted).as("and runs nothing").hasValue(0);
+            plugin.show(question);
+            host.windowView(ID, "Clear Cookies").orElseThrow().emit(new dev.jasper.sdk.ui.UiEvent.Action(BrowserPlugin.PROMPT_OK));
+            assertThat(host.windowView(ID, "Clear Cookies")).isEmpty();
+            assertThat(accepted).hasValue(1);
+
+            plugin.show(new BrowserSettingsPanel.Prompt("Clear Website Data", "All website data has been cleared successfully!", false, () -> { }));
+            var told = (Nodes.Form) host.windowView(ID, "Clear Website Data").orElseThrow().spec().root();
+            assertThat(told.actions()).extracting(Nodes.Button::label).containsExactly("OK");
+            assertThat(told.cancelAction()).as("Escape closes it").isEqualTo(BrowserPlugin.PROMPT_OK);
+            host.stopAll();
+            plugin.show(question);
+            assertThat(host.windowView(ID, "Clear Cookies")).as("a stopped plugin asks nothing").isEmpty();
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /**
+     * The plan's call: Settings' Manage Permissions opens {@code jasper-about:permissions} in a new tab, in the
+     * persistent store, whatever the /dev/null setting; once Chromium cannot serve pages it posts why instead.
+     */
+    @Test void managePermissionsOpensThePersistentStoresPermissionsPage() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            UUID window = host.addTerminalWindow();
+            host.activateTerminalWindow(window);
+            host.setSetting(ID, "devnull_mode", true);
+            var plugin = new BrowserPlugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            plugin.managePermissions();
+            assertThat(plugin.items().items()).singleElement().satisfies(item -> {
+                assertThat(item.url()).isEqualTo(dev.jasper.browser.pages.PermissionsPage.ADDRESS);
+                assertThat(item.devNull()).isFalse();
+            });
+            assertThat(host.contentTabs()).hasSize(1);
+            plugin.chromium().close();
+            plugin.managePermissions();
+            assertThat(plugin.items().items()).hasSize(1);
+            assertThat(host.notifications().lines()).singleElement().asString().startsWith("dev.jasper.browser|ERROR|The browser could not start|");
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /** A clearing that failed posts its error with the reason, while the plugin runs. */
+    @Test void aClearingThatFailedPostsAnErrorWhileThePluginRuns() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var plugin = new BrowserPlugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            plugin.notCleared(dev.jasper.browser.item.WebsiteData.NOT_CLEARED,
+                new java.util.concurrent.TimeoutException("Chromium did not clear its data within 60 seconds"));
+            assertThat(host.notifications().lines())
+                .containsExactly("dev.jasper.browser|ERROR|Website data could not be cleared|Chromium did not clear its data within 60 seconds");
+            host.stopAll();
+            plugin.notCleared(dev.jasper.browser.item.WebsiteData.NOT_CLEARED, new IllegalStateException("late"));
+            assertThat(host.notifications().lines()).hasSize(1);
+            assertThat(host.failures()).isEmpty();
+        } });
     }
 
     /** What {@code page}'s script is answered for {@code request} from browser {@code browser}, as its own document asks. */

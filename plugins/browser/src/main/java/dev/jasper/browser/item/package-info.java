@@ -17,7 +17,10 @@
  * Each store keeps its site permissions through the {@code permissions} package, and the menu button's
  * {@code PrivacyMenu} resets those of the page's site. It also holds the item's {@code AudioGate}: the first sound of
  * a page whose site has no stored choice mutes it and shows the {@code AudioBar}, whose Always answers are stored in
- * the item's store, and the menu offers Unmute Current Page while the page is muted. An item's
+ * the item's store, and the menu offers Unmute Current Page while the page is muted.
+ * {@link dev.jasper.browser.item.WebsiteData} is Settings' Clear Cookies and Clear Website Data for the persistent
+ * store: Chromium's part through the {@code engine} package, then its history, bookmarks and site permissions, and the
+ * database compacted; the /dev/null stores are untouched. An item's
  * {@code SitePermissions} answers its page's camera, microphone and notification requests from its store, or with the
  * {@code dialogs} package's prompt, and the notifications its page shows are Jasper's, in the plugin's group for them
  * ({@link dev.jasper.browser.item.PageNotifications}); a /dev/null item denies notifications.

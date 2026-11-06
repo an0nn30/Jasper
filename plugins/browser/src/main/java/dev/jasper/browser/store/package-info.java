@@ -3,7 +3,7 @@
  * folder, which holds the {@code permissions} table of the site permissions too.
  * {@link dev.jasper.browser.store.BrowserDatabase} opens it at its first call, on its own thread, and runs it in memory
  * for the rest of the run when the file cannot be used; {@link dev.jasper.browser.store.HistoryStore} keeps an
- * entry for each page load and counts the visits of each host and path, and
+ * entry for each page load and counts the visits of each host and path, whose sites Clear Website Data clears, and
  * {@link dev.jasper.browser.store.BookmarkStore} keeps the bookmarks and their tags.
  * {@link dev.jasper.browser.store.Addresses} decides which addresses they keep, without user names and passwords.
  * {@link dev.jasper.browser.store.Stores} holds a database's two stores and the indexes of them the UI thread reads, the

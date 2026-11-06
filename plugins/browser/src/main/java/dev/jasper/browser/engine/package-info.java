@@ -16,5 +16,10 @@
  * it has stopped; each browser of the group is handed a {@code BrowserContext} of its own over it, as JCEF disposes a
  * browser's context object as the browser closes. It serves {@code jasper-about:} to such a context's pages through
  * their request handler, as its scheme handler factory serves the global context alone.
+ * Clear Cookies and Clear Website Data clear the global context, the persistent store's: {@code ProfileWipe}, plain
+ * Java, keeps the marker by which the next start, on Chromium's worker before JCEF opens the profile, wipes the profile
+ * or has its cookies deleted, and {@code ProfileClearing}, which loads only while Chromium runs, deletes the cookies live
+ * and clears the sites' storage through a helper browser of a client of its own, whose DevTools calls carry the
+ * {@code json} package's literals. Depends on the {@code json} package, the JDK and the runtime's {@code jcef} module.
  */
 package dev.jasper.browser.engine;

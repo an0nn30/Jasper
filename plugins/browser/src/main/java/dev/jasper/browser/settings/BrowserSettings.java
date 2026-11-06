@@ -10,14 +10,18 @@ import dev.jasper.sdk.settings.Setting;
 import dev.jasper.sdk.settings.SettingKind;
 import dev.jasper.sdk.settings.SettingSpec;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 /**
- * Settings › Browser, as one snapshot (spec section 17).
+ * Settings › Tools › Browser, as one snapshot (spec section 17). Each setting is declared under its section, which
+ * {@link Declared#sections()} gives the Browser's own Settings page.
  *
  * @param startPage what a new browser tab, window or pane loads, as typed into its address field
  * @param pageZoom the zoom, a whole percent from 25 to 500, that a page shows at until it is zoomed, and that Reset Font
@@ -38,8 +42,25 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
     static final String START_PAGE = "start_page", PAGE_ZOOM = "page_zoom", LINKS = "open_links_from_terminal",
         LOCAL_FILES = "open_local_web_files", SEARCH_ENGINE = "search_engine", CUSTOM_SEARCH = "custom_search_url",
         CUSTOM_SUGGESTIONS = "custom_suggestions_url", DEVNULL_MODE = "devnull_mode";
-    private static final String GENERAL = "General", LINK_OPENING = "Link Opening", SEARCH = "Search Engine", PRIVACY = "Privacy & Data";
+    static final String GENERAL = "General", LINK_OPENING = "Link Opening", SEARCH = "Search Engine", PRIVACY = "Privacy & Data",
+        AD_BLOCKING = "Ad Blocking", PROXY = "Proxy";
+    /** The sections, in the order the Settings page shows them. */
+    static final List<String> SECTIONS = List.of(GENERAL, LINK_OPENING, SEARCH, PRIVACY, AD_BLOCKING, PROXY);
     private static final String NO_TEMPLATE = "The URL must start with https:// or http:// and contain " + SearchEngine.TERMS;
+
+    /**
+     * A section of the Settings page and its settings, in the order declared.
+     *
+     * @param title the section's title
+     * @param settings its settings
+     */
+    public record Section(String title, List<Setting<?>> settings) {
+        /** Copies the settings. */
+        public Section {
+            Objects.requireNonNull(title, "title");
+            settings = List.copyOf(settings);
+        }
+    }
 
     /** Open Links From Terminal: where a web link the user opens in Jasper goes. */
     public enum LinkOpening {
@@ -91,15 +112,17 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
     }
 
     /**
-     * Declares the Browser's settings, which Settings › Browser shows: Start page and Page zoom, a percent from 25 to 500,
-     * under General, Open Links From Terminal and Open Local Web Files under Link Opening, then Default Search Engine,
-     * Custom Search URL and Custom Search Suggestions URL under Search Engine, each custom URL empty or an http or https
-     * address with {@code %s} in it, and Use /dev/null mode under Privacy &amp; Data. UI thread, while the plugin starts.
+     * Declares the Browser's settings, which Settings › Tools › Browser shows: Start page and Page zoom, a percent from 25
+     * to 500, under General, Open Links From Terminal and Open Local Web Files under Link Opening, then Default Search
+     * Engine, Custom Search URL and Custom Search Suggestions URL under Search Engine, each custom URL empty or an http or
+     * https address with {@code %s} in it, and Use /dev/null mode under Privacy &amp; Data. Each is recorded under its
+     * section ({@link Declared#sections()}). UI thread, while the plugin starts.
      *
-     * @param settings the plugin's settings
+     * @param plugin the plugin's settings
      * @return the declared settings, which read the current values
      */
-    public static Declared declare(PluginSettings settings) {
+    public static Declared declare(PluginSettings plugin) {
+        var settings = new Declaring(plugin);
         Setting<String> startPage = settings.declare(SettingSpec.of(START_PAGE,
                 SettingKind.text(AddressInput::resolves, "Enter a web address."), WELCOME)
             .label("Start page").section(GENERAL)
@@ -144,7 +167,29 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
             .description("Browser tabs, windows and panes opened after you turn this on keep cookies, history and all other "
                 + "browser data in memory, and lose them when that tab and the tabs it opened have all closed.")
             .keywords("private", "incognito", "privacy", "history", "cookies", "data", "dev null", "devnull", "memory"));
-        return new Declared(startPage, pageZoom, links, localFiles, engine, customSearch, customSuggestions, devNull);
+        return new Declared(startPage, pageZoom, links, localFiles, engine, customSearch, customSuggestions, devNull, settings.sections());
+    }
+
+    /** Declares each setting in the plugin's settings and records it under its section, one of {@link #SECTIONS}. */
+    private static final class Declaring {
+        private final PluginSettings settings;
+        private final Map<String, List<Setting<?>>> sections = new LinkedHashMap<>();
+
+        Declaring(PluginSettings settings) {
+            this.settings = settings;
+        }
+
+        <T> Setting<T> declare(SettingSpec<T> spec) {
+            if (!SECTIONS.contains(spec.section())) throw new IllegalArgumentException("Not a section of the Browser's: " + spec.section());
+            Setting<T> setting = settings.declare(spec);
+            sections.computeIfAbsent(spec.section(), title -> new ArrayList<>()).add(setting);
+            return setting;
+        }
+
+        /** The sections with a setting, in {@link #SECTIONS}' order. */
+        List<Section> sections() {
+            return SECTIONS.stream().filter(sections::containsKey).map(title -> new Section(title, sections.get(title))).toList();
+        }
     }
 
     /** A custom URL: empty, or a {@link SearchEngine#template template}, an http or https address with {@code %s}. */
@@ -178,10 +223,11 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
         private final Setting<SearchEngine> engine;
         private final Setting<String> customSearch, customSuggestions;
         private final Setting<Boolean> devNull;
+        private final List<Section> sections;
 
         private Declared(Setting<String> startPage, Setting<Integer> pageZoom, Setting<LinkOpening> links,
                          Setting<LocalFileOpening> localFiles, Setting<SearchEngine> engine, Setting<String> customSearch,
-                         Setting<String> customSuggestions, Setting<Boolean> devNull) {
+                         Setting<String> customSuggestions, Setting<Boolean> devNull, List<Section> sections) {
             this.startPage = startPage;
             this.pageZoom = pageZoom;
             this.links = links;
@@ -190,6 +236,17 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
             this.customSearch = customSearch;
             this.customSuggestions = customSuggestions;
             this.devNull = devNull;
+            this.sections = List.copyOf(sections);
+        }
+
+        /**
+         * Every declared setting, by section: General, Link Opening, Search Engine, Privacy &amp; Data, Ad Blocking and
+         * Proxy, each in the order declared; a section without a setting is left out.
+         *
+         * @return the sections
+         */
+        public List<Section> sections() {
+            return sections;
         }
 
         /**
