@@ -20,12 +20,14 @@ the Markdown preview is the Editor's Basic one, and while Jasper is itself the s
   your [default browser](#making-jasper-your-default-browser), links from other apps can open here, as
   [below](#links-from-terminals-and-jasper).
 
-The start page is `jasper-about:welcome` by default: Jasper's welcome page, in the workspace theme's colours. It shows
-**Top Sites**, the eight sites you visit most, with **Refresh**, and Quick Actions: **Bookmarks**, **History** and
-**Settings**, which opens Settings › Tools › Browser. An open welcome page shows a theme change the next time it loads.
+The start page is `jasper-about:welcome` by default: Jasper's welcome page, "Welcome Back", in the workspace theme's
+colours. It shows **Top Sites**, the eight sites you visit most ([History](#history)), with **Refresh**, and Quick
+Actions: **Bookmarks** and **History**, which open the [bookmarks page](#bookmarks) and the [history page](#history),
+and **Settings**, which opens Settings › Tools › Browser. An open welcome page shows a theme change the next time it
+loads.
 
-The first time the welcome page loads, it shows three onboarding pages instead: Meet the Jasper Browser, What Can It Do?
-and Let’s Get You Set Up. **Start Browsing** on the last one finishes the onboarding, which is remembered in
+Until you finish the onboarding, the welcome page shows three onboarding pages instead: Meet the Jasper Browser, What
+Can It Do? and Let’s Get You Set Up. **Start Browsing** on the last one finishes the onboarding, which is remembered in
 `onboarding-finished` in the plugin's data folder, and shows the welcome page.
 
 Each page is the item of one pane. Its tab shows the page's title; while a page without a title loads, the tab keeps
@@ -52,12 +54,15 @@ Along the top of each page, from left to right:
 
 - **Back** and **Forward**, each disabled when the page has nowhere to go. Holding either for half a second lists the
   page's history that way, up to 12 entries, nearest first, each by its title or else its address; choosing one goes
-  there. A right-click (Control-click on macOS), Shift+F10 or the context-menu key opens the list at once.
+  there. A list that has entries ends with **Show Full History**, which loads the [history page](#history). A
+  right-click (Control-click on macOS), Shift+F10 or the context-menu key opens the list at once.
 - **Reload**, which is **Stop** while the page loads;
 - **Not secure**, in the warning colour, while the page is one you went on to past a certificate error
   ([Certificate errors](#certificate-errors));
 - the address field, with the site icon at its left;
-- the menu button (☰), whose **Settings** opens Settings › Tools › Browser.
+- the menu button (☰): **Add Bookmark**, or **Remove Bookmark** while the page is bookmarked
+  ([Bookmarks](#bookmarks)); **Manage Bookmarks** and **History**, which load the bookmarks and [history](#history)
+  pages; and **Settings**, which opens Settings › Tools › Browser.
 
 The site icon, which the page's tab shows too, is the page's favicon once the page has loaded, Jasper's icon on
 Jasper's own `jasper-about:` pages, and a globe while the page loads, on an [error page](#error-pages) and whenever the
@@ -91,7 +96,15 @@ The list under the address field holds, in order:
 2. **Search for “…”** (Web Search);
 3. up to five of the search engine's suggestions (Search Suggestion), asked for once you pause typing for 150 ms, with
    "Loading suggestions…" after the rows until they arrive;
-4. a single word's **Navigate to “https://…”**.
+4. a single word's **Navigate to “https://…”**;
+5. up to ten of your [bookmarks](#bookmarks), newest first (Bookmark), then up to five of the sites you visited
+   ([History](#history)), the most visited first ("Visited 3 times").
+
+A bookmark or a visited site is listed when the text, ignoring case, begins its address after the scheme
+(`github.com/x` for `https://github.com/x`), or after the scheme and a leading `www.`, or begins its title or one of
+the title's words. Each shows its title, or its address when it has none. A row that loads an address the list already
+holds is left out, so an address you bookmarked and visited lists once, and a stored `https://example.com/` does not
+list again under the typed `example.com`.
 
 So Enter right after typing loads `example.com`, `localhost:3000` or `10.0.0.1`, and searches for a single word such
 as `jcef`, whose address is further down. When the text is itself a results page's address, a search for its terms
@@ -128,10 +141,13 @@ nothing.
 | Back | `"dev.jasper.browser.back"` | Cmd+[ | Alt+Left |
 | Forward | `"dev.jasper.browser.forward"` | Cmd+] | Alt+Right |
 | Reload Page | `"dev.jasper.browser.reload"` | Cmd+R | Ctrl+R |
+| History | `"dev.jasper.browser.history"` | Cmd+Y | Ctrl+H |
 
 These keys apply only in browser tabs, where they win over the same keys bound elsewhere, also inside a page's text
 field: on macOS, Cmd+R in a browser tab reloads the page, and in a terminal it still opens Search Shell History. Rebind
-them in Settings › Keymap, under Browser ([Keyboard shortcuts](keyboard-shortcuts.md)).
+them in Settings › Keymap, under Browser ([Keyboard shortcuts](keyboard-shortcuts.md)). **History** loads the
+[history page](#history). On Linux and Windows, Ctrl+H opens it from the address field too, as Jasper's text fields
+leave Ctrl+H to the keymap there ([Keyboard shortcuts](keyboard-shortcuts.md#bundled-plugins)).
 
 - **Copy** and **Paste**, Jasper's actions (Cmd+C and Cmd+V; Ctrl+Shift+C and Ctrl+Shift+V), copy the page's selection
   and paste into the page. On Linux and Windows, Ctrl+C and Ctrl+V reach the page too.
@@ -145,6 +161,132 @@ them in Settings › Keymap, under Browser ([Keyboard shortcuts](keyboard-shortc
   a page's own draggable item, is cancelled.
 - **Find**, **Find Next** and **Find Previous** search the page ([Find in page](#find-in-page)), and **Increase**,
   **Decrease** and **Reset Font Size** zoom it ([Zoom](#zoom)).
+
+## History
+
+Every page loaded in a browser pane is recorded: its address and, once the page has one, its title, which follows the
+page's title at most once a second. Only `http`, `https` and `file` addresses of at most 8,192 characters are recorded,
+without any user name and password in them; Jasper's own `jasper-about:` pages, and `about:`, `data:` and `blob:`
+pages, are not. A load that ends on an [error page](#error-pages) leaves no entry. Nothing expires.
+
+Jasper also counts the visits of each site: an address's host, with its port, and its path, without the scheme, the
+query and the fragment, so `http://example.com/docs` and `https://example.com/docs?page=2` are one site and
+`example.com:8080` another. A site shows its latest address and that address's title. The welcome page's Top Sites,
+the address field's [suggestions](#search-and-suggestions) and the [command palette](#palette-scopes) list sites; the
+suggestions and the palette see only the 10,000 sites visited most recently.
+
+History and [bookmarks](#bookmarks) are kept in `browser.sqlite` in the plugin's data folder ([Files](#files)), which
+Jasper opens the first time it needs it, such as when a browser page first shows, and never as it starts. When the file
+cannot be used, because Jasper cannot read or write it, it is damaged, a later Jasper wrote it, or another program holds
+it for more than 2 seconds, Jasper leaves it as it was, posts "Browser history and bookmarks are unavailable" with the
+reason, and keeps history and bookmarks in memory until it quits. When SQLite itself cannot load, there are none for
+the run. Browsing works as usual either way.
+
+**The history page**, `jasper-about:history`, opens from Web › History, ☰ › History, Show Full History and the welcome
+page's Quick Actions, with the keyboard in its search field. "Browsing History" lists the entries newest first, under
+Today, Yesterday and each earlier day, each with its time, its title ("Untitled" without one) and its address as a
+link, 50 at a time: **Load More** shows the next. The search field ("Search your browsing history…") searches once you
+pause typing for 300 ms, and lists the entries whose title or address holds any word of the text.
+
+- × deletes an entry after "Delete this history entry?"; its site then counts one visit fewer and shows its newest
+  address left, and a site with no entries left goes.
+- **Clear All History** deletes every entry and every site after "This will delete all browsing history. This action
+  cannot be undone. Continue?".
+- A search, here and on the bookmarks page, reads the first 256 characters of the text and, of those, the first 8
+  words, and ignores the case of ASCII letters only: `Ä` does not find `ä`.
+
+## Bookmarks
+
+**Add Bookmark**, in the menu button (☰), bookmarks the page's address, without any user name and password, with the
+page's title, and opens **Edit Bookmark** below the button, unless the page began another load meanwhile. It is dimmed
+for an address that history does not record ([History](#history)), such as a `jasper-about:` page. On an
+[error page](#error-pages) it bookmarks the address that failed, without a title. While the page's address is
+bookmarked, the item reads **Remove Bookmark**, which removes the bookmark and posts "Bookmark Removed".
+
+**Edit Bookmark** shows the bookmark's **Title** and **URL**, which cannot be changed, and its **Tags**, which take the
+keyboard:
+
+- Enter adds the text typed as a tag, and so does a comma, a line break or a tab, typed or pasted, for the text before
+  it. Backspace with nothing typed removes the last tag, and a tag's × removes it.
+- Left with the caret at the start of the text selects the last tag; Left, Right, Home and End move between the tags;
+  Backspace or Delete removes the selected tag; Right past the last tag, Escape and typing go back to the text.
+- A tag has at most 64 characters and no control characters, and a bookmark at most 100 tags. A tag that differs from
+  an earlier one only in the case of ASCII letters is dropped: `Work` and `work` are one tag, `Äpfel` and `äpfel` two.
+  Tags keep the case you type them in, in every look.
+
+**Save** keeps the tags and closes the panel, and Escape closes it, dropping the changes. However else it closes, by a
+click outside, the page's next load, closing the page, or **Delete Bookmark**, the bookmark keeps the tags the panel
+shows.
+**Delete Bookmark** asks "Are you sure you want to delete this bookmark?": **Delete** deletes the bookmark and posts
+"Bookmark Deleted", and **Cancel** keeps it.
+
+**The bookmarks page**, `jasper-about:bookmarks`, opens from ☰ › Manage Bookmarks and the welcome page's Quick Actions,
+with the keyboard in its search field. "Bookmarks" lists them 50 at a time, with **Load More**, each with its title,
+else its address, its address as a link, its tags and the day it was added.
+
+- **Sort by:** Date Added, newest first (the default); Title, by the title or else the address; or URL. Title and URL
+  ignore the case of ASCII letters.
+- **Filter by tags:** a chip for each tag; with chips chosen, only the bookmarks that have every chosen tag show.
+- The search field ("Search bookmarks...") lists, once you pause typing for 300 ms, the bookmarks whose title, address
+  or one of whose tags holds the text.
+- × deletes a bookmark after "Delete this bookmark?", and **Clear All** deletes every bookmark after "This will delete
+  all bookmarks. This action cannot be undone. Continue?".
+
+## Palette scopes
+
+The Browser adds two scopes to the [command palette](command-palette.md#bundled-scopes), both searched in All:
+
+- **Bookmarks** ("Search bookmarks") lists the bookmarks whose title, address or tags hold every word typed, those whose
+  title begins with the text first, then the newest. Its chip with nothing typed lists them all, newest first.
+  Bookmarks you open appear among the empty query's rows.
+- **Browser History** ("Search visited sites") lists the sites whose title or address holds every word typed, the most
+  visited first, then the most recent. Its chip with nothing typed lists the 50 visited most recently, under "Recent".
+  When the text is an `https://` address with a host, **Open URL in Browser** comes first and opens it. Visited sites
+  never appear among the empty query's rows.
+
+**Open** (Enter) loads the row's address in the window's focused browser page, the page itself when the keyboard is in
+its DevTools, or, with none, in a new browser tab at the end of the window's tab strip. While Chromium cannot start, it
+posts "The browser could not start" again.
+
+## Snippets in page fields
+
+The [Snippets](history-and-snippets.md#using-snippets) scope's **Insert** and **Paste and run** put a snippet into a
+browser page too, when the palette opened over the page, or the [Run window](command-palette.md#the-run-window)'s
+current item is the page: the snippet goes into the field you are typing in, and Paste and run presses Return after it.
+
+Jasper looks for the focused field from the page's top document, through frames of the same origin and open shadow
+roots: an input that takes text (text, search, URL, telephone, email or password), a text area or an editable element,
+not disabled or read-only. The snippet replaces the field's selection, as typing would. When the search finds no such
+field, as when the focus is in a frame of another origin, Jasper types the snippet where the page's focus is, with
+Chromium's DevTools (`Input.insertText`). The clipboard is never used.
+
+- Return, and a snippet typed with DevTools, are trusted input, as your own keys are: the page gets user activation
+  from them. The page sees the input events of every insertion.
+- Jasper finds the field with a script that runs, through DevTools, in a JavaScript world of its own in the page, which
+  the page's scripts cannot reach. The first time it runs a script in a document, for a snippet or for
+  [Copy on select](#copy-on-select), it turns on DevTools' Runtime for a moment, which replays the page's console
+  messages to Jasper, so a page can notice that DevTools attached.
+- When the page does not answer within 5 seconds, or its answer fails, nothing is inserted.
+
+## Copy on select
+
+With **Copy on select** on (Settings › Terminal, `terminal.copy_on_select`), a selection you make in a page is copied
+to the clipboard about a tenth of a second after you finish it. The setting applies from the next selection.
+
+- **What finishes a selection:** releasing the mouse button after a drag, a double or triple click, or a Shift+click;
+  releasing the keys after Shift with an arrow, Home, End, Page Up or Page Down, or after Cmd+A (Ctrl+A on Linux and
+  Windows); and the right-click menu's **Select All**. A plain click copies nothing, and nor does typing, Shift+Tab
+  included, or a selection a page's script makes on its own.
+- **Only a changed selection is copied:** a gesture that leaves the selection as it was, such as a drag of a
+  scrollbar, a map or a slider, copies nothing over what you copied since.
+- **Never copied:** the text of a password field or of a field the page masks with CSS; the selection of an email or a
+  number field; a selection longer than 1,048,576 characters; and a selection inside a frame of another origin, which
+  **Copy** copies.
+- Non-breaking spaces copy as spaces, so a command copied from a page runs in a shell.
+- What is copied is what is selected when Jasper reads it: the page can change the selection between your gesture and
+  the read.
+- Jasper reads the selection in its own JavaScript world ([Snippets in page fields](#snippets-in-page-fields)), so the
+  page's scripts cannot change what the read sees.
 
 ## Find in page
 
@@ -266,7 +408,9 @@ Alt-click, which Chromium makes a download.
 
 Links that open a new tab or pane, and popups, open only at `http`, `https`, `file`, `about` and `jasper-about`
 addresses. A `mailto:` or `tel:` link opens nothing, however it is clicked. A `jasper-about:` address loads only as a
-page's whole document: in a frame, or as an image, a script or a style sheet, it loads nothing.
+page's whole document: in a frame, or as an image, a script or a style sheet, it loads nothing. A `file:` link on one of
+Jasper's own pages, such as a row of the [history page](#history), loads on a click, and a click that would open it in
+a new tab or a split opens nothing.
 
 ## Popups
 
@@ -580,3 +724,8 @@ Under [Jasper home](getting-started.md#jasper-home):
 | `plugins/dev.jasper.browser/dev.jasper.browser.toml` | The [settings](#settings) |
 | `plugins/dev.jasper.browser/data/chromium/` | Chromium's profile: cookies, the cache and other site data |
 | `plugins/dev.jasper.browser/data/chromium.log` | Chromium's warnings and errors |
+| `plugins/dev.jasper.browser/data/browser.sqlite` | [History](#history) and [bookmarks](#bookmarks), in SQLite |
+| `plugins/dev.jasper.browser/data/onboarding-finished` | That the [onboarding](#opening-pages) is finished |
+
+SQLite's native library loads from the copy in `jasper-sqlite` in the system's temporary folder that
+[Remote](remote.md#files) describes, which the Browser writes there when Remote has not.

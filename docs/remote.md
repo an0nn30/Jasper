@@ -646,8 +646,10 @@ Under `plugins/dev.jasper.remote/` in the Jasper home:
 | `data/transfers/` | The transfer queue (`queue.sqlite` and its journal files, `queue.lock`) |
 | `data/browser-cache/` | Folder listings while the SFTP browser shows them, deleted after use |
 
-SQLite's native library loads from a copy Remote writes into `jasper-sqlite` in the system's temporary folder while
-Jasper runs.
+SQLite's native library loads from a copy Remote writes into `jasper-sqlite` in the system's temporary folder (on
+Linux, `jasper-sqlite-` and your user name), which only you may use where the file system has POSIX permissions, while
+Jasper runs; the [Browser](browser.md#files) uses the same folder. When that folder cannot be used, such as one another
+user made, Remote logs it and the copy goes into the temporary folder itself.
 
 Remote reads `~/.ssh/config` and the files it includes only when you import, and `~/.ssh/known_hosts` while
 `read_user_known_hosts` is on; it writes neither.

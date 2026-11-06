@@ -1,5 +1,122 @@
 # Jasper — Status and Handoff
 
+**Browser plan 5: history, bookmarks and Jasper integrations — 2026-11-06** (`claude/browser-history-bookmarks`,
+worktree `.claude/worktrees/browser-4b-4c-e6deab`, from local `main` `68265a983`, which has plans 4a, 4b, 4c and 9
+merged; the plan `4930f00b6`, commits `6240e693d` to `986462e5c` and the docs; not merged or pushed;
+[plan](superpowers/plans/2026-10-30-browser-5-history-bookmarks.md), whose banner lists every deviation by task,
+[spec](superpowers/specs/2026-10-26-jasper-browser-plugin-design.md) sections 6, 7, 10, 12, 14, 15 and 23,
+[guide](browser.md#history); executed with per-task subagents and reviews, Task 6 as 6a and 6b; the final review has
+not run). The Browser keeps history and bookmarks, and joins the command palette, Snippets and Copy on select:
+- **History:** each page a browser pane loads at an `http`, `https` or `file` address of at most 8,192 characters,
+  without its user name and password, with its title, and each site's visits (its host with the port, and its path),
+  in `data/browser.sqlite`, which opens at its first use and never at the plugin's start (spec section 19); a load
+  that ends on an error page leaves no entry. A file that cannot be used is left as it was, history and bookmarks run
+  in memory, and "Browser history and bookmarks are unavailable" says why. The history page, `jasper-about:history`
+  (Web › History, Cmd+Y and Ctrl+H; ☰ › History; Show Full History at the end of Back's and Forward's hold menus):
+  days, search, ×, Load More and Clear All History.
+- **Bookmarks:** ☰ gains Add Bookmark or Remove Bookmark, Manage Bookmarks and History before Settings; Add Bookmark
+  opens the Edit Bookmark panel under ☰ (Title and URL read-only, Tags in the SDK's new token field; Save, Escape,
+  every other close keeping the tags, Delete Bookmark asking); the bookmarks page, `jasper-about:bookmarks`: sorts,
+  tag chips, search, ×, Load More and Clear All.
+- **Jasper's pages** reach Java through `jasperAboutQuery`, which answers only the main frame of a page that
+  registered queries and only with that page's 128-bit secret, under a nonce-only content security policy; the welcome
+  page (Top Sites, Refresh, Quick Actions) and three onboarding pages, finished in `data/onboarding-finished`.
+- **The address field** lists up to ten bookmarks and five visited sites after its own rows; **the command palette**
+  gains the Bookmarks and Browser History scopes (`palette.contribute`), with Open URL in Browser for a typed `https://`
+  address.
+- **Snippets in page fields:** Insert and Paste and run reach the field you are typing in on a browser page, through
+  a script in Jasper's isolated world, else DevTools' `Input.insertText`, and never through the clipboard (H30).
+- **Copy on select in pages:** a drag, a double or triple click, a Shift+click, Shift with a caret key, Cmd+A (Ctrl+A)
+  and the page menu's Select All copy the page's selection, read in Jasper's isolated world 100 ms later: only a
+  changed selection, never a password or CSS-masked field, and nothing in a frame of another origin.
+
+SDK 0.29.0 (every bundled range `>=0.29.0, <0.30`): the token field, a menu button anchoring a popover (and popovers
+kept inside their anchor's window), `InsertedText`, `TextTarget`, `ContentTab.setTextInsertion`,
+`PaletteQuery.textTarget` and `Platform.copyOnSelect()`, with the testkit's counterparts. The Browser stays 0.2.0 (H6)
+and bundles sqlite-jdbc 3.53.4.0, Remote's coordinates; Snippets is 0.5.0. Remote's `SqliteNatives` now uses the
+Browser's per-user, owner-only folder (H9) and skips one it cannot use (H11): the pre-flight's F13 follow-up, done in
+this plan. User-facing copy beyond the spec: the onboarding's "Links from the terminal" row (H27) and its "Snippets in
+page fields" and "Copy on select" rows. Docs: the Browser guide (the toolbar's menu and Show Full History, the
+suggestions, History, Bookmarks, palette scopes, Snippets in page fields, Copy on select, `file:` links on Jasper's
+pages, the welcome and onboarding pages, the Files table), keyboard shortcuts (History, and Ctrl+H in Jasper's text
+fields), the command palette (two scopes), Shell History and Snippets (Insert in pages), the terminal and configuration
+guides (Copy on select in pages), Plugins (the Browser's capabilities), Remote (the SQLite folder), the docs index, the
+README, the SDK reference's overview and the regenerated reference, the root `package-info`, the plan's banner and this
+entry; the SDK guides came with Tasks 6b, 7 and 10. `./gradlew check --continue` (JBR 25.0.4.1 b635.75 jcef, 12m 19s,
+after the docs): **15,063 tests, 0 failures, 0 errors, 103 skipped** (1,352 classes in the 16 build folders, without the
+example plugin's: jasper-app 5,280 with 90 skipped, Editor 5,387 with 4 skipped, Browser 886 with 1 skipped, jasper-ui
+1,020, Remote 659, jasper-sdk 135, jasper-sdk-testkit 304; the modules the docs did not change were up to date from the
+check at `986462e5c`), that is, the 15,017 of the check at `d3463fcf2` and the 46 Browser tests of Task 11's fix round
+and Task 12; the example external plugin's `check pluginZip` against `build/sdk-release` passes (1 test, up to date: the
+docs changed no SDK source); `sdkReference` was rerun; source hygiene is clean over 3,360 Java files, and no file the
+docs touched holds a raw U+00A0, U+2028 or U+2029. No GUI was launched.
+
+The controller's rulings, one line each (the pre-flight scan's F1-F39 adopted as H0; the banner gives each H-F*n* where
+it applied):
+- H0: every ruling the pre-flight scan proposed (F1-F39) is adopted and cited as H-F*n*, except where H1-H6 decide
+  otherwise.
+- H1: Snippets into page fields first built as the spec's paste and restore, with a 500 ms restore, while the user was
+  asked about DevTools `Input.insertText`; superseded by H30.
+- H2: Back's and Forward's hold menus end with a separator and Show Full History, as Chrome's do (4b's P23).
+- H3: a `file:` row on Jasper's pages loads on a plain click and a modifier-click opens nothing, recorded in the guide;
+  no `open` op.
+- H4: the second sqlite-jdbc's first open is left for the start-up benchmark, not queued behind Chromium's client.
+- H5: Task 6 splits into 6a (the 0.29.0 bump) and 6b (the token field), each with its own review.
+- H6: the Browser stays 0.2.0, as `dev.jasper.browser.api` is unchanged.
+- H7: the Browser's native-library folder is owner-only (`rwx------`); Remote's shared folder joins F13's follow-up.
+- H8: user information is cut after the authority's last `@`, restore's included, and a delete points its site at the
+  newest entry left.
+- H9: Remote's `SqliteNatives` takes the Browser's per-user, owner-only rule, as `org.sqlite.tmpdir` is one for the JVM.
+- H10: tags fold ASCII letters only, as SQLite's `NOCASE`, and the token field keeps the same rule.
+- H11: Remote's start logs a native folder it cannot use and lets sqlite-jdbc take its default.
+- H12: `BrowserToolbar.node`'s bookmark state waits for Task 7, and Task 2 passes the store rows through the toolbar's
+  constructor.
+- H13: Task 2's choices accepted: `MemoryStores` on the UI thread, F19's delete only before the document loaded, and no
+  test that types into or shows the real plugin's items.
+- H14: each retitle queues behind its record on the store's thread, so the last title lands, at the plugin's stop too.
+- H15: Task 3's choices accepted: `AboutQueries.prepare` with an executor, `AboutPages(Appearance, AboutScheme)`,
+  secrets minted on first need and sent as a prefix, 404 for a page that throws, a public `answer`.
+- H16: a search reads the first 256 characters and, of those, the first 8 words.
+- H17: every kit text field releases Ctrl+H on Windows and Linux (secret, picker and breadcrumb fields keep it), and the
+  shortcuts guide says so.
+- H18: any token can be removed from the keyboard, the field staying one Tab stop (WCAG 2.1.1).
+- H19: tokens the user enters keep their case in every look.
+- H20: `BookmarkStore.keptTags` calls the SDK's `Nodes.TokenField.kept`.
+- H21: a menu button issues an anchor (SDK 0.29.0), and a popover stays inside its anchor's window, right-aligned to
+  the control when there is no room to its right.
+- H22: Task 7's five defaults: the ☰ order, the Bookmarks notification group, what Add Bookmark stores, the Delete
+  question as an overlay over the tab, and the two notices' titles.
+- H23: the Edit Bookmark panel keeps its tags on a click outside or the page's next load; Escape discards them.
+- H24: `ClassicHostedAnchorContractTest` stays.
+- H25: every close but Escape keeps the tags, Delete Bookmark's included, and an unchanged close writes nothing.
+- H26: Task 9's deviations accepted: the executor, two setup scripts, the features query and the hidden note.
+- H27: the "Links from the terminal" row's copy, true on every routing path, and the setup note's Settings › Tools ›
+  Browser.
+- H28: `PaletteQuery` takes no old-arity constructor.
+- H29: every stand-in Browser `PluginInfo` outside the plugin declares the Browser's capabilities.
+- H30: the clipboard path is replaced by DevTools `Input.insertText` and `clipboard.read` goes; a DevTools timeout or
+  error does nothing; the world's `uniqueContextId` is used. Supersedes H1.
+- H31: Task 12's choices accepted: Shift only with a caret key, the sixth constructor parameter, one world, and no copy
+  from email and number fields or of a selection over 1,048,576 characters.
+- H32: a Shift+click's release and the page menu's Select All are gestures.
+- H33: the world's `uniqueContextId` is kept per document, with `Runtime.releaseObjectGroup` after each disable, so
+  Runtime's console replay runs once per document.
+- H34: one selection read at a time per item, and only the latest read copies.
+- H35: only a selection changed since the last read is copied.
+- H36 (for the final wave): a read dropped for a later gesture keeps its nonempty text, which copies when the re-read
+  answers "unchanged".
+
+Known gaps and follow-ups (the banner has them all, with the deferred minors by task): the final review has not run,
+and H36, the Paste and run fix (a focused button or link gets Return), `PageText`'s parsing executor and three raw
+characters in tests wait for its fix wave; a page can notice Jasper's DevTools through Runtime's console replay, once
+per document, and the user's DevTools lists the "Jasper" world; a run just after a main-frame load start can use the
+old document's world id once (it fails) or ask for one it does not keep; the page can change its selection between the
+gesture and the read (H-F12); a long search matches on its start only (H16); `Äpfel` and `äpfel` are two tags (H10);
+a modifier-click on a `file:` row opens nothing (H3); the palette and the suggestions see the 10,000 sites visited most
+recently (H-F29); no JavaScript runs in a test. Task 14 (the user's check on macOS, with their OK): pending, the
+GUI-only risks first (H-F1's transition flags, CEF's `Runtime.executionContextCreated` through JBR's out-of-process
+bridge, H-F19's load start for a failed navigation). Windows and Linux are not run; benchmarks are deferred (H4).
+
 **Browser plan 9: the Chromium Markdown preview — 2026-11-05** (`claude/browser-markdown-preview`, worktree
 `.claude/worktrees/browser-4b-4c-e6deab`, from local `main` `420bfd63a`, which has plans 4a, 4b and 4c merged; the plan
 `1364c1dc3`, commits `8676bfab4` to `a38f29813`, the docs `ea57ab1af` and the checklist `11e04ff16`, then the final
