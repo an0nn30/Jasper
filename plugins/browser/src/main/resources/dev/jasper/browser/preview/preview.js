@@ -30,8 +30,8 @@
  * - {op: "link", id}, for a click or a middle click on a [data-link] element, or Enter on a focused one, whose default it
  *   prevents.
  *
- * Mermaid: the first document with a diagram (a pre.mermaid) loads /mermaid.min.js, which the Browser serves once it
- * bundles Mermaid. Until then, and if it does not load, a diagram shows as its source, as code. Each diagram's SVG is
+ * Mermaid: the first document with a diagram (a pre.mermaid) loads /mermaid.min.js, the Mermaid the Browser bundles. If
+ * it does not load, a diagram shows as its source, as code. Each diagram's SVG is
  * kept by its source and theme. A diagram Mermaid cannot draw shows "Mermaid could not draw this diagram: <message>"
  * above its source. Mermaid runs strictly: no script or click of a diagram's runs, and a diagram's own directives cannot
  * change that, as Mermaid's default list of what they may not set stays.

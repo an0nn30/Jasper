@@ -120,8 +120,9 @@ banners of 4b, 4c and 9 bind. The task reviews recorded these deviations from th
   - **H30 supersedes H1:** the clipboard path, `ClipboardPaste` and `clipboard.read` are gone, as the paste broke the
     Vault's 30-second password clear and let a page read the previous clipboard. The isolated world's script comes
     first; on its answered false, DevTools `Input.insertText`; anything else (a timeout, an error, no browser yet) does
-    nothing. Spec 15's "pastes it, then puts the clipboard back" is not followed; the user is told, and choosing the
-    clipboard path reverts to `d3463fcf2`'s `ClipboardPaste`;
+    nothing. Spec 15's "pastes it, then puts the clipboard back" is not followed. On 2026-11-06 the user chose "Type it
+    in" (`Input.insertText`), so H30 is the user's answer, no longer an interim choice, and this departure from spec
+    15's wording stands;
   - `PageText` (an instance over a DevTools seam), `insert-text.js`, `Page.insertIntoField`, `Page.insertText` and
     `Page.pressReturn`; every DevTools call times out after 5 s; the world's `uniqueContextId` (CEF 150.0.14.0) comes
     from `Runtime.executionContextCreated`; Return and `Input.insertText` are trusted input, which gives the page user
@@ -273,7 +274,7 @@ Known gaps and follow-ups:
   history has no full-text index, and Top Sites sorts every site (H-F29).
 - **Spec deviations** (H-F31): copy on select drops "or the selection changes"; Add Bookmark is dimmed for an address
   that cannot be stored; history suggestions are capped at 5; the features row's copy (H27); Snippets type through
-  DevTools instead of the clipboard (H30).
+  DevTools instead of the clipboard (H30, the user's choice on 2026-11-06).
 - **Remote** (H-F13's follow-up, done here): Remote's `SqliteNatives` now uses the Browser's per-user, owner-only folder
   (H9), and a folder it cannot use is logged and skipped (H11).
 

@@ -5,7 +5,9 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
+import org.tomlj.Toml;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -41,6 +43,43 @@ class ThirdPartyNoticesTest {
         assertThat(autolink.notice()).isEmpty();
         assertThat(ThirdPartyNotices.read(autolink.text())).contains("Robin Stocker",
             "Permission is hereby granted, free of charge", "THE SOFTWARE IS PROVIDED \"AS IS\"");
+    }
+
+    /**
+     * Browser plan 9's slice 1b: the Browser ships npm's {@code mermaid.min.js} unmodified, listed in the component's
+     * files, with Mermaid's MIT licence and a notice naming the packages the file bundles.
+     */
+    @Test void mermaidIsListedWithItsFileItsMitLicenseAndWhatItBundles() {
+        var mermaid = ThirdPartyNotices.thirdParty().stream().filter(c -> c.name().equals("Mermaid")).findFirst().orElseThrow();
+        assertThat(mermaid.title()).isEqualTo("Mermaid 11.17.2");
+        assertThat(mermaid.license()).isEqualTo("MIT");
+        assertThat(mermaid.homepage()).isEqualTo("https://mermaid.js.org/");
+        assertThat(mermaid.modules()).isEmpty();
+        assertThat(ThirdPartyNotices.read(mermaid.text())).startsWith("The MIT License (MIT)\n\nCopyright (c) 2014 - 2022 Knut Sveidqvist\n")
+            .contains("Permission is hereby granted, free of charge", "THE SOFTWARE IS PROVIDED \"AS IS\"");
+        String notice = ThirdPartyNotices.read(mermaid.notice().orElseThrow());
+        assertThat(notice).contains("mermaid-11.17.2.tgz", "package/dist/mermaid.min.js",
+            "581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8", "production dependency tree", "(MPL-2.0 OR Apache-2.0)",
+            "d3-sankey", "BSD-3-Clause", "khroma", "MIT © Fabio Spampinato, Andrew Maney", "@mermaid-js/parser", "DOMPurify 3.4.12", "lodash-es");
+        // Ruling N25: the full tree, transitive packages and type declarations included, each with its version and licence.
+        assertThat(notice).containsPattern("(?m)^@chevrotain/types +11\\.1\\.2 +Apache-2\\.0 ")
+            .containsPattern("(?m)^robust-predicates +3\\.0\\.3 +Unlicense ").containsPattern("(?m)^internmap +2\\.0\\.0 +ISC ")
+            .containsPattern("(?m)^@types/geojson +7946\\.0\\.16 +MIT ");
+        assertThat(notice).as("the file's banner names DOMPurify's version").containsPattern("(?m)^dompurify +3\\.4\\.12 ")
+            .doesNotContainPattern("(?m)^dompurify +3\\.4\\.14 ");
+        assertThat(notice).as("the file's own constant names cytoscape's version").containsPattern("(?m)^cytoscape +3\\.34\\.0 ")
+            .doesNotContainPattern("(?m)^cytoscape +3\\.34\\.1 ");
+        // Ruling N26: what @mermaid-js/parser's own dist bundles, which npm's dependency metadata does not show, with the
+        // Apache License 2.0's text for chevrotain.
+        String parser = notice.substring(notice.indexOf("Bundled inside @mermaid-js/parser's dist:"), notice.indexOf("Type declarations, not in the file:"));
+        assertThat(parser).containsPattern("(?m)^chevrotain +11\\.1\\.2 +Apache-2\\.0 +@mermaid-js/parser$")
+            .containsPattern("(?m)^langium +4\\.2\\.1 +MIT +@mermaid-js/parser$").doesNotContain("@chevrotain/types");
+        assertThat(notice.substring(notice.indexOf("Type declarations, not in the file:"))).containsPattern("(?m)^@chevrotain/types +11\\.1\\.2 ");
+        assertThat(notice).endsWith(ThirdPartyNotices.read("apache-2.0.txt"));
+        var table = Toml.parse(ThirdPartyNotices.read("notices.toml")).getArrayOrEmpty("component");
+        var files = IntStream.range(0, table.size()).mapToObj(table::getTable)
+            .filter(component -> "Mermaid".equals(component.getString("name"))).findFirst().orElseThrow().getArrayOrEmpty("files");
+        assertThat(files.toList()).containsExactly("dev.jasper.browser/dev/jasper/browser/third_party/mermaid.min.js");
     }
 
     @Test void jasperComesFirstThenTheRestByNameIgnoringCase() {

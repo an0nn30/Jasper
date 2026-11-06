@@ -104,7 +104,9 @@ it applied):
 - H28: `PaletteQuery` takes no old-arity constructor.
 - H29: every stand-in Browser `PluginInfo` outside the plugin declares the Browser's capabilities.
 - H30: the clipboard path is replaced by DevTools `Input.insertText` and `clipboard.read` goes; a DevTools timeout or
-  error does nothing; the world's `uniqueContextId` is used. Supersedes H1.
+  error does nothing; the world's `uniqueContextId` is used. Supersedes H1. On 2026-11-06 the user chose "Type it in"
+  (`Input.insertText`): H30 is the user's answer, no longer an interim choice, and the departure from spec 15's wording
+  stands.
 - H31: Task 12's choices accepted: Shift only with a caret key, the sixth constructor parameter, one world, and no copy
   from email and number fields or of a selection over 1,048,576 characters.
 - H32: a Shift+click's release and the page menu's Select All are gestures.
@@ -238,6 +240,11 @@ where it applied):
   proportional), R3 (emoji families after the generics) and R4 (docs).
 - N24: the page's messages are parsed on Chromium's UI thread (AppKit's main thread on macOS), bounded by the 4 MiB
   message limit, and recorded as a known gap.
+- N25 (slice 1b): Mermaid's NOTICE lists its npm production dependency tree as of its publication, with the version
+  the file itself names where it names one (DOMPurify 3.4.12, cytoscape 3.34.0); that tree over-approximates the bundle.
+- N26 (slice 1b): the NOTICE also lists what `@mermaid-js/parser`'s own dist bundles, which npm's dependency metadata
+  does not show (langium 4.2.1, chevrotain ~11.1.2 and what they require, resolved by date), and carries the Apache
+  License 2.0's text for chevrotain and the `@chevrotain` packages.
 
 The final review ("With fixes", base `420bfd63a`, head `11e04ff16`) and the docs review (Approved, one Important) were
 answered by one fix wave, W1-W10 (the banner has each): the page reports a layout's clamp of its scroll as not the
@@ -276,6 +283,33 @@ wave's three
 ([checklist](browser-verification.md#plan-9-the-chromium-markdown-preview)); if the first line fails,
 `markdown_preview`'s default goes to `basic` before anything is pushed. Windows and Linux are not run; benchmarks and
 the memory run are deferred.
+
+**Slice 1b: Mermaid in the Chromium preview — 2026-11-06** (`claude/browser-mermaid`, worktree
+`.claude/worktrees/browser-mermaid`, from local `main` `ef3347601`, which has plans 4a, 4b, 4c, 9 and 5 merged;
+`4bc7557d4` and its docs; not merged or pushed; the plan's banner has the detail). With the user's approval of the
+download ("Yes, download it"), the Browser bundles `package/dist/mermaid.min.js` of npm's `mermaid-11.17.2.tgz`,
+unmodified (3,572,661 bytes, SHA-256 `581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8`), under its
+`third_party/`: 11.17.2 is the newest 11.x at least two weeks old (N-F17), in place of the plan's 11.12.0. The Mermaid
+notices component lists it in `files`, with `mermaid.LICENSE.txt` and `mermaid.NOTICE.txt` (Mermaid's npm production
+dependency tree as of its publication, which over-approximates the bundle, N25; beside it the packages
+`@mermaid-js/parser`'s own dist bundles, N26; the licence banners the file keeps; and the Apache License 2.0's text),
+and `MermaidBundleTest` pins the hash, the size and the strict defaults that a diagram's `%%{init}%%` cannot change. The
+Chromium preview draws `mermaid` fences, and a diagram's `click` callbacks do nothing; Basic shows them as code. The
+preview's files are read on the plugin's background executor, never on Chromium's IO thread (Task 4's minor), and
+`verifyThirdPartyNotices` leaves out what the jar does, such as `.DS_Store` and `*~` (Task 1a's minor). The setting's
+description and `mermaid` keyword, `settings.toml`, the Editor and Browser guides and README's Editor row name Mermaid
+again (N8 and N12 undone). N2 and N14: `autolink.LICENSE.txt` matches upstream's at tag `autolink-0.12.0` but for
+upstream's one trailing blank line, and stays as it is (the user's "Yes, check it"). Plan 5's H30 is now the user's
+choice (its entry above). Task 9 gains three lines: a loosening diagram runs nothing, a diagram's network link makes no
+request, and Mermaid's first load ([checklist](browser-verification.md#lines-slice-1b-added)). Verification: `./gradlew
+check --continue` (JBR 25.0.4.1 b635.75 jcef) first failed only `ThemeMigrationCoverageTest`, as two new tests' `new
+ArrayList` matched its pattern, so they queue in an `ArrayDeque`; then (10m 33s, 140 of 172 tasks up to date): **15,086
+tests, 0 failures, 0 errors, 103 skipped** (1,353 classes in the 16 build folders, without the example plugin's:
+jasper-app 5,281 with 90 skipped, Editor 5,387 with 4 skipped, Browser 908 with 1 skipped), plan 5's 15,078 and slice
+1b's eight; the example external plugin's `check pluginZip` against `build/sdk-release` passes (1 test);
+`verifyThirdPartyNotices` passes and refuses the component without its `files` line; source hygiene is clean over 3,362
+Java files, no file the slice wrote holds a raw U+00A0, U+2028 or U+2029, and `preview.js` passes `node --check`. No GUI
+was launched.
 
 **Browser plan 4c: registering Jasper as the default browser — 2026-10-31** (`claude/browser-default-browser`, worktree
 `.claude/worktrees/browser-4b-4c-e6deab`, from local `main` `4e0ce0a14`, which has plan 4b merged; commits `ff4a7bfc9`

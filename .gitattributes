@@ -6,3 +6,4 @@
 
 # Hash-locked upstream artifacts must retain their exact bytes and original formatting.
 packaging/windows/cygwin/seed-support/** -text -whitespace
+plugins/browser/src/main/resources/dev/jasper/browser/third_party/** -text -whitespace

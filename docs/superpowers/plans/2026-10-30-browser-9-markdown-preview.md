@@ -3,14 +3,15 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or
 > superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Execution status (2026-11-05): Tasks 1a and 2-8 executed and reviewed, and the final review ("With fixes") and its
-fix wave; slice 1b (Mermaid) waits for the user's approval of its download, and plan 9 merges without it (N20); Task 9,
-the user's GUI check on macOS, is pending** (branch `claude/browser-markdown-preview`, worktree
-`.claude/worktrees/browser-4b-4c-e6deab`, cut from local `main` `420bfd63a`, which has plans 4a, 4b and 4c merged; the
-plan `1364c1dc3`, then commits `8676bfab4` to `a38f29813`, the docs `ea57ab1af` and the checklist `11e04ff16`, then the
-fix wave `af2f1e1ed` to `8031cee59` and its docs, then the targeted round `21b3b42f2` and its docs (N23); not merged or pushed; see `docs/STATUS.md`). Executed with per-task
-subagents and reviews. The pre-flight scan's findings F1-F38 were adopted as rulings (N0, cited N-F*n*), and the
-controller's further rulings are N1-N24; plan 4a's R0-R48, its sandbox ruling and the banners of 4b and 4c bind. The
+**Execution status (2026-11-06): Tasks 1a and 2-8 executed and reviewed, and the final review ("With fixes") and its
+fix wave; plan 9 merged into local `main` without slice 1b (N20); slice 1b (Mermaid 11.17.2) is done on its own branch,
+`claude/browser-mermaid` (below); Task 9, the user's GUI check on macOS, is pending** (branch
+`claude/browser-markdown-preview`, worktree `.claude/worktrees/browser-4b-4c-e6deab`, cut from local `main` `420bfd63a`,
+which has plans 4a, 4b and 4c merged; the plan `1364c1dc3`, then commits `8676bfab4` to `a38f29813`, the docs
+`ea57ab1af` and the checklist `11e04ff16`, then the fix wave `af2f1e1ed` to `8031cee59` and its docs, then the targeted
+round `21b3b42f2` and its docs (N23); merged into local `main`, not pushed; see `docs/STATUS.md`). Executed with
+per-task subagents and reviews. The pre-flight scan's findings F1-F38 were adopted as rulings (N0, cited N-F*n*), and the
+controller's further rulings are N1-N26; plan 4a's R0-R48, its sandbox ruling and the banners of 4b and 4c bind. The
 task reviews and the final review recorded these deviations from the plan's text, each with its ruling:
 - **Versions:** no SDK change (`JasperSdk.VERSION` stays 0.28.0, every bundled range `>=0.28.0, <0.29`); the Browser
   is 0.2.0 and exports `dev.jasper.browser.api` (no `@since`); the Editor is 0.19.0 and requires
@@ -22,17 +23,59 @@ task reviews and the final review recorded these deviations from the plan's text
     with `modules` (N-F33); the `third_party/` rule in `gradle/third-party-notices.gradle.kts` (a bundled plugin's file
     under any `third_party` folder must be listed in a component's `files`, as fonts are), proven both ways with a
     temporary fixture, and in AGENTS.md and `docs/app-maintenance.md`.
-  - **`autolink.LICENSE.txt` is unverified** (N2, N14): no resolved artifact carries autolink-java's licence, so its
-    heading and "Copyright (c) 2015 Robin Stocker" come from memory of upstream's `LICENSE`; compare it with upstream at
-    tag `autolink-0.12.0` before any push (N14 amends N2's "before the merge": the GitHub read waits for the user's yes,
-    and plans 5-8 branch from local main). `ThirdPartyNoticesTest` checks only the holder and the MIT clauses.
-  - **1b waits for the user** (N1, N5): the approval of the download of `mermaid-11.12.0.tgz` from registry.npmjs.org
-    was asked for on 2026-10-31 and has not come. 1b adds `mermaid.min.js` under
-    `plugins/browser/src/main/resources/dev/jasper/browser/third_party/`, unmodified, the "Mermaid" notices component
-    with `mermaid.LICENSE.txt` and `mermaid.NOTICE.txt` (the full production dependency tree, N-F17) and
-    `MermaidBundleTest` (SHA-256 and size); N-F17's version rule (the newest 11.x at least two weeks old) applies then.
-    Until it lands a `mermaid` fence shows as a plain code block in both previews: the scheme answers
-    `/mermaid.min.js` with 404, and `preview.js` leaves the fence as code (N5's seam).
+  - **`autolink.LICENSE.txt` is verified** (N2, N14): no resolved artifact carries autolink-java's licence, so 1a wrote
+    it from memory of upstream's `LICENSE`. On 2026-11-06, with the user's yes ("Yes, check it"), the controller
+    compared it with upstream's `LICENSE` at tag `autolink-0.12.0`: identical but for upstream's one trailing blank
+    line, so the file is unchanged. `ThirdPartyNoticesTest` checks the holder and the MIT clauses.
+  - **1b** (`4bc7557d4`, on `claude/browser-mermaid`, worktree `.claude/worktrees/browser-mermaid`, cut from local
+    `main` `ef3347601`, which has plans 4a, 4b, 4c, 9 and 5 merged; not merged or pushed): the user approved the
+    download on 2026-11-06 ("Yes, download it"; N1). **Mermaid 11.17.2, not the plan's 11.12.0:** N-F17's rule, the
+    newest 11.x published at least two weeks before (11.17.2, 2026-08-25; 12.3.0 is the newest overall, and the
+    approval was for 11.x). The controller fetched `mermaid-11.17.2.tgz` from registry.npmjs.org into an empty scratch
+    folder (its sha512 and sha1 matched the registry's) and took only `package/dist/mermaid.min.js` and
+    `package/LICENSE`; the file makes no `import(` call, its two `.mjs` strings are esbuild's module labels, and it is
+    3,572,661 bytes, SHA-256 `581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8`
+    (`MermaidBundleTest.MERMAID_SHA256`):
+    - `mermaid.min.js`, unmodified, under `plugins/browser/src/main/resources/dev/jasper/browser/third_party/`, kept
+      byte for byte by `.gitattributes` (`-text -whitespace`, as the Cygwin seed files);
+    - the "Mermaid" notices component (`files`, `text = "mermaid.LICENSE.txt"`, the tarball's `LICENSE`, and
+      `notice = "mermaid.NOTICE.txt"`); `verifyThirdPartyNotices` refuses it without its `files` line ("…
+      ships but no component in notices.toml lists it in files"), checked and restored;
+    - **the NOTICE lists Mermaid's npm production dependency tree as of its publication** (N25, the commit "Notices:
+      Mermaid's full dependency tree", after the first slice 1b commit listed only the 22 direct `dependencies`): the
+      controller resolved its 123 rows from npm's metadata by date, each the newest version in its parent's range then,
+      with that version's licence (khroma's names none; its npm readme says MIT). The NOTICE says that tree
+      over-approximates the bundle (the type declarations, listed apart, and Node-only tooling, such as d3-dsv's
+      command-line dependencies, are not in the file), and, under N26 (the commit "Notices: what Mermaid's parser
+      bundles"), lists beside it the 15 packages `@mermaid-js/parser`'s own dist bundles, which npm's dependency
+      metadata does not show: its devDependencies langium 4.2.1 and chevrotain ~11.1.2 and what they require, resolved
+      by date, with `@chevrotain/types` under the type declarations. Where the file names a version, in its licence
+      banners or a version constant, that version is used: DOMPurify 3.4.12 (the range's newest was 3.4.14) and
+      cytoscape 3.34.0 (3.34.1). Then come the licence banners the file keeps (lodash-es twice, four of cytoscape's) and
+      the Apache License 2.0's text, from `apache-2.0.txt`, for chevrotain and the `@chevrotain` packages;
+    - `MermaidBundleTest`: the hash, a size of 1 to 8 MiB, every origin serving the file at `/mermaid.min.js`, and the
+      bundle's own defaults (`securityLevel:"strict"` and the `secure` list `secure`, `securityLevel`, `startOnLoad`,
+      `maxTextSize`, `suppressErrorRendering`, `maxEdges`) and its `sanitize`, which deletes every key that list names
+      from each diagram's `%%{init}%%` directive and front matter; `ThirdPartyNoticesTest`'s Mermaid case;
+    - N5's seam holds: `preview.js` loads `/mermaid.min.js` once a document has a `pre.mermaid` and draws through
+      `mermaid.render` alone, after `initialize` with `securityLevel: "strict"` and `startOnLoad: false`; it never sets
+      `secure`, never calls `run`, `init` or a diagram's `bindFunctions`, and leaves `htmlLabels` at Mermaid's default
+      (the plan names none; strict passes labels through DOMPurify). `PreviewScriptTest.mermaidIsStrict` checks this as
+      text. Mermaid's own window `load` listener runs `run` only while `startOnLoad` is on, and the script's `load`
+      handler, which calls `initialize`, comes before any window `load` still to come;
+    - Task 4's minor: `PreviewScheme.answer` returns a future and reads each of the plugin's files on the plugin's
+      background executor at its first request, then holds it; `PreviewSchemeFactory`'s handler continues a request
+      whose file is still being read once it is, off Chromium's IO thread, as `AboutSchemeFactory` answers a later page,
+      and a request Chromium cancels cancels its own answer, not the read. Chosen over reading Mermaid at the first
+      preview's start: a page can ask before such a read ends, and the IO thread would then wait. A read the executor
+      refuses (after the plugin's stop) is a 404 and is not held; `PreviewScheme`'s constructor takes the executor;
+    - Task 1a's minor: the `third_party/` walk is a Gradle file tree, so Gradle's default excludes, which the jar
+      leaves out too (`.DS_Store`, `*~` and the rest), are not counted, and the task's description names jars, fonts
+      and `third_party` files; proven with a `.DS_Store` and a `mermaid.min.js~` beside the file (refused before,
+      passing after, and the jar holds neither);
+    - N8 and N12 undone: the `markdown_preview` setting's description, its `mermaid` keyword and `settings.toml` name
+      Mermaid diagrams again (`EditorSettingsTest`), and the Editor and Browser guides and README's Editor row say that
+      Chromium draws Mermaid diagrams and Basic shows them as code.
   - **javap** (0.30.0; autolink 0.12.0): `org.commonmark.ext.gfm.alerts.Alert extends CustomBlock` with
     `String getType()` (upper-cased: `[!tip]` gives `TIP`) and `boolean hasBody()`; `AlertTitle` appears only with
     custom titles, off by default; `AlertsExtension.STANDARD_TYPES` is NOTE, TIP, IMPORTANT, WARNING and CAUTION.
@@ -197,18 +240,17 @@ task reviews and the final review recorded these deviations from the plan's text
 
 Not run:
 - **Task 9**, the user's GUI check on macOS, with their OK: pending (checklist `11e04ff16`, with the fix wave's three
-  lines: [checklist](../../browser-verification.md#plan-9-the-chromium-markdown-preview)); the GUI-only risks come first
-  (N-F38): if a document does not show, update and count in Find, `markdown_preview`'s default goes to `basic` before
-  anything is pushed.
+  lines and slice 1b's three: [checklist](../../browser-verification.md#plan-9-the-chromium-markdown-preview)); the
+  GUI-only risks come first (N-F38): if a document does not show, update and count in Find, `markdown_preview`'s
+  default goes to `basic` before anything is pushed.
 - **Windows and Linux** (no hosts), benchmarks and the memory run: deferred.
 - **No JavaScript runs in a test:** `preview.js` and `find.js` are checked as text (`PreviewScriptTest`) and with
-  `node --check`; the repository has no JavaScript harness, and no test starts Chromium.
+  `node --check`, and the bundled Mermaid as text (`MermaidBundleTest`); the repository has no JavaScript harness, and
+  no test starts Chromium.
 
 Known gaps and follow-ups:
-- **Mermaid** waits for slice 1b (above); after it, the setting's description, its keywords and the guides name
-  Mermaid again (N8), and the first `/mermaid.min.js` read (about 3 MB) should be answered off Chromium's IO thread, as
-  `AboutSchemeFactory` does.
-- **`autolink.LICENSE.txt`** is unverified against upstream (N2); it is checked before any push (N14).
+- **Mermaid in the GUI:** diagrams drawing, a broken diagram's message, and that a loosening diagram runs nothing are
+  Task 9's lines; no test runs Mermaid.
 - **The page's messages are parsed on Chromium's UI thread** (N24): `PreviewPage.received` parses geometry there,
   which on macOS is AppKit's main thread and also feeds AWT's input; the 4 MiB message limit bounds the work, at the
   cost of input latency on a huge geometry message.
@@ -232,18 +274,16 @@ Known gaps and follow-ups:
 - **Line height** does not reach the Chromium preview (`--line-height` unused).
 
 Deferred minors, as the final review triaged them (fixed in the fix wave: 2's unresolved label and 7's late-path throw
-and re-render scroll test; the rest stay recorded):
-- 1a: the `third_party/` walk counts `.DS_Store` and `*~` files Gradle's jar leaves out, and the rule's task description
-  names only jars and licence files; both go with slice 1b, which makes the first `third_party/` folder. No automated
-  test of the Gradle rule; plan 7 Task 5 defines the same rule, and plan 7 settles the shared wording.
+and re-render scroll test; fixed in slice 1b: 1a's `.DS_Store` and `*~` files and task description, and 4's first
+`/mermaid.min.js` read on Chromium's IO thread; the rest stay recorded):
+- 1a: no automated test of the Gradle rule; plan 7 Task 5 defines the same rule, and plan 7 settles the shared wording.
 - 2: the definitions loop is duplicated across the dialects; `Footnotes`' two-phase mutable ids; the fixture lacks an
   HTML block with text; `AutolinkExtension` links any `scheme://` and keeps a trailing curly quote (an observation).
 - 3: a surface-mismatch drop in `MarkdownController` does not heal if a swap skips `invalidate()`; `BasicPreviewTest`
   lacks the no-layout path; `ScrollLink`'s `instanceof ViewportScroller`; `FindTarget.owner()` returns `Object`.
-- 4: `makePreview`'s STOPPED branch is untested; the first `/mermaid.min.js` read would block Chromium's IO thread (with
-  1b); inline fully qualified names in `ChromiumStateTest` and `PreviewSchemeTest`; the true side of
-  `Chromium.answersPreview` is untested headless (no `CefClient` without native libraries), which Task 9's first line
-  covers.
+- 4: `makePreview`'s STOPPED branch is untested; inline fully qualified names in `ChromiumStateTest` and
+  `PreviewSchemeTest`; the true side of `Chromium.answersPreview` is untested headless (no `CefClient` without native
+  libraries), which Task 9's first line covers.
 - 6: no test of a view closed before its first Split or Preview, or of the setting changing while in Source.
 - 7: `anInvalidReplyShowsInvalidPattern`'s step half asserts nothing new; N10's Java-only edges (`\Qa`, `(?x)a #c`
   refused once grouped, `PreviewSearch.java:66`; N11); the usual stderr lines (sqlite-jdbc, SLF4J, mac-notifications).
@@ -262,6 +302,15 @@ The targeted round's verification: `./gradlew check --continue` (JBR 25.0.4.1 b6
 90 skipped, Editor 5,387 with 4 skipped, Browser 610 with 1 skipped), the wave's 14,732 and one new test; the example
 external plugin's `check pluginZip` passes (up to date); source hygiene is clean; `preview.js` passes `node --check`.
 No GUI was launched.
+
+Slice 1b's verification (`4bc7557d4`, after its docs): `./gradlew check --continue` (JBR 25.0.4.1 b635.75 jcef) first
+failed only `ThemeMigrationCoverageTest`, as two new tests' `new ArrayList` matched its pattern, so they queue in an
+`ArrayDeque`; then (10m 33s, 140 of 172 tasks up to date): **15,086 tests, 0 failures, 0 errors, 103 skipped** (1,353
+classes in the 16 build folders, without the example plugin's: jasper-app 5,281 with 90 skipped, Editor 5,387 with 4
+skipped, Browser 908 with 1 skipped), plan 5's 15,078 and slice 1b's eight; the example external plugin's `check
+pluginZip` against `build/sdk-release` passes (1 test); `verifyThirdPartyNotices` passes and refuses the component
+without its `files` line; source hygiene is clean over 3,362 Java files, no file the slice wrote holds a raw U+00A0,
+U+2028 or U+2029, and `preview.js` passes `node --check`. No GUI was launched.
 
 **Goal:** The Editor's Markdown preview drawn by Chromium, through the Browser's exported API:
 - Mermaid diagrams, highlighted code and GitHub's layout in Jasper's theme colours, following light and dark;

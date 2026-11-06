@@ -28,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * background work runs at once, and its result comes back on the UI thread, which each step waits for.
  */
 class PagePreviewTest {
-    private final PreviewScheme scheme = new PreviewScheme();
+    private final PreviewScheme scheme = new PreviewScheme(Runnable::run);
     private final PreviewScheme.Origin origin = scheme.open();
     private final List<String> ran = new ArrayList<>(), asked = new ArrayList<>();
     private final List<Color> backgrounds = new ArrayList<>();
@@ -422,7 +422,7 @@ class PagePreviewTest {
     }
 
     private PreviewScheme.Answer answer(String path) {
-        return scheme.answer("GET", origin.shell() + path);
+        return scheme.answer("GET", origin.shell() + path).join();
     }
 
     private static String text(PreviewScheme.Answer answer) {

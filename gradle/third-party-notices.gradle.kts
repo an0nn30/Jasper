@@ -9,7 +9,8 @@ val verificationClasspaths = extra["verificationClasspaths"] as Map<String, org.
 val noticesApp = project(":jasper-app")
 val verifyThirdPartyNotices = tasks.register("verifyThirdPartyNotices") {
     group = "verification"
-    description = "Checks that every shipped third-party jar has a license entry and that every named license file exists."
+    description = "Checks that every shipped third-party jar, and every font and third_party file a bundled plugin ships, has a " +
+        "license entry, and that every named license file exists."
     val index = noticesApp.file("src/main/resources/dev/jasper/app/about/licenses/notices.toml")
     inputs.file(index)
     inputs.files(rootProject.fileTree("plugins") { include("*/src/main/resources/plugin.toml", "*/src/main/resources/**/*.ttf", "*/src/main/resources/**/*.otf",
@@ -48,12 +49,13 @@ val verifyThirdPartyNotices = tasks.register("verifyThirdPartyNotices") {
         }
         listed.groupingBy { it }.eachCount().filterValues { it > 1 }.keys.forEach { problems.add("$it is listed twice") }
         // Font files (spec 14.1) and the files under a third_party folder ship inside plugin jars, not as Maven modules:
-        // each must be listed in a component's files.
+        // each must be listed in a component's files. The walk is a Gradle file tree, so it leaves out what the jar does:
+        // Gradle's default excludes, such as .DS_Store and *~.
         val bundledFiles = rootProject.subprojects.filter { it.path.startsWith(":jasper-plugin-") }.flatMap { plugin ->
             val pluginResources = plugin.file("src/main/resources")
             val descriptor = pluginResources.resolve("plugin.toml")
             val id = if (descriptor.isFile) Regex("(?m)^id\\s*=\\s*\"([^\"]+)\"").find(descriptor.readText())?.groupValues?.get(1) else null
-            if (id == null) emptyList<String>() else pluginResources.walkTopDown().filter { it.isFile }
+            if (id == null) emptyList<String>() else plugin.fileTree(pluginResources).files.asSequence()
                 .map { it.relativeTo(pluginResources).invariantSeparatorsPath }
                 .filter { it.endsWith(".ttf") || it.endsWith(".otf") || "third_party" in it.split('/').dropLast(1) }
                 .map { "$id/$it" }.toList()

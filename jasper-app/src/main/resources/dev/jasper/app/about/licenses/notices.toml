@@ -265,6 +265,15 @@ modules = ["org.jetbrains.kotlin:kotlin-stdlib:2.4.0"]
 text = "apache-2.0.txt"
 
 [[component]]
+name = "Mermaid"
+version = "11.17.2"
+license = "MIT"
+homepage = "https://mermaid.js.org/"
+files = ["dev.jasper.browser/dev/jasper/browser/third_party/mermaid.min.js"]
+text = "mermaid.LICENSE.txt"
+notice = "mermaid.NOTICE.txt"
+
+[[component]]
 name = "Nerd Fonts"
 version = "3.5.1"
 license = "LicenseRef-Nerd-Fonts"
