@@ -54,7 +54,7 @@ class OnboardingPagesTest {
     @Test void everyFeatureRowShowsWithCmdOnMacOsAndCtrlElsewhere() throws Exception {
         assertThat(OnboardingPages.FEATURES).extracting(OnboardingPages.Feature::title).containsExactly("Pages beside your terminals",
             "Links from the terminal", "An address field that searches", "Find in page", "Bookmarks and history",
-            "Snippets in page fields", "Copy on select", "/dev/null mode");
+            "Snippets in page fields", "Copy on select", "/dev/null mode", "Site permissions");
         for (boolean macOs : new boolean[] {true, false}) {
             try (var other = new PagesFixture()) {
                 var pages = new OnboardingPages(other.pages, other.about, onboarding, macOs, List.of(), Runnable::run);
@@ -73,6 +73,8 @@ class OnboardingPagesTest {
                     "text", "Insert a snippet into the page field you are typing in."));
                 assertThat(rows.get(6)).isEqualTo(Map.of("title", "Copy on select",
                     "text", "With Copy on select on, selecting text in a page copies it."));
+                assertThat(rows.get(8)).isEqualTo(Map.of("title", "Site permissions",
+                    "text", "Allow or block each site's camera, microphone, notifications and sound, and review them on one page."));
             }
         }
     }

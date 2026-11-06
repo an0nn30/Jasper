@@ -1,6 +1,7 @@
 package dev.jasper.browser.item;
 
 import dev.jasper.browser.page.PageContext;
+import dev.jasper.browser.permissions.PermissionStore;
 import dev.jasper.browser.store.Stores;
 import dev.jasper.sdk.Subscription;
 import java.util.ArrayList;
@@ -11,17 +12,18 @@ import java.util.function.Consumer;
 
 /**
  * What one browsing group of items shares (spec section 12): the request context their pages are made with, their
- * history and bookmarks ({@link Stores}) and the certificates the user went on past in them. The persistent store is
- * Chromium's global context and the database in the plugin's data folder, which every item shares that opened in no
- * other. A /dev/null store holds an in-memory context and an in-memory database, which the items a /dev/null item opens
- * share; it counts its open items ({@link #retain}, {@link #release}) and closes as the last of them closes: its stores
- * close, its allowances go and its context is released. The persistent store closes only with the plugin's
- * {@link DataStores}. UI thread, except where a method says otherwise.
+ * history and bookmarks ({@link Stores}), their site permissions, kept in the same database, and the certificates the
+ * user went on past in them. The persistent store is Chromium's global context and the database in the plugin's data
+ * folder, which every item shares that opened in no other. A /dev/null store holds an in-memory context and an in-memory
+ * database, which the items a /dev/null item opens share; it counts its open items ({@link #retain}, {@link #release})
+ * and closes as the last of them closes: its stores close, its allowances go and its context is released. The
+ * persistent store closes only with the plugin's {@link DataStores}. UI thread, except where a method says otherwise.
  */
 public final class DataStore {
     private final boolean devNull;
     private final PageContext context;
     private final Stores stores;
+    private final PermissionStore permissions;
     private final CertificateAllowance allowance = new CertificateAllowance();
     // Told as the store closes, so its DataStores forget it.
     private final Consumer<DataStore> ended;
@@ -36,12 +38,14 @@ public final class DataStore {
      * @param devNull whether it is a /dev/null group's, which closes with its last item
      * @param context the context its pages are made with
      * @param stores its history and bookmarks
+     * @param permissions its site permissions, in the same database as {@code stores}
      * @param ended told once, as it closes
      */
-    DataStore(boolean devNull, PageContext context, Stores stores, Consumer<DataStore> ended) {
+    DataStore(boolean devNull, PageContext context, Stores stores, PermissionStore permissions, Consumer<DataStore> ended) {
         this.devNull = devNull;
         this.context = Objects.requireNonNull(context, "context");
         this.stores = Objects.requireNonNull(stores, "stores");
+        this.permissions = Objects.requireNonNull(permissions, "permissions");
         this.ended = Objects.requireNonNull(ended, "ended");
     }
 
@@ -72,19 +76,30 @@ public final class DataStore {
         return stores;
     }
 
+    /**
+     * Its site permissions, which its items' pages are answered from and which its {@code jasper-about:permissions}
+     * page shows. Any thread.
+     *
+     * @return the permissions
+     */
+    public PermissionStore permissions() {
+        return permissions;
+    }
+
     /** The certificates the user went on past in its items, which last as long as it does. Any thread. */
     CertificateAllowance allowance() {
         return allowance;
     }
 
     /**
-     * Completes once what an item's first page load reads of the store is ready, so the item makes its page's browser
-     * only then: at once for now.
+     * Completes once what an item's first page load reads of the store is ready, its site permissions, so the item makes
+     * its page's browser only then. The first call loads them, which opens the store's database; it completes as well when
+     * they cannot load, which is logged, as when the store has closed (plan 6's F15), so no page waits for ever.
      *
-     * @return the future
+     * @return the future, which never fails
      */
     public CompletableFuture<Void> ready() {
-        return CompletableFuture.completedFuture(null);
+        return permissions.load().exceptionally(unloaded -> null);
     }
 
     /**

@@ -15,9 +15,9 @@ import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 /**
- * The Browser's one database (spec section 12), for history and bookmarks, on a thread of its own. Making one does no
- * I/O and starts no thread: the first {@link #call} starts its thread, {@code jasper-browser-store}, which opens the
- * database and then runs every call in turn.
+ * The Browser's one database (spec section 12), for history, bookmarks and site permissions, on a thread of its own.
+ * Making one does no I/O and starts no thread: the first {@link #call} starts its thread, {@code jasper-browser-store},
+ * which opens the database and then runs every call in turn.
  *
  * <p>A file that cannot be used is left as it was, and the database runs in memory for the rest of the run instead:
  * one the plugin cannot read or write, that fails SQLite's quick check, that a later Jasper wrote ({@code user_version}
@@ -69,7 +69,10 @@ public final class BrowserDatabase implements AutoCloseable {
         "CREATE TABLE IF NOT EXISTS bookmarks (id INTEGER PRIMARY KEY, url TEXT NOT NULL UNIQUE, title TEXT NOT NULL DEFAULT '',"
             + " added_at INTEGER NOT NULL)",
         "CREATE TABLE IF NOT EXISTS bookmark_tags (bookmark INTEGER NOT NULL REFERENCES bookmarks (id) ON DELETE CASCADE,"
-            + " tag TEXT NOT NULL COLLATE NOCASE, PRIMARY KEY (bookmark, tag))");
+            + " tag TEXT NOT NULL COLLATE NOCASE, PRIMARY KEY (bookmark, tag))",
+        // Plan 6: the site permissions, which the permissions package keeps; a file plan 5 made gets the table as it opens.
+        "CREATE TABLE IF NOT EXISTS permissions (origin TEXT NOT NULL, type TEXT NOT NULL, decision TEXT NOT NULL, created INTEGER NOT NULL,"
+            + " updated INTEGER NOT NULL, PRIMARY KEY (origin, type))");
     /** The schema's version; a file with a higher one is a later Jasper's and is left alone. */
     private static final int VERSION = 1;
     private static final String MEMORY = "jdbc:sqlite::memory:";

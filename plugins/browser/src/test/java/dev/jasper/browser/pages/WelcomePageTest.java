@@ -47,10 +47,15 @@ class WelcomePageTest {
             .doesNotContain("{{");
     }
 
-    @Test void theQuickActionsAreBookmarksHistoryAndSettings() {
+    /** Spec section 14: the Quick Actions are Bookmarks, History, Settings and Permissions, in that order (plan 6's F29). */
+    @Test void theQuickActionsAreBookmarksHistorySettingsAndPermissions() {
         onboarding.finish();
-        assertThat(fixture.html("welcome")).contains("<a class=\"tile\" href=\"jasper-about:bookmarks\">Bookmarks</a>",
-            "<a class=\"tile\" href=\"jasper-about:history\">History</a>", "<a class=\"tile\" href=\"jasper-about:settings\">Settings</a>");
+        String html = fixture.html("welcome");
+        java.util.regex.Matcher tiles = java.util.regex.Pattern.compile("<a class=\"tile\" href=\"([^\"]*)\">([^<]*)</a>").matcher(html);
+        var actions = new java.util.ArrayList<String>();
+        while (tiles.find()) actions.add(tiles.group(2) + " " + tiles.group(1));
+        assertThat(actions).containsExactly("Bookmarks jasper-about:bookmarks", "History jasper-about:history", "Settings jasper-about:settings",
+            "Permissions jasper-about:permissions");
     }
 
     @Test void thePagesScriptComesAfterAboutJs() {

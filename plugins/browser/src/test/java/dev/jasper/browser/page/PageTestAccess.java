@@ -173,6 +173,17 @@ public final class PageTestAccess {
     }
 
     /**
+     * Has {@code page} load again with {@code reloader} from now on, which is told the page each time: a test's recording
+     * one, as a page without Chromium loads nothing.
+     *
+     * @param page a page
+     * @param reloader told each reload
+     */
+    public static void useReloader(Page page, java.util.function.Consumer<Page> reloader) {
+        page.useReloader(reloader);
+    }
+
+    /**
      * Has {@code page} read its selection with {@code reader} from now on, which is told the page each time and answers
      * what is selected, as the page's script would: a test's, as a page without Chromium has nothing selected.
      *

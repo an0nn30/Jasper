@@ -83,7 +83,9 @@ public final class OnboardingPages {
         new Feature("Copy on select", "With Copy on select on, selecting text in a page copies it.",
             "With Copy on select on, selecting text in a page copies it."),
         new Feature("/dev/null mode", "Browse without keeping history, cookies or other data: turn it on in Settings › Tools › Browser › Privacy & Data.",
-            "Browse without keeping history, cookies or other data: turn it on in Settings › Tools › Browser › Privacy & Data."));
+            "Browse without keeping history, cookies or other data: turn it on in Settings › Tools › Browser › Privacy & Data."),
+        new Feature("Site permissions", "Allow or block each site's camera, microphone, notifications and sound, and review them on one page.",
+            "Allow or block each site's camera, microphone, notifications and sound, and review them on one page."));
 
     private final AboutPages pages;
     private final AboutScheme about;

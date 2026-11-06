@@ -16,6 +16,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -27,7 +28,8 @@ import javax.swing.Timer;
  * The plugin's open browser items, in every window: it opens them, finds one by the OSC 8 target it was opened for,
  * and knows each window's focused one. It registers the globe every item shows, gives the items the settings and the
  * plugin's {@link DataStores}, whose store each item opens in holds the history and bookmarks it records into and
- * suggests from and the certificates the user went on past, hands each error page's Try Again and
+ * suggests from, the site permissions its page is answered from and the certificates the user went on past, reloads a
+ * store's items that show a site whose permissions changed, hands each error page's Try Again and
  * Continue to the item whose page it is, finds the item's capture a source page shows, and holds the fetchers of their
  * pages' favicons and their address fields' search suggestions until {@link #close()}. A page is made, and Chromium so
  * asked for, only when its item first shows. UI thread.
@@ -163,6 +165,21 @@ public final class BrowserItems implements AutoCloseable {
     public Optional<BrowserItem> focused(WindowHandle window) {
         Objects.requireNonNull(window, "window");
         return open.stream().filter(item -> item.focusedIn(window)).findFirst();
+    }
+
+    /**
+     * The items open in {@code store} whose page shows one of {@code origins} load again, as a permission of those sites
+     * changed there: an item that shows an error page for one tries again. Items of another store, and an item that waits
+     * or has not shown its page yet, load nothing.
+     *
+     * @param store the data store whose permissions changed
+     * @param origins the sites, as {@code Origins.of} names them
+     */
+    public void reloadShowing(DataStore store, Set<String> origins) {
+        Objects.requireNonNull(store, "store");
+        Objects.requireNonNull(origins, "origins");
+        if (origins.isEmpty()) return;
+        for (BrowserItem item : List.copyOf(open)) if (item.store() == store) item.reloadShowing(origins);
     }
 
     /** Opens Settings at the Browser's page. */

@@ -29,7 +29,7 @@ class AboutPagesScriptsTest {
 
     @Test void noPageFileTurnsTextIntoMarkupOrCode() throws Exception {
         Map<String, String> files = files();
-        assertThat(files).as("the scan sees the pages' files").containsKeys("about.js", "about.css");
+        assertThat(files).as("the scan sees the pages' files").containsKeys("about.js", "about.css", "permissions.html", "permissions.js");
         for (var file : files.entrySet())
             for (Pattern forbidden : FORBIDDEN)
                 assertThat(file.getValue()).as(file.getKey() + ": " + forbidden).doesNotContainPattern(forbidden);

@@ -14,12 +14,12 @@ import java.util.function.IntFunction;
 
 /**
  * {@code jasper-about:welcome} (spec section 14), the default start page: "Welcome Back", Top Sites, the sites visited
- * most, and Quick Actions for the bookmarks, the history and Settings (the {@code jasper-about:settings} action). Its
- * template is {@code welcome.html} and its script {@code welcome.js}, which asks {@code {"op":"top-sites"}} and is
- * answered {@code {"sites":[{"url","title","host"}]}}: at most {@value #TOP_SITES} sites, most visited first as
- * {@link HistoryStore#topSites} gives them, from the asking browser's history, {@code title} empty when a site has none
- * and {@code host} the address's host or, for an address with none, the address. Until the onboarding
- * ({@link OnboardingPages}) is finished the page redirects to its first page.
+ * most, and Quick Actions for the bookmarks, the history, Settings (the {@code jasper-about:settings} action) and the
+ * site permissions. Its template is {@code welcome.html} and its script {@code welcome.js}, which asks
+ * {@code {"op":"top-sites"}} and is answered {@code {"sites":[{"url","title","host"}]}}: at most {@value #TOP_SITES}
+ * sites, most visited first as {@link HistoryStore#topSites} gives them, from the asking browser's history,
+ * {@code title} empty when a site has none and {@code host} the address's host or, for an address with none, the
+ * address. Until the onboarding ({@link OnboardingPages}) is finished the page redirects to its first page.
  */
 public final class WelcomePage {
     /** The page's name, and the name of the action that opens Settings › Browser. */

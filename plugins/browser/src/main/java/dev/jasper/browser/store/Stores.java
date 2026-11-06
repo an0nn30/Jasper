@@ -66,6 +66,15 @@ public final class Stores implements AutoCloseable {
         return visitIndex;
     }
 
+    /**
+     * The database they are kept in, where the same data store keeps its site permissions too.
+     *
+     * @return the database, which these close
+     */
+    public BrowserDatabase database() {
+        return database;
+    }
+
     /** Closes the database as {@link BrowserDatabase#close} does: at once, the work given before it still running. */
     @Override public void close() {
         database.close();

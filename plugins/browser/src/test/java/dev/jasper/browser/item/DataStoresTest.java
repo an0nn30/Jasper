@@ -4,6 +4,8 @@ import dev.jasper.browser.engine.AboutScheme;
 import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.engine.PreviewScheme;
 import dev.jasper.browser.page.PageTestAccess;
+import dev.jasper.browser.permissions.Decision;
+import dev.jasper.browser.permissions.Permission;
 import dev.jasper.browser.store.MemoryStores;
 import dev.jasper.browser.store.Stores;
 import java.nio.file.Path;
@@ -54,9 +56,80 @@ class DataStoresTest {
             assertThat(persistent.context().inMemory()).isFalse();
             assertThat(persistent.stores()).isSameAs(plugins);
             assertThat(stores.persistent()).isSameAs(persistent);
-            assertThat(one.ready()).isCompleted();
-            assertThat(persistent.ready()).isCompleted();
+            assertThat(one.permissions()).isNotSameAs(two.permissions()).isNotSameAs(persistent.permissions());
             stores.close();
+            return null;
+        });
+    }
+
+    /**
+     * Plan 6: a store is ready once its site permissions have loaded, which only asking it starts; one whose permissions
+     * cannot load, as a store closed before its first item showed, is ready all the same (F15). Each store keeps its own
+     * permissions: a /dev/null group's are not the persistent store's.
+     */
+    @Test void aStoreIsReadyOnceItsPermissionsHaveLoadedOrCannotLoad() throws Exception {
+        Stores plugins = memory.make();
+        done(new dev.jasper.browser.permissions.PermissionStore(plugins.database(), Runnable::run, failure -> { })
+            .set("https://a.test", Permission.CAMERA, Decision.ALLOWED));
+        var stores = new AtomicReference<DataStores>();
+        DataStore persistent = onUi(() -> {
+            stores.set(stores(plugins));
+            return stores.get().persistent();
+        });
+        assertThat(persistent.permissions().decision("https://a.test", Permission.CAMERA)).as("not loaded before it is asked").isEmpty();
+        Runnable release = memory.hold(plugins);
+        CompletableFuture<Void> ready = onUi(persistent::ready);
+        assertThat(ready).as("its permissions are still loading").isNotDone();
+        release.run();
+        done(ready);
+        assertThat(persistent.permissions().decision("https://a.test", Permission.CAMERA)).contains(Decision.ALLOWED);
+
+        DataStore devNull = onUi(() -> stores.get().newDevNull());
+        done(onUi(devNull::ready));
+        done(devNull.permissions().set("https://private.test", Permission.MICROPHONE, Decision.ALLOWED));
+        assertThat(persistent.permissions().all()).extracting(dev.jasper.browser.permissions.Grant::origin).containsExactly("https://a.test");
+
+        DataStore closed = onUi(() -> {
+            DataStore early = stores.get().newDevNull();
+            early.retain();
+            early.release();
+            return early;
+        });
+        assertThat(closed.closed()).isTrue();
+        try (var log = new dev.jasper.browser.store.CapturedLog(dev.jasper.browser.permissions.PermissionStore.class.getName())) {
+            assertThat(onUi(closed::ready)).as("a store whose permissions cannot load").succeedsWithin(10, TimeUnit.SECONDS);
+            assertThat(log.records()).as("no warning for a closed store").noneMatch(record -> record.getLevel() == java.util.logging.Level.WARNING);
+        }
+        onUi(() -> {
+            stores.get().close();
+            return null;
+        });
+    }
+
+    /** Plan 6: a permission a store could not save is told to whoever listens, once for each write, on the UI thread. */
+    @Test void aPermissionNoStoreCouldSaveIsToldOnTheUiThread() throws Exception {
+        Stores plugins = memory.make();
+        done(plugins.database().call(connection -> {
+            try (var statement = connection.createStatement()) {
+                statement.execute("CREATE TEMP TRIGGER refused BEFORE INSERT ON permissions BEGIN SELECT RAISE(ABORT, 'refused'); END");
+            }
+            return null;
+        }));
+        var told = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        var stores = new AtomicReference<DataStores>();
+        DataStore persistent = onUi(() -> {
+            stores.set(stores(plugins));
+            stores.get().onPermissionsUnsaved(cause -> told.add(javax.swing.SwingUtilities.isEventDispatchThread() + " " + (cause instanceof java.sql.SQLException)));
+            return stores.get().persistent();
+        });
+        try (var log = new dev.jasper.browser.store.CapturedLog(dev.jasper.browser.permissions.PermissionStore.class.getName())) {
+            assertThat(persistent.permissions().set("https://a.test", Permission.CAMERA, Decision.ALLOWED)).failsWithin(10, TimeUnit.SECONDS);
+            onUi(() -> null);
+            assertThat(log.records()).singleElement().satisfies(record -> assertThat(record.getMessage()).isEqualTo("Site permissions could not be saved"));
+        }
+        assertThat(told).as("on the UI thread, with SQLite's reason").containsExactly("true true");
+        onUi(() -> {
+            stores.get().close();
             return null;
         });
     }
@@ -278,6 +351,10 @@ class DataStoresTest {
     private Chromium chromium() {
         return new Chromium(data, () -> { }, task -> { throw new AssertionError("Chromium was started"); }, new AboutScheme(),
             new PreviewScheme(), cause -> { });
+    }
+
+    private static <T> T done(CompletableFuture<T> future) throws Exception {
+        return future.get(10, TimeUnit.SECONDS);
     }
 
     private static <T> T onUi(Callable<T> task) throws Exception {

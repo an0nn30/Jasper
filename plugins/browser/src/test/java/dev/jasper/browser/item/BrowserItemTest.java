@@ -6,6 +6,8 @@ import dev.jasper.browser.page.NavigationHistory.History;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageTestAccess;
 import dev.jasper.browser.pages.HistoryPage;
+import dev.jasper.browser.permissions.Decision;
+import dev.jasper.browser.permissions.Permission;
 import dev.jasper.browser.settings.BrowserSettings;
 import dev.jasper.browser.store.BrowserDatabase;
 import dev.jasper.browser.store.DataFolder;
@@ -719,6 +721,72 @@ class BrowserItemTest {
                 return null;
             });
         }
+    }
+
+    /**
+     * Spec sections 6 and 12: the menu button lists a Reset item for each permission its store holds for the page's site,
+     * and follows the store as it changes. Choosing one revokes that permission there and reloads the items of that store
+     * that show the site and have shown their page; not the item of another site, of another store or one never shown.
+     */
+    @Test void theMenuResetsAPermissionOfThePagesSiteAndReloadsTheItemsOfItsStoreThatShowIt() throws Exception {
+        var host = onUi(FakePluginHost::new);
+        var parents = new ArrayList<JPanel>();
+        try {
+            var items = onUi(() -> items(host, page -> { }));
+            var reloads = new CopyOnWriteArrayList<String>();
+            List<BrowserItem> opened = onUi(() -> {
+                DataStore devNull = items.dataStores().newDevNull();
+                var all = List.of(items.open(URI.create("https://camera.test/a"), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty()),
+                    items.open(URI.create("https://camera.test/b"), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty()),
+                    items.open(URI.create("https://other.test/"), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty()),
+                    items.open(URI.create("https://camera.test/c"), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), devNull),
+                    items.open(URI.create("https://camera.test/d"), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty()));
+                List<String> names = List.of("Site", "Same", "Other", "DevNull", "Unshown");
+                for (int at = 0; at < all.size(); at++) {
+                    String name = names.get(at);
+                    PageTestAccess.titleChanged(all.get(at).page(), name);
+                    PageTestAccess.useReloader(all.get(at).page(), page -> reloads.add(name));
+                    if (at < 4) parents.add(show(all.get(at)));
+                }
+                return all;
+            });
+            var permissions = opened.getFirst().store().permissions();
+            permissions.set("https://camera.test", Permission.CAMERA, Decision.ALLOWED).get(10, TimeUnit.SECONDS);
+            permissions.set("https://camera.test", Permission.NOTIFICATIONS, Decision.BLOCKED).get(10, TimeUnit.SECONDS);
+            opened.get(3).store().permissions().set("https://camera.test", Permission.CAMERA, Decision.ALLOWED).get(10, TimeUnit.SECONDS);
+            onUi(() -> {
+                assertThat(resets(host, "Site")).containsExactly("Reset Camera Permission (Allowed)", "Reset Notifications Permission (Blocked)");
+                assertThat(resets(host, "Other")).as("another site").isEmpty();
+                host.contentView(ID, "Site").orElseThrow().choose(BrowserToolbar.MENU, "browser.permission.reset.camera");
+                assertThat(reloads).as("the items of its store at the site").containsExactly("Site", "Same");
+                return null;
+            });
+            assertThat(permissions.decision("https://camera.test", Permission.CAMERA)).isEmpty();
+            assertThat(permissions.decision("https://camera.test", Permission.NOTIFICATIONS)).contains(Decision.BLOCKED);
+            assertThat(opened.get(3).store().permissions().decision("https://camera.test", Permission.CAMERA)).as("another store's")
+                .contains(Decision.ALLOWED);
+            onUi(() -> {
+                assertThat(resets(host, "Site")).as("the menu follows the store").containsExactly("Reset Notifications Permission (Blocked)");
+                assertThat(resets(host, "DevNull")).containsExactly("Reset Camera Permission (Allowed)");
+                items.reloadShowing(opened.getFirst().store(), Set.of());
+                items.reloadShowing(opened.getFirst().store(), Set.of("https://other.test"));
+                assertThat(reloads).containsExactly("Site", "Same", "Other");
+                assertThat(host.failures()).isEmpty();
+                return null;
+            });
+        } finally {
+            onUi(() -> {
+                parents.forEach(JPanel::removeNotify);
+                host.close();
+                return null;
+            });
+        }
+    }
+
+    /** The Reset items of the menu button of the item whose tab is called {@code title}. UI thread. */
+    private static List<String> resets(FakePluginHost host, String title) {
+        var menu = (Nodes.MenuButton) Views.node(host.contentView(ID, title).orElseThrow().spec().root(), BrowserToolbar.MENU);
+        return menu.items().stream().map(MenuItem::label).filter(label -> label.startsWith("Reset ")).toList();
     }
 
     /**

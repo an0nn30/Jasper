@@ -42,12 +42,13 @@ class BrowserDatabaseTest {
         }
     }
 
-    @Test void aNewFileGetsTheFourTablesAndVersionOne() throws Exception {
+    /** The four tables of history and bookmarks, and plan 6's site permissions. */
+    @Test void aNewFileGetsTheFiveTablesAndVersionOne() throws Exception {
         Path file = data.resolve("data").resolve("browser.sqlite");
         BrowserDatabase database = file(file);
         assertThat(done(database.<List<String>>call(connection -> strings(connection,
             "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name"))))
-            .containsExactly("bookmark_tags", "bookmarks", "history", "visits");
+            .containsExactly("bookmark_tags", "bookmarks", "history", "permissions", "visits");
         assertThat(done(database.<List<String>>call(connection -> strings(connection, "SELECT name FROM sqlite_master WHERE type = 'index' AND sql IS NOT NULL"))))
             .containsExactly("history_by_time");
         assertThat(done(database.<List<String>>call(connection -> List.of(text(connection, "PRAGMA user_version"), text(connection, "PRAGMA journal_mode"),

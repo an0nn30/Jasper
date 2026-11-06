@@ -70,6 +70,8 @@ public final class Page implements AutoCloseable {
     private BiFunction<Page, String, CompletableFuture<Void>> textInserter =
         (page, typed) -> page.pageText().map(text -> text.insertText(typed)).orElseGet(Page::noBrowser);
     private Consumer<Page> returnPresser = page -> page.pageText().ifPresent(PageText::pressReturn);
+    // Given the page, loads it again: through its browser, or a test's.
+    private Consumer<Page> reloader = Page::reloadBrowser;
     // Given the page, reads what is selected in it, through its browser's DevTools; or a test's.
     private Function<Page, CompletableFuture<Selection>> selectionReader =
         page -> page.pageText().map(PageText::selectedText).orElseGet(() -> CompletableFuture.completedFuture(new Selection.None()));
@@ -362,9 +364,13 @@ public final class Page implements AutoCloseable {
         showZoom();
     }
 
-    /** Loads the page again. */
+    /** Loads the page again; nothing before the page has its browser or after {@link #close()}. */
     public void reload() {
-        if (ready && !closed) browser.reload();
+        if (!closed) reloader.accept(this);
+    }
+
+    private void reloadBrowser() {
+        if (ready) browser.reload();
     }
 
     /** Stops the page loading. */
@@ -1267,6 +1273,11 @@ public final class Page implements AutoCloseable {
     /** Has the page type text where its focus is with {@code replacement} from now on, as a test's answering one. */
     void useTextInserter(BiFunction<Page, String, CompletableFuture<Void>> replacement) {
         textInserter = Objects.requireNonNull(replacement, "replacement");
+    }
+
+    /** Has the page load again with {@code replacement} from now on, as a test's recording one. */
+    void useReloader(Consumer<Page> replacement) {
+        reloader = Objects.requireNonNull(replacement, "replacement");
     }
 
     /** Has the page press Return with {@code replacement} from now on, as a test's recording one. */

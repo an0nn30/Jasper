@@ -9,6 +9,9 @@ import dev.jasper.browser.page.NavigationHistory;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.pages.BookmarksPage;
 import dev.jasper.browser.pages.HistoryPage;
+import dev.jasper.browser.permissions.Grant;
+import dev.jasper.browser.permissions.Origins;
+import dev.jasper.browser.permissions.Permission;
 import dev.jasper.browser.restore.BrowserRestore;
 import dev.jasper.browser.settings.BrowserSettings;
 import dev.jasper.browser.store.BookmarkStore.Bookmark;
@@ -45,6 +48,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import javax.swing.JComponent;
@@ -72,7 +76,9 @@ import javax.swing.JComponent;
  * back and forward, and an entry chosen from Back's or Forward's hold menu goes to that entry of the page's history,
  * while their Show Full History loads Jasper's history page ({@link #showHistory}). The menu button's Add Bookmark
  * bookmarks the page at once and opens its {@link BookmarkPanel}, Remove Bookmark removes the page's bookmark and says
- * "Bookmark Removed", and Manage Bookmarks and History load Jasper's bookmarks and history pages. It
+ * "Bookmark Removed", and Manage Bookmarks and History load Jasper's bookmarks and history pages. Its Reset items, one
+ * for each permission its store holds for the page's site ({@link PrivacyMenu}), revoke that permission and reload the
+ * store's items that show the site; the menu follows the store's permissions as they change. It
  * saves its URL, its own zoom and its target with Jasper's workspace ({@link BrowserRestore}): what it loads first until
  * it shows, then where each committed navigation takes its page.
  * Restored after a run that ended while Chromium ran, an item waits: in place of the canvas it says that Jasper closed
@@ -123,8 +129,8 @@ public final class BrowserItem implements AutoCloseable {
     private final SourcePages sources;
     private final HistoryRecorder history;
     private final BrowserToolbar toolbar = new BrowserToolbar(this::storeSuggestions);
-    // The item's listening to its bookmarks and visits, which ends as it closes.
-    private final Subscription bookmarksChanged, visitsChanged;
+    // The item's listening to its bookmarks, visits and site permissions, which ends as it closes.
+    private final Subscription bookmarksChanged, visitsChanged, permissionsChanged;
     private final BrowserFindBar findBar;
     private final UiView view;
     private ContentTab tab;
@@ -189,6 +195,8 @@ public final class BrowserItem implements AutoCloseable {
         // The item draws again as the bookmarks change, and as the visits do while something is typed, for the field's list.
         bookmarksChanged = stores.bookmarkIndex().onChanged(this::render);
         visitsChanged = stores.visitIndex().onChanged(() -> { if (toolbar.typing()) render(); });
+        // And as its store's permissions change, for the menu's Reset items.
+        permissionsChanged = store.permissions().onChanged(this::render);
     }
 
     /**
@@ -242,6 +250,7 @@ public final class BrowserItem implements AutoCloseable {
         } catch (RuntimeException | Error failure) {
             bookmarksChanged.close();
             visitsChanged.close();
+            permissionsChanged.close();
             view.close();
             throw failure;
         }
@@ -557,6 +566,16 @@ public final class BrowserItem implements AutoCloseable {
         return closed ? Optional.empty() : sources.source(token, address);
     }
 
+    /**
+     * The page loads again if it shows one of {@code origins}, as their permissions changed in the item's store: on an
+     * error page for one, what failed is tried again. Nothing while the item waits, before it has shown its page, or
+     * once it has closed.
+     */
+    void reloadShowing(Set<String> origins) {
+        if (closed || waiting || !asked) return;
+        if (Origins.of(errors.address()).filter(origins::contains).isPresent()) errors.reload();
+    }
+
     /** Whether the item has asked for its page, which it does the first time it shows. */
     boolean pageAsked() {
         return asked;
@@ -649,6 +668,7 @@ public final class BrowserItem implements AutoCloseable {
         history.flush();
         bookmarksChanged.close();
         visitsChanged.close();
+        permissionsChanged.close();
         endSuggestions();
         sources.close();
         if (devTools != null) devTools.close();
@@ -806,9 +826,26 @@ public final class BrowserItem implements AutoCloseable {
                 endWait();
                 page.focus();
             }
-            // An entry of Back's or Forward's hold menu.
-            default -> NavigationHistory.entryId(action).ifPresent(page::goToHistoryEntry);
+            // A Reset item of the menu, or an entry of Back's or Forward's hold menu.
+            default -> {
+                Optional<Permission> reset = PrivacyMenu.reset(action);
+                if (reset.isPresent()) resetPermission(reset.get());
+                else NavigationHistory.entryId(action).ifPresent(page::goToHistoryEntry);
+            }
         }
+    }
+
+    /**
+     * A Reset item: the store forgets {@code permission} for the page's site, and its items that show the site load
+     * again, this one among them, so the site asks again.
+     */
+    private void resetPermission(Permission permission) {
+        Origins.of(errors.address()).ifPresent(origin -> items.reloadShowing(store, store.permissions().revoke(origin, permission)));
+    }
+
+    /** The permissions the item's store holds for the page's site, which the menu offers to reset. */
+    private List<Grant> sitePermissions() {
+        return Origins.of(errors.address()).map(store.permissions()::of).orElse(List.of());
     }
 
     /**
@@ -940,7 +977,7 @@ public final class BrowserItem implements AutoCloseable {
     private ViewSpec spec() {
         Nodes.Node bar = toolbar.node(shown(errors.address()), page.loading(), errors.canGoBack(), page.canGoForward(), icon(),
             page.history(), items.settings(), errors.notSecure(), store.devNull(),
-            store.devNull() ? Optional.empty() : Optional.of(stores.bookmarkIndex().has(errors.address())));
+            store.devNull() ? Optional.empty() : Optional.of(stores.bookmarkIndex().has(errors.address())), sitePermissions());
         // A waiting item keeps the canvas's slot, hidden: a slot that leaves the view closes its content, the page.
         Nodes.Node canvas = new Nodes.Custom(PAGE, waiting ? HIDDEN : ControlState.READY, CONTENT, Nodes.CustomKind.PREVIEW, "Web page");
         return new ViewSpec(new Nodes.Split(ROOT, ControlState.READY, Nodes.SplitKind.DOCUMENT,

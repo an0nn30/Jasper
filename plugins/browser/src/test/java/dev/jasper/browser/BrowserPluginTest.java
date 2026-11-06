@@ -6,6 +6,8 @@ import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.item.BrowserItems;
 import dev.jasper.browser.item.ItemTestAccess;
 import dev.jasper.browser.page.PageTestAccess;
+import dev.jasper.browser.permissions.Decision;
+import dev.jasper.browser.permissions.Permission;
 import dev.jasper.browser.restore.BrowserRestore;
 import dev.jasper.browser.store.CapturedLog;
 import dev.jasper.browser.store.MemoryStores;
@@ -399,19 +401,65 @@ class BrowserPluginTest {
             });
             devNull.get().stores().history().record("https://private.example/", Reached.LINK, 1_000).get(10, TimeUnit.SECONDS);
             devNull.get().stores().bookmarks().add("https://private.example/", "Private", 1_000).get(10, TimeUnit.SECONDS);
-            String list = "{\"op\":\"list\",\"query\":\"\"}", top = "{\"op\":\"top-sites\"}";
+            devNull.get().permissions().set("https://private.example", Permission.CAMERA, Decision.ALLOWED).get(10, TimeUnit.SECONDS);
+            String list = "{\"op\":\"list\",\"query\":\"\"}", top = "{\"op\":\"top-sites\"}", grants = "{\"op\":\"list\"}";
             assertThat(ask(plugin, "history", 61, list)).contains("https://private.example/");
             assertThat(ask(plugin, "bookmarks", 61, list)).contains("https://private.example/");
             assertThat(ask(plugin, "welcome", 61, top)).contains("https://private.example/");
+            assertThat(ask(plugin, "permissions", 61, grants)).contains("https://private.example");
             assertThat(ask(plugin, "history", 62, list)).doesNotContain("private.example");
             assertThat(ask(plugin, "bookmarks", 62, list)).doesNotContain("private.example");
             assertThat(ask(plugin, "welcome", 62, top)).doesNotContain("private.example");
-            for (String page : List.of("history", "bookmarks", "welcome")) {
+            assertThat(ask(plugin, "permissions", 62, grants)).doesNotContain("private.example");
+            assertThat(ask(plugin, "permissions", 61, "{\"op\":\"clear-site\",\"origin\":\"https://private.example\"}")).isEqualTo("{}");
+            assertThat(devNull.get().permissions().all()).as("the asking browser's store changed").isEmpty();
+            for (String page : List.of("history", "bookmarks", "welcome", "permissions")) {
                 var refused = plugin.about().query("jasper-about:" + page, true, 63, plugin.about().secret(page).orElseThrow() + list);
                 assertThat(refused).as(page).isPresent();
                 assertThat(refused.get()).as(page + " from a browser no page has").failsWithin(10, TimeUnit.SECONDS)
                     .withThrowableThat().withMessageContaining("Jasper could not answer this request.");
             }
+        } finally {
+            SwingUtilities.invokeAndWait(() -> host.get().close());
+        }
+    }
+
+    /** Spec section 12: the start registers {@code jasper-about:permissions}, "Site Permissions", with its queries. */
+    @Test void theStartRegistersThePermissionsPageAndItsQueries() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var plugin = new BrowserPlugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            assertThat(plugin.about().secret("permissions")).as("its queries").isPresent();
+            var answer = plugin.about().answer("jasper-about:permissions");
+            assertThat(answer.status()).isEqualTo(200);
+            assertThat(answer.html()).contains("<title>Site Permissions</title>", "Clear All Permissions");
+            assertThat(plugin.stores().opened()).as("no database opened").isFalse();
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /** Plan 6: a site permission that could not be saved posts "Site permissions could not be saved", while the plugin runs. */
+    @Test void aSitePermissionThatCannotBeSavedPostsAnErrorWhileThePluginRuns(@TempDir Path root) throws Exception {
+        var plugin = new BrowserPlugin();
+        var host = new AtomicReference<FakePluginHost>();
+        SwingUtilities.invokeAndWait(() -> {
+            host.set(new FakePluginHost(root));
+            host.get().start(INFO, Set.of(), Set.of(), plugin);
+        });
+        try (var log = new CapturedLog(dev.jasper.browser.permissions.PermissionStore.class.getName())) {
+            plugin.stores().database().call(connection -> {
+                try (var statement = connection.createStatement()) {
+                    statement.execute("CREATE TEMP TRIGGER refused BEFORE INSERT ON permissions BEGIN SELECT RAISE(ABORT, 'refused'); END");
+                }
+                return null;
+            }).get(10, TimeUnit.SECONDS);
+            var persistent = new AtomicReference<dev.jasper.browser.item.DataStore>();
+            SwingUtilities.invokeAndWait(() -> persistent.set(plugin.dataStores().persistent()));
+            assertThat(persistent.get().permissions().set("https://a.test", Permission.CAMERA, Decision.ALLOWED)).failsWithin(10, TimeUnit.SECONDS);
+            SwingUtilities.invokeAndWait(() -> { });
+            SwingUtilities.invokeAndWait(() -> assertThat(host.get().notifications().lines()).singleElement().asString()
+                .startsWith("dev.jasper.browser|ERROR|Site permissions could not be saved|"));
+            assertThat(log.records()).as("the store logs why").hasSize(1);
         } finally {
             SwingUtilities.invokeAndWait(() -> host.get().close());
         }

@@ -1,8 +1,10 @@
 package dev.jasper.browser.item;
 
 import dev.jasper.browser.page.PageContext;
+import dev.jasper.browser.permissions.PermissionStore;
 import dev.jasper.browser.store.BrowserDatabase;
 import dev.jasper.browser.store.Stores;
+import dev.jasper.sdk.Subscription;
 import java.awt.EventQueue;
 import java.util.ArrayList;
 import java.util.List;
@@ -11,17 +13,20 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
  * The plugin's data stores (spec section 12): the persistent one, over the history and bookmarks the plugin makes in
  * {@code browser.sqlite}, which still open only on their first use, and a new one for each group of /dev/null items,
- * with an in-memory database and an in-memory context, which closes with its last item. Making it, and making a store,
- * opens nothing and asks nothing of Chromium. It also knows, from any thread, which store each page's browser is in, as
- * Chromium names the browser ({@link #forBrowser}), so Jasper's pages answer their queries from the asking browser's
- * store. UI thread, except where a method says otherwise.
+ * with an in-memory database and an in-memory context, which closes with its last item. Each store keeps its site
+ * permissions in its own database, and a write of them that fails is told to {@link #onPermissionsUnsaved}'s listeners.
+ * Making it, and making a store, opens nothing and asks nothing of Chromium. It also knows, from any thread, which store
+ * each page's browser is in, as Chromium names the browser ({@link #forBrowser}), so Jasper's pages answer their
+ * queries from the asking browser's store. UI thread, except where a method says otherwise.
  */
 public final class DataStores implements AutoCloseable {
     /** Why a query from a browser with no open store fails. */
@@ -33,6 +38,7 @@ public final class DataStores implements AutoCloseable {
     // Filled and emptied on Chromium's thread or the UI thread, read on the background executor.
     private final Map<Integer, DataStore> browsers = new ConcurrentHashMap<>();
     private final List<DataStore> devNull = new ArrayList<>();
+    private final List<Consumer<Throwable>> unsaved = new CopyOnWriteArrayList<>();
     // Made the first time it is asked for.
     private DataStore persistent;
     // Read by Chromium's thread as it names a browser.
@@ -69,7 +75,7 @@ public final class DataStores implements AutoCloseable {
      */
     public DataStore persistent() {
         if (persistent == null) {
-            persistent = new DataStore(false, PageContext.persistent(), plugins, store -> { });
+            persistent = new DataStore(false, PageContext.persistent(), plugins, permissions(plugins), store -> { });
             if (closed) persistent.close();
         }
         return persistent;
@@ -84,7 +90,9 @@ public final class DataStores implements AutoCloseable {
      */
     public DataStore newDevNull() {
         if (closed) throw new IllegalStateException("The browser's data stores have closed");
-        var store = new DataStore(true, contexts.get(), memory.get(), this::ended);
+        PageContext context = contexts.get();
+        Stores made = memory.get();
+        var store = new DataStore(true, context, made, permissions(made), this::ended);
         devNull.add(store);
         return store;
     }
@@ -141,6 +149,20 @@ public final class DataStores implements AutoCloseable {
     }
 
     /**
+     * Tells {@code listener} why each write of a store's site permissions that failed was not saved, on the UI thread:
+     * the plugin posts "Site permissions could not be saved". A write a closed /dev/null store drops is not told.
+     *
+     * @param listener the listener
+     * @return ends the listening
+     */
+    public Subscription onPermissionsUnsaved(Consumer<Throwable> listener) {
+        // A wrapper of its own, so that ending one of two subscriptions of the same listener ends that one.
+        Consumer<Throwable> entry = Objects.requireNonNull(listener, "listener")::accept;
+        unsaved.add(entry);
+        return () -> unsaved.remove(entry);
+    }
+
+    /**
      * Chromium made {@code browser} for a page in {@code store}; once these have closed, at the plugin's stop, it is
      * forgotten at once. Any thread: Chromium's, before any of its documents asks.
      */
@@ -171,6 +193,11 @@ public final class DataStores implements AutoCloseable {
     /** How many browsers' stores these know: for tests. Any thread. */
     int browsersKnown() {
         return browsers.size();
+    }
+
+    /** The site permissions in {@code stores}' database, whose failed writes go to {@link #onPermissionsUnsaved}'s listeners. */
+    private PermissionStore permissions(Stores stores) {
+        return new PermissionStore(stores.database(), EventQueue::invokeLater, cause -> unsaved.forEach(listener -> listener.accept(cause)));
     }
 
     /** A /dev/null store closed: it is no longer live, and no browser is in it. */

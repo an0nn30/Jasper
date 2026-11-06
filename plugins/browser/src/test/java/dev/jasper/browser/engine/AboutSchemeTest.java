@@ -231,6 +231,51 @@ class AboutSchemeTest {
         assertThat(asked).hasValue(1);
     }
 
+    /**
+     * Plan 6's Review Focus 2: the permissions page's queries, which change what a site may do, answer its own main frame
+     * alone. A web page, a sub-frame of the page, another of Jasper's pages that has queries of its own (with its own
+     * secret or the permissions page's) and a request of 65,537 characters are refused, there and then on Chromium's
+     * thread for the web page and the sub-frame; no answer runs for any of them.
+     */
+    @Test void thePermissionsPagesQueriesRefuseAWebPageASubFrameAnotherJasperPageAndAnOversizedRequest() {
+        var about = new AboutScheme();
+        var asked = new AtomicInteger();
+        var others = new AtomicInteger();
+        for (String page : List.of("permissions", "history", "welcome")) about.register(page, () -> "<p>" + page + "</p>");
+        about.registerQueries("permissions", (browser, request) -> {
+            asked.incrementAndGet();
+            return CompletableFuture.completedFuture("{}");
+        });
+        about.registerQueries("history", (browser, request) -> {
+            others.incrementAndGet();
+            return CompletableFuture.completedFuture("{}");
+        });
+        String secret = about.secret("permissions").orElseThrow();
+        String request = secret + "{\"op\":\"clear-all\"}";
+        for (String address : new String[] {"https://evil.example/", "https://evil.example/jasper-about:permissions", "file:///tmp/x.html",
+                "jasper-about:history", "jasper-about://history/", "jasper-about:welcome", "view-source:jasper-about://permissions/"})
+            assertThat(about.query(address, true, 1, request)).as(address).isEmpty();
+        assertThat(about.query("jasper-about://permissions/", false, 1, request)).as("a sub-frame of the page").isEmpty();
+        assertThat(about.query("jasper-about://permissions/", true, 1, about.secret("history").orElseThrow() + "{\"op\":\"clear-all\"}"))
+            .as("history's secret").isEmpty();
+        String longest = secret + "x".repeat(AboutScheme.LONGEST_REQUEST - secret.length());
+        assertThat(about.query("jasper-about://permissions/", true, 1, longest + "x")).as("65,537 characters").isEmpty();
+
+        CefBrowser page = browser(7);
+        var background = new ArrayDeque<Runnable>();
+        var router = new AboutQueries.Router(about, browser -> browser == page, background::add);
+        var replies = new Replies();
+        router.onQuery(page, frame("https://evil.example/", true), 1, request, false, replies);
+        router.onQuery(page, frame("jasper-about://permissions/", false), 2, request, false, replies);
+        router.onQuery(page, frame("jasper-about://permissions/", true), 3, longest + "x", false, replies);
+        assertThat(replies.calls).as("each refused there and then").hasSize(3).containsOnly(REFUSED);
+        assertThat(background).isEmpty();
+        assertThat(asked).as("no answer ran").hasValue(0);
+        assertThat(others).hasValue(0);
+        assertThat(about.query("jasper-about://permissions/", true, 1, request)).as("its own main frame").isPresent();
+        assertThat(asked).hasValue(1);
+    }
+
     @Test void anAnswerThatThrowsOrGivesNothingIsAFailedFutureNeverAThrow() {
         var about = new AboutScheme();
         about.register("history", () -> "");

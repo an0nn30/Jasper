@@ -23,7 +23,9 @@ import dev.jasper.browser.pages.BookmarksPage;
 import dev.jasper.browser.pages.HistoryPage;
 import dev.jasper.browser.pages.Onboarding;
 import dev.jasper.browser.pages.OnboardingPages;
+import dev.jasper.browser.pages.PermissionsPage;
 import dev.jasper.browser.pages.WelcomePage;
+import dev.jasper.browser.permissions.PermissionStore;
 import dev.jasper.browser.preview.PreviewService;
 import dev.jasper.browser.restore.BrowserRestore;
 import dev.jasper.browser.routing.BrowserRole;
@@ -54,17 +56,18 @@ import java.util.concurrent.RejectedExecutionException;
 /**
  * The Browser: web pages as Jasper items. Its start registers New Browser Tab, New Browser Window and the Browser split
  * item, the globe they show, the Web menu, Settings › Browser, the Bookmarks notification group, the welcome page and
- * the onboarding pages, the history and bookmarks pages and their queries, the Bookmarks and Browser History palette
- * scopes, the error page with its Try Again and Continue actions, View Source's page, the Browser as Jasper's web
- * browser, the terminal's Open URL in Split items and the restorer of saved browser items, publishes the Markdown
- * previews' service ({@link MarkdownPreviews}), and makes Chromium's engine, which starts Chromium only
+ * the onboarding pages, the history, bookmarks and site permissions pages and their queries, the Bookmarks and Browser
+ * History palette scopes, the error page with its Try Again and Continue actions, View Source's page, the Browser as
+ * Jasper's web browser, the terminal's Open URL in Split items and the restorer of saved browser items, publishes the
+ * Markdown previews' service ({@link MarkdownPreviews}), and makes Chromium's engine, which starts Chromium only
  * when a browser item or a Markdown preview first shows, so starting the plugin, and restoring its items, loads no
  * Chromium class. After a run that ended while Chromium ran, the items it restores wait to be loaded. It makes the
  * items' history and bookmarks too, in {@code browser.sqlite} in its data folder, which opens only once an item first
  * shows or its address field is edited, so the start opens no database and loads no sqlite-jdbc class (spec section
  * 19); that folder, which holds Chromium's cookies too, is made its owner's alone before either writes there. They are
  * the persistent store of its {@link DataStores}, beside which each group of /dev/null items has a store of its own,
- * in memory (spec section 12); Jasper's pages answer from the store of the browser that asks.
+ * in memory (spec section 12), each with its own site permissions; Jasper's pages answer from the store of the browser
+ * that asks, and a site permission that could not be saved posts one error.
  */
 public class BrowserPlugin implements Plugin {
     static final String NEW_TAB = "dev.jasper.browser.new_tab", NEW_WINDOW = "dev.jasper.browser.new_window";
@@ -113,6 +116,7 @@ public class BrowserPlugin implements Plugin {
         // memory. Making them opens nothing.
         var dataStores = new DataStores(stores, () -> settings.read().devNullMode());
         this.dataStores = dataStores;
+        dataStores.onPermissionsUnsaved(this::permissionsUnsaved);
         // Spec section 15: "Bookmark Removed" and "Bookmark Deleted" post in a group of their own, which Settings lists.
         context.notifications().group(BookmarkPanel.GROUP);
         // A page is made when its item first shows: the client's handlers are installed then, before any page is made on
@@ -145,6 +149,12 @@ public class BrowserPlugin implements Plugin {
         about.register(BookmarksPage.NAME, () -> pages.render(BookmarksPage.NAME, Map.of()));
         about.registerQueries(BookmarksPage.NAME, (browser, request) ->
             dataStores.answer(browser, store -> BookmarksPage.answer(store.stores().bookmarks(), request)));
+        // Spec section 12: the site permissions page, answered from the asking browser's store, whose items that show a
+        // site whose permissions it changed then load again, on the UI thread.
+        about.register(PermissionsPage.NAME, () -> pages.render(PermissionsPage.NAME, Map.of()));
+        about.registerQueries(PermissionsPage.NAME, (browser, request) -> dataStores.answer(browser, store ->
+            PermissionsPage.answer(store.permissions(), sites -> EventQueue.invokeLater(() -> { if (running) items.reloadShowing(store, sites); }),
+                request)));
         // Spec section 14: a failed load's page, and what its Try Again and Continue ask of the item whose page it is.
         var errors = new ErrorPage(context.appearance());
         about.register(ErrorPage.NAME, errors::html);
@@ -226,6 +236,14 @@ public class BrowserPlugin implements Plugin {
     void storesUnavailable(Throwable cause) {
         context.log().log(System.Logger.Level.WARNING, "Browser history and bookmarks are unavailable: " + reason(cause), cause);
         if (running) context.notifications().group().warning("Browser history and bookmarks are unavailable", reason(cause));
+    }
+
+    /**
+     * A site permission could not be saved: one notification says so, with the reason, while the plugin runs; the store
+     * has logged it. UI thread.
+     */
+    void permissionsUnsaved(Throwable cause) {
+        if (running) context.notifications().group().error(PermissionStore.UNSAVED, reason(cause));
     }
 
     /** The plugin's history and bookmarks. */
