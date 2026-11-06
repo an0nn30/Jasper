@@ -132,8 +132,10 @@ public final class BrowserItem implements AutoCloseable {
     private boolean waiting, asked, closed;
     // How many main-frame loads the page has started: a bookmark's panel opens only if none has since Add Bookmark.
     private long loadStarts;
-    // Copy on select: whether a read of the page's selection is under way, and whether a gesture came meanwhile (H34).
+    // Copy on select: whether a read of the page's selection is under way, and whether a gesture came meanwhile (H34);
+    // and the text a read dropped for a later one found, which that one copies if it finds the selection unchanged (H36).
     private boolean readingSelection, selectedAgain;
+    private String keptSelection;
     // Cancels the wait for the typing to pause; and the engine's answer the field waits for, or null.
     private Runnable typingPause = NOTHING;
     private CompletableFuture<List<String>> suggestion;
@@ -348,9 +350,12 @@ public final class BrowserItem implements AutoCloseable {
      * The user finished a selection in the page. While Copy on select is on, the page's selection is read, and its text,
      * if any, is copied on the UI thread, if Copy on select is still on and the item still open by then. One read runs at
      * a time (H34): a gesture during it starts none, but once it ends the selection is read once more, and only that
-     * latest read is copied, so a page that answers late queues no copies. A selection in a frame of another origin is
-     * not copied (F2): Chromium's copy there would run that frame's scripts, which could put anything on the clipboard;
-     * Copy copies it. A read that fails copies nothing.
+     * latest read is copied, so a page that answers late queues no copies. The dropped read's text is kept for the read
+     * after it (H36): the page counted the selection's change as read by the dropped read, so the read after it finds the
+     * selection unchanged, and copies the kept text; if it finds a new selection, it copies that. A selection in a frame
+     * of another origin is not copied (F2): Chromium's copy there would run that frame's scripts, which could put anything
+     * on the clipboard; Copy copies it. A read that fails copies nothing and keeps nothing, so when it ran in the page but
+     * answered too late, the next read finds the selection unchanged and copies nothing.
      */
     private void selectionFinished() {
         if (closed || items.closed() || !items.context().platform().copyOnSelect()) return;
@@ -358,23 +363,38 @@ public final class BrowserItem implements AutoCloseable {
         else readSelection();
     }
 
-    /** Reads the page's selection, and copies its text once it arrives, unless a gesture came meanwhile. */
+    /** Reads the page's selection; its answer comes back to {@link #selectionRead} on the UI thread. */
     private void readSelection() {
         readingSelection = true;
         selectedAgain = false;
-        page.selectedText().whenComplete((selection, failure) -> EventQueue.invokeLater(() -> {
-            readingSelection = false;
-            if (closed || items.closed()) return;
-            if (selectedAgain) { // a later gesture: only the read for it is copied
-                selectedAgain = false;
-                if (items.context().platform().copyOnSelect()) readSelection();
-            } else if (failure != null) {
-                items.context().log().log(System.Logger.Level.DEBUG, "A page's selection could not be read", failure);
-            } else if (selection instanceof Page.Selection.Text selected && !selected.text().isEmpty()
-                && items.context().platform().copyOnSelect()) {
-                items.context().platform().copy(selected.text());
-            }
-        }));
+        page.selectedText().whenComplete((selection, failure) -> EventQueue.invokeLater(() -> selectionRead(selection, failure)));
+    }
+
+    /**
+     * A read of the page's selection answered {@code selection}, or failed: what it found is copied, unless a gesture
+     * came meanwhile, when it is kept and the selection is read once more. What it found is its non-empty text, or for a
+     * selection unchanged the text kept for it; nothing for anything else.
+     */
+    private void selectionRead(Page.Selection selection, Throwable failure) {
+        readingSelection = false;
+        String kept = keptSelection;
+        keptSelection = null;
+        if (closed || items.closed()) return;
+        if (failure != null) items.context().log().log(System.Logger.Level.DEBUG, "A page's selection could not be read", failure);
+        String found = failure != null || selection == null ? null : switch (selection) {
+            case Page.Selection.Text text -> text.text().isEmpty() ? null : text.text();
+            case Page.Selection.Unchanged unchanged -> kept;
+            case Page.Selection.InFrame frame -> null;
+            case Page.Selection.None none -> null;
+        };
+        if (!items.context().platform().copyOnSelect()) {
+            selectedAgain = false;
+        } else if (selectedAgain) { // a later gesture: only the read for it is copied
+            keptSelection = found;
+            readSelection();
+        } else if (found != null) {
+            items.context().platform().copy(found);
+        }
     }
 
     /**

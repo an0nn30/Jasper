@@ -366,7 +366,7 @@ public final class Page implements AutoCloseable {
     }
 
     /** What is selected in a page, as {@link #selectedText} reads it. */
-    public sealed interface Selection permits Selection.Text, Selection.InFrame, Selection.None {
+    public sealed interface Selection permits Selection.Text, Selection.InFrame, Selection.Unchanged, Selection.None {
         /**
          * Text the user selected in the page, or in its focused field.
          *
@@ -382,10 +382,13 @@ public final class Page implements AutoCloseable {
         /** The focus is in a frame of another origin, whose selection Jasper does not read. */
         record InFrame() implements Selection { }
 
+        /** The selection has not changed since the last read in its document or field (H35, H36). */
+        record Unchanged() implements Selection { }
+
         /**
-         * Nothing that can be copied: no browser yet, the page closed, a selection unchanged since the last read, a
-         * password field focused or one CSS masks, a field whose type has no selection, or a selection of more than
-         * 1,048,576 characters, which {@code PageText} reads at most.
+         * Nothing that can be copied: no browser yet, the page closed, a password field focused or one CSS masks, changed
+         * or not, a field whose type has no selection, or a selection of more than 1,048,576 characters, which
+         * {@code PageText} reads at most.
          */
         record None() implements Selection { }
     }
@@ -397,7 +400,8 @@ public final class Page implements AutoCloseable {
      * field or one CSS masks never does, and anything else gives the selection of the deepest same-origin document, its
      * non-breaking spaces as spaces; the focus in a cross-origin frame gives {@link Selection.InFrame}. A selection gives
      * its text only when it changed since the last read there, as a {@code selectionchange} told Jasper's world (H35),
-     * and {@link Selection.None} otherwise; the first read in a document or field gives it. No page script can steer what
+     * and {@link Selection.Unchanged} otherwise; the first read in a document or field gives it. Each read that runs
+     * counts the change as read, one whose answer comes too late included. No page script can steer what
      * the script reads, but a page can change its own selection, during a drag or before the read, and that is what is
      * read. It completes on any thread.
      *

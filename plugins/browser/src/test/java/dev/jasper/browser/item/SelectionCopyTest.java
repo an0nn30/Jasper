@@ -28,8 +28,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code Platform.copyOnSelect()} is on, reads the page's selection and copies its text, if any, with the plugin's
  * clipboard on the UI thread. A selection in a frame of another origin copies nothing, not even through Chromium's own
  * copy, which would let that frame's scripts write the clipboard (F2). One read runs at a time, and only the latest is
- * copied (H34). The page is a stand-in, as a page cannot be made without Chromium: the test fires its gestures, answers
- * its selection reads and records any copy Chromium would run.
+ * copied (H34); a read dropped for a later one keeps its text for it (H36). The page is a stand-in, as a page cannot be
+ * made without Chromium: the test fires its gestures, answers its selection reads, as {@code selection.js} would with its
+ * flag where that matters, and records any copy Chromium would run.
  */
 class SelectionCopyTest {
     private static final String ID = "dev.jasper.browser";
@@ -37,6 +38,12 @@ class SelectionCopyTest {
     private final List<String> log = new CopyOnWriteArrayList<>();
     // What the page answers its next selection read.
     private CompletableFuture<Page.Selection> selection = CompletableFuture.completedFuture(new Page.Selection.Text("abc"));
+    // With flagged, the page answers as selection.js does with its flag (H35): what is selected, and whether a
+    // selectionchange came since the last read, which each read consumes as it runs; the answer then waits for stall.
+    private boolean flagged;
+    private String selected = "";
+    private boolean changed;
+    private CompletableFuture<Void> stall = CompletableFuture.completedFuture(null);
     private FakePluginHost host;
     private Page page;
 
@@ -164,6 +171,77 @@ class SelectionCopyTest {
         assertThat(copies()).containsExactly("copy|" + ID + "|abc");
     }
 
+    /**
+     * H36: a read dropped for a later gesture (H34) keeps its text. In the page, the dropped read already consumed the
+     * selection's change (H35), so the read after it finds the selection unchanged, and the kept text is copied, once.
+     */
+    @Test void aDroppedReadsTextIsCopiedWhenTheReadAfterItFindsTheSelectionUnchanged() throws Exception {
+        openFlagged();
+        var stalled = new CompletableFuture<Void>();
+        stall = stalled;
+        select("ls -la");
+        gesture();
+        stall = CompletableFuture.completedFuture(null);
+        gesture();
+        onUi(() -> stalled.complete(null));
+        settle();
+        assertThat(log).containsExactly("read", "read");
+        assertThat(copies()).containsExactly("copy|" + ID + "|ls -la");
+        gesture();
+        assertThat(log).as("a gesture that changed nothing, as a scrollbar drag").hasSize(3);
+        assertThat(copies()).as("copied once").hasSize(1);
+    }
+
+    /** H36: when the read after a dropped one finds a selection made since, that one is copied instead. */
+    @Test void aReadAfterADroppedOneThatFindsANewSelectionCopiesThatInstead() throws Exception {
+        openFlagged();
+        var stalled = new CompletableFuture<Void>();
+        stall = stalled;
+        select("old");
+        gesture();
+        stall = CompletableFuture.completedFuture(null);
+        select("new");
+        gesture();
+        onUi(() -> stalled.complete(null));
+        settle();
+        assertThat(copies()).containsExactly("copy|" + ID + "|new");
+    }
+
+    /** H36: a kept text outlasts reads dropped meanwhile that found the selection unchanged, and is copied by the last. */
+    @Test void aKeptTextOutlastsADroppedReadThatFoundTheSelectionUnchanged() throws Exception {
+        openFlagged();
+        var first = new CompletableFuture<Void>();
+        stall = first;
+        select("kept");
+        gesture();
+        var second = new CompletableFuture<Void>();
+        stall = second;
+        gesture();
+        onUi(() -> first.complete(null));
+        settle();
+        stall = CompletableFuture.completedFuture(null);
+        gesture();
+        onUi(() -> second.complete(null));
+        settle();
+        assertThat(log).containsExactly("read", "read", "read");
+        assertThat(copies()).containsExactly("copy|" + ID + "|kept");
+    }
+
+    /**
+     * H36's cost: a read that ran in the page but failed, as one DevTools answered too late, consumed the change and
+     * keeps no text, so the next read finds the selection unchanged and copies nothing.
+     */
+    @Test void aReadThatRanButFailedLeavesTheNextUnchangedReadNothingToCopy() throws Exception {
+        openFlagged();
+        stall = CompletableFuture.failedFuture(new TimeoutException());
+        select("lost");
+        gesture();
+        stall = CompletableFuture.completedFuture(null);
+        gesture();
+        assertThat(log).containsExactly("read", "read");
+        assertThat(copies()).isEmpty();
+    }
+
     @Test void aReadThatFailsCopiesNothing() throws Exception {
         open(true);
         selection = CompletableFuture.failedFuture(new TimeoutException());
@@ -215,11 +293,26 @@ class SelectionCopyTest {
             page = item.page();
             if (answering) PageTestAccess.useSelectionReader(page, read -> {
                 log.add("read");
-                return selection;
+                if (!flagged) return selection;
+                Page.Selection found = changed ? new Page.Selection.Text(selected) : new Page.Selection.Unchanged();
+                changed = false;
+                return stall.thenApply(released -> found);
             });
             PageTestAccess.useCopier(page, copying -> log.add("chromium copy"));
             return item;
         });
+    }
+
+    /** As {@link #open(boolean)} with Copy on select on, the page answering as {@code selection.js} would with its flag. */
+    private void openFlagged() throws Exception {
+        flagged = true;
+        open(true);
+    }
+
+    /** The user selects {@code text} in the page, which tells Jasper's world a selectionchange. */
+    private void select(String text) {
+        selected = text;
+        changed = true;
     }
 
     /** The page tells a selection gesture, as its canvas does 100 ms after the last, and the item's answer arrives. */

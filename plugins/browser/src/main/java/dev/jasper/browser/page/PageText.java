@@ -48,9 +48,10 @@ import org.cef.browser.CefDevToolsClient;
  * DevTools is attached.
  *
  * <p>Only the script's own answer is an answer: for an insertion, that the field took the text, that the focus is where
- * the world cannot reach, or that it takes no text (H38); for a read, the selected text, a frame of another origin, or
- * nothing. Every call times out after five seconds, and a late call, an error answer, a
- * refused call and an answer that cannot be read each fail the run, as the text may still go in or nothing can tell.
+ * the world cannot reach, or that it takes no text (H38); for a read, the selected text, a frame of another origin, a
+ * selection unchanged since the last read (H36), or nothing. Every call times out after five seconds, and a late call,
+ * an error answer, a refused call and an answer that cannot be read each fail the run, as the text may still go in or
+ * nothing can tell.
  * DevTools' answers are read as untrusted input, within bounds, as the page's own scripts can shape the frame tree and
  * the selection.
  *
@@ -382,7 +383,8 @@ final class PageText {
     /**
      * What {@code selection.js} answered in DevTools' answer to {@code Runtime.evaluate}: its {@code result}, an object by
      * value, when nothing threw. Its {@code kind} is {@code text}, with the selected {@code text} of at most
-     * {@link #MAX_SELECTION} characters; {@code frame}, for the focus in a frame of another origin; or {@code none}.
+     * {@link #MAX_SELECTION} characters; {@code frame}, for the focus in a frame of another origin; {@code unchanged},
+     * for a selection unchanged since the last read; or {@code none}.
      *
      * @param answer what DevTools answered
      * @return the selection; empty for anything else, for an answer over {@link #MAX_SELECTION_ANSWER} characters, and
@@ -398,6 +400,7 @@ final class PageText {
             case "text" -> value.get("text") instanceof String text && text.length() <= MAX_SELECTION
                 ? Optional.of(new Page.Selection.Text(text)) : Optional.empty();
             case "frame" -> Optional.of(new Page.Selection.InFrame());
+            case "unchanged" -> Optional.of(new Page.Selection.Unchanged());
             case "none" -> Optional.of(new Page.Selection.None());
             default -> Optional.empty();
         };

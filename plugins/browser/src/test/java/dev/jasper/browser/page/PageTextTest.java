@@ -261,11 +261,12 @@ class PageTextTest {
         assertThat((String) evaluated.get("expression")).isEqualTo(PageText.SELECTION + "\n(" + PageText.MAX_SELECTION + ");");
     }
 
-    @Test void theSelectionsAnswerIsTextAFrameOfAnotherOriginOrNone() {
+    @Test void theSelectionsAnswerIsTextAFrameOfAnotherOriginUnchangedOrNone() {
         assertThat(PageText.selection(selected("{\"kind\":\"text\",\"text\":\"\"}"))).contains(new Page.Selection.Text(""));
         assertThat(PageText.selection(selected("{\"kind\":\"text\",\"text\":\"a\\u2028b\"}"))).contains(new Page.Selection.Text("a\u2028b"));
         assertThat(PageText.selection(selected("{\"kind\":\"frame\"}"))).contains(new Page.Selection.InFrame());
         assertThat(PageText.selection(selected("{\"kind\":\"none\"}"))).contains(new Page.Selection.None());
+        assertThat(PageText.selection(selected("{\"kind\":\"unchanged\"}"))).as("H36").contains(new Page.Selection.Unchanged());
         String longest = "x".repeat(PageText.MAX_SELECTION);
         assertThat(PageText.selection(selected("{\"kind\":\"text\",\"text\":" + StrictJson.quote(longest) + "}")))
             .contains(new Page.Selection.Text(longest));
@@ -428,12 +429,15 @@ class PageTextTest {
         String script = PageText.SELECTION;
         int code = script.indexOf("(function (maxLength) {");
         assertThat(script.indexOf("addEventListener('selectionchange'", code)).isGreaterThan(code);
-        int unchanged = script.indexOf("if (!changed(doc)) return NONE;", code);
+        int unchanged = script.indexOf("if (!changed(doc)) return UNCHANGED;", code);
         assertThat(unchanged).as("a document read checks for a change").isGreaterThan(code);
         assertThat(script.indexOf("getSelection()", code)).as("before it reads the selection").isGreaterThan(unchanged);
         int field = script.indexOf("const fieldChanged = changed(element), documentChanged = changed(doc);", code);
         assertThat(field).as("a field read checks both").isGreaterThan(code);
         assertThat(script.indexOf(".value", code)).as("before it reads the field").isGreaterThan(field);
+        int fieldUnchanged = script.indexOf("if (!fieldChanged && !documentChanged) return UNCHANGED;", code);
+        assertThat(fieldUnchanged).as("H36: an unchanged field answers so").isGreaterThan(field);
+        assertThat(script.indexOf("element.type === 'password'", code)).as("a password field stays none").isBetween(field, fieldUnchanged);
     }
 
     /** Items 6 and 7: non-breaking spaces copy as spaces, and any element with a document of its own is a frame. */
