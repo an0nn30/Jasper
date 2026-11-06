@@ -3,6 +3,7 @@ package dev.jasper.browser.dialogs;
 import dev.jasper.browser.engine.AboutScheme;
 import dev.jasper.browser.page.DialogPlace;
 import dev.jasper.browser.page.Page;
+import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.ViewSpec;
@@ -22,8 +23,9 @@ import java.util.function.LongSupplier;
  * cover the window; and a page whose dialogs come one straight after another is refused them by its
  * {@link DialogFlood} until it loads again. Jasper's own pages, whose origin is {@code jasper-about:}, are never refused
  * as a flood: their {@code confirm()}s ask before each row is deleted, as iTerm2's pages do, however quickly the user
- * deletes rows. The script is answered exactly once: true for OK; false for Cancel, Escape, the dialog's own close, its
- * item's close, Chromium cancelling the page's dialogs, a refusal, or a page with nowhere to show it.
+ * deletes rows. While the page has a permission prompt asked, its dialogs wait until it has been answered, so none can
+ * stack over the prompt. The script is answered exactly once: true for OK; false for Cancel, Escape, the dialog's own
+ * close, its item's close, Chromium cancelling the page's dialogs, a refusal, or a page with nowhere to show it.
  */
 final class ScriptDialog {
     /** What the script asked. */
@@ -96,7 +98,21 @@ final class ScriptDialog {
         new PageModal<>(page, found.get(), title, spec(title), ANSWERS, false, ok -> {
             reply.accept(ok, "");
             if (flood != null) flood.closed(clock.getAsLong());
-        }).show();
+        }, new AfterPrompts(page)).show();
+    }
+
+    /**
+     * Ruling V19: a page's script dialog waits while the page has a permission prompt asked, so nothing of the page's
+     * can stack over the prompt, such as an alert sized for its OK to cover Allow.
+     */
+    private record AfterPrompts(Page page) implements PageModal.Gate {
+        @Override public boolean holds() {
+            return PermissionPrompt.asking(page);
+        }
+
+        @Override public Subscription onRelease(Runnable released) {
+            return PermissionPrompt.afterPrompts(page, released);
+        }
     }
 
     /**

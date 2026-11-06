@@ -8,7 +8,9 @@ import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.ViewSpec;
+import java.awt.AWTError;
 import java.awt.EventQueue;
+import java.awt.Toolkit;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
@@ -24,7 +26,11 @@ import java.util.function.LongSupplier;
  * ({@link PageModal}), headed by the permission, such as "Allow Camera", saying which site wants what, such as "The
  * website https://example.com wants to use your camera.", with Block and, right-most, Allow. Escape and the prompt's
  * own close dismiss it, neither blocking nor allowing; Enter presses nothing, so no keystroke a page times a prompt for
- * allows it. Like a page's alerts, it shows only while its item is its window's active item.
+ * allows it. Allow and Block, from the mouse or the keyboard, count only once the platform's double-click interval has
+ * passed since the prompt showed, or since another of the page's modals closed while it showed (ruling V19), so a page
+ * cannot time a click onto them, such as a double-click lure's second click; and the page's script dialogs wait while
+ * it has a prompt asked, so none can stack over it. Like a page's alerts, it shows only while its item is its window's
+ * active item.
  *
  * <p>A page shows one prompt at a time. A request equal to one the page has asked already, shown or waiting, shares
  * that prompt and its answer; the others wait, in the order asked, each shown once the one before is answered. The
@@ -39,8 +45,12 @@ public final class PermissionPrompt {
         DISMISS = "permission-prompt.answer.dismiss";
     private static final Map<String, Optional<Decision>> ANSWERS = Map.of(ALLOW, Optional.of(Decision.ALLOWED),
         BLOCK, Optional.of(Decision.BLOCKED), DISMISS, Optional.empty());
+    /** The double-click interval a platform that names none gets, in milliseconds. */
+    static final long CLICK_INTERVAL = 500;
     // The prompts of each page that has any, shown or waiting; a page's entry goes once it has none.
     private static final Map<Page, Prompts> PAGES = new IdentityHashMap<>();
+    // What the prompts asked from now on read: the system's monotonic clock, or a test's.
+    private static volatile LongSupplier clock = PermissionPrompt::millis;
 
     private PermissionPrompt() { }
 
@@ -56,16 +66,19 @@ public final class PermissionPrompt {
      * @throws UnsupportedOperationException for audio playback
      */
     public static void ask(DialogPlace place, Page page, PermissionRequest request, Consumer<Optional<Decision>> answer) {
-        ask(place, page, request, answer, () -> System.nanoTime() / 1_000_000);
+        ask(place, page, request, answer, clock, platformInterval());
     }
 
     /**
      * {@link #ask(DialogPlace, Page, PermissionRequest, Consumer)} timed by {@code clock}, which the page's flood guard
-     * reads.
+     * and the prompt's double-click interval read, with that interval.
      *
      * @param clock a monotonic clock's milliseconds
+     * @param interval how long after the prompt shows, or after another of the page's modals closes while it shows,
+     *     Allow and Block start to count, in milliseconds
      */
-    static void ask(DialogPlace place, Page page, PermissionRequest request, Consumer<Optional<Decision>> answer, LongSupplier clock) {
+    static void ask(DialogPlace place, Page page, PermissionRequest request, Consumer<Optional<Decision>> answer, LongSupplier clock,
+                    long interval) {
         Objects.requireNonNull(place, "place");
         Objects.requireNonNull(page, "page");
         Objects.requireNonNull(answer, "answer");
@@ -75,7 +88,71 @@ public final class PermissionPrompt {
             pending.answer(Optional.empty());
             return;
         }
-        PAGES.computeIfAbsent(page, shown -> new Prompts(shown, clock)).add(pending);
+        PAGES.computeIfAbsent(page, shown -> new Prompts(shown, clock, interval)).add(pending);
+    }
+
+    /**
+     * The double-click interval a prompt ignores Allow and Block for (ruling V19): the platform's, as
+     * {@code awt.multiClickInterval} gives it.
+     *
+     * @param property the desktop property's value
+     * @return its milliseconds when it is a positive number; else {@value #CLICK_INTERVAL}
+     */
+    static long clickInterval(Object property) {
+        return property instanceof Number number && number.longValue() > 0 ? number.longValue() : CLICK_INTERVAL;
+    }
+
+    /** The platform's double-click interval now, as {@link #clickInterval(Object)} reads it. */
+    private static long platformInterval() {
+        Object property;
+        try {
+            property = Toolkit.getDefaultToolkit().getDesktopProperty("awt.multiClickInterval");
+        } catch (RuntimeException | AWTError unavailable) {
+            property = null;
+        }
+        return clickInterval(property);
+    }
+
+    /** Has the prompts asked from now on read {@code replacement}, as a test's clock. */
+    static void useClock(LongSupplier replacement) {
+        clock = Objects.requireNonNull(replacement, "replacement");
+    }
+
+    /** Has the prompts asked from now on read the system's monotonic clock again. */
+    static void useSystemClock() {
+        clock = PermissionPrompt::millis;
+    }
+
+    private static long millis() {
+        return System.nanoTime() / 1_000_000;
+    }
+
+    /**
+     * Whether {@code page} has a prompt asked, shown or waiting, which holds its script dialogs back (ruling V19).
+     *
+     * @param page a page
+     * @return whether it has
+     */
+    static boolean asking(Page page) {
+        return PAGES.containsKey(page);
+    }
+
+    /**
+     * Tells {@code released}, on a later turn of the UI thread, once {@code page} has no prompt asked: at once when it
+     * has none.
+     *
+     * @param page a page
+     * @param released told once
+     * @return ends the wait
+     */
+    static Subscription afterPrompts(Page page, Runnable released) {
+        Objects.requireNonNull(released, "released");
+        Prompts prompts = PAGES.get(Objects.requireNonNull(page, "page"));
+        if (prompts == null) {
+            EventQueue.invokeLater(released);
+            return () -> { };
+        }
+        return prompts.afterwards(released);
     }
 
     /**
@@ -128,15 +205,19 @@ public final class PermissionPrompt {
     private static final class Prompts {
         private final Page page;
         private final LongSupplier clock;
+        private final long interval;
         private final DialogFlood flood;
         private final List<Subscription> ends;
         private final ArrayDeque<Pending> waiting = new ArrayDeque<>();
+        // Told once the page has no prompt left, as its held script dialogs are.
+        private final List<Runnable> releases = new ArrayList<>();
         private Pending front;
         private boolean ended;
 
-        Prompts(Page page, LongSupplier clock) {
+        Prompts(Page page, LongSupplier clock, long interval) {
             this.page = page;
             this.clock = clock;
+            this.interval = interval;
             flood = DialogFlood.of(page);
             ends = List.of(page.onClose(this::dismissAll), page.onDialogsReset(this::dismissAll), page.onLoadStart(url -> dismissAll()));
         }
@@ -173,7 +254,7 @@ public final class PermissionPrompt {
                 }
                 front = pending;
                 pending.modal = new PageModal<>(page, pending.place, pending.heading, spec(pending.heading, pending.text), ANSWERS,
-                    Optional.empty(), decision -> closed(pending, decision));
+                    Optional.empty(), decision -> closed(pending, decision), new Guard());
                 // In Jasper this returns only once the prompt has closed; what comes next was posted meanwhile.
                 pending.modal.show();
                 return;
@@ -209,6 +290,33 @@ public final class PermissionPrompt {
             ended = true;
             PAGES.remove(page, this);
             for (Subscription end : ends) end.close();
+            for (Runnable released : List.copyOf(releases)) EventQueue.invokeLater(released);
+            releases.clear();
+        }
+
+        /** Tells {@code released} on a later turn once the page has no prompt left. */
+        Subscription afterwards(Runnable released) {
+            releases.add(released);
+            return () -> releases.remove(released);
+        }
+
+        /**
+         * Ruling V19: the front prompt takes no Allow or Block until the double-click interval has passed since it showed,
+         * or since another of the page's modals closed while it showed, so a page cannot time a click onto it. Escape
+         * dismisses it at any time, as that grants nothing.
+         */
+        private final class Guard implements PageModal.Gate {
+            private long shown = Long.MAX_VALUE;
+
+            @Override public void showing() {
+                shown = clock.getAsLong();
+            }
+
+            @Override public boolean accepts(String action) {
+                if (action.equals(DISMISS)) return true;
+                long since = Math.max(shown, flood.lastClosed());
+                return shown != Long.MAX_VALUE && clock.getAsLong() - since >= interval;
+            }
         }
     }
 }

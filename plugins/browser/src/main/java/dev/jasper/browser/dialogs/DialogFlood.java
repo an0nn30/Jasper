@@ -64,6 +64,15 @@ final class DialogFlood {
         lastClosed = now;
     }
 
+    /**
+     * When the page's last admitted dialog closed, which starts a permission prompt's double-click interval again.
+     *
+     * @return the time it closed; {@link Long#MIN_VALUE} when none has closed since the guard was made or rearmed
+     */
+    long lastClosed() {
+        return anyClosed ? lastClosed : Long.MIN_VALUE;
+    }
+
     /** The page loads a new document: its dialogs may open again, and a run starts afresh. */
     void rearm() {
         stopped = false;

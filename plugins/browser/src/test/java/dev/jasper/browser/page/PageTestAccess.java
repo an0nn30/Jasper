@@ -382,6 +382,16 @@ public final class PageTestAccess {
     }
 
     /**
+     * A Markdown preview's browser as the preview client's handlers meet it, made without Chromium as {@link #pageBrowser}
+     * makes a page's: no page's, and on no preview yet. Every Chromium call on it answers nothing.
+     *
+     * @return the browser
+     */
+    public static PageBrowser previewBrowser() {
+        return withoutConstructor();
+    }
+
+    /**
      * A {@code PageBrowser} whose constructors never ran, only {@code Object}'s: the JDK's serialization constructor,
      * from {@code jdk.unsupported}'s {@code sun.reflect.ReflectionFactory}, found by name so the compiler has no internal
      * API to warn of.

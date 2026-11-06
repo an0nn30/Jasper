@@ -48,6 +48,8 @@ class PermissionPromptTest {
     private static final String SITE = "https://camera.example";
     private static final PermissionRequest CAMERA = new PermissionRequest(SITE, Permission.CAMERA),
         MICROPHONE = new PermissionRequest(SITE, Permission.MICROPHONE);
+    // The double-click interval the prompts are given: no Allow or Block counts until it has passed.
+    private static final long INTERVAL = 500;
     private final MemoryStores memory = new MemoryStores();
     private Shown shown;
 
@@ -209,13 +211,13 @@ class PermissionPromptTest {
         });
         onUiThread(() -> {
             assertThat(shown.host.windowView(ID, "Allow Camera")).as("the new document may ask").isPresent();
-            clock.set(300);
+            clock.set(200 + INTERVAL);
             press("Allow Camera", form("Allow Camera").actions().getLast().action());
             assertThat(next.calls).containsExactly("ALLOWED");
         });
         var second = new Answers();
         onUiThread(() -> {
-            clock.set(400);
+            clock.set(300 + INTERVAL);
             ask(MICROPHONE, second, clock::get);
         });
         onUiThread(() -> {
@@ -334,10 +336,143 @@ class PermissionPromptTest {
         onUiThread(() -> ask(CAMERA, reloaded, clock::get));
         onUiThread(() -> {
             assertThat(shown.host.windowView(ID, "Allow Camera")).as("a new document may ask again").isPresent();
+            clock.set(90_000 + INTERVAL);
             press("Allow Camera", form("Allow Camera").actions().getLast().action());
             assertThat(reloaded.calls).containsExactly("ALLOWED");
             assertThat(shown.host.failures()).isEmpty();
         });
+    }
+
+    /**
+     * Ruling V19: a page cannot time a click onto Allow. Until the double-click interval has passed since the prompt
+     * showed, Allow and Block are ignored, from the mouse and the keyboard alike, so a double-click lure's second click
+     * does nothing; Escape still dismisses, as dismissing grants nothing.
+     */
+    @Test void allowAndBlockAreIgnoredUntilTheDoubleClickIntervalHasPassedAndEscapeIsNot() throws Exception {
+        shown = show();
+        var clock = new AtomicLong(10_000);
+        var camera = new Answers();
+        onUiThread(() -> ask(CAMERA, camera, clock::get));
+        onUiThread(() -> {
+            Nodes.Form form = form("Allow Camera");
+            clock.set(10_001);
+            press("Allow Camera", form.actions().getLast().action());
+            press("Allow Camera", form.actions().getFirst().action());
+            clock.set(10_000 + INTERVAL - 1);
+            press("Allow Camera", form.actions().getLast().action());
+            assertThat(camera.calls).as("ignored inside the interval").isEmpty();
+            assertThat(shown.host.windowView(ID, "Allow Camera")).as("still asking").isPresent();
+            clock.set(10_000 + INTERVAL);
+            press("Allow Camera", form.actions().getLast().action());
+            assertThat(camera.calls).containsExactly("ALLOWED");
+        });
+        var blocked = new Answers();
+        onUiThread(() -> {
+            clock.set(20_000);
+            ask(MICROPHONE, blocked, clock::get);
+        });
+        onUiThread(() -> {
+            clock.set(20_000 + INTERVAL);
+            press("Allow Microphone", form("Allow Microphone").actions().getFirst().action());
+            assertThat(blocked.calls).containsExactly("BLOCKED");
+        });
+        var escaped = new Answers();
+        onUiThread(() -> {
+            clock.set(30_000);
+            ask(CAMERA, escaped, clock::get);
+        });
+        onUiThread(() -> {
+            clock.set(30_001);
+            press("Allow Camera", form("Allow Camera").cancelAction());
+            assertThat(escaped.calls).as("Escape at once").containsExactly("dismissed");
+            assertThat(shown.host.windows()).isEmpty();
+            assertThat(shown.host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * Ruling V19: nothing of the page's can stack over its prompt, so a page's alert, confirm or prompt asked while its
+     * permission prompt is asked waits, and shows once the prompt has been answered; one Chromium resets meanwhile goes
+     * unshown, answered once.
+     */
+    @Test void aPagesScriptDialogWaitsWhileItsPromptIsAskedAndShowsOnceItIsAnswered() throws Exception {
+        shown = show();
+        var clock = new AtomicLong(10_000);
+        var camera = new Answers();
+        onUiThread(() -> ask(CAMERA, camera, clock::get));
+        var alert = new CopyOnWriteArrayList<String>();
+        ScriptDialog.ask(shown.page, ScriptDialog.Kind.ALERT, "https://camera.example/", "Over it", (ok, text) -> alert.add(ok + ""), clock::get);
+        onUiThread(() -> {
+            assertThat(shown.host.windowView(ID, "Web Page Alert")).as("held while the prompt shows").isEmpty();
+            assertThat(shown.host.windows()).hasSize(1);
+            clock.set(12_000);
+            press("Allow Camera", form("Allow Camera").actions().getLast().action());
+            assertThat(camera.calls).containsExactly("ALLOWED");
+        });
+        onUiThread(() -> {
+            assertThat(shown.host.windowView(ID, "Web Page Alert")).as("once the prompt is answered").isPresent();
+            assertThat(alert).isEmpty();
+            press("Web Page Alert", form("Web Page Alert").actions().getFirst().action());
+            assertThat(alert).containsExactly("true");
+        });
+        var microphone = new Answers();
+        onUiThread(() -> {
+            clock.set(30_000);
+            ask(MICROPHONE, microphone, clock::get);
+        });
+        var confirm = new CopyOnWriteArrayList<String>();
+        ScriptDialog.ask(shown.page, ScriptDialog.Kind.CONFIRM, "https://camera.example/", "Reset?", (ok, text) -> confirm.add(ok + ""), clock::get);
+        onUiThread(() -> {
+            assertThat(shown.host.windowView(ID, "Web Page Confirmation")).isEmpty();
+            shown.page.dialogsReset();
+            assertThat(microphone.calls).containsExactly("dismissed");
+            assertThat(confirm).as("answered once, unshown").containsExactly("false");
+        });
+        onUiThread(() -> {
+            assertThat(shown.host.windows()).as("the reset confirm never shows").isEmpty();
+            assertThat(confirm).containsExactly("false");
+            assertThat(shown.host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * Ruling V19: the interval starts again when another of the page's modals closes while the prompt shows, as an
+     * alert under it does, so the second click of a double-click on that alert's OK cannot land on Allow.
+     */
+    @Test void theIntervalStartsAgainWhenAnotherModalOfThePageClosesWhileThePromptShows() throws Exception {
+        shown = show();
+        var clock = new AtomicLong(10_000);
+        var alert = new CopyOnWriteArrayList<String>();
+        ScriptDialog.ask(shown.page, ScriptDialog.Kind.ALERT, "https://camera.example/", "Under it", (ok, text) -> alert.add(ok + ""), clock::get);
+        var camera = new Answers();
+        onUiThread(() -> {
+            assertThat(shown.host.windowView(ID, "Web Page Alert")).isPresent();
+            clock.set(10_100);
+            ask(CAMERA, camera, clock::get);
+        });
+        onUiThread(() -> {
+            assertThat(shown.host.windowView(ID, "Allow Camera")).as("over the alert").isPresent();
+            clock.set(11_000);
+            press("Web Page Alert", form("Web Page Alert").actions().getFirst().action());
+            assertThat(alert).containsExactly("true");
+            clock.set(11_000 + INTERVAL - 1);
+            press("Allow Camera", form("Allow Camera").actions().getLast().action());
+            assertThat(camera.calls).as("inside the interval the alert's close started again").isEmpty();
+            clock.set(11_000 + INTERVAL);
+            press("Allow Camera", form("Allow Camera").actions().getLast().action());
+            assertThat(camera.calls).containsExactly("ALLOWED");
+            assertThat(shown.host.failures()).isEmpty();
+        });
+    }
+
+    /** The interval is the platform's double-click interval, or 500 ms when the platform names none that will do. */
+    @Test void theIntervalIsThePlatformsDoubleClickIntervalOr500Milliseconds() {
+        assertThat(PermissionPrompt.clickInterval(null)).isEqualTo(500);
+        assertThat(PermissionPrompt.clickInterval(300)).isEqualTo(300);
+        assertThat(PermissionPrompt.clickInterval(2_000)).isEqualTo(2_000);
+        assertThat(PermissionPrompt.clickInterval("fast")).isEqualTo(500);
+        assertThat(PermissionPrompt.clickInterval(0)).isEqualTo(500);
+        assertThat(PermissionPrompt.clickInterval(-5)).isEqualTo(500);
     }
 
     /** The plugin's stop dismisses a page's prompts, shown and waiting, while Chromium still runs (ruling F43). */
@@ -367,7 +502,7 @@ class PermissionPromptTest {
     /** Asks {@code request} over the shown item's page, as its item does. UI thread. */
     private void ask(PermissionRequest request, Consumer<Optional<Decision>> answer, LongSupplier clock) {
         DialogPlace place = shown.page.dialogPlace().orElseGet(() -> shown.place);
-        PermissionPrompt.ask(place, shown.page, request, answer, clock);
+        PermissionPrompt.ask(place, shown.page, request, answer, clock, INTERVAL);
     }
 
     /** A clock a user who takes their time answers by: each reading is 10 s after the last, so no prompt comes quickly. */

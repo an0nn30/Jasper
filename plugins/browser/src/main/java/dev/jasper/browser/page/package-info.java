@@ -46,7 +46,8 @@
  * Markdown preview's page, in plain types, for the {@code preview} package: it makes its canvas at once, and its browser,
  * on Chromium's preview client, only once the canvas first shows; {@code PreviewHandlers} are the preview client's own
  * handlers and message router, which refuse every navigation but the shell's first load, every request off the
- * preview's origin, popups, dialogs and the right-click menu, and its Find runs {@code find.js} too.
+ * preview's origin, popups, dialogs, the right-click menu and the camera and microphone, and its Find runs
+ * {@code find.js} too.
  * {@link dev.jasper.browser.page.LastPress}, {@code Favicons}, {@code Page}'s methods and {@code PreviewPage}'s name no
  * Chromium type, and none of these classes loads until a browser item opens or a Markdown preview is made.
  */

@@ -1,5 +1,6 @@
 package dev.jasper.browser.item;
 
+import dev.jasper.browser.dialogs.DialogsTestAccess;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageTestAccess;
 import dev.jasper.browser.permissions.Decision;
@@ -22,9 +23,11 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -33,7 +36,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * stored decision at once, or else its prompt asks the user. Allow and Block are stored in the item's store, a
  * dismissal is not, and the same request is then refused without a prompt until the page's next main-frame load
  * (ruling F25). A /dev/null item's answers stay in its group's store. The plugin's stop dismisses an item's prompts and
- * asks nothing more. Stand-in items over stores in memory, on the testkit's fake host; no Chromium.
+ * asks nothing more. Stand-in items over stores in memory, on the testkit's fake host; no Chromium. The prompts read a
+ * clock each of whose readings is 10 s after the last, so the user answers each after its double-click interval.
  */
 class SitePermissionsTest {
     private static final String ID = "dev.jasper.browser";
@@ -43,6 +47,12 @@ class SitePermissionsTest {
         MICROPHONE = new PermissionRequest(SITE, Permission.MICROPHONE);
     private final MemoryStores memory = new MemoryStores();
     private FakePluginHost host;
+    private AutoCloseable unhurried;
+
+    @BeforeEach void unhurriedPrompts() {
+        var now = new AtomicLong();
+        unhurried = DialogsTestAccess.promptsTimedBy(() -> now.addAndGet(10_000));
+    }
 
     @AfterEach void close() throws Exception {
         if (host != null) onUi(() -> {
@@ -50,6 +60,7 @@ class SitePermissionsTest {
             return null;
         });
         memory.close();
+        unhurried.close();
     }
 
     @Test void aStoredDecisionAnswersAtOnceWithoutAPrompt() throws Exception {

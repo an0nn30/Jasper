@@ -25,6 +25,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class MediaAccessTest {
     private static final int AUDIO = MediaPermissionFlags.DEVICE_AUDIO_CAPTURE, VIDEO = MediaPermissionFlags.DEVICE_VIDEO_CAPTURE,
         DESKTOP_AUDIO = MediaPermissionFlags.DESKTOP_AUDIO_CAPTURE, DESKTOP_VIDEO = MediaPermissionFlags.DESKTOP_VIDEO_CAPTURE;
+    // The origin Chromium names for a sub-frame that asks: an embedded frame of another site, whose request is the page's.
+    private static final String FRAME = "https://frame.example/";
 
     @Test void theFlagsGiveTheCameraTheMicrophoneOrBothAndScreenCaptureOrNoDeviceGivesNothing() {
         assertThat(MediaPermissionFlags.NONE).isZero();
@@ -49,6 +51,55 @@ class MediaAccessTest {
     }
 
     /**
+     * Finding 5-r1 item 3: the preview client's own handler cancels a Markdown preview's request, whose browser is no
+     * page's, so no request depends on Chromium's default handling.
+     */
+    @Test void thePreviewClientsHandlerCancelsAPreviewsRequest() {
+        var callback = new Callback();
+        assertThat(PreviewHandlers.MEDIA.onRequestMediaAccessPermission(PageTestAccess.previewBrowser(), null, "jasper-preview://token",
+            VIDEO | AUDIO, callback)).as("handled").isTrue();
+        assertThat(callback.calls).containsExactly("cancel");
+        var ownerless = new Callback();
+        assertThat(new MediaAccess(() -> false).onRequestMediaAccessPermission(PageTestAccess.previewBrowser(), null, "https://example.com",
+            AUDIO, ownerless)).isTrue();
+        assertThat(ownerless.calls).as("a browser with no page").containsExactly("cancel");
+    }
+
+    /**
+     * Finding 5-r1 item 2: a main frame's request whose origin is not the site the main frame shows now came from a
+     * document that has gone, as when a page asks and then navigates to a site with a stored Allow: it is cancelled,
+     * asking nothing. A sub-frame's origin may differ, as the request is the top-level site's (ruling V16).
+     */
+    @Test void aMainFramesRequestFromADocumentThatHasGoneIsCancelledAskingNothing() throws Exception {
+        var asked = new CopyOnWriteArrayList<PermissionRequest>();
+        var answers = new CopyOnWriteArrayList<Consumer<Boolean>>();
+        Page page = onUi(() -> page((request, answer) -> {
+            asked.add(request);
+            answers.add(answer);
+        }));
+        var access = new MediaAccess(() -> false);
+        var gone = new Callback();
+        access.ask(page, "https://allowed.example/call", true, "https://asker.example/", VIDEO, gone::allow, gone::cancel);
+        var opaque = new Callback();
+        access.ask(page, "https://allowed.example/call", true, "null", VIDEO, opaque::allow, opaque::cancel);
+        assertThat(gone.calls).as("at once").containsExactly("cancel");
+        assertThat(opaque.calls).containsExactly("cancel");
+        var current = new Callback();
+        access.ask(page, "https://allowed.example/call", true, "https://Allowed.Example:443/", VIDEO, current::allow, current::cancel);
+        var embedded = new Callback();
+        access.ask(page, "https://allowed.example/call", false, "https://asker.example/", AUDIO, embedded::allow, embedded::cancel);
+        onUi(() -> null);
+        assertThat(asked).containsExactly(new PermissionRequest("https://allowed.example", Permission.CAMERA),
+            new PermissionRequest("https://allowed.example", Permission.MICROPHONE));
+        onUi(() -> {
+            answers.forEach(answer -> answer.accept(true));
+            return null;
+        });
+        assertThat(current.calls).containsExactly("continue " + VIDEO);
+        assertThat(embedded.calls).containsExactly("continue " + AUDIO);
+    }
+
+    /**
      * Ruling V16: the page's top-level site asks, as its main frame's address names it, whatever frame asked; an allowed
      * answer continues with what the request asked for, and a refusal cancels it, each once.
      */
@@ -61,11 +112,11 @@ class MediaAccessTest {
         }));
         var access = new MediaAccess(() -> false);
         var camera = new Callback();
-        access.ask(page, "https://ada:secret@Camera.Example:443/call?x=1#y", VIDEO, camera::allow, camera::cancel);
+        access.ask(page, "https://ada:secret@Camera.Example:443/call?x=1#y", false, FRAME, VIDEO, camera::allow, camera::cancel);
         var both = new Callback();
-        access.ask(page, "https://camera.example/call", VIDEO | AUDIO, both::allow, both::cancel);
+        access.ask(page, "https://camera.example/call", false, FRAME, VIDEO | AUDIO, both::allow, both::cancel);
         var microphone = new Callback();
-        access.ask(page, "http://localhost:8080/", AUDIO, microphone::allow, microphone::cancel);
+        access.ask(page, "http://localhost:8080/", false, FRAME, AUDIO, microphone::allow, microphone::cancel);
         onUi(() -> null);
         assertThat(asked).containsExactly(new PermissionRequest("https://camera.example", Permission.CAMERA),
             new PermissionRequest("https://camera.example", Permission.CAMERA_AND_MICROPHONE),
@@ -92,12 +143,12 @@ class MediaAccessTest {
         var cancelled = new CopyOnWriteArrayList<String>();
         for (String address : List.of("jasper-about:welcome", "about:blank", "data:text/html,<p>", "", "https://", "ftp://example.com/")) {
             var callback = new Callback();
-            access.ask(page, address, VIDEO, callback::allow, callback::cancel);
+            access.ask(page, address, false, FRAME, VIDEO, callback::allow, callback::cancel);
             cancelled.addAll(callback.calls);
         }
         for (int flags : List.of(DESKTOP_VIDEO, DESKTOP_AUDIO | AUDIO, MediaPermissionFlags.NONE)) {
             var callback = new Callback();
-            access.ask(page, "https://example.com/", flags, callback::allow, callback::cancel);
+            access.ask(page, "https://example.com/", false, FRAME, flags, callback::allow, callback::cancel);
             cancelled.addAll(callback.calls);
         }
         assertThat(cancelled).as("each cancelled at once, on the asking thread").containsOnly("cancel").hasSize(9);
@@ -118,12 +169,12 @@ class MediaAccessTest {
         Page failing = onUi(() -> page((request, answer) -> { throw new IllegalStateException("broken"); }));
         var access = new MediaAccess(() -> false);
         var first = new Callback();
-        access.ask(unanswered, "https://example.com/", VIDEO, first::allow, first::cancel);
+        access.ask(unanswered, "https://example.com/", false, FRAME, VIDEO, first::allow, first::cancel);
         var second = new Callback();
-        access.ask(closed, "https://example.com/", AUDIO, second::allow, second::cancel);
+        access.ask(closed, "https://example.com/", false, FRAME, AUDIO, second::allow, second::cancel);
         var third = new Callback();
         try (var log = new CapturedLog(PagePrivacy.class.getName())) {
-            access.ask(failing, "https://example.com/", AUDIO, third::allow, third::cancel);
+            access.ask(failing, "https://example.com/", false, FRAME, AUDIO, third::allow, third::cancel);
             onUi(() -> null);
             assertThat(log.records()).singleElement().satisfies(record -> {
                 assertThat(record.getLevel()).isEqualTo(java.util.logging.Level.WARNING);
@@ -143,9 +194,9 @@ class MediaAccessTest {
         var stopped = new AtomicBoolean();
         var access = new MediaAccess(stopped::get);
         var allowed = new Callback();
-        access.ask(page, "https://example.com/", VIDEO, allowed::allow, allowed::cancel);
+        access.ask(page, "https://example.com/", false, FRAME, VIDEO, allowed::allow, allowed::cancel);
         var refused = new Callback();
-        access.ask(page, "https://example.com/", AUDIO, refused::allow, refused::cancel);
+        access.ask(page, "https://example.com/", false, FRAME, AUDIO, refused::allow, refused::cancel);
         onUi(() -> null);
         stopped.set(true);
         onUi(() -> {

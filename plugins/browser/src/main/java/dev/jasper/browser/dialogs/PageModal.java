@@ -20,13 +20,54 @@ import java.util.function.Consumer;
  * and 12): Jasper's dialog over the page's item, owned by the item's tab and built from the SDK's nodes, an overlay of
  * the window. It shows only while its item is its window's active item, waiting until then, so a page the user is not
  * looking at cannot cover the window. An action of its view that it maps gives its answer and closes it; Escape reports
- * the form's cancel action, which it maps too. Anything else that ends it dismisses it: its own close, the page's close
- * with its item, Chromium's reset of the page's dialogs, {@link #dismiss()}, or a dialog that cannot open or show. It is
- * answered exactly once. UI thread.
+ * the form's cancel action, which it maps too. Its {@link Gate} may hold it back besides, as a script dialog waits while
+ * its page's permission prompt is asked, and may ignore an action for now, as a prompt ignores Allow until the
+ * double-click interval has passed. Anything else that ends it dismisses it: its own close, the page's close with its
+ * item, Chromium's reset of the page's dialogs, {@link #dismiss()}, or a dialog that cannot open or show. It is answered
+ * exactly once. UI thread.
  *
  * @param <T> what it answers
  */
 final class PageModal<T> {
+    /** What else decides when a modal shows and which of its actions answer it: by default, nothing. */
+    interface Gate {
+        /** A gate that holds nothing and lets every action answer. */
+        Gate OPEN = new Gate() { };
+
+        /**
+         * Whether the modal waits now, besides for its item to be active.
+         *
+         * @return whether it waits
+         */
+        default boolean holds() {
+            return false;
+        }
+
+        /**
+         * Has {@code released} told, on a later turn of the UI thread, once what holds the modal may have let go.
+         *
+         * @param released told once
+         * @return ends the wait
+         */
+        default Subscription onRelease(Runnable released) {
+            return () -> { };
+        }
+
+        /** The modal's dialog is about to show. */
+        default void showing() { }
+
+        /**
+         * Whether {@code action}, one the modal maps, answers it now; one that does not is ignored.
+         *
+         * @param action the action its view reported
+         * @return whether it answers
+         */
+        default boolean accepts(String action) {
+            return true;
+        }
+    }
+
+
     private static final System.Logger LOG = System.getLogger(PageModal.class.getName());
     private final Page page;
     private final DialogPlace place;
@@ -35,11 +76,12 @@ final class PageModal<T> {
     private final Map<String, T> answers;
     private final T dismissed;
     private final Consumer<T> answer;
+    private final Gate gate;
     private final AtomicBoolean answered = new AtomicBoolean();
     private boolean started;
     private PluginDialog dialog;
-    // While it waits for its item to become active.
-    private Subscription waiting;
+    // While it waits for its item to become active, and while its gate holds it.
+    private Subscription waiting, held;
     private List<Subscription> ends = List.of();
 
     /**
@@ -54,6 +96,18 @@ final class PageModal<T> {
      * @param answer told the answer, once
      */
     PageModal(Page page, DialogPlace place, String title, ViewSpec content, Map<String, T> answers, T dismissed, Consumer<T> answer) {
+        this(page, place, title, content, answers, dismissed, answer, Gate.OPEN);
+    }
+
+    /**
+     * As {@link #PageModal(Page, DialogPlace, String, ViewSpec, Map, Object, Consumer)}, shown and answered as
+     * {@code gate} lets it.
+     *
+     * @param gate what holds it back, and which actions answer it when
+     */
+    PageModal(Page page, DialogPlace place, String title, ViewSpec content, Map<String, T> answers, T dismissed, Consumer<T> answer,
+              Gate gate) {
+        this.gate = Objects.requireNonNull(gate, "gate");
         this.page = Objects.requireNonNull(page, "page");
         this.place = Objects.requireNonNull(place, "place");
         this.title = Objects.requireNonNull(title, "title");
@@ -83,11 +137,19 @@ final class PageModal<T> {
     }
 
     /**
-     * Shows the modal if its item is its window's active item, or else waits until it is. Activation is told in the
-     * middle of selecting a tab, so the modal, whose show blocks, is shown after that has finished.
+     * Shows the modal once its gate no longer holds it and its item is its window's active item, waiting for whichever
+     * has not come yet. Activation is told in the middle of selecting a tab, so the modal, whose show blocks, is shown
+     * after that has finished.
      */
     private void showWhenActive() {
         if (answered.get() || dialog != null) return;
+        if (gate.holds()) {
+            if (held == null) held = gate.onRelease(() -> {
+                held = null;
+                showWhenActive();
+            });
+            return;
+        }
         if (!place.owner().isActive()) {
             if (waiting == null)
                 waiting = place.owner().onActive(active -> { if (active) EventQueue.invokeLater(this::showWhenActive); });
@@ -111,6 +173,7 @@ final class PageModal<T> {
             view = place.kit().create(content, this::event);
             dialog.setContent(view);
             view = null; // the dialog's now, which disposes it as it closes
+            gate.showing();
             dialog.show(); // a modal overlay returns once it closes
         } catch (RuntimeException failed) {
             LOG.log(System.Logger.Level.WARNING, "A page's dialog could not show", failed);
@@ -121,6 +184,7 @@ final class PageModal<T> {
 
     private void event(UiEvent event) {
         if (!(event instanceof UiEvent.Action action) || answered.get() || !answers.containsKey(action.id())) return;
+        if (!gate.accepts(action.id())) return;
         finish(answers.get(action.id()));
         dialog.close();
     }
@@ -129,6 +193,8 @@ final class PageModal<T> {
     private void finish(T given) {
         if (!answered.compareAndSet(false, true)) return;
         stopWaiting();
+        if (held != null) held.close();
+        held = null;
         for (Subscription end : ends) end.close();
         answer.accept(given);
     }

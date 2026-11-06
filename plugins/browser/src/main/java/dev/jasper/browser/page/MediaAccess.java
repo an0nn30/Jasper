@@ -20,11 +20,13 @@ import org.cef.handler.CefPermissionHandler;
  * Pages' camera and microphone (spec section 12): the client's one permission handler, which answers every request
  * itself, so Chromium asks nothing of its own (ruling F26). A page's request is its top-level site's (ruling V16): the
  * origin of the address its main frame shows, read there and then on Chromium's thread, whichever of its frames asked,
- * so a grant follows the site the user sees and Jasper's prompt names it. It asks for the camera, the microphone or
- * both, as {@link #permission} reads Chromium's flags, through the page's {@link PagePrivacy}, which its item answers
- * from its store or with a prompt. An allowed request continues with exactly what it asked for, and any other answer
- * cancels it. A browser that is no page's, as DevTools' is, a page whose address has no site, such as Jasper's own
- * pages, and screen capture are cancelled at once, asking and storing nothing. Chromium asks on its own thread, and the
+ * so a grant follows the site the user sees and Jasper's prompt names it; a main frame's request from another origin
+ * came from a document that has gone, and is cancelled. It asks for the camera, the microphone or both, as
+ * {@link #permission} reads Chromium's flags, through the page's {@link PagePrivacy}, which its item answers from its
+ * store or with a prompt. An allowed request continues with exactly what it asked for, and any other answer cancels it.
+ * A browser that is no page's, as DevTools' and the Markdown previews' are, a page whose address has no site, such as
+ * Jasper's own pages, and screen capture are cancelled at once, asking and storing nothing. The preview client has a
+ * handler of its own ({@code PreviewHandlers}), which so cancels every request. Chromium asks on its own thread, and the
  * answer comes on the UI thread: JCEF's callback hands each call straight to CEF, whose callback takes it on any
  * thread, and continues one never answered with nothing once it is collected. An answer that comes once Chromium has
  * stopped touches the callback no more (ruling F43).
@@ -73,25 +75,30 @@ final class MediaAccess implements CefPermissionHandler {
                                                             CefMediaAccessCallback callback) {
         Page page = browser instanceof PageBrowser shown ? shown.owner() : null;
         if (page == null) callback.Cancel();
-        else ask(page, mainFrameAddress(browser), requested, callback::Continue, callback::Cancel);
+        else ask(page, mainFrameAddress(browser), frame == null || frame.isMain(), requestingOrigin, requested, callback::Continue,
+            callback::Cancel);
         return true;
     }
 
     /**
      * {@code page}'s top-level site, at {@code address}, asks for what {@code requested} names: {@code allow} is told
      * {@code requested} once the page's item allows it, and {@code cancel} is run when it does not, once, and nothing is
-     * run once Chromium has stopped. With no site or no permission, {@code cancel} runs at once and nothing is asked.
+     * run once Chromium has stopped. With no site or no permission, {@code cancel} runs at once and nothing is asked; so
+     * it does for a main frame's request from another origin than the address's, which came from a document that has
+     * gone, as when a page asks and then goes to a site with a stored Allow.
      *
      * @param page the page whose browser asks
      * @param address the address the page's main frame shows
+     * @param mainFrame whether the page's main frame asked, not one of its sub-frames
+     * @param requestingOrigin the origin of the document that asked, as Chromium names it
      * @param requested Chromium's flags
      * @param allow continues the request with the flags it is given
      * @param cancel cancels the request
      */
-    void ask(Page page, String address, int requested, IntConsumer allow, Runnable cancel) {
+    void ask(Page page, String address, boolean mainFrame, String requestingOrigin, int requested, IntConsumer allow, Runnable cancel) {
         Optional<Permission> permission = permission(requested);
         Optional<String> origin = Origins.of(address);
-        if (permission.isEmpty() || origin.isEmpty()) {
+        if (permission.isEmpty() || origin.isEmpty() || mainFrame && !Origins.of(requestingOrigin).equals(origin)) {
             cancel.run();
             return;
         }
