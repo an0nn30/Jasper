@@ -2,6 +2,7 @@ package dev.jasper.browser.item;
 
 import dev.jasper.browser.page.NavigationHistory;
 import dev.jasper.browser.page.Page;
+import dev.jasper.browser.pages.PageHtml;
 import java.awt.EventQueue;
 import java.net.URI;
 import java.util.Iterator;

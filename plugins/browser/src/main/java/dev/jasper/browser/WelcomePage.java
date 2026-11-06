@@ -1,7 +1,7 @@
 package dev.jasper.browser;
 
 import dev.jasper.browser.engine.AboutScheme;
-import dev.jasper.browser.item.PageHtml;
+import dev.jasper.browser.pages.PageHtml;
 import dev.jasper.sdk.ui.Appearance;
 import dev.jasper.sdk.ui.WorkspacePalette;
 

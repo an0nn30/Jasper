@@ -1,13 +1,18 @@
 package dev.jasper.browser.json;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * The one reader of untrusted JSON the Browser has, for a page's requests through the opener bridge and DevTools'
  * answers: one object, read whole and strictly, within a nesting bound; anything else gives nothing, never an exception.
+ * And the one writer of the answers Jasper's own pages read, whose every string reads back as it was written.
  */
 class StrictJsonTest {
     @Test void readsEveryKindOfValue() {
@@ -56,5 +61,64 @@ class StrictJsonTest {
         assertThat(StrictJson.array("[[1]]", 1)).isEmpty();
         assertThat(StrictJson.array("[[1]]", 2)).isPresent();
         assertThat(StrictJson.array("[" + "[".repeat(100_000), 8)).as("no stack overflow").isEmpty();
+    }
+
+    /** Plan 5's F6: every answer a page of Jasper's reads is written here, compactly, and reads back as it was written. */
+    @Test void writesMapsListsStringsLongsBooleansAndNullInTheirOrder() {
+        var members = new LinkedHashMap<String, Object>();
+        members.put("s", "x");
+        members.put("n", 42L);
+        members.put("negative", Long.MIN_VALUE);
+        members.put("t", true);
+        members.put("f", false);
+        members.put("none", StrictJson.NULL);
+        members.put("list", List.of("a", 1L, List.of(), Map.of()));
+        members.put("o", Map.of("k", "v"));
+        String text = StrictJson.write(members);
+        assertThat(text).isEqualTo("{\"s\":\"x\",\"n\":42,\"negative\":-9223372036854775808,\"t\":true,\"f\":false,\"none\":null,"
+            + "\"list\":[\"a\",1,[],{}],\"o\":{\"k\":\"v\"}}");
+        members.remove("negative"); // more than 18 digits, which the reader takes as a number it does not hold
+        assertThat(StrictJson.object(StrictJson.write(members), 3)).hasValue(members);
+        assertThat(StrictJson.write(List.of())).isEqualTo("[]");
+        assertThat(StrictJson.write(Map.of())).isEqualTo("{}");
+        assertThat(StrictJson.write("x")).isEqualTo("\"x\"");
+        assertThat(StrictJson.write(StrictJson.NULL)).isEqualTo("null");
+    }
+
+    /**
+     * Review Focus 1: a hostile title or address in an answer stays one string. Quotes, backslashes, control characters,
+     * DEL, the line and paragraph separators and surrogates are escaped, so none ends the string or the line it is on.
+     */
+    @Test void aWrittenStringEscapesQuotesControlCharactersAndTheLineAndParagraphSeparators() {
+        String face = new String(Character.toChars(0x1F600));
+        String hostile = "</script><img src=x onerror=alert(1)>\"'\\" + (char) 0x2028 + (char) 0x2029 + "\n\r\t\b\f"
+            + (char) 0x01 + (char) 0x1F + (char) 0x7F + face + "\u00e9";
+        String text = StrictJson.write(Map.of("title", hostile));
+        assertThat(text).contains("\\\"'\\\\", "\\u2028", "\\u2029", "\\n\\r\\t\\b\\f", "\\u0001", "\\u001f", "\\u007f", "\\ud83d\\ude00",
+            "\u00e9");
+        assertThat(text.chars().filter(c -> c < 0x20 || c == 0x7F || c == 0x2028 || c == 0x2029 || Character.isSurrogate((char) c)))
+            .as("no raw control character, separator or surrogate").isEmpty();
+        assertThat(StrictJson.object(text, 1)).hasValue(Map.of("title", hostile));
+    }
+
+    /** Only what JSON holds is written: Java's null, other numbers, other objects and keys that are not text are refused. */
+    @Test void writingRefusesWhatJsonCannotHold() {
+        var nulls = Arrays.asList("a", null);
+        var nullValue = new LinkedHashMap<String, Object>();
+        nullValue.put("a", null);
+        for (Object value : new Object[] {null, 1, 1.5, 'c', new Object(), StrictJson.NUMBER, Map.of(1L, "x"), nulls, nullValue})
+            assertThatThrownBy(() -> StrictJson.write(value)).as(String.valueOf(value)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    /** Nesting is bounded, so a list or map that holds itself is refused rather than written forever. */
+    @Test void writingRefusesNestingPastItsBoundAndACycle() {
+        Object deepest = "x";
+        for (int level = 0; level < StrictJson.WRITE_DEPTH; level++) deepest = level % 2 == 0 ? List.of(deepest) : Map.of("k", deepest);
+        Object bounded = deepest;
+        assertThat(StrictJson.write(bounded)).as("%d levels", StrictJson.WRITE_DEPTH).endsWith("\"x\"" + "]}".repeat(StrictJson.WRITE_DEPTH / 2));
+        assertThatThrownBy(() -> StrictJson.write(List.of(bounded))).as("one more").isInstanceOf(IllegalArgumentException.class);
+        var cycle = new ArrayList<Object>();
+        cycle.add(cycle);
+        assertThatThrownBy(() -> StrictJson.write(cycle)).isInstanceOf(IllegalArgumentException.class);
     }
 }

@@ -1,0 +1,51 @@
+/*
+ * What every one of Jasper's own pages (jasper-about:) shares, after the theme's colours: --background, --card,
+ * --text, --muted, --border, --accent, --warning and --error. Nothing on these pages moves.
+ */
+html, body { margin: 0; background: var(--background); color: var(--text); }
+body { font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; }
+main { max-width: 880px; margin: 0 auto; padding: 48px 24px 72px; }
+h1 { margin: 0 0 4px; font-size: 28px; font-weight: 600; }
+h2 { margin: 28px 0 8px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.subtitle { margin: 0 0 24px; color: var(--muted); }
+.muted { color: var(--muted); }
+.grow { flex: 1; min-width: 0; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 16px; }
+input, select, button { font: inherit; color: var(--text); }
+input[type="search"], input[type="text"], select {
+  padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--card);
+}
+input[type="search"] { flex: 1; min-width: 200px; }
+button {
+  padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); cursor: pointer;
+}
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--background); font-weight: 600; }
+button.danger { color: var(--error); }
+button.icon { padding: 2px 8px; border-color: transparent; background: transparent; color: var(--muted); }
+button.icon:hover { color: var(--error); border-color: var(--border); }
+button:disabled { opacity: 0.5; cursor: default; }
+a { color: var(--accent); text-decoration: none; overflow-wrap: anywhere; }
+a:hover { text-decoration: underline; }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+.list { margin: 0; padding: 0; list-style: none; }
+.row { display: flex; gap: 12px; align-items: baseline; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.row:hover { background: var(--card); }
+.title { overflow-wrap: anywhere; }
+.address { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.time { flex: none; width: 4em; color: var(--muted); font-variant-numeric: tabular-nums; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { padding: 1px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--card); font-size: 12px; }
+.chip[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+.tile {
+  display: block; padding: 12px 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--card);
+  color: var(--text); text-decoration: none;
+}
+.tile:hover { border-color: var(--accent); text-decoration: none; }
+.empty { padding: 48px 0; text-align: center; color: var(--muted); }
+.more { display: block; margin: 16px auto 0; }
+.actions { display: flex; gap: 8px; justify-content: flex-end; margin: 32px 0 0; }
+[hidden] { display: none !important; }

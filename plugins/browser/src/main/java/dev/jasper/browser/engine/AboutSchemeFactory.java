@@ -27,6 +27,9 @@ import org.cef.network.CefResponse;
  * none, is answered 404 with an empty body and runs no action: no Jasper page loads a {@code jasper-about:} address but
  * as its main frame, so a local page's {@code <img>} or {@code <iframe>} can neither run an action nor have a source
  * page built.
+ *
+ * <p>A page's redirect is answered 302, its address handed to Chromium as the request's redirect, with no body;
+ * Chromium then requests that address in its place.
  */
 final class AboutSchemeFactory implements CefSchemeHandlerFactory {
     private final AboutScheme pages;
@@ -62,13 +65,14 @@ final class AboutSchemeFactory implements CefSchemeHandlerFactory {
      * One request: the status, then the body. An answer that is ready when Chromium opens the request is handled at
      * once; one still to come lets {@code open} return, so Chromium's IO thread goes on, and continues the request once it
      * comes, off that thread, unless Chromium cancelled the request meanwhile, which cancels the answer. An action's 204
-     * has no body.
+     * and a redirect's 302 have no body.
      */
     static final class Page extends CefResourceHandlerAdapter {
         private final CompletableFuture<AboutScheme.Answer> answer;
         // Set before Chromium is told to go on, read on its thread after.
         private volatile int status;
         private volatile byte[] body = new byte[0];
+        private volatile String location;
         private volatile boolean cancelled;
         private int sent;
 
@@ -97,11 +101,14 @@ final class AboutSchemeFactory implements CefSchemeHandlerFactory {
             response.setStatusText(switch (status) {
                 case 200 -> "OK";
                 case 204 -> "No Content";
+                case 302 -> "Found";
                 default -> "Not Found";
             });
             response.setMimeType("text/html");
             // The charset, which JCEF's CefResponse has no setter for.
             response.setHeaderByName("Content-Type", "text/html; charset=utf-8", true);
+            String to = location;
+            if (to != null) redirectUrl.set(to);
             responseLength.set(body.length);
         }
 
@@ -127,6 +134,7 @@ final class AboutSchemeFactory implements CefSchemeHandlerFactory {
         private void take(AboutScheme.Answer answered) {
             AboutScheme.Answer given = answered == null ? AboutScheme.NOT_FOUND : answered;
             body = given.html().getBytes(StandardCharsets.UTF_8);
+            location = given.location().orElse(null);
             status = given.status();
         }
     }

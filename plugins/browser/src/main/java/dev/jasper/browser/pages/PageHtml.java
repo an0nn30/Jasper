@@ -1,4 +1,4 @@
-package dev.jasper.browser.item;
+package dev.jasper.browser.pages;
 
 import dev.jasper.sdk.ui.WorkspacePalette;
 import java.awt.Color;
@@ -9,7 +9,8 @@ import java.util.regex.Pattern;
 
 /**
  * What Jasper's own {@code jasper-about:} pages share (spec section 14): the workspace theme's colours as CSS custom
- * properties, text escaped for HTML and cut to a length, and the random tokens by which an item knows its own pages.
+ * properties, text escaped for HTML and cut to a length, and the random tokens by which an item knows its own pages and
+ * {@link AboutPages} its scripts. The {@code item} package's error and source pages use it too.
  */
 public final class PageHtml {
     private static final Pattern TOKENS = Pattern.compile("[0-9a-f]{32}");
@@ -66,28 +67,46 @@ public final class PageHtml {
     /**
      * A new random token, 128 bits as 32 lowercase hexadecimal digits: what names one of an item's pages to it, which no
      * page can guess.
+     *
+     * @return the token
      */
-    static String newToken() {
+    public static String newToken() {
         var bytes = new byte[16];
         RANDOM.nextBytes(bytes);
         return HexFormat.of().formatHex(bytes);
     }
 
-    /** Whether {@code text} is a token as {@link #newToken} makes them. */
-    static boolean isToken(String text) {
+    /**
+     * Whether {@code text} is a token as {@link #newToken} makes them.
+     *
+     * @param text any text
+     * @return whether it is one
+     */
+    public static boolean isToken(String text) {
         return TOKENS.matcher(text).matches();
     }
 
-    /** {@code text} cut to {@code length} characters, the last an ellipsis, when it is longer. */
-    static String cut(String text, int length) {
+    /**
+     * {@code text} cut to {@code length} characters, the last an ellipsis, when it is longer; never inside a character.
+     *
+     * @param text any text
+     * @param length the most characters to keep, the ellipsis one of them
+     * @return the text, or its start and an ellipsis
+     */
+    public static String cut(String text, int length) {
         if (text.length() <= length) return text;
         int end = length - 1;
         if (Character.isHighSurrogate(text.charAt(end - 1))) end--;
         return text.substring(0, end) + ELLIPSIS;
     }
 
-    /** {@code color} as CSS, its alpha kept. */
-    static String css(Color color) {
+    /**
+     * {@code color} as CSS, its alpha kept.
+     *
+     * @param color a colour
+     * @return {@code #rrggbb}, or {@code rgba(…)} for a colour that is not opaque
+     */
+    public static String css(Color color) {
         if (color.getAlpha() == 255) return String.format(Locale.ROOT, "#%02x%02x%02x", color.getRed(), color.getGreen(), color.getBlue());
         return String.format(Locale.ROOT, "rgba(%d, %d, %d, %.3f)", color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha() / 255.0);
     }

@@ -52,7 +52,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * A page's dialogs (spec section 5): {@code alert} and {@code confirm} are Jasper's in-window modals over the page's
  * item, built from the SDK's nodes, and each is answered exactly once, whether the user answers it, cancels it, or the
  * item closes under it; they wait while their item is not its window's active item, go when Chromium resets the page's
- * dialogs, and a page that floods them is refused them until it loads again; {@code prompt} shows nothing;
+ * dialogs, and a page that floods them is refused them until it loads again, unless it is one of Jasper's own;
+ * {@code prompt} shows nothing;
  * {@code beforeunload} lets the page go without asking; and a file input opens Jasper's chooser over the item. The pages are the items' own, open on the testkit's fake host, so no
  * Chromium is needed: Chromium's side is played by the test thread, which asks as Chromium's own thread would, and
  * by recording replies.
@@ -60,6 +61,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PageDialogsTest {
     private static final String ID = "dev.jasper.browser";
     private static final String ALERT = "Web Page Alert", CONFIRM = "Web Page Confirmation";
+    // The origin Chromium names for a dialog of a web page.
+    private static final String WEB = "https://example.com/";
     private Shown shown;
 
     // Stores in memory, one for each BrowserItems a test makes.
@@ -76,7 +79,7 @@ class PageDialogsTest {
     @Test void anAlertIsAnOverlayOverItsItemHeadedWebPageAlertWithTheMessageAsTextAndOK() throws Exception {
         shown = show();
         var replies = new Replies();
-        ScriptDialog.ask(shown.page, ScriptDialog.Kind.ALERT, "Saved.\n<b>Twice</b>", replies);
+        ScriptDialog.ask(shown.page, ScriptDialog.Kind.ALERT, WEB, "Saved.\n<b>Twice</b>", replies);
         onUiThread(() -> {
             assertThat(shown.host.dialogPresentation(ID, ALERT)).contains(DialogSpec.Presentation.OVERLAY);
             Nodes.Form form = form(ALERT);
@@ -104,7 +107,7 @@ class PageDialogsTest {
         shown = show();
         LongSupplier unhurried = unhurried();
         var ok = new Replies();
-        ScriptDialog.ask(shown.page, ScriptDialog.Kind.CONFIRM, "Leave?", ok, unhurried);
+        ScriptDialog.ask(shown.page, ScriptDialog.Kind.CONFIRM, WEB, "Leave?", ok, unhurried);
         onUiThread(() -> {
             assertThat(shown.host.dialogPresentation(ID, CONFIRM)).contains(DialogSpec.Presentation.OVERLAY);
             Nodes.Form form = form(CONFIRM);
@@ -121,13 +124,13 @@ class PageDialogsTest {
         });
 
         var cancel = new Replies();
-        ScriptDialog.ask(shown.page, ScriptDialog.Kind.CONFIRM, "Leave?", cancel, unhurried);
+        ScriptDialog.ask(shown.page, ScriptDialog.Kind.CONFIRM, WEB, "Leave?", cancel, unhurried);
         onUiThread(() -> press(CONFIRM, form(CONFIRM).actions().getFirst().action()));
         var escape = new Replies();
-        ScriptDialog.ask(shown.page, ScriptDialog.Kind.CONFIRM, "Leave?", escape, unhurried);
+        ScriptDialog.ask(shown.page, ScriptDialog.Kind.CONFIRM, WEB, "Leave?", escape, unhurried);
         onUiThread(() -> press(CONFIRM, form(CONFIRM).cancelAction()));
         var closed = new Replies();
-        ScriptDialog.ask(shown.page, ScriptDialog.Kind.CONFIRM, "Leave?", closed, unhurried);
+        ScriptDialog.ask(shown.page, ScriptDialog.Kind.CONFIRM, WEB, "Leave?", closed, unhurried);
         onUiThread(() -> {
             assertThat(shown.host.requestClose("dialog")).as("the dialog's own close").isTrue();
             assertThat(cancel.calls).containsExactly("false|");
@@ -143,18 +146,18 @@ class PageDialogsTest {
         shown = show();
         LongSupplier unhurried = unhurried();
         String face = new String(Character.toChars(0x1F600));
-        ScriptDialog.ask(shown.page, ScriptDialog.Kind.ALERT, "a".repeat(9_998) + face + "tail", new Replies(), unhurried);
+        ScriptDialog.ask(shown.page, ScriptDialog.Kind.ALERT, WEB, "a".repeat(9_998) + face + "tail", new Replies(), unhurried);
         onUiThread(() -> {
             String text = ((Nodes.Text) form(ALERT).sections().getFirst()).text();
             assertThat(text).isEqualTo("a".repeat(9_998) + "…");
             press(ALERT, form(ALERT).cancelAction());
         });
-        ScriptDialog.ask(shown.page, ScriptDialog.Kind.ALERT, "b".repeat(10_000), new Replies(), unhurried);
+        ScriptDialog.ask(shown.page, ScriptDialog.Kind.ALERT, WEB, "b".repeat(10_000), new Replies(), unhurried);
         onUiThread(() -> {
             assertThat(((Nodes.Text) form(ALERT).sections().getFirst()).text()).as("10,000 fit").isEqualTo("b".repeat(10_000));
             press(ALERT, form(ALERT).cancelAction());
         });
-        ScriptDialog.ask(shown.page, ScriptDialog.Kind.ALERT, null, new Replies(), unhurried);
+        ScriptDialog.ask(shown.page, ScriptDialog.Kind.ALERT, WEB, null, new Replies(), unhurried);
         onUiThread(() -> assertThat(((Nodes.Text) form(ALERT).sections().getFirst()).text()).as("alert()").isEmpty());
     }
 
@@ -166,7 +169,7 @@ class PageDialogsTest {
     @Test void anItemThatClosesWhileAnAlertShowsDismissesItAndContinuesItOnce() throws Exception {
         shown = show();
         var replies = new Replies();
-        ScriptDialog.ask(shown.page, ScriptDialog.Kind.ALERT, "Wait", replies);
+        ScriptDialog.ask(shown.page, ScriptDialog.Kind.ALERT, WEB, "Wait", replies);
         var other = new AtomicReference<BrowserItem>();
         onUiThread(() -> {
             other.set(shown.items.open(URI.create("https://example.org"), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty()));
@@ -178,7 +181,7 @@ class PageDialogsTest {
             assertThat(shown.host.contentTabs()).containsExactly(other.get().tab());
             shown.item.close();
         });
-        ScriptDialog.ask(shown.page, ScriptDialog.Kind.CONFIRM, "Again?", replies);
+        ScriptDialog.ask(shown.page, ScriptDialog.Kind.CONFIRM, WEB, "Again?", replies);
         onUiThread(() -> {
             assertThat(shown.host.windows()).as("a closed page shows nothing").isEmpty();
             assertThat(replies.calls).as("answered at once, as cancelled").containsExactly("false|", "false|");
@@ -188,7 +191,7 @@ class PageDialogsTest {
         var popup = show();
         try {
             var confirmed = new Replies();
-            ScriptDialog.ask(popup.page, ScriptDialog.Kind.CONFIRM, "Close?", confirmed);
+            ScriptDialog.ask(popup.page, ScriptDialog.Kind.CONFIRM, WEB, "Close?", confirmed);
             onUiThread(() -> {
                 assertThat(popup.host.windowView(ID, CONFIRM)).isPresent();
                 popup.page.closeItem(); // window.close()
@@ -214,7 +217,7 @@ class PageDialogsTest {
             assertThat(shown.item.tab().isActive()).as("behind the other item").isFalse();
         });
         var replies = new Replies();
-        ScriptDialog.ask(shown.page, ScriptDialog.Kind.ALERT, "Behind", replies);
+        ScriptDialog.ask(shown.page, ScriptDialog.Kind.ALERT, WEB, "Behind", replies);
         onUiThread(() -> {
             assertThat(shown.host.windows()).as("waiting").isEmpty();
             assertThat(replies.calls).isEmpty();
@@ -244,7 +247,7 @@ class PageDialogsTest {
         var other = new AtomicReference<BrowserItem>();
         onUiThread(() -> other.set(shown.items.open(URI.create("https://example.org"), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty())));
         var replies = new Replies();
-        ScriptDialog.ask(shown.page, ScriptDialog.Kind.CONFIRM, "Behind", replies);
+        ScriptDialog.ask(shown.page, ScriptDialog.Kind.CONFIRM, WEB, "Behind", replies);
         onUiThread(() -> {
             assertThat(replies.calls).isEmpty();
             shown.item.close();
@@ -263,7 +266,7 @@ class PageDialogsTest {
     @Test void aResetDismissesTheDialogShownOrWaiting() throws Exception {
         shown = show();
         var shownReply = new Replies();
-        ScriptDialog.ask(shown.page, ScriptDialog.Kind.CONFIRM, "Shown", shownReply);
+        ScriptDialog.ask(shown.page, ScriptDialog.Kind.CONFIRM, WEB, "Shown", shownReply);
         onUiThread(() -> {
             assertThat(shown.host.windowView(ID, CONFIRM)).isPresent();
             shown.page.dialogsReset();
@@ -273,7 +276,7 @@ class PageDialogsTest {
         var other = new AtomicReference<BrowserItem>();
         onUiThread(() -> other.set(shown.items.open(URI.create("https://example.org"), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty())));
         var waitingReply = new Replies();
-        ScriptDialog.ask(shown.page, ScriptDialog.Kind.ALERT, "Waiting", waitingReply);
+        ScriptDialog.ask(shown.page, ScriptDialog.Kind.ALERT, WEB, "Waiting", waitingReply);
         onUiThread(() -> {
             assertThat(waitingReply.calls).isEmpty();
             shown.page.dialogsReset();
@@ -298,14 +301,14 @@ class PageDialogsTest {
         shown = show();
         var clock = new AtomicLong();
         var first = new Replies();
-        ScriptDialog.ask(shown.page, ScriptDialog.Kind.ALERT, "1", first, clock::get);
+        ScriptDialog.ask(shown.page, ScriptDialog.Kind.ALERT, WEB, "1", first, clock::get);
         onUiThread(() -> {
             clock.set(100);
             press(ALERT, form(ALERT).actions().getFirst().action());
         });
         clock.set(600);
         var second = new Replies();
-        ScriptDialog.ask(shown.page, ScriptDialog.Kind.ALERT, "2", second, clock::get);
+        ScriptDialog.ask(shown.page, ScriptDialog.Kind.ALERT, WEB, "2", second, clock::get);
         onUiThread(() -> {
             assertThat(shown.host.windowView(ID, ALERT)).as("the second shows").isPresent();
             clock.set(700);
@@ -313,11 +316,11 @@ class PageDialogsTest {
         });
         clock.set(1_650);
         var third = new Replies();
-        ScriptDialog.ask(shown.page, ScriptDialog.Kind.CONFIRM, "3", third, clock::get);
+        ScriptDialog.ask(shown.page, ScriptDialog.Kind.CONFIRM, WEB, "3", third, clock::get);
         onUiThread(() -> assertThat(third.calls).as("950 ms after the second closed").containsExactly("false|"));
         clock.set(60_000);
         var later = new Replies();
-        ScriptDialog.ask(shown.page, ScriptDialog.Kind.ALERT, "4", later, clock::get);
+        ScriptDialog.ask(shown.page, ScriptDialog.Kind.ALERT, WEB, "4", later, clock::get);
         onUiThread(() -> {
             assertThat(shown.host.windows()).as("refused unshown").isEmpty();
             assertThat(first.calls).containsExactly("true|");
@@ -327,11 +330,50 @@ class PageDialogsTest {
             PageTestAccess.loadStarted(shown.page, "https://example.com/next");
         });
         var reloaded = new Replies();
-        ScriptDialog.ask(shown.page, ScriptDialog.Kind.ALERT, "5", reloaded, clock::get);
+        ScriptDialog.ask(shown.page, ScriptDialog.Kind.ALERT, WEB, "5", reloaded, clock::get);
         onUiThread(() -> {
             assertThat(shown.host.windowView(ID, ALERT)).as("a new document may ask again").isPresent();
             press(ALERT, form(ALERT).actions().getFirst().action());
             assertThat(reloaded.calls).containsExactly("true|");
+            assertThat(shown.host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * Jasper's own pages confirm each row's delete, as iTerm2's do, and a user deleting rows quickly must not be refused:
+     * three confirms 100 ms apart all show from {@code jasper-about://history/}, while from a web page the third is
+     * refused as a flood.
+     */
+    @Test void jaspersOwnPagesConfirmsAreNeverAFloodWhileAWebPagesThirdQuickOneIsRefused() throws Exception {
+        shown = show();
+        var clock = new AtomicLong();
+        for (int confirm = 1; confirm <= 3; confirm++) {
+            clock.set(confirm * 100L);
+            var replies = new Replies();
+            ScriptDialog.ask(shown.page, ScriptDialog.Kind.CONFIRM, "jasper-about://history/", "Delete this history entry?", replies, clock::get);
+            int asked = confirm;
+            onUiThread(() -> {
+                assertThat(shown.host.windowView(ID, CONFIRM)).as("Jasper's confirm " + asked + " shows").isPresent();
+                clock.addAndGet(10);
+                press(CONFIRM, form(CONFIRM).actions().getLast().action());
+                assertThat(replies.calls).containsExactly("true|");
+            });
+        }
+        var answers = new java.util.ArrayList<Replies>();
+        for (int confirm = 1; confirm <= 3; confirm++) {
+            clock.set(1_000 + confirm * 100L);
+            var replies = new Replies();
+            answers.add(replies);
+            ScriptDialog.ask(shown.page, ScriptDialog.Kind.CONFIRM, "https://a.example/", "Delete?", replies, clock::get);
+            onUiThread(() -> {
+                if (shown.host.windowView(ID, CONFIRM).isEmpty()) return;
+                clock.addAndGet(10);
+                press(CONFIRM, form(CONFIRM).actions().getLast().action());
+            });
+        }
+        onUiThread(() -> {
+            assertThat(answers).extracting(replies -> replies.calls).containsExactly(List.of("true|"), List.of("true|"), List.of("false|"));
+            assertThat(shown.host.windows()).isEmpty();
             assertThat(shown.host.failures()).isEmpty();
         });
     }
@@ -364,7 +406,7 @@ class PageDialogsTest {
 
     @Test void aDialogForNoPageIsAnsweredAtOnceAsCancelled() throws Exception {
         var replies = new Replies();
-        ScriptDialog.ask(null, ScriptDialog.Kind.ALERT, "Lost", replies);
+        ScriptDialog.ask(null, ScriptDialog.Kind.ALERT, WEB, "Lost", replies);
         onUiThread(() -> assertThat(replies.calls).containsExactly("false|"));
     }
 

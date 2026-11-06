@@ -4,6 +4,7 @@ import dev.jasper.browser.engine.AboutScheme;
 import dev.jasper.browser.page.LoadFailure;
 import dev.jasper.browser.page.NavigationHistory;
 import dev.jasper.browser.page.ServerCertificate;
+import dev.jasper.browser.pages.PageHtml;
 import dev.jasper.sdk.Variant;
 import dev.jasper.sdk.ui.Appearance;
 import dev.jasper.sdk.ui.WorkspacePalette;

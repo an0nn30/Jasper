@@ -2,6 +2,7 @@ package dev.jasper.browser;
 
 import dev.jasper.browser.api.MarkdownPreviews;
 import dev.jasper.browser.dialogs.PageDialogs;
+import dev.jasper.browser.engine.AboutQueries;
 import dev.jasper.browser.engine.AboutScheme;
 import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.engine.PreviewScheme;
@@ -85,11 +86,13 @@ public class BrowserPlugin implements Plugin {
         var database = BrowserDatabase.file(data.resolve("browser.sqlite"), cause -> EventQueue.invokeLater(() -> storesUnavailable(cause)));
         stores = new Stores(database, EventQueue::invokeLater);
         // A page is made when its item first shows: the client's handlers are installed then, before any page is made on
-        // it, as naming their types loads Chromium's classes.
+        // it, as naming their types loads Chromium's classes. Jasper's own pages ask Java through a router of their own,
+        // read and answered on the background executor.
         Chromium engine = chromium;
         var items = new BrowserItems(context, settings::read, stores, page -> {
             PageNavigation.prepare(engine);
             PageDialogs.prepare(engine);
+            AboutQueries.prepare(engine, about, context.background());
             page.start(engine);
         });
         this.items = items;
