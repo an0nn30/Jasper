@@ -193,7 +193,8 @@ public final class Page implements AutoCloseable {
     }
 
     /**
-     * The page's privacy hooks, through which its site's camera and microphone requests reach its item. Any thread.
+     * The page's privacy hooks, through which its site's camera, microphone and notification requests, and its
+     * notifications, reach its item, and its item's stored decisions reach the page. Any thread.
      *
      * @return the hooks, the same each time
      */
@@ -205,8 +206,9 @@ public final class Page implements AutoCloseable {
      * Makes the page's browser: asks {@code chromium} for its client, starting Chromium when no page has yet, and for its
      * group's request context, and makes the browser in that context once the client, the context and what
      * {@link #makeAfter} gave are all ready, which then loads what the page was last asked to. Only the browser waits for
-     * them: Chromium's start waits for none. The client's display, load, keyboard, context-menu and permission handlers
-     * are installed before any page is made on it. Once; nothing after {@link #close()}.
+     * them: Chromium's start waits for none. The client's display, load, keyboard, context-menu and permission handlers,
+     * and the hooks that run its frames' privacy scripts, are installed before any page is made on it. Once; nothing
+     * after {@link #close()}.
      *
      * @param chromium the plugin's Chromium
      */
@@ -217,6 +219,7 @@ public final class Page implements AutoCloseable {
         PageEvents.prepare(chromium);
         PageMenu.prepare(chromium);
         MediaAccess.prepare(chromium);
+        FrameScripts.prepare(chromium);
         CompletableFuture<CefClient> client = chromium.client();
         CompletableFuture<CefRequestContext> inContext = context.context(chromium);
         // What the item waits for counts once done, however it ended.

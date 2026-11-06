@@ -75,8 +75,9 @@ import javax.swing.JComponent;
  * "Bookmark Removed", and Manage Bookmarks and History load Jasper's bookmarks and history pages. Its Reset items, one
  * for each permission its store holds for the page's site ({@link PrivacyMenu}), revoke that permission for the site the
  * menu offered them for and reload the store's items that show the site; the menu follows the store's permissions as
- * they change. Its page's requests for the camera and the microphone are answered from its store, or asked of the user
- * ({@link SitePermissions}). It saves its URL, its own zoom and its target with Jasper's workspace
+ * they change. Its page's requests for the camera, the microphone and notifications are answered from its store, or
+ * asked of the user ({@link SitePermissions}), and its page's notifications show as Jasper's in the item's window
+ * ({@link PageNotifications}). It saves its URL, its own zoom and its target with Jasper's workspace
  * ({@link BrowserRestore}): what it loads first until it shows, then where each committed navigation takes its page.
  * Restored after a run that ended while Chromium ran, an item waits: in place of the canvas it says that Jasper closed
  * while the page was open, and it asks for its page only once the user loads it, with its Load Page button, Enter in the
@@ -130,8 +131,10 @@ public final class BrowserItem implements AutoCloseable {
     private final Subscription bookmarksChanged, visitsChanged;
     // The menu's privacy group, which follows the store's permissions until the item closes.
     private final PrivacyMenu privacy;
-    // Answers the page's camera and microphone requests until the item closes or the plugin stops.
+    // Answers the page's camera, microphone and notification requests until the item closes or the plugin stops.
     private final SitePermissions sitePermissions;
+    // The plugin's pages' notifications, which the page's go to.
+    private final PageNotifications notifications;
     private final BrowserFindBar findBar;
     private final UiView view;
     private ContentTab tab;
@@ -185,6 +188,12 @@ public final class BrowserItem implements AutoCloseable {
         errors = new ErrorPages(page, store.allowance(), this::load);
         privacy = new PrivacyMenu(store, items, errors::address, this::reloadForPermissions);
         sitePermissions = new SitePermissions(page, store, items::closed);
+        // The page's notifications are Jasper's, in the item's window, until it closes; a new document's names are its own.
+        notifications = items.pageNotifications();
+        page.privacy().onNotifications(notice -> !closed && tab != null
+                && notifications.post(page, tab.window(), notice.origin(), notice.id(), notice.title(), notice.body()),
+            id -> notifications.close(page, id));
+        page.onLoadStart(address -> notifications.forget(page));
         page.onLoadFailure(failure -> { if (!closed) errors.failed(failure); });
         sources = new SourcePages(page, this::load);
         history = new HistoryRecorder(page, stores, items::later);
@@ -682,6 +691,7 @@ public final class BrowserItem implements AutoCloseable {
         sources.close();
         if (devTools != null) devTools.close();
         items.closed(this);
+        notifications.forget(page);
         view.close();
         page.close();
         releaseStore();

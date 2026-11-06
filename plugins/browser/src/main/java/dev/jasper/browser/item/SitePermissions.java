@@ -14,13 +14,14 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 /**
- * One item's answers to its page's permission requests (spec section 12), such as for the camera: the decision its
- * store holds for the site answers at once; otherwise the page's {@link PermissionPrompt} asks the user. Allow stores
- * Allowed in the item's store and answers true, Block stores Blocked and answers false, and a prompt dismissed answers
- * false and stores nothing; the same request is then refused without a prompt until the page's next main-frame load
- * (ruling F25), so a page cannot ask again at once. A prompt the load itself takes away counts as no dismissal. A
- * /dev/null item's decisions stay in its group's store. Once the item closes, or the plugin stops, which takes the
- * item's prompts away while Chromium still runs (ruling F43), every request is refused. UI thread.
+ * One item's answers to its page's permission requests (spec section 12), such as for the camera or notifications: the
+ * decision its store holds for the site answers at once, and the page reads those decisions on any thread; otherwise
+ * the page's {@link PermissionPrompt} asks the user. Allow stores Allowed in the item's store and answers true, Block
+ * stores Blocked and answers false, and a prompt dismissed answers false and stores nothing; the same request is then
+ * refused without a prompt until the page's next main-frame load (ruling F25), so a page cannot ask again at once. A
+ * prompt the load itself takes away counts as no dismissal. A /dev/null item's decisions stay in its group's store.
+ * Once the item closes, or the plugin stops, which takes the item's prompts away while Chromium still runs (ruling
+ * F43), every request is refused. UI thread.
  */
 final class SitePermissions implements AutoCloseable {
     private final Page page;
@@ -51,6 +52,7 @@ final class SitePermissions implements AutoCloseable {
             dismissed.clear();
         });
         page.privacy().onPermissionRequest(this::ask);
+        page.privacy().onStoredDecision(store.permissions()::decision);
     }
 
     /** The page's site asks for {@code request}: {@code answer} is told once whether it may. */

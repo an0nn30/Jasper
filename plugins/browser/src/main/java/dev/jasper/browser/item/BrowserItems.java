@@ -30,9 +30,10 @@ import javax.swing.Timer;
  * plugin's {@link DataStores}, whose store each item opens in holds the history and bookmarks it records into and
  * suggests from, the site permissions its page is answered from and the certificates the user went on past, reloads a
  * store's items that show a site whose permissions changed, hands each error page's Try Again and
- * Continue to the item whose page it is, finds the item's capture a source page shows, and holds the fetchers of their
- * pages' favicons and their address fields' search suggestions until {@link #close()}. A page is made, and Chromium so
- * asked for, only when its item first shows. UI thread.
+ * Continue to the item whose page it is, finds the item's capture a source page shows, holds the notifications their
+ * pages show ({@link PageNotifications}), and holds the fetchers of their pages' favicons and their address fields'
+ * search suggestions until {@link #close()}. A page is made, and Chromium so asked for, only when its item first shows.
+ * UI thread.
  */
 public final class BrowserItems implements AutoCloseable {
     /** The globe: a browser item's tab icon, and its actions' and split item's. */
@@ -51,6 +52,8 @@ public final class BrowserItems implements AutoCloseable {
     private Favicons favicons;
     // Made with the first suggestion request.
     private SuggestionFetcher suggestions;
+    // Made with the first item.
+    private PageNotifications notifications;
     private boolean closed;
 
     /**
@@ -249,6 +252,14 @@ public final class BrowserItems implements AutoCloseable {
             if (closed) favicons.close();
         }
         return favicons;
+    }
+
+    /** The notifications the items' pages show, in the plugin's Page notifications group. */
+    PageNotifications pageNotifications() {
+        if (notifications == null)
+            notifications = new PageNotifications(context.notifications().group(PageNotifications.GROUP),
+                () -> System.nanoTime() / 1_000_000);
+        return notifications;
     }
 
     PluginContext context() {
