@@ -6,6 +6,7 @@ import dev.jasper.sdk.terminal.PaneInfo;
 import dev.jasper.sdk.terminal.SessionKind;
 import dev.jasper.sdk.terminal.SessionState;
 import dev.jasper.sdk.testing.FakePluginHost;
+import dev.jasper.sdk.ui.InsertedText;
 import dev.jasper.snippets.api.SnippetService;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -102,6 +103,42 @@ class SnippetsScopeTest {
             assertThat(host.sent(pane)).contains("paste:make deploy", "paste:echo {{not a placeholder}}");
             assertThat(host.availableInScope(SCOPE, deploy, "paste", window, null)).as("paste needs a live pane").isFalse();
             assertThat(host.availableInScope(SCOPE, deploy, "edit", window, null)).as("edit does not").isTrue();
+        }
+    }
+
+    /**
+     * Spec 15: with no terminal pane, Insert and Paste and run go to the window's current item when it takes inserted
+     * text, such as a browser page: Insert without Return, Paste and run with it, a snippet's placeholders filled first.
+     */
+    @Test void withNoPaneTheVerbsInsertIntoTheWindowsTextTarget() throws Exception {
+        try (var host = started(THREE)) {
+            UUID window = host.addTerminalWindow(), target = host.addTextTarget(window);
+            host.searchScope(SCOPE, "", window, null);
+            String inspect = SnippetService.rowId("Inspect branch"), deploy = SnippetService.rowId("Deploy");
+            assertThat(host.availableInScope(SCOPE, deploy, "paste", window, null)).isTrue();
+            assertThat(host.availableInScope(SCOPE, deploy, "paste_run", window, null)).isTrue();
+            host.executeInScope(SCOPE, deploy, "paste", window, null);
+            host.executeInScope(SCOPE, deploy, "paste_run", window, null);
+            assertThat(host.completeStep(SCOPE, inspect, "paste", window, null, Map.of("branch", "main", "since", "1w"))).isEqualTo("done");
+            assertThat(host.completeStep(SCOPE, inspect, "paste_run", window, null, Map.of("branch", "dev", "since", "2d"))).isEqualTo("done");
+            assertThat(host.insertedText(target)).containsExactly(new InsertedText("make deploy", false), new InsertedText("make deploy", true),
+                new InsertedText("git log main --since=1w", false), new InsertedText("git log dev --since=2d", true));
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    @Test void theVerbsAreAvailableWithAnOpenTextTargetAndNotOnceItCloses() throws Exception {
+        try (var host = started(THREE)) {
+            UUID window = host.addTerminalWindow(), target = host.addTextTarget(window);
+            host.searchScope(SCOPE, "", window, null);
+            String deploy = SnippetService.rowId("Deploy");
+            assertThat(host.availableInScope(SCOPE, deploy, "paste", window, null)).as("an open target").isTrue();
+            host.closeTab(target);
+            assertThat(host.availableInScope(SCOPE, deploy, "paste", window, null)).as("no target").isFalse();
+            assertThat(host.availableInScope(SCOPE, deploy, "paste_run", window, null)).isFalse();
+            assertThat(host.availableInScope(SCOPE, deploy, "edit", window, null)).as("edit needs none").isTrue();
+            host.executeInScope(SCOPE, deploy, "paste", window, null);
+            assertThat(host.insertedText(target)).as("a closed target takes nothing").isEmpty();
         }
     }
 

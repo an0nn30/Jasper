@@ -18,7 +18,9 @@
  * the {@code store} package's history ({@code HistoryRecorder}), and the Web menu's History and the hold menus' Show
  * Full History load the {@code pages} package's history page. The menu button's Add Bookmark bookmarks the page in the
  * {@code store} package's bookmarks and opens {@link dev.jasper.browser.item.BookmarkPanel}, where its tags are
- * edited, and its Manage Bookmarks and History load the {@code pages} package's bookmarks and history pages. Each item
+ * edited, and its Manage Bookmarks and History load the {@code pages} package's bookmarks and history pages. Text another
+ * plugin inserts into an item, such as a snippet, goes into its page's focused field, or is pasted with the clipboard,
+ * whose text {@code ClipboardPaste} puts back. Each item
  * saves its restore state through the {@code restore} package, and {@code BrowserItems} opens saved ones again.
  */
 package dev.jasper.browser.item;

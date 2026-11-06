@@ -49,6 +49,11 @@ public final class Page implements AutoCloseable {
     private ObjIntConsumer<Page> historyJumper;
     // Given the page, reads the HTML its main frame shows: Chromium's, or a test's.
     private Function<Page, CompletableFuture<Optional<String>>> sourceReader = page -> chromiumSource(page.readyBrowser());
+    // Given the page and a text, puts the text where the user is typing in it; given the page, presses Return in it, and
+    // pastes the clipboard into its focused frame: Chromium's, or a test's.
+    private BiFunction<Page, String, CompletableFuture<Boolean>> textInserter = (page, text) -> PageText.insert(page.readyBrowser(), text);
+    private Consumer<Page> returnPresser = page -> PageText.pressReturn(page.readyBrowser());
+    private Consumer<Page> paster = page -> page.onFocusedFrame(CefFrame::paste);
     private final List<Consumer<String>> loadStarts = new CopyOnWriteArrayList<>();
     private final List<BiConsumer<String, Reached>> visits = new CopyOnWriteArrayList<>();
     private final List<Consumer<NavigationButton>> navigationButtons = new CopyOnWriteArrayList<>();
@@ -281,7 +286,34 @@ public final class Page implements AutoCloseable {
 
     /** Pastes the clipboard into the page's focused frame, as its Edit menu's Paste would. */
     public void paste() {
-        onFocusedFrame(CefFrame::paste);
+        if (!closed) paster.accept(this);
+    }
+
+    /**
+     * Puts {@code text} into the field the user is typing in on the page, as text another plugin inserts into its item
+     * asks (spec section 15): {@link PageText} runs {@code insert-text.js} in an isolated world of the main frame, which
+     * follows the focus through same-origin frames and open shadow roots to an {@code <input>} that takes text, a
+     * {@code <textarea>} or an editable element, and inserts the text there as typing would. It completes on any thread.
+     *
+     * @param text the text
+     * @return true when the focused field took the text; false when the page has no such field focused, its focus is in
+     *     a cross-origin frame, before the page has its browser and after {@link #close()}. It fails when DevTools did
+     *     not answer the script in time, as the text may still go in
+     */
+    public CompletableFuture<Boolean> insertIntoField(String text) {
+        Objects.requireNonNull(text, "text");
+        if (closed) return CompletableFuture.completedFuture(false);
+        CompletableFuture<Boolean> inserted = textInserter.apply(this, text);
+        return inserted == null ? CompletableFuture.completedFuture(false) : inserted;
+    }
+
+    /**
+     * Presses Return in the page, where its focus is, as the user would, after text inserted into its item asks for it:
+     * Return's key down, with its text, then its key up, through DevTools ({@link PageText}). Nothing before the page has
+     * its browser or after {@link #close()}.
+     */
+    public void pressReturn() {
+        if (!closed) returnPresser.accept(this);
     }
 
     /** Selects all of the page's focused frame, as its Edit menu's Select All would. */
@@ -988,6 +1020,21 @@ public final class Page implements AutoCloseable {
     /** Has the page read the HTML it shows with {@code replacement} from now on, as a test's. */
     void useSourceReader(Function<Page, CompletableFuture<Optional<String>>> replacement) {
         sourceReader = Objects.requireNonNull(replacement, "replacement");
+    }
+
+    /** Has the page put text where the user types with {@code replacement} from now on, as a test's answering one. */
+    void useTextInserter(BiFunction<Page, String, CompletableFuture<Boolean>> replacement) {
+        textInserter = Objects.requireNonNull(replacement, "replacement");
+    }
+
+    /** Has the page press Return with {@code replacement} from now on, as a test's recording one. */
+    void useReturnPresser(Consumer<Page> replacement) {
+        returnPresser = Objects.requireNonNull(replacement, "replacement");
+    }
+
+    /** Has the page paste the clipboard with {@code replacement} from now on, as a test's recording one. */
+    void usePaster(Consumer<Page> replacement) {
+        paster = Objects.requireNonNull(replacement, "replacement");
     }
 
     /** Has the page find with {@code replacement} from now on, as a test's recording one. */

@@ -134,6 +134,40 @@ public final class PageTestAccess {
     }
 
     /**
+     * Has {@code page} put text where the user types with {@code inserter} from now on, which is told the page and each
+     * text and answers whether a field took it, as DevTools would: a test's, as a page without Chromium inserts nothing.
+     *
+     * @param page a page
+     * @param inserter answers each insertion
+     */
+    public static void useTextInserter(Page page, java.util.function.BiFunction<Page, String,
+            java.util.concurrent.CompletableFuture<Boolean>> inserter) {
+        page.useTextInserter(inserter);
+    }
+
+    /**
+     * Has {@code page} press Return with {@code presser} from now on, which is told the page each time: a test's
+     * recording one, as a page without Chromium presses nothing.
+     *
+     * @param page a page
+     * @param presser told each Return
+     */
+    public static void useReturnPresser(Page page, java.util.function.Consumer<Page> presser) {
+        page.useReturnPresser(presser);
+    }
+
+    /**
+     * Has {@code page} paste the clipboard with {@code paster} from now on, which is told the page each time: a test's
+     * recording one, as a page without Chromium pastes nothing.
+     *
+     * @param page a page
+     * @param paster told each paste
+     */
+    public static void usePaster(Page page, java.util.function.Consumer<Page> paster) {
+        page.usePaster(paster);
+    }
+
+    /**
      * Has {@code page} read the HTML its main frame shows with {@code reader} from now on, which is told the page: a
      * test's, as a page without Chromium has none to read.
      *

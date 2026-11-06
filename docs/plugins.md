@@ -51,7 +51,7 @@ and the action's row in Settings › Keymap shows the same text in its tooltip. 
 | File Server | `dev.jasper.fileserver` | 0.8.0 | Yes | [File Server](file-server.md) |
 | Project Index | `dev.jasper.indexer` | 0.4.0 | Yes | [Project Index](project-index.md) |
 | Shell History | `dev.jasper.history` | 0.4.0 | Yes | [Shell History and Snippets](history-and-snippets.md) |
-| Snippets | `dev.jasper.snippets` | 0.4.0 | Yes | [Shell History and Snippets](history-and-snippets.md) |
+| Snippets | `dev.jasper.snippets` | 0.5.0 | Yes | [Shell History and Snippets](history-and-snippets.md) |
 | Browser | `dev.jasper.browser` | 0.2.0 | Yes | [Browser](browser.md) |
 | Enterprise | `dev.jasper.enterprise` | 0.4.0 | No | [The Enterprise look](enterprise.md) |
 | Sample | `dev.jasper.sample` | 0.6.0 | Yes, but inert | [Plugin authoring](plugin-authoring.md) |

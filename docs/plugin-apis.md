@@ -12,7 +12,7 @@ APIs, and exports its own, through the same mechanism. Every type below is in th
 | [`dev.jasper.vault.api`](sdk-reference.html#package-dev.jasper.vault.api) | Credential Vault, `dev.jasper.vault` | 0.8.0 | [`VaultApi`](sdk-reference.html#dev.jasper.vault.api.VaultApi) | `publishPerConsumer`: each consumer gets its own instance | Remote, File Server |
 | [`dev.jasper.editor.api`](sdk-reference.html#package-dev.jasper.editor.api) | Editor, `dev.jasper.editor` | 0.19.0 | [`Editor`](sdk-reference.html#dev.jasper.editor.api.Editor) | `publish` | Remote, Project Index |
 | [`dev.jasper.remote.api`](sdk-reference.html#package-dev.jasper.remote.api) | Remote, `dev.jasper.remote` | 0.19.0 | [`RemoteProjects`](sdk-reference.html#dev.jasper.remote.api.RemoteProjects) | `publish` | Project Index |
-| [`dev.jasper.snippets.api`](sdk-reference.html#package-dev.jasper.snippets.api) | Snippets, `dev.jasper.snippets` | 0.4.0 | [`SnippetService`](sdk-reference.html#dev.jasper.snippets.api.SnippetService) | `publish` | Shell History |
+| [`dev.jasper.snippets.api`](sdk-reference.html#package-dev.jasper.snippets.api) | Snippets, `dev.jasper.snippets` | 0.5.0 | [`SnippetService`](sdk-reference.html#dev.jasper.snippets.api.SnippetService) | `publish` | Shell History |
 | [`dev.jasper.browser.api`](sdk-reference.html#package-dev.jasper.browser.api) | Browser, `dev.jasper.browser` | 0.2.0 | [`MarkdownPreviews`](sdk-reference.html#dev.jasper.browser.api.MarkdownPreviews) | `publish` | Editor |
 
 Every bundled consumer declares its provider as an optional requirement and runs without it, except Shell History,
@@ -494,7 +494,7 @@ private void countFiles(ActionContext invoked) {
 ## Snippets API
 
 Package [`dev.jasper.snippets.api`](sdk-reference.html#package-dev.jasper.snippets.api), from Snippets
-(`dev.jasper.snippets`, 0.4.0). The user's side is in [Shell History and Snippets](history-and-snippets.md).
+(`dev.jasper.snippets`, 0.5.0). The user's side is in [Shell History and Snippets](history-and-snippets.md).
 
 Snippets publishes one [`SnippetService`](sdk-reference.html#dev.jasper.snippets.api.SnippetService) for every consumer
 with `publish`. Call both methods on the UI thread.

@@ -77,7 +77,9 @@ public final class OnboardingPages {
         new Feature("Find in page", "Search the page with Match case and regular expressions.",
             "Search the page with Match case and regular expressions."),
         new Feature("Bookmarks and history", "Bookmark and tag pages, and open them or any site you visited from the command palette.",
-            "Bookmark and tag pages, and open them or any site you visited from the command palette."));
+            "Bookmark and tag pages, and open them or any site you visited from the command palette."),
+        new Feature("Snippets in page fields", "Insert a snippet into the page field you are typing in.",
+            "Insert a snippet into the page field you are typing in."));
 
     private final AboutPages pages;
     private final AboutScheme about;

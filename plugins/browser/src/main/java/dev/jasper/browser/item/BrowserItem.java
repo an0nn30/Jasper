@@ -25,6 +25,7 @@ import dev.jasper.sdk.ui.ContentStatus;
 import dev.jasper.sdk.ui.ContentTab;
 import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.CustomContent;
+import dev.jasper.sdk.ui.InsertedText;
 import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.PixelImage;
 import dev.jasper.sdk.ui.TabPlacement;
@@ -85,7 +86,10 @@ import javax.swing.JComponent;
  * menu, shows the page's source in the item at {@code jasper-about:source} (spec section 10), as its {@link SourcePages}
  * capture it; the item saves a source page without its token. Inspect Element, from the same menu, shows the page's
  * DevTools, inspecting the element under the pointer, in the item's one {@link DevToolsItem}, a pane below its own,
- * which closes with it. UI thread.
+ * which closes with it. Text another plugin inserts into the item, such as a snippet from the command palette (spec
+ * section 15), goes into the page's focused field ({@link Page#insertIntoField}), then Return when asked; with no field
+ * the page's script reaches, the item pastes it with the {@link ClipboardPaste}, which puts the clipboard's text back,
+ * then presses Return when asked. UI thread.
  */
 public final class BrowserItem implements AutoCloseable {
     static final String ROOT = "browser", PAGE = "browser.page", CONTENT = "browser.page.content";
@@ -111,6 +115,8 @@ public final class BrowserItem implements AutoCloseable {
     // The item's listening to its bookmarks and visits, which ends as it closes.
     private final Subscription bookmarksChanged, visitsChanged;
     private final BrowserFindBar findBar;
+    // Pastes inserted text into a page with no field the insertion reaches, and puts the clipboard's text back.
+    private final ClipboardPaste clipboard;
     private final UiView view;
     private ContentTab tab;
     // The item's DevTools item while it is open; null before the first Inspect Element and once it closes.
@@ -152,6 +158,7 @@ public final class BrowserItem implements AutoCloseable {
         history = new HistoryRecorder(page, stores, items::later);
         title = TabTitle.of("", host(url.toString()), "", false);
         findBar = new BrowserFindBar(() -> closed ? Optional.empty() : Optional.of(page.find()), this::render, this::focusFind);
+        clipboard = new ClipboardPaste(items.context().platform(), (millis, task) -> items.later(Duration.ofMillis(millis), task));
         view = items.context().kit().create(spec(), this::event);
         view.registerContent(new CustomContent(CONTENT, Nodes.CustomKind.PREVIEW, page.view(), page));
         page.view().addHierarchyListener(event -> {
@@ -215,6 +222,7 @@ public final class BrowserItem implements AutoCloseable {
             new ContentCommand("font-bigger", "Increase Font Size", null, true, () -> zoomTo(Zoom.step(zoom, 1))),
             new ContentCommand("font-smaller", "Decrease Font Size", null, true, () -> zoomTo(Zoom.step(zoom, -1))),
             new ContentCommand("font-reset", "Reset Font Size", null, true, this::resetZoom)));
+        tab.setTextInsertion(Optional.of(this::insert));
         tab.onClosed(this::closed);
         // The page's alerts, confirmations and file choosers show over this item's tab, and close with it; so does its
         // right-click menu, which copies with the plugin's clipboard and searches with the engine chosen as it opens.
@@ -298,6 +306,26 @@ public final class BrowserItem implements AutoCloseable {
     /** Pastes the clipboard into the page. */
     public void paste() {
         if (!closed) page.paste();
+    }
+
+    /**
+     * Text another plugin inserts into the item, as the tab's insertion receives it: into the page's focused field, then
+     * Return when {@code inserted} asks; with no field the page's script reaches, a paste with the clipboard, which gets
+     * its text back, then Return when asked. DevTools' answer comes back to the UI thread: an item closed by then does
+     * nothing, and an insertion DevTools did not answer in time does nothing more, as its text may still go in.
+     */
+    private void insert(InsertedText inserted) {
+        if (closed) return;
+        page.insertIntoField(inserted.text()).whenComplete((taken, failure) -> EventQueue.invokeLater(() -> {
+            if (closed) return;
+            if (failure != null) {
+                items.context().log().log(System.Logger.Level.DEBUG, "A page did not answer an insertion in time", failure);
+            } else if (taken) {
+                if (inserted.submit()) page.pressReturn();
+            } else {
+                clipboard.paste(inserted.text(), page::paste, inserted.submit() ? page::pressReturn : NOTHING);
+            }
+        }));
     }
 
     /**

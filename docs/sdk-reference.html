@@ -10933,7 +10933,8 @@ Read it through <a href="#dev.jasper.sdk.ui.Appearance.terminalTypography()"><co
 <div class="doc"><p>A content tab that takes inserted text, as a command palette query names it (<code>PaletteQuery.textTarget()</code>): the
 window's current item, when it is a content tab whose plugin set an insertion (<a href="#dev.jasper.sdk.ui.ContentTab.setTextInsertion(Optional)"><code>ContentTab.setTextInsertion</code></a>)
 and no terminal pane is the query's origin. The handle is bound to the scope's plugin and to that tab: it does not
-follow the window to another item. Implemented by the application and by the testkit.</p></div>
+follow the window to another item. Once the plugin's context is closed, both methods throw
+<code>IllegalStateException</code>. Implemented by the application and by the testkit.</p></div>
 <h5>Methods</h5>
 <div class="member" id="dev.jasper.sdk.ui.TextTarget.insert(InsertedText)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.TextTarget.insert(InsertedText)" aria-label="Link to this member">#</a><code><span class="kw">void</span> <b>insert</b>(<a class="tl" href="#dev.jasper.sdk.ui.InsertedText">InsertedText</a> text)</code></pre>
@@ -13985,7 +13986,7 @@ nothing for a host that is no longer saved.</p></div>
 </section>
 <section class="package" id="package-dev.jasper.snippets.api">
 <h3 class="package-title"><span class="kind kind-package">package</span> <code>dev.jasper.snippets.api</code></h3>
-<p class="export">Exported by <b>Snippets</b> <code>dev.jasper.snippets</code> 0.4.0. Declare it in <code>plugin.toml</code>: <code>requires = [{ id = "dev.jasper.snippets", version = "&gt;=0.4.0", optional = true }]</code>.</p>
+<p class="export">Exported by <b>Snippets</b> <code>dev.jasper.snippets</code> 0.5.0. Declare it in <code>plugin.toml</code>: <code>requires = [{ id = "dev.jasper.snippets", version = "&gt;=0.5.0", optional = true }]</code>.</p>
 <div class="doc"><p>What other plugins may use: the snippet service and its value. Exported by <code>plugin.toml</code>;
 everything outside this package is private to the Snippets plugin.</p></div>
 <div class="table-wrap"><table class="summary"><thead><tr><th>Type</th><th>Kind</th><th>Summary</th></tr></thead><tbody>
