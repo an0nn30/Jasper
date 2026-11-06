@@ -7,13 +7,16 @@ import dev.jasper.browser.page.MenuPlace;
 import dev.jasper.browser.page.NavigationButton;
 import dev.jasper.browser.page.NavigationHistory;
 import dev.jasper.browser.page.Page;
+import dev.jasper.browser.pages.BookmarksPage;
 import dev.jasper.browser.pages.HistoryPage;
 import dev.jasper.browser.restore.BrowserRestore;
 import dev.jasper.browser.settings.BrowserSettings;
+import dev.jasper.browser.store.BookmarkStore.Bookmark;
 import dev.jasper.browser.store.Stores;
 import dev.jasper.sdk.RestoreState;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.WindowOwner;
+import dev.jasper.sdk.notifications.NotificationGroup;
 import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.ui.ContentCommand;
 import dev.jasper.sdk.ui.ContentPresentation;
@@ -66,7 +69,9 @@ import javax.swing.JComponent;
  * Ctrl+wheel over the page steps the zoom too, unsaved. Chromium keeps one zoom per host, so two items on one host that
  * show at once share the zoom set last (an engine-forced gap). The mouse's back and forward buttons over the page go
  * back and forward, and an entry chosen from Back's or Forward's hold menu goes to that entry of the page's history,
- * while their Show Full History loads Jasper's history page ({@link #showHistory}). It
+ * while their Show Full History loads Jasper's history page ({@link #showHistory}). The menu button's Add Bookmark
+ * bookmarks the page at once and opens its {@link BookmarkPanel}, Remove Bookmark removes the page's bookmark and says
+ * "Bookmark Removed", and Manage Bookmarks and History load Jasper's bookmarks and history pages. It
  * saves its URL, its own zoom and its target with Jasper's workspace ({@link BrowserRestore}): what it loads first until
  * it shows, then where each committed navigation takes its page.
  * Restored after a run that ended while Chromium ran, an item waits: in place of the canvas it says that Jasper closed
@@ -118,6 +123,8 @@ public final class BrowserItem implements AutoCloseable {
     private OptionalInt ownZoom;
     private String title;
     private boolean waiting, asked, closed;
+    // How many main-frame loads the page has started: a bookmark's panel opens only if none has since Add Bookmark.
+    private long loadStarts;
     // Cancels the wait for the typing to pause; and the engine's answer the field waits for, or null.
     private Runnable typingPause = NOTHING;
     private CompletableFuture<List<String>> suggestion;
@@ -138,6 +145,7 @@ public final class BrowserItem implements AutoCloseable {
         page.onCloseItem(this::close);
         page.onShowItem(this::show);
         page.onAddressChange(this::committed);
+        page.onLoadStart(address -> loadStarts++);
         errors = new ErrorPages(page, items.certificates(), this::load);
         page.onLoadFailure(failure -> { if (!closed) errors.failed(failure); });
         sources = new SourcePages(page, this::load);
@@ -298,6 +306,11 @@ public final class BrowserItem implements AutoCloseable {
      */
     public void showHistory() {
         if (!closed) loadAndFocus(HistoryPage.ADDRESS);
+    }
+
+    /** Loads Jasper's bookmarks page, and the page takes the focus, as the menu button's Manage Bookmarks does. */
+    void showBookmarks() {
+        if (!closed) loadAndFocus(BookmarksPage.ADDRESS);
     }
 
     /** Focuses the address field and selects its text, as Open Location does. */
@@ -619,7 +632,10 @@ public final class BrowserItem implements AutoCloseable {
                 view.selectAll(BrowserToolbar.ADDRESS);
             }
             case BrowserToolbar.SETTINGS -> items.showSettings();
-            case BrowserToolbar.SHOW_HISTORY -> showHistory();
+            case BrowserToolbar.SHOW_HISTORY, BrowserToolbar.HISTORY -> showHistory();
+            case BrowserToolbar.BOOKMARKS -> showBookmarks();
+            case BrowserToolbar.BOOKMARK_ADD -> addBookmark();
+            case BrowserToolbar.BOOKMARK_REMOVE -> removeBookmark();
             case LOAD_PAGE -> {
                 endWait();
                 page.focus();
@@ -627,6 +643,51 @@ public final class BrowserItem implements AutoCloseable {
             // An entry of Back's or Forward's hold menu.
             default -> NavigationHistory.entryId(action).ifPresent(page::goToHistoryEntry);
         }
+    }
+
+    /**
+     * Add Bookmark: the page is bookmarked at once, at the address the item shows, with its title, or none while the item
+     * shows its error page; then, unless the item has closed or its page has started another load meanwhile, the
+     * bookmark's {@link BookmarkPanel} opens from the menu button. The bookmarks load, if they have not, so the menu
+     * offers Remove Bookmark once the bookmark is stored.
+     */
+    private void addBookmark() {
+        loadIndexes();
+        long started = loadStarts;
+        String title = errors.shown().isPresent() ? "" : page.title();
+        CompletableFuture<Bookmark> added = stores.bookmarks().add(errors.address(), title, System.currentTimeMillis());
+        added.whenComplete((bookmark, failure) -> EventQueue.invokeLater(() -> {
+            if (failure != null) {
+                items.context().log().log(System.Logger.Level.DEBUG, "A page could not be bookmarked", failure);
+                return;
+            }
+            if (!closed && !items.closed() && tab != null && loadStarts == started) openPanel(bookmark);
+        }));
+    }
+
+    /** The bookmark's panel, from the menu button; none while the button cannot anchor one. */
+    private void openPanel(Bookmark bookmark) {
+        try {
+            BookmarkPanel.open(items.context(), view.anchor(BrowserToolbar.MENU), stores, bookmark, bookmarkNotices(), page, tab);
+        } catch (IllegalArgumentException | IllegalStateException unanchored) { // the view or its menu button cannot anchor now
+            items.context().log().log(System.Logger.Level.DEBUG, "The bookmark's panel could not open", unanchored);
+        }
+    }
+
+    /** Remove Bookmark: the page's bookmark is removed, and once it is gone "Bookmark Removed" says so, its title only. */
+    private void removeBookmark() {
+        stores.bookmarks().remove(errors.address()).whenComplete((removed, failure) -> EventQueue.invokeLater(() -> {
+            if (failure != null) {
+                items.context().log().log(System.Logger.Level.DEBUG, "A bookmark could not be removed", failure);
+                return;
+            }
+            if (removed && !items.closed()) bookmarkNotices().info("Bookmark Removed", "");
+        }));
+    }
+
+    /** The group the bookmark notifications post in, which the plugin declared as it started: the same group again. */
+    private NotificationGroup bookmarkNotices() {
+        return items.context().notifications().group(BookmarkPanel.GROUP);
     }
 
     /** The address field loads {@code address}, and the page takes the focus. */
@@ -699,7 +760,7 @@ public final class BrowserItem implements AutoCloseable {
 
     private ViewSpec spec() {
         Nodes.Node bar = toolbar.node(shown(errors.address()), page.loading(), errors.canGoBack(), page.canGoForward(), icon(),
-            page.history(), items.settings(), errors.notSecure());
+            page.history(), items.settings(), errors.notSecure(), Optional.of(stores.bookmarkIndex().has(errors.address())));
         // A waiting item keeps the canvas's slot, hidden: a slot that leaves the view closes its content, the page.
         Nodes.Node canvas = new Nodes.Custom(PAGE, waiting ? HIDDEN : ControlState.READY, CONTENT, Nodes.CustomKind.PREVIEW, "Web page");
         return new ViewSpec(new Nodes.Split(ROOT, ControlState.READY, Nodes.SplitKind.DOCUMENT,

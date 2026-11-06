@@ -7,6 +7,7 @@ import dev.jasper.browser.engine.AboutScheme;
 import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.engine.PreviewScheme;
 import dev.jasper.browser.engine.RunMarker;
+import dev.jasper.browser.item.BookmarkPanel;
 import dev.jasper.browser.item.BrowserItems;
 import dev.jasper.browser.item.ErrorPage;
 import dev.jasper.browser.item.SourcePage;
@@ -43,8 +44,9 @@ import java.util.concurrent.RejectedExecutionException;
 
 /**
  * The Browser: web pages as Jasper items. Its start registers New Browser Tab, New Browser Window and the Browser split
- * item, the globe they show, the Web menu, Settings › Browser, the welcome page, the history page and its queries, the
- * error page with its Try Again and Continue actions, View Source's page, the Browser as Jasper's web browser,
+ * item, the globe they show, the Web menu, Settings › Browser, the Bookmarks notification group, the welcome page, the
+ * history page and its queries, the error page with its Try Again and Continue actions, View Source's page, the Browser
+ * as Jasper's web browser,
  * the terminal's Open URL in Split items and the restorer of saved browser items, publishes the Markdown previews'
  * service ({@link MarkdownPreviews}), and makes Chromium's engine, which starts Chromium only when a browser item or a
  * Markdown preview first shows, so starting the plugin, and restoring its items, loads no Chromium class. After a run
@@ -89,6 +91,8 @@ public class BrowserPlugin implements Plugin {
         // open is told on its own thread.
         var database = BrowserDatabase.file(data.resolve("browser.sqlite"), cause -> EventQueue.invokeLater(() -> storesUnavailable(cause)));
         stores = new Stores(database, EventQueue::invokeLater);
+        // Spec section 15: "Bookmark Removed" and "Bookmark Deleted" post in a group of their own, which Settings lists.
+        context.notifications().group(BookmarkPanel.GROUP);
         // A page is made when its item first shows: the client's handlers are installed then, before any page is made on
         // it, as naming their types loads Chromium's classes. Jasper's own pages ask Java through a router of their own,
         // read and answered on the background executor.

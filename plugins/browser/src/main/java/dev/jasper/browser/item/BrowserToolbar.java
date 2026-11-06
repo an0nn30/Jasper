@@ -2,6 +2,7 @@ package dev.jasper.browser.item;
 
 import dev.jasper.browser.page.NavigationHistory;
 import dev.jasper.browser.settings.BrowserSettings;
+import dev.jasper.browser.store.Addresses;
 import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.MenuItem;
 import dev.jasper.sdk.ui.Nodes;
@@ -19,8 +20,9 @@ import java.util.function.Function;
  * each disabled when the page cannot go there and each holding the page's twelve nearest history entries that way in
  * its hold menu, then, as Chrome's do, a separator and Show Full History, which opens Jasper's history page (plan 5's
  * H2); Reload, which is Stop while the page loads; the address field, with the site icon at its left; and the
- * menu button, which holds Settings. The site icon is the page's icon, else the globe, and dragging it drags the page's
- * address; while the page is one Jasper goes on to past a certificate error, "Not secure", in the warning colour, stands
+ * menu button, which holds Add Bookmark, or Remove Bookmark while the page is bookmarked, a separator, Manage Bookmarks
+ * and History, then a separator and Settings (spec section 6). The site icon is the page's icon, else the globe, and
+ * dragging it drags the page's address; while the page is one Jasper goes on to past a certificate error, "Not secure", in the warning colour, stands
  * in its place (spec section 14). The click that brings the focus into the field selects all its text. The toolbar keeps what is typed into
  * the field and the engine's suggestions for it: the field shows the page's address, or a results page's search terms,
  * until something is typed, then that text and its {@link Suggestions}, the rows of Jasper's bookmarks and history for
@@ -37,11 +39,15 @@ final class BrowserToolbar {
     static final String ENTER = "browser.address.enter", ESCAPE = "browser.address.escape";
     /** What the menu's Settings reports. */
     static final String SETTINGS = "browser.settings";
+    /** What the menu's Add Bookmark, Remove Bookmark, Manage Bookmarks and History report. */
+    static final String BOOKMARK_ADD = "browser.bookmark.add", BOOKMARK_REMOVE = "browser.bookmark.remove", BOOKMARKS = "browser.bookmarks",
+        HISTORY = "browser.history";
     /** What Show Full History, at the end of Back's and Forward's hold menus, reports. */
     static final String SHOW_HISTORY = "browser.history.show";
     // What ends a hold menu that lists entries of the page's history: a separator, then Show Full History.
     private static final List<MenuItem> FULL_HISTORY = List.of(new MenuItem("browser.history.separator", "", "", "", true, true),
         new MenuItem(SHOW_HISTORY, "Show Full History", "", SHOW_HISTORY, true, false));
+    private static final MenuItem SETTINGS_ITEM = new MenuItem(SETTINGS, "Settings", "", SETTINGS, true, false);
     static final String PLACEHOLDER = "Search or enter website name";
     /** What says the page is not secure, in place of the site icon. */
     static final String NOT_SECURE = "browser.address.not-secure";
@@ -78,10 +84,12 @@ final class BrowserToolbar {
      * @param settings the settings, which say what a results page is
      * @param notSecure whether the page is one Jasper goes on to past a certificate error: "Not secure" then stands before
      *     the field, which shows no site icon
+     * @param bookmarked whether the page's address is bookmarked, which decides between Add Bookmark and Remove Bookmark;
+     *     empty for a menu without the bookmark items, as in plan 6's /dev/null mode
      * @return the toolbar's row
      */
     Nodes.Stack node(String address, boolean loading, boolean canGoBack, boolean canGoForward, Optional<PixelImage> icon,
-                     NavigationHistory.History history, BrowserSettings settings, boolean notSecure) {
+                     NavigationHistory.History history, BrowserSettings settings, boolean notSecure, Optional<Boolean> bookmarked) {
         var reload = loading
             ? new Nodes.Button(RELOAD, ControlState.READY, "", "close", Nodes.ButtonKind.GHOST, STOP, "Stop")
             : new Nodes.Button(RELOAD, ControlState.READY, "", "refresh", Nodes.ButtonKind.GHOST, RELOAD, "Reload");
@@ -94,8 +102,7 @@ final class BrowserToolbar {
         Optional<String> drag = notSecure || address.isBlank() ? Optional.empty() : Optional.of(address);
         var field = new Nodes.Field(ADDRESS, ControlState.READY, Nodes.FieldKind.TEXT, value, PLACEHOLDER, "Address", ENTER, Optional.empty(),
             Nodes.FieldPresentation.EMBEDDED, "", ESCAPE, "", false, image, glyph, name, drag, true, rows, typed != null && suggesting);
-        var menu = new Nodes.MenuButton(MENU, ControlState.READY, "", "menu", Nodes.ButtonKind.GHOST, "",
-            List.of(new MenuItem(SETTINGS, "Settings", "", SETTINGS, true, false)), "Menu");
+        var menu = new Nodes.MenuButton(MENU, ControlState.READY, "", "menu", Nodes.ButtonKind.GHOST, "", menu(address, bookmarked), "Menu");
         var children = new ArrayList<Nodes.Node>(List.of(
             historyButton(BACK, canGoBack, "back", "Back", NavigationHistory.backMenu(history)),
             historyButton(FORWARD, canGoForward, "forward", "Forward", NavigationHistory.forwardMenu(history)), reload));
@@ -151,6 +158,19 @@ final class BrowserToolbar {
         typed = null;
         suggested = List.of();
         suggesting = false;
+    }
+
+    /**
+     * The menu button's items: with a bookmark state, Add Bookmark (disabled for an address bookmarks never keep) or Remove
+     * Bookmark, a separator, Manage Bookmarks, History and a separator; then Settings.
+     */
+    private static List<MenuItem> menu(String address, Optional<Boolean> bookmarked) {
+        if (bookmarked.isEmpty()) return List.of(SETTINGS_ITEM);
+        MenuItem bookmark = bookmarked.get() ? new MenuItem(BOOKMARK_REMOVE, "Remove Bookmark", "", BOOKMARK_REMOVE, true, false)
+            : new MenuItem(BOOKMARK_ADD, "Add Bookmark", "", BOOKMARK_ADD, Addresses.storable(address).isPresent(), false);
+        return List.of(bookmark, new MenuItem("browser.bookmarks.separator", "", "", "", true, true),
+            new MenuItem(BOOKMARKS, "Manage Bookmarks", "", BOOKMARKS, true, false), new MenuItem(HISTORY, "History", "", HISTORY, true, false),
+            new MenuItem("browser.settings.separator", "", "", "", true, true), SETTINGS_ITEM);
     }
 
     /**

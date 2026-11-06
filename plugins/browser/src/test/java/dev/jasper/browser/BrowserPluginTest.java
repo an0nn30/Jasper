@@ -180,6 +180,15 @@ class BrowserPluginTest {
         } });
     }
 
+    /** Spec section 15: the bookmark notifications are a group of their own, which Settings lists from the start. */
+    @Test void theStartDeclaresTheBookmarksNotificationGroup() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            host.start(INFO, Set.of(), Set.of(), new BrowserPlugin());
+            assertThat(host.notifications().groups()).contains("dev.jasper.browser.bookmarks|Bookmarks|CARD");
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
     @Test void aNewTabOpensTheStartPageInItsWindowAndANewWindowInAWindowOfItsOwn() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
             UUID window = host.addTerminalWindow();
