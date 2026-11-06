@@ -16,7 +16,6 @@ import dev.jasper.browser.item.PageNotifications;
 import dev.jasper.browser.item.SourcePage;
 import dev.jasper.browser.item.WebMenu;
 import dev.jasper.browser.links.PageNavigation;
-import dev.jasper.browser.links.PrivacyQueries;
 import dev.jasper.browser.palette.BookmarksScope;
 import dev.jasper.browser.palette.PaletteOpener;
 import dev.jasper.browser.palette.VisitedScope;
@@ -133,8 +132,6 @@ public class BrowserPlugin implements Plugin {
             PageNavigation.prepare(engine);
             PageDialogs.prepare(engine);
             AboutQueries.prepare(engine, about, context.background());
-            // Spec section 12: the page scripts' own router, for their notifications.
-            PrivacyQueries.prepare(engine);
             // Before the first page asks for the welcome page, so that Chromium's IO thread only reads the answer from memory.
             onboarding.load();
             page.start(engine);

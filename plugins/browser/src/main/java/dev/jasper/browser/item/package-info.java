@@ -18,7 +18,7 @@
  * {@code PrivacyMenu} resets those of the page's site. An item's {@code SitePermissions} answers its page's camera,
  * microphone and notification requests from its store, or with the {@code dialogs} package's prompt, and the
  * notifications its page shows are Jasper's, in the plugin's group for them
- * ({@link dev.jasper.browser.item.PageNotifications}).
+ * ({@link dev.jasper.browser.item.PageNotifications}); a /dev/null item denies notifications.
  * View Source shows
  * {@link dev.jasper.browser.item.SourcePage}, a page's source fetched again through the {@code http} package or as the
  * item's {@code SourcePages} captured it; both take the theme's colours and their tokens from the {@code pages}

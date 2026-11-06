@@ -30,10 +30,11 @@
  * {@link dev.jasper.browser.page.PagePrivacy} to its item, which answers them; screen capture, and any request of a
  * browser that is no page's, are cancelled. {@code FrameScripts} hooks each main-frame and sub-frame load start: a
  * page's main frame runs {@code notifications.js}, which stands in for {@code window.Notification} in the page's own
- * world, given the permission the item's store holds for the document's site through {@code PagePrivacy}, and asks
- * Jasper through the {@code links} package's privacy router; no sub-frame runs it, and no challenge frame
- * ({@code ChallengeFrames}). {@code PageMenu} is the client's one context-menu handler: Jasper shows
- * the page's right-click menu, {@code PageMenuItems} for what is under the pointer, at the
+ * world, given the permission the item's store holds for the document's site through {@code PagePrivacy}, or denied
+ * for a /dev/null page and outside a secure context, and asks Jasper through the {@code links} package's privacy
+ * router; no sub-frame runs it, and no challenge frame ({@code ChallengeFrames}). {@code PageMenu} is the client's
+ * one context-menu handler: Jasper shows the page's right-click menu, {@code PageMenuItems} for what is under the
+ * pointer, at the
  * {@link dev.jasper.browser.page.MenuPlace} the item gives, over its tab, and Chromium shows none; its View Source
  * reads the page's HTML through {@code Page.source}, and its Inspect Element opens the page's
  * {@link dev.jasper.browser.page.DevTools}: a canvas of their own, which the page makes, and Chromium's DevTools

@@ -1,10 +1,14 @@
 package dev.jasper.browser.permissions;
 
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
-/** The site a permission is kept for: an address's origin, as Chromium writes one. */
+/**
+ * The site a permission is kept for: an address's origin, as Chromium writes one; and whether it is a secure context's,
+ * where Chromium offers notifications.
+ */
 public final class Origins {
     /** The one origin of every {@code file:} address. */
     static final String FILE = "file://";
@@ -12,8 +16,26 @@ public final class Origins {
     // A host as Chromium writes one, letters and digits and URL punctuation, or an IPv6 address in its brackets.
     private static final Pattern HOST = Pattern.compile("[A-Za-z0-9._~%!$&'()*+,;=-]+"), IPV6 = Pattern.compile("\\[[0-9A-Fa-f:.]+]");
     private static final Pattern PORT = Pattern.compile("[0-9]{1,5}");
+    // A host on this computer, as Chromium counts one for a secure context.
+    private static final Pattern LOOPBACK =
+        Pattern.compile("localhost|.+\\.localhost|127(?:\\.[0-9]{1,3}){3}|\\[::1\\]");
 
     private Origins() { }
+
+    /**
+     * Whether {@code origin} is a secure context's, as Chromium decides one for an origin: an {@code https} origin, or
+     * an {@code http} one on this computer ({@code localhost} and its subdomains, {@code 127.0.0.0/8} and
+     * {@code [::1]}).
+     *
+     * @param origin an origin, as {@link #of} writes one
+     * @return whether it is; false for a file's and any other
+     */
+    public static boolean secure(String origin) {
+        Objects.requireNonNull(origin, "origin");
+        if (origin.startsWith("https://")) return true;
+        if (!origin.startsWith("http://")) return false;
+        return LOOPBACK.matcher(origin.substring("http://".length()).replaceFirst(":[0-9]+$", "")).matches();
+    }
 
     /**
      * The origin of {@code address}.

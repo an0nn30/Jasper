@@ -4,6 +4,7 @@ import dev.jasper.browser.dialogs.PermissionPrompt;
 import dev.jasper.browser.page.DialogPlace;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.permissions.Decision;
+import dev.jasper.browser.permissions.Permission;
 import dev.jasper.browser.permissions.PermissionRequest;
 import dev.jasper.sdk.Subscription;
 import java.util.HashSet;
@@ -19,9 +20,9 @@ import java.util.function.Consumer;
  * the page's {@link PermissionPrompt} asks the user. Allow stores Allowed in the item's store and answers true, Block
  * stores Blocked and answers false, and a prompt dismissed answers false and stores nothing; the same request is then
  * refused without a prompt until the page's next main-frame load (ruling F25), so a page cannot ask again at once. A
- * prompt the load itself takes away counts as no dismissal. A /dev/null item's decisions stay in its group's store.
- * Once the item closes, or the plugin stops, which takes the item's prompts away while Chromium still runs (ruling
- * F43), every request is refused. UI thread.
+ * prompt the load itself takes away counts as no dismissal. A /dev/null item's decisions stay in its group's store,
+ * and it refuses notifications without a prompt (ruling V20). Once the item closes, or the plugin stops, which takes
+ * the item's prompts away while Chromium still runs (ruling F43), every request is refused. UI thread.
  */
 final class SitePermissions implements AutoCloseable {
     private final Page page;
@@ -57,7 +58,8 @@ final class SitePermissions implements AutoCloseable {
 
     /** The page's site asks for {@code request}: {@code answer} is told once whether it may. */
     private void ask(PermissionRequest request, Consumer<Boolean> answer) {
-        if (closed || stopped.getAsBoolean()) {
+        // A /dev/null item denies notifications, as Chrome's Incognito does (ruling V20): nothing is asked or stored.
+        if (closed || stopped.getAsBoolean() || store.devNull() && request.permission() == Permission.NOTIFICATIONS) {
             answer.accept(false);
             return;
         }

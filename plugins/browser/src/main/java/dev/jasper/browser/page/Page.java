@@ -274,8 +274,10 @@ public final class Page implements AutoCloseable {
     /**
      * Whether the page's browsing group keeps its data in memory, as a /dev/null group's does: what its store says. Any
      * thread.
+     *
+     * @return whether it does
      */
-    boolean inMemory() {
+    public boolean inMemory() {
         return context.inMemory();
     }
 

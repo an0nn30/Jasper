@@ -77,8 +77,9 @@ import javax.swing.JComponent;
  * menu offered them for and reload the store's items that show the site; the menu follows the store's permissions as
  * they change. Its page's requests for the camera, the microphone and notifications are answered from its store, or
  * asked of the user ({@link SitePermissions}), and its page's notifications show as Jasper's in the item's window
- * ({@link PageNotifications}). It saves its URL, its own zoom and its target with Jasper's workspace
- * ({@link BrowserRestore}): what it loads first until it shows, then where each committed navigation takes its page.
+ * ({@link PageNotifications}), but for a /dev/null item, which denies them. It saves its URL, its own zoom and its
+ * target with Jasper's workspace ({@link BrowserRestore}): what it loads first until it shows, then where each committed
+ * navigation takes its page.
  * Restored after a run that ended while Chromium ran, an item waits: in place of the canvas it says that Jasper closed
  * while the page was open, and it asks for its page only once the user loads it, with its Load Page button, Enter in the
  * address field, Reload or {@link #load}.
@@ -189,8 +190,9 @@ public final class BrowserItem implements AutoCloseable {
         privacy = new PrivacyMenu(store, items, errors::address, this::reloadForPermissions);
         sitePermissions = new SitePermissions(page, store, items::closed);
         // The page's notifications are Jasper's, in the item's window, until it closes; a new document's names are its own.
+        // A /dev/null item shows none, as Chrome's Incognito (ruling V20).
         notifications = items.pageNotifications();
-        page.privacy().onNotifications(notice -> !closed && tab != null
+        page.privacy().onNotifications(notice -> !closed && tab != null && !store.devNull()
                 && notifications.post(page, tab.window(), notice.origin(), notice.id(), notice.title(), notice.body()),
             id -> notifications.close(page, id));
         page.onLoadStart(address -> notifications.forget(page));

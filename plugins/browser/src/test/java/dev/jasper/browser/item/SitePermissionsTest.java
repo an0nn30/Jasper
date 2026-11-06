@@ -151,6 +151,32 @@ class SitePermissionsTest {
         assertThat(item.store().permissions().decision(SITE, Permission.MICROPHONE)).isEmpty();
     }
 
+    /**
+     * Ruling V20: a /dev/null item refuses notifications without a prompt, as Chrome's Incognito does, and stores
+     * nothing; its camera is still asked.
+     */
+    @Test void aDevNullItemRefusesNotificationsWithoutAPromptAndStoresNothing() throws Exception {
+        BrowserItems items = items();
+        BrowserItem item = onUi(() -> items.open(PAGE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), items.dataStores().newDevNull()));
+        var notifications = request(item, new PermissionRequest(SITE, Permission.NOTIFICATIONS));
+        var camera = request(item, CAMERA);
+        onUi(() -> {
+            assertThat(notifications).containsExactly(false);
+            assertThat(host.windowView(ID, "Allow Notifications")).as("no prompt").isEmpty();
+            assertThat(host.windowView(ID, "Allow Camera")).as("the camera is asked").isPresent();
+            return null;
+        });
+        assertThat(item.store().permissions().all()).as("nothing stored").isEmpty();
+        assertThat(camera).isEmpty();
+        BrowserItem ordinary = onUi(() -> items.open(PAGE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty()));
+        var asked = request(ordinary, new PermissionRequest(SITE, Permission.NOTIFICATIONS));
+        onUi(() -> {
+            assertThat(asked).as("a persistent item is asked").isEmpty();
+            assertThat(host.windowView(ID, "Allow Notifications")).isPresent();
+            return null;
+        });
+    }
+
     /** Spec section 12: a /dev/null item's answer stays in its group's store, never in the persistent one. */
     @Test void aDevNullItemsAnswerIsInItsGroupsStoreAndAbsentFromThePersistentOne() throws Exception {
         BrowserItems items = items();

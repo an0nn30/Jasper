@@ -1,6 +1,7 @@
 package dev.jasper.browser.links;
 
 import dev.jasper.browser.links.PrivacyQueries.Answer;
+import dev.jasper.browser.page.Activation;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageContext;
 import dev.jasper.browser.page.PagePrivacy;
@@ -34,7 +35,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * JSON object of at most 65,536 characters, from a page's top frame alone; anything else fails, malformed with 1 and
  * refused with 2, and nothing a page sends makes it throw. A notification shows only when the page's item's store
  * holds Allowed for its site, whatever the script claims; a permission request is answered from the store without a
- * prompt, or else asks the item, and a dismissed prompt answers "default". Each page is a recording stand-in whose
+ * prompt, or else asks the item, and a dismissed prompt answers "default". A /dev/null page (ruling V20), a document
+ * outside a secure context (ruling V21) and one a sandbox made opaque (ruling V22) have no site that may: a request is
+ * denied and nothing shows. Each page is a recording stand-in whose
  * privacy hooks record what reaches its item; the router meets Chromium's browsers, frames and callbacks as proxies.
  * Pages run on the UI thread, as Jasper's do. No Chromium.
  */
@@ -42,6 +45,8 @@ class PrivacyQueriesTest {
     private static final String SITE = "https://chat.example", ROOM = SITE + "/room";
     private static final String REQUEST = "{\"op\":\"notification.request\"}";
     private final PrivacyQueries queries = new PrivacyQueries();
+    // The client's opener bridge, whose record of each page's document the router reads.
+    private final OpenerBridge bridge = new OpenerBridge();
 
     @Test void aNotificationShowsOnlyWithAStoredAllowForThePagesSiteWhateverTheScriptClaims() throws Exception {
         var site = onUi(() -> new Site(ROOM));
@@ -156,6 +161,89 @@ class PrivacyQueriesTest {
         assertThat(ask(closed, true, ROOM, REQUEST)).as("a closed page asks no one").containsExactly(success("default"));
     }
 
+    /** Ruling V20: a /dev/null page's notifications are denied, as in Chrome's Incognito, whatever its store holds. */
+    @Test void aDevNullPageIsDeniedWithoutAPromptAndShowsNothing() throws Exception {
+        var site = onUi(() -> new Site(ROOM, PageContext.memory()));
+        assertThat(ask(site, true, ROOM, REQUEST)).as("nothing stored").containsExactly(success("denied"));
+        site.stored.put(SITE, Decision.ALLOWED);
+        assertThat(ask(site, true, ROOM, REQUEST)).as("an Allow stored").containsExactly(success("denied"));
+        assertThat(ask(site, true, ROOM, show("1", "Hi", ""))).extracting(Answer::code).containsExactly(PrivacyQueries.REFUSED);
+        assertThat(site.asked).as("no prompt").isEmpty();
+        assertThat(site.shown).isEmpty();
+    }
+
+    /**
+     * Ruling V21: notifications need a secure context, as in Chromium: https, or http on this computer. Elsewhere, and in
+     * a {@code file:} page, a request is denied without a prompt and nothing shows, whatever is stored.
+     */
+    @Test void onlyASecureContextAsksOrShows() throws Exception {
+        var site = onUi(() -> new Site("http://chat.example/room"));
+        assertThat(ask(site, true, "http://chat.example/room", REQUEST)).containsExactly(success("denied"));
+        site.stored.put("http://chat.example", Decision.ALLOWED);
+        assertThat(ask(site, true, "http://chat.example/room", show("1", "Hi", ""))).extracting(Answer::code)
+            .containsExactly(PrivacyQueries.REFUSED);
+        site.stored.put("file://", Decision.ALLOWED);
+        assertThat(ask(site, true, "file:///Users/someone/page.html", REQUEST)).containsExactly(success("denied"));
+        assertThat(ask(site, true, "file:///Users/someone/page.html", show("2", "Hi", ""))).extracting(Answer::code)
+            .containsExactly(PrivacyQueries.REFUSED);
+        assertThat(site.asked).as("no prompt").isEmpty();
+        assertThat(site.shown).isEmpty();
+
+        var local = onUi(() -> new Site("http://localhost:3000/"));
+        List<Answer> asked = ask(local, true, "http://localhost:3000/", REQUEST);
+        assertThat(local.asked).as("http on this computer asks").containsExactly(new PermissionRequest("http://localhost:3000",
+            Permission.NOTIFICATIONS));
+        onUi(() -> {
+            local.answers.removeFirst().accept(false);
+            return null;
+        });
+        assertThat(asked).containsExactly(success("default"));
+        local.stored.put("http://localhost:3000", Decision.ALLOWED);
+        assertThat(ask(local, true, "http://localhost:3000/", show("1", "Local", ""))).containsExactly(PrivacyQueries.DONE);
+    }
+
+    /**
+     * Ruling V22: a document a sandbox gave an opaque origin has no site that may have notifications: a request is denied
+     * without a prompt and a show is refused, whatever its address's site holds.
+     */
+    @Test void aSandboxedDocumentWithAnOpaqueOriginIsDenied() throws Exception {
+        var site = onUi(() -> new Site(ROOM));
+        site.stored.put(SITE, Decision.ALLOWED);
+        assertThat(ask(site, true, ROOM, true, REQUEST)).containsExactly(success("denied"));
+        assertThat(ask(site, true, ROOM, true, show("1", "Hi", ""))).extracting(Answer::code).containsExactly(PrivacyQueries.REFUSED);
+        assertThat(site.shown).isEmpty();
+        assertThat(ask(site, true, ROOM, false, show("1", "Hi", ""))).as("the same site unsandboxed").containsExactly(PrivacyQueries.DONE);
+        assertThat(site.asked).isEmpty();
+    }
+
+    /**
+     * Ruling V22 through the router: it reads the opener bridge's record of the page's document as it takes the query, so
+     * a main-frame response sandboxed without {@code allow-same-origin} is denied, and one with it is not.
+     */
+    @Test void theRouterJudgesTheDocumentTheBridgeRecordedForThePage() throws Exception {
+        var site = onUi(() -> new Site(ROOM));
+        site.stored.put(SITE, Decision.ALLOWED);
+        CefBrowser browser = browser();
+        var ui = new ArrayDeque<Runnable>();
+        var router = new PrivacyQueries.Router(queries, bridge, shown -> shown == browser ? site.page : null, ui::add, () -> false);
+        bridge.responded(site.page, ROOM, null, List.of("sandbox allow-scripts"));
+        bridge.loadStarted(party(site.page, ROOM), ROOM);
+        var sandboxed = new Replies();
+        router.onQuery(browser, frame(ROOM, true), 1, REQUEST, false, sandboxed);
+        router.onQuery(browser, frame(ROOM, true), 2, show("1", "Hi", ""), false, sandboxed);
+        runOnUi(ui);
+        assertThat(sandboxed.calls).containsExactly("success denied", "failure 2");
+
+        bridge.responded(site.page, ROOM, null, List.of("sandbox allow-scripts allow-same-origin"));
+        bridge.loadStarted(party(site.page, ROOM), ROOM);
+        var sameOrigin = new Replies();
+        router.onQuery(browser, frame(ROOM, true), 3, show("2", "Hi", ""), false, sameOrigin);
+        runOnUi(ui);
+        assertThat(sameOrigin.calls).containsExactly("success ");
+        assertThat(site.shown).hasSize(1);
+        assertThat(site.asked).isEmpty();
+    }
+
     @Test void closeClosesThePagesNotification() throws Exception {
         var site = onUi(() -> new Site(ROOM));
         assertThat(ask(site, true, ROOM, "{\"op\":\"notification.close\",\"id\":\"7\"}")).containsExactly(PrivacyQueries.DONE);
@@ -172,7 +260,7 @@ class PrivacyQueriesTest {
         site.stored.put(SITE, Decision.ALLOWED);
         CefBrowser browser = browser(), other = browser();
         var ui = new ArrayDeque<Runnable>();
-        var router = new PrivacyQueries.Router(queries, shown -> shown == browser ? site.page : null, ui::add, () -> false);
+        var router = new PrivacyQueries.Router(queries, bridge, shown -> shown == browser ? site.page : null, ui::add, () -> false);
         var replies = new Replies();
         router.onQuery(browser, frame(ROOM, true), 1, REQUEST, true, replies);
         router.onQuery(browser, frame(ROOM, true), 2, "x".repeat(PrivacyQueries.LONGEST_REQUEST + 1), false, replies);
@@ -203,7 +291,7 @@ class PrivacyQueriesTest {
         var another = onUi(() -> new Site(ROOM));
         CefBrowser browser = browser(), second = browser();
         var ui = new ArrayDeque<Runnable>();
-        var router = new PrivacyQueries.Router(queries, shown -> shown == browser ? site.page : shown == second ? another.page : null,
+        var router = new PrivacyQueries.Router(queries, bridge, shown -> shown == browser ? site.page : shown == second ? another.page : null,
             ui::add, () -> false);
         var waiting = new Replies();
         for (int id = 1; id <= PrivacyQueries.WAITING_LIMIT; id++) router.onQuery(browser, frame(ROOM, true), id, REQUEST, false, waiting);
@@ -242,7 +330,7 @@ class PrivacyQueriesTest {
         CefBrowser browser = browser();
         var ui = new ArrayDeque<Runnable>();
         var stopped = new AtomicBoolean();
-        var router = new PrivacyQueries.Router(queries, shown -> shown == browser ? site.page : null, ui::add, stopped::get);
+        var router = new PrivacyQueries.Router(queries, bridge, shown -> shown == browser ? site.page : null, ui::add, stopped::get);
         var cancelled = new Replies();
         router.onQuery(browser, frame(ROOM, true), 1, REQUEST, false, cancelled);
         runOnUi(ui);
@@ -275,7 +363,7 @@ class PrivacyQueriesTest {
     /** A request that the UI thread would not take is refused, not thrown. */
     @Test void aRequestTheUiThreadCannotTakeIsRefused() throws Exception {
         Page page = onUi(PrivacyQueriesTest::page);
-        var router = new PrivacyQueries.Router(queries, shown -> page, task -> {
+        var router = new PrivacyQueries.Router(queries, bridge, shown -> page, task -> {
             throw new IllegalStateException("no UI thread");
         }, () -> false);
         var replies = new Replies();
@@ -285,9 +373,14 @@ class PrivacyQueriesTest {
 
     /** {@code site}'s frame, the main one or not, at {@code address}, sends {@code request}: the answers it gets. */
     private List<Answer> ask(Site site, boolean main, String address, String request) throws Exception {
+        return ask(site, main, address, false, request);
+    }
+
+    /** As {@link #ask(Site, boolean, String, String)}, from a document whose origin a sandbox made opaque or not. */
+    private List<Answer> ask(Site site, boolean main, String address, boolean opaque, String request) throws Exception {
         var answers = new CopyOnWriteArrayList<Answer>();
         onUi(() -> {
-            queries.request(site.page, main, address, request, answers::add);
+            queries.request(site.page, main, address, opaque, request, answers::add);
             return null;
         });
         return answers;
@@ -303,6 +396,11 @@ class PrivacyQueriesTest {
 
     private static Answer malformed() {
         return new Answer(PrivacyQueries.MALFORMED, PrivacyQueries.MALFORMED_REQUEST.text());
+    }
+
+    /** {@code page} as the opener bridge reaches it, showing {@code address}. */
+    private static OpenerBridge.Party party(Page page, String address) {
+        return new OpenerBridge.Party(page, new Activation(), () -> true, script -> { }, () -> address);
     }
 
     private static Page page() {
@@ -321,7 +419,11 @@ class PrivacyQueriesTest {
         volatile RuntimeException breaking;
 
         Site(String address) {
-            page = new Page(URI.create(address), () -> { }, PageTestAccess.noFavicons(), Runnable::run, PageContext.persistent());
+            this(address, PageContext.persistent());
+        }
+
+        Site(String address, PageContext context) {
+            page = new Page(URI.create(address), () -> { }, PageTestAccess.noFavicons(), Runnable::run, context);
             page.privacy().onStoredDecision((origin, permission) ->
                 permission == Permission.NOTIFICATIONS ? Optional.ofNullable(stored.get(origin)) : Optional.empty());
             page.privacy().onPermissionRequest((request, answer) -> {
@@ -352,6 +454,7 @@ class PrivacyQueriesTest {
             (proxy, method, args) -> switch (method.getName()) {
                 case "getURL" -> url;
                 case "isMain" -> main;
+                case "getIdentifier" -> main ? "main" : "sub";
                 case "equals" -> proxy == args[0];
                 case "hashCode" -> System.identityHashCode(proxy);
                 default -> throw new UnsupportedOperationException(method.getName());

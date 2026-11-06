@@ -14,8 +14,9 @@
  *   the other options are ignored, and click never fires, as Jasper shows the page's tab instead.
  * - close() asks Jasper to take the notification away (op "notification.close") and fires close.
  *
- * The page function is the one found when this script runs, and Jasper checks every request itself: a notification
- * shows only when the user allowed the site. Running it again in the same document does nothing.
+ * The page function is the one found when this script runs, and so are the built-ins the stand-in calls, so a page
+ * that changes them later breaks nothing of it; Jasper checks every request itself: a notification shows only when the
+ * user allowed the site. Running it again in the same document does nothing.
  */
 (function (permission) {
   'use strict';
@@ -27,30 +28,43 @@
     return;
   }
   const query = window.jasperPrivacyQuery;
-  const ANSWERS = ['granted', 'denied', 'default'];
+  // The built-ins the stand-in calls, as they are now.
+  const apply = Reflect.apply;
+  const PromiseOf = Promise, then = Promise.prototype.then, stringify = JSON.stringify, schedule = setTimeout;
+  const EventOf = Event, text = String, Failure = Error, Misuse = TypeError;
+  const listen = EventTarget.prototype.addEventListener, dispatch = EventTarget.prototype.dispatchEvent;
+  const TYPES = ['show', 'close', 'error', 'click'];
   // The answer of the permission request Jasper is asked now, which every call meanwhile shares.
   let asking = null;
   let made = 0;
 
   function ask(request) {
-    return new Promise((resolve, reject) => {
+    return new PromiseOf((resolve, reject) => {
       if (typeof query !== 'function') {
-        reject(new Error('Jasper cannot reach this page.'));
+        reject(new Failure('Jasper cannot reach this page.'));
         return;
       }
       query({
-        request: JSON.stringify(request),
+        request: stringify(request),
         persistent: false,
         onSuccess: resolve,
         onFailure(code, reason) {
-          reject(new Error(reason));
+          reject(new Failure(reason));
         }
       });
     });
   }
 
-  function later(task) {
-    setTimeout(task, 0);
+  function after(promise, answered, failed) {
+    return apply(then, promise, [answered, failed]);
+  }
+
+  function fire(target, type) {
+    schedule(() => apply(dispatch, target, [new EventOf(type)]), 0);
+  }
+
+  function known(answer) {
+    return answer === 'granted' || answer === 'denied' || answer === 'default';
   }
 
   class Notification extends EventTarget {
@@ -64,25 +78,26 @@
     constructor(title, options) {
       super();
       if (arguments.length === 0) {
-        throw new TypeError("Failed to construct 'Notification': 1 argument required, but only 0 present.");
+        throw new Misuse("Failed to construct 'Notification': 1 argument required, but only 0 present.");
       }
-      this.#title = String(title);
-      this.#body = options === undefined || options === null || options.body === undefined ? '' : String(options.body);
-      this.#id = String(++made);
-      for (const type of Object.keys(this.#handlers)) {
-        this.addEventListener(type, event => {
+      this.#title = text(title);
+      this.#body = options === undefined || options === null || options.body === undefined ? '' : text(options.body);
+      this.#id = text(++made);
+      for (let at = 0; at < TYPES.length; at++) {
+        const type = TYPES[at];
+        apply(listen, this, [type, event => {
           const handler = this.#handlers[type];
-          if (handler) handler.call(this, event);
-        });
+          if (handler) apply(handler, this, [event]);
+        }]);
       }
       if (permission !== 'granted') {
         this.#refuse();
         return;
       }
-      ask({op: 'notification.show', id: this.#id, title: this.#title, body: this.#body}).then(() => {
+      after(ask({op: 'notification.show', id: this.#id, title: this.#title, body: this.#body}), () => {
         if (this.#state !== 'asked') return;
         this.#state = 'shown';
-        this.dispatchEvent(new Event('show'));
+        apply(dispatch, this, [new EventOf('show')]);
       }, () => {
         if (this.#state === 'asked') this.#refuse();
       });
@@ -95,20 +110,21 @@
     static requestPermission(callback) {
       let answer;
       if (permission !== 'default') {
-        answer = Promise.resolve(permission);
+        const now = permission;
+        answer = new PromiseOf(resolve => resolve(now));
       } else {
         if (asking === null) {
-          asking = ask({op: 'notification.request'}).then(given => {
-            if (ANSWERS.includes(given)) permission = given;
+          asking = after(after(ask({op: 'notification.request'}), given => {
+            if (known(given)) permission = given;
             return permission;
-          }, () => permission).then(given => {
+          }, () => permission), given => {
             asking = null;
             return given;
           });
         }
         answer = asking;
       }
-      if (typeof callback === 'function') answer.then(given => callback(given));
+      if (typeof callback === 'function') after(answer, given => callback(given));
       return answer;
     }
 
@@ -155,13 +171,13 @@
     close() {
       if (this.#state !== 'asked' && this.#state !== 'shown') return;
       this.#state = 'closed';
-      ask({op: 'notification.close', id: this.#id}).catch(() => {});
-      later(() => this.dispatchEvent(new Event('close')));
+      after(ask({op: 'notification.close', id: this.#id}), undefined, () => {});
+      fire(this, 'close');
     }
 
     #refuse() {
       this.#state = 'refused';
-      later(() => this.dispatchEvent(new Event('error')));
+      fire(this, 'error');
     }
   }
 

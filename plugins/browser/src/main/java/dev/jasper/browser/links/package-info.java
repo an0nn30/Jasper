@@ -12,11 +12,12 @@
  * opener policy. The router serves the {@code page} package's scripts too, each request by its op: a document's
  * favicon goes to its {@link dev.jasper.browser.page.Page}, when {@code http} would fetch it, and what a frame's
  * {@code find.js} found to the page's {@link dev.jasper.browser.page.PageFind}, from any frame of the page.
- * {@link dev.jasper.browser.links.PrivacyQueries} is the client's privacy router, apart from the bridge's as its
- * permission requests can wait minutes: the {@code page} package's {@code notifications.js} asks through it, from a
+ * {@code PrivacyQueries} is the client's privacy router, apart from the bridge's as its permission requests can wait
+ * minutes, which the same installer adds: the {@code page} package's {@code notifications.js} asks through it, from a
  * page's top frame, and each request, untrusted, is answered from the page's
  * {@link dev.jasper.browser.page.PagePrivacy}, judged for the site of the document that asked, as the
- * {@code permissions} package names it. Depends on {@code engine}, {@code http}, {@code json}, {@code page} and
- * {@code permissions}; it loads only once a page first asks for Chromium.
+ * {@code permissions} package names it; a /dev/null page, a document outside a secure context and one whose origin a
+ * sandbox made opaque, as the bridge recorded it, have none that may have notifications. Depends on {@code engine},
+ * {@code http}, {@code json}, {@code page} and {@code permissions}; it loads only once a page first asks for Chromium.
  */
 package dev.jasper.browser.links;

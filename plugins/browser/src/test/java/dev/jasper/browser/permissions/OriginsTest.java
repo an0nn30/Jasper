@@ -1,5 +1,6 @@
 package dev.jasper.browser.permissions;
 
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -57,5 +58,19 @@ class OriginsTest {
             "https://a.test:99999/", "https://a.test:8x/", "https://a test/", "https://a.test\"/", " https://a.test/", "", "no address"})
             assertThat(Origins.of(address)).as(address).isEmpty();
         assertThat(Origins.of(null)).isEqualTo(Optional.empty());
+    }
+
+    /**
+     * Ruling V21: a secure context, as Chromium decides one for an origin: https, or http on this computer (localhost
+     * and its subdomains, 127.0.0.0/8 and [::1]). A file's site and any other origin are not.
+     */
+    @Test void aSecureOriginIsHttpsOrHttpOnThisComputer() {
+        for (String secure : List.of("https://example.com", "https://example.com:8443", "http://localhost", "http://localhost:3000",
+                "http://app.localhost", "http://127.0.0.1", "http://127.12.0.1:8080", "http://[::1]", "http://[::1]:3000"))
+            assertThat(Origins.secure(secure)).as(secure).isTrue();
+        for (String insecure : List.of("http://example.com", "http://localhost.example", "http://notlocalhost", "http://128.0.0.1",
+                "http://[::2]", "http://192.168.1.10:3000", "file://", "ftp://localhost", ""))
+            assertThat(Origins.secure(insecure)).as(insecure).isFalse();
+        assertThat(Origins.of("HTTP://LOCALHOST:3000/a").map(Origins::secure)).contains(true);
     }
 }

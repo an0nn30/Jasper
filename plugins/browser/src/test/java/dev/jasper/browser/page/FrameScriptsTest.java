@@ -19,7 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * The scripts a page's frames run as their documents start loading (spec section 12): a main frame gets
  * {@code notifications.js} with the permission its item's store holds for the document's site, quoted into the call,
- * and no other frame gets it, nor a challenge frame, nor a browser that is no page's. Chromium's side is played by the
+ * and no other frame gets it, nor a challenge frame, nor a browser that is no page's. A /dev/null page (ruling V20), and
+ * a document outside a secure context (ruling V21), are denied without asking the store. Chromium's side is played by the
  * test: the frames it names and the browsers it calls about, made without Chromium. No Chromium.
  */
 class FrameScriptsTest {
@@ -38,53 +39,92 @@ class FrameScriptsTest {
         onUiThread(() -> {
             var stored = new HashMap<String, Decision>();
             var asked = new ArrayList<String>();
-            Page page = page(stored, asked);
-            assertThat(FrameScripts.state("https://Chat.Example:443/room?x=1#top", page.privacy())).as("nothing stored").isEqualTo("default");
+            Page page = page(stored, asked, PageContext.persistent());
+            assertThat(FrameScripts.state("https://Chat.Example:443/room?x=1#top", page)).as("nothing stored").isEqualTo("default");
             assertThat(asked).containsExactly(SITE + " notifications");
             stored.put(SITE, Decision.ALLOWED);
-            assertThat(FrameScripts.state(SITE + "/", page.privacy())).isEqualTo("granted");
+            assertThat(FrameScripts.state(SITE + "/", page)).isEqualTo("granted");
             stored.put(SITE, Decision.BLOCKED);
-            assertThat(FrameScripts.state(SITE + "/", page.privacy())).isEqualTo("denied");
+            assertThat(FrameScripts.state(SITE + "/", page)).isEqualTo("denied");
             stored.put("https://chat.example:8443", Decision.ALLOWED);
-            assertThat(FrameScripts.state("https://chat.example:8443/", page.privacy())).as("another origin").isEqualTo("granted");
+            assertThat(FrameScripts.state("https://chat.example:8443/", page)).as("another origin").isEqualTo("granted");
             asked.clear();
             for (String noSite : new String[] {"about:blank", "data:text/html,hi", "jasper-about:welcome", "", null})
-                assertThat(FrameScripts.state(noSite, page.privacy())).as(String.valueOf(noSite)).isEqualTo("denied");
+                assertThat(FrameScripts.state(noSite, page)).as(String.valueOf(noSite)).isEqualTo("denied");
             assertThat(asked).as("no site asks no store").isEmpty();
             page.close();
-            assertThat(FrameScripts.state(SITE + "/", page.privacy())).as("a closed page's store is no longer asked").isEqualTo("default");
+            assertThat(FrameScripts.state(SITE + "/", page)).as("a closed page's store is no longer asked").isEqualTo("default");
+        });
+    }
+
+    /** Ruling V20: a /dev/null page denies notifications, as Chrome's Incognito does, whatever its store holds. */
+    @Test void aDevNullPageIsDeniedWithoutAskingItsStore() throws Exception {
+        onUiThread(() -> {
+            var asked = new ArrayList<String>();
+            Page page = page(new HashMap<>(Map.of(SITE, Decision.ALLOWED)), asked, PageContext.memory());
+            assertThat(FrameScripts.state(SITE + "/room", page)).isEqualTo("denied");
+            var ran = new ArrayList<String>();
+            FrameScripts.loadStarting(PageTestAccess.pageBrowser(page), frame(true, SITE + "/room", ran, new ArrayList<>()));
+            assertThat(ran).containsExactly("jasper-about:notifications.js " + FrameScripts.notifications("denied"));
+            assertThat(asked).as("the store is not asked").isEmpty();
+        });
+    }
+
+    /**
+     * Ruling V21: notifications need a secure context, as in Chromium: https, or http on this computer. A {@code file:}
+     * page is denied too, as Chrome denies files, and every file shares one site.
+     */
+    @Test void onlyASecureContextIsAskedItsStore() throws Exception {
+        onUiThread(() -> {
+            var stored = new HashMap<String, Decision>();
+            for (String site : new String[] {"http://chat.example", "http://localhost:3000", "http://127.0.0.1", "http://[::1]:8080",
+                    "http://app.localhost", "file://"})
+                stored.put(site, Decision.ALLOWED);
+            var asked = new ArrayList<String>();
+            Page page = page(stored, asked, PageContext.persistent());
+            for (String insecure : new String[] {"http://chat.example/room", "file:///Users/someone/page.html", "http://localhost.example/"})
+                assertThat(FrameScripts.state(insecure, page)).as(insecure).isEqualTo("denied");
+            assertThat(asked).as("no insecure site asks its store").isEmpty();
+            for (String local : new String[] {"http://localhost:3000/", "http://127.0.0.1/", "http://[::1]:8080/", "http://app.localhost/"})
+                assertThat(FrameScripts.state(local, page)).as(local).isEqualTo("granted");
+            stored.clear();
+            assertThat(FrameScripts.state("http://localhost:3000/", page)).isEqualTo("default");
         });
     }
 
     /**
      * The polyfill runs in a page's top frame, never in a sub-frame (plan 6's call) or a challenge frame (spec section
-     * 5), and a page's DevTools get none.
+     * 5), and a page's DevTools get none. A sub-frame's address is not even read (review M4).
      */
     @Test void onlyAPagesMainFrameGetsTheNotificationsScriptAndNeverAChallengeFrame() throws Exception {
         onUiThread(() -> {
             var stored = new HashMap<String, Decision>(Map.of(SITE, Decision.ALLOWED));
-            Page page = page(stored, new ArrayList<>());
+            Page page = page(stored, new ArrayList<>(), PageContext.persistent());
             PageBrowser browser = PageTestAccess.pageBrowser(page);
             var ran = new ArrayList<String>();
-            FrameScripts.loadStarting(browser, frame(true, SITE + "/room", ran));
+            var read = new ArrayList<String>();
+            FrameScripts.loadStarting(browser, frame(true, SITE + "/room", ran, read));
             assertThat(ran).containsExactly("jasper-about:notifications.js " + FrameScripts.notifications("granted"));
+            assertThat(read).containsExactly(SITE + "/room");
             ran.clear();
-            FrameScripts.loadStarting(browser, frame(false, SITE + "/frame", ran));
-            FrameScripts.loadStarting(browser, frame(false, "https://challenges.cloudflare.com/turnstile", ran));
-            FrameScripts.loadStarting(browser, frame(true, "https://challenges.cloudflare.com/turnstile", ran));
-            FrameScripts.loadStarting(browser, frame(true, "https://www.google.com/recaptcha/api2/anchor", ran));
+            read.clear();
+            FrameScripts.loadStarting(browser, frame(false, SITE + "/frame", ran, read));
+            FrameScripts.loadStarting(browser, frame(false, "https://challenges.cloudflare.com/turnstile", ran, read));
+            assertThat(read).as("a sub-frame's address is not read").isEmpty();
+            FrameScripts.loadStarting(browser, frame(true, "https://challenges.cloudflare.com/turnstile", ran, read));
+            FrameScripts.loadStarting(browser, frame(true, "https://www.google.com/recaptcha/api2/anchor", ran, read));
             assertThat(ran).as("sub-frames and challenge frames").isEmpty();
-            FrameScripts.loadStarting(PageTestAccess.devToolsBrowser(PageTestAccess.devTools(page, new Point())), frame(true, SITE + "/", ran));
+            FrameScripts.loadStarting(PageTestAccess.devToolsBrowser(PageTestAccess.devTools(page, new Point())), frame(true, SITE + "/", ran, read));
             assertThat(ran).as("a page's DevTools").isEmpty();
-            FrameScripts.loadStarting(browser, frame(true, "about:blank", ran));
+            FrameScripts.loadStarting(browser, frame(true, "about:blank", ran, read));
             assertThat(ran).as("a document without a site is denied").containsExactly("jasper-about:notifications.js "
                 + FrameScripts.notifications("denied"));
         });
     }
 
     /** A page whose stored decisions come from {@code stored}, by site, recording each site and permission it is asked. */
-    private static Page page(Map<String, Decision> stored, List<String> asked) {
-        Page page = new Page(URI.create(SITE + "/"), () -> { }, PageTestAccess.noFavicons(), Runnable::run, PageContext.persistent());
+    private static Page page(Map<String, Decision> stored, List<String> asked, PageContext context) {
+        Page page = new Page(URI.create(SITE + "/"), () -> { }, PageTestAccess.noFavicons(), Runnable::run, context);
         page.privacy().onStoredDecision((origin, permission) -> {
             asked.add(origin + " " + permission.token());
             return permission == Permission.NOTIFICATIONS ? Optional.ofNullable(stored.get(origin)) : Optional.empty();
@@ -92,12 +132,15 @@ class FrameScriptsTest {
         return page;
     }
 
-    /** A frame showing {@code url} that records each script it runs, by its address and text. */
-    private static CefFrame frame(boolean main, String url, List<String> ran) {
+    /** A frame showing {@code url} that records each script it runs, by its address and text, and each read of its address. */
+    private static CefFrame frame(boolean main, String url, List<String> ran, List<String> read) {
         return (CefFrame) Proxy.newProxyInstance(CefFrame.class.getClassLoader(), new Class<?>[] {CefFrame.class}, (proxy, method, args) -> {
             switch (method.getName()) {
                 case "isMain" -> { return main; }
-                case "getURL" -> { return url; }
+                case "getURL" -> {
+                    read.add(url);
+                    return url;
+                }
                 case "executeJavaScript" -> ran.add(args[1] + " " + args[0]);
                 default -> throw new UnsupportedOperationException(method.getName());
             }

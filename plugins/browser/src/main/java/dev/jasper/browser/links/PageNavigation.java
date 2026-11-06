@@ -56,7 +56,8 @@ import org.cef.security.CefSSLInfo;
  * <p>JCEF keeps a client's first request handler, so this is the only one: what else a request handler is asked goes to
  * its defaults. Life span handlers are a list, which JetBrains' runtime adds its own to, so this adds one and removes
  * none. The same installer wires the {@link OpenerBridge}, which a script's {@code window.open} goes through instead of
- * {@code onBeforePopup}, so the popup keeps its {@code window.opener}.
+ * {@code onBeforePopup}, so the popup keeps its {@code window.opener}, and the page scripts' privacy router
+ * ({@link PrivacyQueries}), which reads what the bridge records of each page's document.
  */
 public final class PageNavigation {
     private static final boolean MAC_OS = System.getProperty("os.name", "").startsWith("Mac");
@@ -77,7 +78,10 @@ public final class PageNavigation {
     }
 
     private static void install(CefClient client, Chromium chromium) {
-        client.addRequestHandler(new Links(OpenerBridge.install(client), chromium));
+        OpenerBridge bridge = OpenerBridge.install(client);
+        // The page scripts' privacy router reads what the bridge records of each page's document.
+        PrivacyQueries.install(client, bridge, chromium);
+        client.addRequestHandler(new Links(bridge, chromium));
         client.addLifeSpanHandler(new Popups());
     }
 

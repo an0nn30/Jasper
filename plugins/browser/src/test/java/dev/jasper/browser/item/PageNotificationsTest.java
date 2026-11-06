@@ -119,6 +119,59 @@ class PageNotificationsTest {
                 assertThat(content.equals("evil.example") || content.startsWith("evil.example — ")).as("body %d: %s", i, content).isTrue();
                 assertThat(content.length()).isLessThanOrEqualTo(4_000);
             }
+            // Review I2: a title's line breaks, which would push the host off the card, become single spaces.
+            String[][] titles = {
+                {"Vault locked" + "\n".repeat(150) + ".", "Vault locked ."},
+                {"Vault\r\nlocked\t\u0085\u2028\u2029now", "Vault locked now"},
+                {"\n\n\nVault locked\n\n", "Vault locked"},
+                {"Vault   \u00a0 locked", "Vault locked"},
+                {"Bell\u0007\u0007rings", "Bell rings"}};
+            Page titled = page();
+            for (int i = 0; i < titles.length; i++) {
+                assertThat(pages.post(titled, WINDOW, evil, "t" + i, titles[i][0], "body " + i)).isTrue();
+                assertThat(last().title()).as("title %d", i).isEqualTo(titles[i][1]);
+                assertThat(last().content()).startsWith("evil.example \u2014 ");
+            }
+            return null;
+        });
+    }
+
+    /** Review I2: History shows a notification's content whole, so a body keeps at most two blank lines in a row. */
+    @Test void aBodyKeepsAtMostTwoBlankLinesInARow() throws Exception {
+        onUi(() -> {
+            Page page = page();
+            String[][] bodies = {
+                {"a" + "\n".repeat(150) + "b", "a\n\n\nb"},
+                {"a\n\nb\n\n\nc", "a\n\nb\n\n\nc"},
+                {"a" + "\u2028".repeat(40) + "b", "a\n\n\nb"},
+                {"a" + "\r\n".repeat(40) + "b\rc\u0085d\u2029e", "a\n\n\nb\nc\nd\ne"},
+                {"a" + "\n \t\u00a0\u200b".repeat(40) + "\nb", "a\n \t\u00a0\u200b\n \t\u00a0\u200b\nb"},
+                {"\n\n\n\nbody\n\n\n\n", "body"}};
+            for (int i = 0; i < bodies.length; i++) {
+                assertThat(pages.post(page, WINDOW, SITE, "b" + i, "Body " + i, bodies[i][0])).isTrue();
+                assertThat(last().content()).as("body %d", i).isEqualTo("chat.example \u2014 " + bodies[i][1]);
+            }
+            return null;
+        });
+    }
+
+    /** Review M1: a long host is cut from the left, as Chrome elides an origin, so its registrable domain shows. */
+    @Test void aLongHostIsElidedFromTheLeft() throws Exception {
+        onUi(() -> {
+            Page page = page();
+            String labels = "x".repeat(50) + "." + "y".repeat(30) + ".evil.example";
+            assertThat(pages.post(page, WINDOW, "https://" + labels, "1", "", "Body")).isTrue();
+            String shown = "\u2026" + "y".repeat(30) + ".evil.example";
+            assertThat(last().title()).isEqualTo(shown);
+            assertThat(last().content()).isEqualTo(shown + " \u2014 Body");
+            String single = "z".repeat(100) + ".com";
+            assertThat(pages.post(page, WINDOW, "https://" + single + ":8443", "2", "T", "")).isTrue();
+            assertThat(last().content()).as("one long label: its end and the top-level domain")
+                .isEqualTo("\u2026" + "z".repeat(55) + ".com").hasSize(60);
+            String sixty = "w".repeat(48) + ".example.com";
+            assertThat(sixty).hasSize(60);
+            assertThat(pages.post(page, WINDOW, "https://" + sixty, "3", "T", "")).isTrue();
+            assertThat(last().content()).as("60 characters are kept whole").isEqualTo(sixty);
             return null;
         });
     }
@@ -287,6 +340,21 @@ class PageNotificationsTest {
             assertThat(privacy.showNotification(new PagePrivacy.Notice(SITE, "4", "After the close", ""))).as("a closed item's page").isFalse();
             privacy.closeNotification("3");
             assertThat(beforeClose.removed()).as("what it posted stays").isFalse();
+            assertThat(host.failures()).isEmpty();
+            return null;
+        });
+    }
+
+    /** Ruling V20: a /dev/null item's page shows no notification, whatever its store holds, as Chrome's Incognito. */
+    @Test void aDevNullItemsPageShowsNoNotification() throws Exception {
+        BrowserItems items = items();
+        BrowserItem item = onUi(() -> items.open(URI.create(SITE + "/room"), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(),
+            items.dataStores().newDevNull()));
+        item.store().permissions().set(SITE, Permission.NOTIFICATIONS, Decision.ALLOWED).get(10, TimeUnit.SECONDS);
+        onUi(() -> {
+            PagePrivacy privacy = ItemTestAccess.page(item).privacy();
+            assertThat(privacy.showNotification(new PagePrivacy.Notice(SITE, "1", "Ping", "From the room"))).isFalse();
+            assertThat(host.notifications().posts()).isEmpty();
             assertThat(host.failures()).isEmpty();
             return null;
         });

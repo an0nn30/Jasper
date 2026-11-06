@@ -14,11 +14,13 @@ import org.cef.browser.CefFrame;
  * The privacy scripts a page's frames run as each of their documents starts loading (spec section 12), at once on
  * Chromium's thread, before the document's own scripts run as a rule: a page's main frame runs
  * {@code notifications.js}, Jasper's stand-in for {@code window.Notification}, called with the permission the page's
- * item's store holds for the document's site ({@link #state}). It runs in the page's own world, as it replaces the
- * page's {@code Notification}, so the page's scripts can change it; what it asks Jasper is untrusted
+ * item's store holds for the document's site ({@link #state}), or {@code denied} for a /dev/null page and outside a
+ * secure context. A document a sandbox gave an opaque origin is given its site's permission: the {@code links}
+ * package's router, which alone knows the sandbox, refuses what it asks (ruling V22). It runs in the page's own world,
+ * as it replaces the page's {@code Notification}, so the page's scripts can change it; what it asks Jasper is untrusted
  * ({@code links.PrivacyQueries}). A sub-frame keeps Chromium's own, which CEF asks no one about and so denies, and so
- * does a challenge frame ({@link ChallengeFrames}), even as a main frame: Jasper's page scripts stay out of those
- * (spec section 5). A script of the page that ran before the stand-in keeps Chromium's {@code Notification} too, and a
+ * does a challenge frame ({@link ChallengeFrames}), even as a main frame: Jasper's page scripts stay out of those (spec
+ * section 5). A script of the page that ran before the stand-in keeps Chromium's {@code Notification} too, and a
  * service worker's {@code showNotification} is not Jasper's. Both hooks are given to the client once, when a page first
  * starts, as {@link PageEvents#prepare} gives its handlers.
  */
@@ -59,8 +61,9 @@ final class FrameScripts {
         Page page = browser.owner();
         if (page == null) return;
         try {
-            script(frame.isMain(), frame.getURL(), page.privacy())
-                .ifPresent(script -> frame.executeJavaScript(script, NOTIFICATIONS_URL, 0));
+            // A sub-frame runs none of these scripts, so its address is not read.
+            if (!frame.isMain()) return;
+            script(true, frame.getURL(), page).ifPresent(script -> frame.executeJavaScript(script, NOTIFICATIONS_URL, 0));
         } catch (RuntimeException failure) {
             LOG.log(System.Logger.Level.WARNING, "A page's notifications script could not run", failure);
         }
@@ -71,27 +74,29 @@ final class FrameScripts {
      *
      * @param mainFrame whether it is its page's main frame
      * @param address the document's address
-     * @param privacy the page's privacy hooks, which give its item's stored decisions
+     * @param page the page, whose privacy hooks give its item's stored decisions
      * @return the notifications stand-in for a main frame that is no challenge frame; empty for any other
      */
-    static Optional<String> script(boolean mainFrame, String address, PagePrivacy privacy) {
+    static Optional<String> script(boolean mainFrame, String address, Page page) {
         if (!mainFrame || ChallengeFrames.is(address)) return Optional.empty();
-        return Optional.of(notifications(state(address, privacy)));
+        return Optional.of(notifications(state(address, page)));
     }
 
     /**
      * The notifications permission of a document at {@code address}, as its item's store holds it for the document's
-     * site, its address's origin. Any thread.
+     * site, its address's origin. A /dev/null page denies notifications, as Chrome's Incognito does (ruling V20), and
+     * only a secure context's site may have them, as in Chromium (ruling V21): neither asks the store. Any thread.
      *
      * @param address the document's address
-     * @param privacy the page's privacy hooks
-     * @return {@value #GRANTED} for Allowed, {@value #DENIED} for Blocked and for an address without a site, and
-     *     {@value #DEFAULT} when none is stored
+     * @param page the page, whose privacy hooks give its item's stored decisions
+     * @return {@value #GRANTED} for Allowed; {@value #DENIED} for Blocked, for a /dev/null page, and for an address
+     *     without a site or outside a secure context, a {@code file:} one included; and {@value #DEFAULT} when none is
+     *     stored
      */
-    static String state(String address, PagePrivacy privacy) {
-        Optional<String> origin = Origins.of(address);
+    static String state(String address, Page page) {
+        Optional<String> origin = page.inMemory() ? Optional.empty() : Origins.of(address).filter(Origins::secure);
         if (origin.isEmpty()) return DENIED;
-        return privacy.storedDecision(origin.get(), Permission.NOTIFICATIONS)
+        return page.privacy().storedDecision(origin.get(), Permission.NOTIFICATIONS)
             .map(decision -> decision == Decision.ALLOWED ? GRANTED : DENIED).orElse(DEFAULT);
     }
 
