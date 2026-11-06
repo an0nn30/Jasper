@@ -664,11 +664,12 @@ Link**.
 
 The Editor's [Markdown preview](editor.md#markdown-preview) draws with the Browser while its **Markdown preview** setting
 is Chromium, the default. Each preview is a page of its own, apart from your browser pages, in GitHub's layout and the
-theme's colours: it loads nothing from the network, runs none of the file's scripts and goes to no other address. Its
-links and images are the Editor's: a click on a link, or Enter on one, goes to the Editor, which follows it as
-[Links in the preview](editor.md#links-in-the-preview) says, and its images are those the Editor loads, web images only
-after **Load external images**. It has no right-click menu and opens no popups or page dialogs. While the Browser plugin
-is off, and once Chromium could not start or has stopped, the Editor's previews are Basic, the Editor's own.
+theme's colours, its diagrams drawn by the Mermaid the Browser bundles: it loads nothing from the network, runs none of
+the file's scripts and goes to no other address. Its links and images are the Editor's: a click on a link, or Enter on
+one, goes to the Editor, which follows it as [Links in the preview](editor.md#links-in-the-preview) says, and its images
+are those the Editor loads, web images only after **Load external images**. It has no right-click menu and opens no
+popups or page dialogs. While the Browser plugin is off, and once Chromium could not start or has stopped, the Editor's
+previews are Basic, the Editor's own, which shows Mermaid diagrams as code.
 
 ## Restore
 

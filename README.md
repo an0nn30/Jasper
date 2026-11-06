@@ -48,7 +48,7 @@ Everything below ships with Jasper as a bundled plugin, listed in Settings › P
 | --- | --- | --- | --- |
 | Remote | `dev.jasper.remote` | SSH terminals, an SFTP browser with persistent transfers, local, remote and SOCKS tunnels, saved hosts with groups, favourites and jump hosts, host-key trust, Vault or SSH-agent authentication, import from `~/.ssh/config`, and a Sessions tool window that also lists WSL distributions | Yes |
 | Credential Vault | `dev.jasper.vault` | Logins, SSH keys and secure notes in one encrypted file, which can be bound to this device; other plugins fetch credentials under per-plugin grants | Yes |
-| Editor | `dev.jasper.editor` | Local and remote text files in workspace panes (one file can show in several), with syntax highlighting, a Markdown preview, its own fonts or the terminal's, a Vim mode and the `jasper editor` command | Yes |
+| Editor | `dev.jasper.editor` | Local and remote text files in workspace panes (one file can show in several), with syntax highlighting, a Markdown preview with Mermaid diagrams, its own fonts or the terminal's, a Vim mode and the `jasper editor` command | Yes |
 | File Server | `dev.jasper.fileserver` | Shares a local folder over HTTP, HTTPS, FTP, FTPS, SFTP or TFTP; servers are read-only and reachable from this computer only until you change that | Yes |
 | Project Index | `dev.jasper.indexer` | Offers to index the project a terminal enters, locally or on a saved host, and finds its files from the command palette | Yes |
 | Shell History | `dev.jasper.history` | Searches every shell's history from the command palette, to paste or run a command or save it as a snippet | Yes |
