@@ -44,8 +44,10 @@ import org.cef.network.CefRequest;
  * start shows the page at its own zoom again, there and then, as Chromium keeps one zoom per host. A main frame's failed
  * load goes to its page with Chromium's name for the error ({@link Page#onLoadFailure}), for its item's error page. Each
  * main-frame load start reaches its page with how the load reached it ({@link #reached}), for its item's history
- * ({@link Page#onVisit}). A page that enters fullscreen is told at once to leave it: Jasper refuses fullscreen (spec
- * section 5). A page's {@link DevTools} browser is no page's: none of this reaches it, but for the editing keys.
+ * ({@link Page#onVisit}), and with how many documents its hooks have started, so the page's muting acts on the one it
+ * has heard of ({@link PagePrivacy#mute}). A page that enters fullscreen is told at once to leave it: Jasper refuses
+ * fullscreen (spec section 5). A page's {@link DevTools} browser is no page's: none of this reaches it, but for the
+ * editing keys.
  *
  * <p>JCEF hands every load, on every client, the same six {@link CefRequest.TransitionType} constants, and ORs each
  * load's qualifiers into the constant's own value without ever clearing them, so a flag one load set would be read by
@@ -293,8 +295,11 @@ public final class PageEvents {
                 if (browser instanceof PageBrowser shown && shown.owner() != null) tell(SUB_FRAME_LOAD_STARTS, shown, frame);
                 return;
             }
+            long document = 0;
             if (browser instanceof PageBrowser shown && shown.owner() != null) {
                 tell(LOAD_STARTS, shown, frame);
+                // The document the hooks just started, which the page's muting acts on once the UI thread hears of it.
+                document = shown.owner().privacy().documents();
                 shown.keepZoom();
                 try {
                     frame.executeJavaScript(DETECT_FAVICON, DETECT_FAVICON_URL, 0);
@@ -303,7 +308,11 @@ public final class PageEvents {
                 }
             }
             String url = frame.getURL();
-            later(browser, page -> page.loadStarted(url, reached));
+            long started = document;
+            later(browser, page -> {
+                page.privacy().documentShown(started);
+                page.loadStarted(url, reached);
+            });
         }
 
         /** Tells the hooks {@code browser}'s client gave in {@code given} that {@code frame} starts loading. */

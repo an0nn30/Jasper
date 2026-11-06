@@ -1,5 +1,6 @@
 package dev.jasper.browser.page;
 
+import dev.jasper.browser.permissions.AudioMode;
 import java.awt.Point;
 import java.lang.reflect.Proxy;
 import java.net.URI;
@@ -61,6 +62,29 @@ class PageEventsTest {
             PageBrowser devTools = PageTestAccess.devToolsBrowser(PageTestAccess.devTools(page, new Point()));
             new PageEvents.Load().onLoadStart(devTools, recording(ran), null);
             assertThat(ran).as("its DevTools'").isEmpty();
+        });
+    }
+
+    /**
+     * Review round 1, item 2: a main frame's load start hands its page, on the UI thread, the document its hooks just
+     * started on Chromium's thread, which the page's muting then acts on; a muting meant for that document changes nothing
+     * once Chromium has started the next, before the UI thread hears of it.
+     */
+    @Test void aMainFramesLoadStartHandsThePageTheDocumentItsHooksStarted() throws Exception {
+        var made = new AtomicReference<Page>();
+        onUiThread(() -> made.set(page()));
+        Page page = made.get();
+        // As FrameScripts' hook starts the document's audio, inside the load start, on Chromium's thread.
+        PageTestAccess.audioDocumentStarted(page, AudioMode.ASK);
+        new PageEvents.Load().onLoadStart(PageTestAccess.pageBrowser(page), recording(new ArrayList<>()), null);
+        onUiThread(() -> {
+            page.privacy().mute(false);
+            assertThat(page.privacy().audioMode()).as("the document the UI thread heard of").isEqualTo(AudioMode.ALLOW);
+        });
+        PageTestAccess.audioDocumentStarted(page, AudioMode.ASK);
+        onUiThread(() -> {
+            page.privacy().mute(true);
+            assertThat(page.privacy().audioMode()).as("the next, which it has not heard of").isEqualTo(AudioMode.ASK);
         });
     }
 

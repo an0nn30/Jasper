@@ -130,8 +130,9 @@ class PrivacyMenuTest {
         BrowserItem item = onUi(() -> items.open(URI.create(SITE + "/room"), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty()));
         Page page = ItemTestAccess.page(item);
         onUi(() -> {
-            PageTestAccess.loadStarted(page, SITE + "/room");
+            // As Chromium starts the document, its frames in the store's mode, then the UI thread hears of it.
             PageTestAccess.audioDocumentStarted(page, AudioMode.ASK);
+            PageTestAccess.loadStarted(page, SITE + "/room");
             assertThat(bar(item).state().visible()).as("no sound yet").isFalse();
             assertThat(menuActions(item)).doesNotContain("browser.unmute");
             page.privacy().audioPlaying();
@@ -149,8 +150,8 @@ class PrivacyMenuTest {
             page.privacy().audioPlaying();
             assertThat(bar(item).state().visible()).as("allowed for this document").isFalse();
 
-            PageTestAccess.loadStarted(page, SITE + "/room");
             PageTestAccess.audioDocumentStarted(page, AudioMode.ASK);
+            PageTestAccess.loadStarted(page, SITE + "/room");
             page.privacy().audioPlaying();
             assertThat(bar(item).state().visible()).as("the next document asks again").isTrue();
             assertThat(page.privacy().audioMode()).as("every frame muted again").isEqualTo(AudioMode.BLOCK);
@@ -236,6 +237,70 @@ class PrivacyMenuTest {
             return null;
         });
         assertThat(item.store().permissions().all()).isEmpty();
+    }
+
+    /**
+     * Review round 1, item 2: a stored Block's first sound mutes every frame of the page, whatever mode they started in,
+     * so a sub-frame that started playing in another mode is muted too.
+     */
+    @Test void aStoredBlocksFirstSoundMutesEveryFrameWhateverModeTheyStartedIn() throws Exception {
+        BrowserItems items = items();
+        BrowserItem item = onUi(() -> items.open(URI.create(SITE + "/"), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty()));
+        item.store().permissions().set(SITE, Permission.AUDIO_PLAYBACK, Decision.BLOCKED).get(10, java.util.concurrent.TimeUnit.SECONDS);
+        Page page = ItemTestAccess.page(item);
+        onUi(() -> {
+            PageTestAccess.audioDocumentStarted(page, AudioMode.ALLOW);
+            PageTestAccess.loadStarted(page, SITE + "/");
+            page.privacy().audioPlaying();
+            assertThat(page.privacy().audioMode()).as("every frame muted").isEqualTo(AudioMode.BLOCK);
+            assertThat(bar(item).state().visible()).isFalse();
+            assertThat(menuActions(item)).contains("browser.unmute");
+            assertThat(host.failures()).isEmpty();
+            return null;
+        });
+    }
+
+    /**
+     * Review round 1, item 2: an answer meant for the document before, which arrives once Chromium has started the next,
+     * leaves the next document's mode as Chromium set it, and tells its frames nothing.
+     */
+    @Test void aMuteMeantForTheDocumentBeforeLeavesTheNextDocumentsModeAlone() throws Exception {
+        BrowserItems items = items();
+        BrowserItem item = onUi(() -> items.open(URI.create(SITE + "/"), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty()));
+        Page page = ItemTestAccess.page(item);
+        onUi(() -> {
+            PageTestAccess.audioDocumentStarted(page, AudioMode.ASK);
+            PageTestAccess.loadStarted(page, SITE + "/");
+            page.privacy().audioPlaying();
+            assertThat(page.privacy().audioMode()).isEqualTo(AudioMode.BLOCK);
+            // Chromium starts the next document, in its site's stored mode; the UI thread has not heard of it yet.
+            PageTestAccess.audioDocumentStarted(page, AudioMode.ASK);
+            view(item).emit(new UiEvent.Action("browser.audio.allow-once"));
+            assertThat(page.privacy().audioMode()).as("the next document's, as Chromium set it").isEqualTo(AudioMode.ASK);
+            PageTestAccess.loadStarted(page, SITE + "/next");
+            assertThat(bar(item).state().visible()).isFalse();
+            page.privacy().audioPlaying();
+            assertThat(page.privacy().audioMode()).as("the next document's own sound mutes it").isEqualTo(AudioMode.BLOCK);
+            assertThat(host.failures()).isEmpty();
+            return null;
+        });
+        assertThat(item.store().permissions().all()).isEmpty();
+    }
+
+    /** Review round 1, item 5: a group that has closed hears nothing more of its page, which may outlive it. */
+    @Test void aClosedGroupHearsNothingMoreOfItsPage() throws Exception {
+        BrowserItems items = items();
+        BrowserItem item = onUi(() -> items.open(URI.create(SITE + "/"), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty()));
+        Page page = ItemTestAccess.page(item);
+        onUi(() -> {
+            PageTestAccess.audioDocumentStarted(page, AudioMode.ASK);
+            PageTestAccess.loadStarted(page, SITE + "/");
+            item.privacy().close();
+            page.privacy().audioPlaying();
+            assertThat(page.privacy().audioMode()).as("no frame muted").isEqualTo(AudioMode.ASK);
+            assertThat(host.failures()).isEmpty();
+            return null;
+        });
     }
 
     /** Ruling V20: a /dev/null item's audio choices come from, and go to, its group's store in memory alone. */

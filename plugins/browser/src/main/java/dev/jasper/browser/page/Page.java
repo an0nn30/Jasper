@@ -1248,7 +1248,7 @@ public final class Page implements AutoCloseable {
      * page hands itself over, not its browser, so that loading this class loads no Chromium type.
      */
     private void inEveryFrame(String script) {
-        if (readyBrowser() != null) FrameScripts.everyFrame(this, script);
+        FrameScripts.everyFrame(this, script);
     }
 
     /**

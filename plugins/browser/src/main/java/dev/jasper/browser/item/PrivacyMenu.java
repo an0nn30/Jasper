@@ -54,10 +54,9 @@ final class PrivacyMenu implements AutoCloseable {
     private final Runnable reload;
     private final Page page;
     private final AudioGate audio = new AudioGate();
-    // The item's listening to its page's load starts, from the start until close().
-    private final Subscription loadStarts;
-    // The item's listening to its store's permissions, from follows() until close(); and what draws the item.
-    private Subscription changed = () -> { };
+    // The item's listening to its page's load starts and its store's permissions, from follows() until close(); and what
+    // draws the item.
+    private Subscription loadStarts = () -> { }, changed = () -> { };
     private Runnable render = () -> { };
     // For each permission, the site the menu last offered its Reset item for.
     private final Map<Permission, String> offered = new EnumMap<>(Permission.class);
@@ -77,20 +76,22 @@ final class PrivacyMenu implements AutoCloseable {
         this.address = Objects.requireNonNull(address, "address");
         this.reload = Objects.requireNonNull(reload, "reload");
         this.page = Objects.requireNonNull(page, "page");
-        loadStarts = page.onLoadStart(this::documentStarted);
-        page.privacy().onAudioPlaying(this::playing);
     }
 
     /**
-     * The item is made: {@code render} draws it again as its store's permissions change, and as its page's sound is
-     * muted or played, until {@link #close()}.
+     * The item is made: from now on, until {@link #close()}, the group hears its page's load starts and sound, and
+     * {@code render} draws the item again as its store's permissions change and as its page's sound is muted or played.
+     * The group hears nothing before, as its page loads nothing before it is shown.
      *
      * @param render draws the item again
      */
     void follows(Runnable render) {
         this.render = Objects.requireNonNull(render, "render");
+        loadStarts.close();
         changed.close();
+        loadStarts = page.onLoadStart(this::documentStarted);
         changed = store.permissions().onChanged(render);
+        page.privacy().onAudioPlaying(this::playing);
     }
 
     /**
@@ -150,10 +151,11 @@ final class PrivacyMenu implements AutoCloseable {
         if (Origins.of(address.get()).filter(sites::contains).isPresent()) reload.run();
     }
 
-    /** The item closes: it is drawn no more as the permissions change or the page plays. */
+    /** The item closes: the group hears its page no more, and draws the item no more. */
     @Override public void close() {
         loadStarts.close();
         changed.close();
+        page.privacy().onAudioPlaying(() -> { });
         render = () -> { };
     }
 
@@ -169,14 +171,16 @@ final class PrivacyMenu implements AutoCloseable {
         if (shown) render.run();
     }
 
-    /** A frame of the page's document plays sound: a site with no stored choice has the page muted and the bar ask. */
+    /**
+     * A frame of the page's document plays sound: a site with no stored choice has every frame muted and the bar ask,
+     * and a stored Block has every frame muted too, whatever mode a frame started in.
+     */
     private void playing() {
         switch (audio.playing()) {
-            case SHOW_BAR -> {
+            case SHOW_BAR, MUTED -> {
                 page.privacy().mute(true);
                 render.run();
             }
-            case MUTED -> render.run();
             case NONE -> { }
         }
     }

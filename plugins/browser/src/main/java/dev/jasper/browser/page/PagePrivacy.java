@@ -8,6 +8,7 @@ import java.awt.EventQueue;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -20,8 +21,10 @@ import java.util.function.Predicate;
  * its item's store holds are read on any thread, as a document starts loading and as its scripts ask. The notifications
  * its scripts show and close go to the item on the UI thread. So does each report that the page plays sound, and its
  * item mutes and unmutes the page's frames through it; the audio mode the page's frames start their documents in, its
- * current mode, is read on any thread. A page whose item gave no handler, or that has closed, is refused, and has no
- * stored decision. Every method runs on the UI thread, except where it says otherwise.
+ * current mode, is read on any thread. The main frame's documents are counted as Chromium starts them, and the item's
+ * muting acts on the latest the UI thread has heard of: one meant for a document Chromium has since left changes
+ * nothing. A page whose item gave no handler, or that has closed, is refused, and has no stored decision. Every method
+ * runs on the UI thread, except where it says otherwise.
  */
 public final class PagePrivacy {
     private static final System.Logger LOG = System.getLogger(PagePrivacy.class.getName());
@@ -33,10 +36,15 @@ public final class PagePrivacy {
     private Runnable playing;
     // Runs a script in each of the page's frames but challenge frames, while the page has its browser.
     private final Consumer<String> frames;
-    // The audio mode a frame starting a document now is given: the main frame's document's, or its muting's since. Read
-    // and written on Chromium's thread too.
-    private volatile AudioMode audio = AudioMode.BLOCK;
+    // How many documents the main frame has started, counted on Chromium's thread, and the audio mode a frame starting a
+    // document now is given: the latest document's, or its muting's since. Read and written on Chromium's thread too.
+    private final AtomicReference<Audio> audio = new AtomicReference<>(new Audio(0, AudioMode.BLOCK));
+    // The latest of those documents the UI thread has heard of, which the item's muting acts on.
+    private long shown;
     private volatile boolean closed;
+
+    /** The main frame's documents started so far, and the audio mode its frames start in now. */
+    private record Audio(long document, AudioMode mode) { }
 
     /**
      * A notification a page's script asks to show: as its script wrote it, for the item to show as its own.
@@ -181,14 +189,20 @@ public final class PagePrivacy {
     /**
      * Mutes every frame of the page, or plays their sound: each runs {@code setMuted} in its {@code audio.js}, and frames
      * that start a document from now on start it so, {@link AudioMode#BLOCK} or {@link AudioMode#ALLOW}, until the main
-     * frame's next document starts in its site's stored mode. Challenge frames run none; nothing once the page has
-     * closed.
+     * frame's next document starts in its site's stored mode. It acts on the latest document the UI thread has heard of:
+     * once Chromium has started another, before the UI thread hears of it, it changes neither that document's mode nor
+     * any frame. Challenge frames run none; nothing once the page has closed.
      *
      * @param muted whether the page's sound is muted
      */
     public void mute(boolean muted) {
         if (closed) return;
-        audio = muted ? AudioMode.BLOCK : AudioMode.ALLOW;
+        AudioMode mode = muted ? AudioMode.BLOCK : AudioMode.ALLOW;
+        Audio now;
+        do {
+            now = audio.get();
+            if (now.document() != shown) return; // meant for a document the main frame has left
+        } while (!audio.compareAndSet(now, new Audio(now.document(), mode)));
         frames.accept(setMuted(muted));
     }
 
@@ -210,12 +224,26 @@ public final class PagePrivacy {
      * @return the mode; {@link AudioMode#BLOCK} before the main frame's first document
      */
     public AudioMode audioMode() {
-        return audio;
+        return audio.get().mode();
     }
 
-    /** The page's main frame starts a document in {@code mode}, its site's stored one. Chromium's thread. */
+    /**
+     * The page's main frame starts a document in {@code mode}, its site's stored one, and the document is counted.
+     * Chromium's thread.
+     */
     void documentStarted(AudioMode mode) {
-        audio = Objects.requireNonNull(mode, "mode");
+        Objects.requireNonNull(mode, "mode");
+        audio.updateAndGet(now -> new Audio(now.document() + 1, mode));
+    }
+
+    /** How many documents the main frame has started: read on Chromium's thread as each load start is handed on. */
+    long documents() {
+        return audio.get().document();
+    }
+
+    /** The UI thread hears of the {@code document}th document, which the item's muting acts on from now on. UI thread. */
+    void documentShown(long document) {
+        shown = document;
     }
 
     /**

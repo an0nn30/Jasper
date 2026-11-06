@@ -5,8 +5,9 @@
  * else is "block".
  *
  * - It watches the document's sound: it wraps HTMLMediaElement.prototype.play and its muted property, listens for play,
- *   playing and volumechange in the capture phase, reads the media elements already in the document, and tracks every
- *   AudioContext (and webkitAudioContext) the page makes from now on.
+ *   playing and volumechange in the capture phase, on the window and on each shadow root the page attaches from now on,
+ *   reads the media elements already in the document, and tracks every AudioContext the page makes from now on, through
+ *   webkitAudioContext too, whether it is AudioContext itself or a constructor of its own.
  * - Muted, every media element is muted, while its muted property reads and keeps what the page set, which unmuting
  *   puts back; one the page unmutes another way is muted again at its next volumechange. Every running audio context is
  *   suspended, and its resume() waits until unmuted; unmuting resumes those the page wants running.
@@ -17,8 +18,9 @@
  *   plays its sound from then on. That entry can be neither replaced nor removed.
  *
  * The muting is cooperative: the page's own scripts can call setMuted too, and an AudioContext made before this ran is
- * not tracked. The page function is the one found when this runs, and so are the built-ins it calls, so a page that
- * changes them later breaks none of it. Running it again in the same document does nothing.
+ * not tracked, nor is an element's autoplay in a shadow root made before this ran, or one the parser made from a
+ * declarative shadow root. The page function is the one found when this runs, and so are the built-ins it calls, so a
+ * page that changes them later breaks none of it. Running it again in the same document does nothing.
  */
 (function (mode) {
   'use strict';
@@ -35,6 +37,7 @@
   const WeakRefOf = WeakRef, deref = WeakRef.prototype.deref;
   const PromiseOf = Promise, then = Promise.prototype.then;
   const listen = EventTarget.prototype.addEventListener, targetOf = describe(Event.prototype, 'target').get;
+  const attachShadow = typeof Element === 'function' ? Element.prototype.attachShadow : undefined;
   const Media = window.HTMLMediaElement;
   if (typeof Media !== 'function' || apply(owns, window, [KEY])) return;
   const media = Media.prototype, play = media.play, mutedOf = describe(media, 'muted');
@@ -54,6 +57,8 @@
   const own = new WeakMapOf();
   // Each element and context seen, and each tracked context's own built-ins; whether a context is to run once unmuted.
   const seen = new WeakSetOf(), natives = new WeakMapOf(), wanted = new WeakMapOf();
+  // The constructor that stands in for each wrapped context prototype, which every name of it is given.
+  const wrappers = new WeakMapOf();
   const elements = {refs: new SetOf(), limit: 64}, contexts = {refs: new SetOf(), limit: 64};
   // The page's resume() calls that wait until unmuted.
   let waiting = new SetOf();
@@ -218,10 +223,15 @@
     const Native = window[name];
     if (typeof Native !== 'function' || typeof Native.prototype !== 'object' || Native.prototype === null) return;
     const prototype = Native.prototype;
+    // Another name of a constructor wrapped already, as webkitAudioContext very likely is of AudioContext, gets the
+    // same stand-in.
+    if (apply(mapHas, wrappers, [prototype])) {
+      const Context = apply(mapGet, wrappers, [prototype]);
+      define(window, name, {value: Context, writable: true, enumerable: false, configurable: true});
+      return;
+    }
     const resume = prototype.resume, suspend = prototype.suspend, state = getter(prototype, 'state');
     if (typeof resume !== 'function' || typeof suspend !== 'function' || typeof state !== 'function') return;
-    if (apply(weakHas, seen, [prototype])) return;
-    apply(weakAdd, seen, [prototype]);
     const kind = freeze({resume, suspend, state});
     const Context = function () {
       if (new.target === undefined) return apply(Native, this, arguments);
@@ -253,7 +263,15 @@
       if (silenced && apply(mapHas, natives, [this])) apply(mapSet, wanted, [this, false]);
       return apply(suspend, this, arguments);
     }}.suspend, writable: true, enumerable: describe(prototype, 'suspend').enumerable, configurable: true});
+    apply(mapSet, wrappers, [prototype, Context]);
     define(window, name, {value: Context, writable: true, enumerable: false, configurable: true});
+  }
+
+  /** A shadow root the page attaches: what plays in it is heard, as its media events stop at the root. */
+  function hearIn(root) {
+    apply(listen, root, ['play', changed, true]);
+    apply(listen, root, ['playing', changed, true]);
+    apply(listen, root, ['volumechange', changed, true]);
   }
 
   // An element Jasper mutes reads, and keeps, the muted value the page sets; any other is the browser's own.
@@ -283,6 +301,14 @@
     if (target !== null) element(target);
     return started;
   }}.play, writable: true, enumerable: describe(media, 'play').enumerable, configurable: true});
+  if (typeof attachShadow === 'function') {
+    const shown = describe(Element.prototype, 'attachShadow').enumerable;
+    define(Element.prototype, 'attachShadow', {value: {attachShadow() {
+      const root = apply(attachShadow, this, arguments);
+      hearIn(root);
+      return root;
+    }}.attachShadow, writable: true, enumerable: shown, configurable: true});
+  }
   wrap('AudioContext');
   wrap('webkitAudioContext');
   apply(listen, window, ['play', changed, true]);

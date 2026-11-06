@@ -89,7 +89,7 @@ public final class PageTestAccess {
      * @param url what it loads
      */
     public static void loadStarted(Page page, String url) {
-        page.loadStarted(url, Reached.OTHER);
+        loadStarted(page, url, Reached.OTHER);
     }
 
     /**
@@ -101,6 +101,7 @@ public final class PageTestAccess {
      * @param reached how the load reached it
      */
     public static void loadStarted(Page page, String url, Reached reached) {
+        page.privacy().documentShown(page.privacy().documents());
         page.loadStarted(url, reached);
     }
 

@@ -159,6 +159,7 @@ class FrameScriptsTest {
             PageBrowser browser = PageTestAccess.pageBrowser(page);
             var ran = new ArrayList<String>();
             FrameScripts.loadStarting(browser, frame(true, SITE + "/room", ran, new ArrayList<>()));
+            PageTestAccess.loadStarted(page, SITE + "/room");
             ran.clear();
             audio.put("https://player.example", Decision.ALLOWED);
             FrameScripts.loadStarting(browser, frame(false, "https://player.example/embed", ran, new ArrayList<>()));
@@ -241,6 +242,30 @@ class FrameScriptsTest {
         privacy.close();
         privacy.mute(false);
         assertThat(scripts).as("a closed page runs nothing").hasSize(2);
+    }
+
+    /**
+     * Review round 1, item 2: a muting meant for a document the main frame has left, as Chromium started the next before
+     * the UI thread heard of it, changes neither the next document's mode nor any frame; once the UI thread hears of the
+     * next, muting acts on it.
+     */
+    @Test void aMutingMeantForTheDocumentBeforeChangesNothing() {
+        var scripts = new ArrayList<String>();
+        var privacy = new PagePrivacy(scripts::add);
+        assertThat(privacy.documents()).isZero();
+        privacy.documentStarted(AudioMode.ASK);
+        privacy.documentShown(privacy.documents());
+        privacy.mute(true);
+        assertThat(privacy.audioMode()).isEqualTo(AudioMode.BLOCK);
+        privacy.documentStarted(AudioMode.ASK);
+        assertThat(privacy.documents()).isEqualTo(2);
+        privacy.mute(false);
+        assertThat(privacy.audioMode()).as("the next document's, as Chromium set it").isEqualTo(AudioMode.ASK);
+        assertThat(scripts).as("no frame told").containsExactly(PagePrivacy.setMuted(true));
+        privacy.documentShown(2);
+        privacy.mute(false);
+        assertThat(privacy.audioMode()).isEqualTo(AudioMode.ALLOW);
+        assertThat(scripts).containsExactly(PagePrivacy.setMuted(true), PagePrivacy.setMuted(false));
     }
 
     /** A page's playing reaches its item's handler on the UI thread, until the page closes; a handler that throws is logged. */
