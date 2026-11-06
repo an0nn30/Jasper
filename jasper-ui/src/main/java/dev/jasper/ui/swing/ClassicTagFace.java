@@ -11,7 +11,8 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * The classic tag (spec 5.2 and 7.1, the Workstation "HTTP" chip): the label in upper case, in its hue through the text
+ * The classic tag (spec 5.2 and 7.1, the Workstation "HTTP" chip): the label in upper case (a token the user entered,
+ * a token field's chip, keeps its own case, plan 5's H19), in its hue through the text
  * guard, on the default tint inside a 1 px box in the hue's tag border role (plan 4c Rulings 11). Both pairs are held
  * against {@code surface.card}, the ground the faint tint stands on and the role {@code tag.border} is mixed with; the
  * opaque hue surface is only painted at the tile share. The box also stands the structural guard apart from that tint as
@@ -57,7 +58,7 @@ final class ClassicTagFace implements TagFace {
 
     @Override public void style(Indicators.ChipControl chip, Indicators.ChipLabel label) {
         var node = (Nodes.Chip) chip.node;
-        label.setText(node.label().toUpperCase(Locale.ROOT));
+        label.setText(chip.entered ? node.label() : node.label().toUpperCase(Locale.ROOT));
         // A chip on a selected row keeps the default inked colours, boxed in the ink.
         if (chip.inked) { label.edge = label.getForeground(); return; }
         label.setForeground(ThemePainting.painted(chip.context(), text(node.hue())));

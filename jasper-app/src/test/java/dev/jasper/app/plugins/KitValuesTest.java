@@ -42,6 +42,22 @@ class KitValuesTest {
   assertThat(classes(nodes)).hasSize(Node.class.getPermittedSubclasses().length);
   for(var node:nodes){var spec=new ViewSpec(node);assertThat(KitValues.toModule(spec).toString().replace("titleNote=, contextActions=[]", "titleNote=")).isEqualTo(spec.toString());}
  }
+ /**
+  * Plan 5 Task 6: the module's token rule is the SDK's, which a token field's events cross back through (KitValues.toSdk
+  * refuses tokens the SDK's rule would not keep), checked on blanks, too long, control characters and case duplicates.
+  */
+ @Test void theModulesTokenRuleKeepsWhatTheSdksKeeps(){
+  var given=new ArrayList<String>(List.of(""," ","  work  ","Work","WORK","x".repeat(64),"y".repeat(65),"a\u0000b","a\u007fb","a\u0085b","\u00C4pfel","\u00E4pfel","\u00C4PFEL",
+   "stra\u00DFe","STRASSE","\u0130stanbul","istanbul","\u0131stanbul","\u03A3\u03C3","\u03C3\u03A3"));
+  for(int i=given.size();i<120;i++)given.add(i%7==0?"Tag"+i/2:"tag"+i);
+  assertThat(given).hasSize(120);
+  var sdk=Nodes.TokenField.kept(given);
+  assertThat(dev.jasper.ui.model.Nodes.TokenField.kept(given)).isEqualTo(sdk);
+  // "\u00C4PFEL" folds its ASCII letters only, to "\u00C4pfel": a duplicate.
+  assertThat(sdk).hasSize(100).startsWith("work","x".repeat(64),"\u00C4pfel","\u00E4pfel","stra\u00DFe","STRASSE","\u0130stanbul","istanbul","\u0131stanbul","\u03A3\u03C3","\u03C3\u03A3");
+  var event=new dev.jasper.ui.model.UiEvent.TokensChanged("tags",dev.jasper.ui.model.Nodes.TokenField.kept(given));
+  assertThat(((UiEvent.TokensChanged)KitValues.toSdk(event)).tokens()).isEqualTo(sdk);
+ }
  /** Plan 3b: a read-only field crosses the projection unchanged. */
  @Test void readOnlyFieldsProjectWithoutLoss(){
   for(boolean readOnly:List.of(false,true)){

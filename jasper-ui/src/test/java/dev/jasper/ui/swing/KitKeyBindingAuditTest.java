@@ -42,6 +42,26 @@ class KitKeyBindingAuditTest {
         });
     }
 
+    /**
+     * As {@link #withFlatLaf}, twice: with the kit's Ctrl+H release off, then on, as on Windows and Linux (Plan 5's H17),
+     * so a run on any platform covers both paths.
+     */
+    static void withFlatLafEitherCtrlH(Runnable body) {
+        withFlatLaf(() -> {
+            boolean prior = TextFields.ctrlHReleased;
+            try { for (boolean released : new boolean[] {false, true}) { TextFields.ctrlHReleased = released; body.run(); } }
+            finally { TextFields.ctrlHReleased = prior; }
+        });
+    }
+
+    /**
+     * H17's deliberate release, which the audits allow as they allow a NUMBER field's steps: while the release holds, a kit
+     * text input's own focused map binds Ctrl+H, and nothing else, to {@code "none"}, leaving the key to the window.
+     */
+    static boolean releasedCtrlH(InputMap own, KeyStroke stroke) {
+        return TextFields.ctrlHReleased && TextFields.CTRL_H.equals(stroke) && "none".equals(own.get(stroke));
+    }
+
     static KeyEvent key(Component on, int code, int modifiers) {
         return new KeyEvent(on, KeyEvent.KEY_PRESSED, 0, modifiers, code, KeyEvent.CHAR_UNDEFINED);
     }
@@ -120,7 +140,7 @@ class KitKeyBindingAuditTest {
      * gives every list key to the look and feel, exactly as a plain field does, and takes them back when the list returns.
      */
     @Test void aFieldWhoseListIsHiddenDisabledOrUnmountedLeavesEveryListKeyToTheLookAndFeel() {
-        withFlatLaf(() -> {
+        withFlatLafEitherCtrlH(() -> {
             var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
             var hidden = new ControlState(false, true, false, ""); var disabled = new ControlState(true, false, false, ""); var busy = new ControlState(true, true, true, "");
             try (var view = new KitView(context, picker(READY, READY), events::add)) {
@@ -149,6 +169,7 @@ class KitKeyBindingAuditTest {
                     for (KeyStroke stroke : own.keys()) {
                         if (own.getParent().get(stroke) == null) continue;
                         if ("notify-field-accept".equals(own.getParent().get(stroke))) continue;
+                        if (releasedCtrlH(own, stroke)) continue;
                         var action = input.getActionMap().get(own.get(stroke));
                         assertThat(action != null && action.isEnabled()).as("%s: %s is live, not a dead shadow", state.getKey(), stroke).isTrue();
                     }
@@ -227,7 +248,7 @@ class KitKeyBindingAuditTest {
      * must be live. The only such keys are a NUMBER field's arrows, which step its value by design.
      */
     @Test void everyKitKeyThatShadowsALookAndFeelBindingIsLive() {
-        withFlatLaf(() -> {
+        withFlatLafEitherCtrlH(() -> {
             var context = KitFixtures.context();
             var nodes = new ArrayList<Node>();
             for (var kind : FieldKind.values()) nodes.add(kind == FieldKind.NUMBER
@@ -247,12 +268,41 @@ class KitKeyBindingAuditTest {
                         if (laf.get(stroke) == null) continue;
                         // Swing's field-accept fires a field's ActionListeners and is inert without one; kit inputs add none.
                         if ("notify-field-accept".equals(laf.get(stroke)) && input instanceof JTextField field && field.getActionListeners().length == 0) continue;
+                        if (releasedCtrlH(own, stroke)) continue;
                         var action = input.getActionMap().get(own.get(stroke));
                         if (action == null || !action.isEnabled()) shadowing.add(input.getClass().getSimpleName() + " " + stroke);
                         else if (!String.valueOf(own.get(stroke)).startsWith("number.step.")) shadowing.add("live non-number " + input.getClass().getSimpleName() + " " + stroke);
                     }
                 }
                 assertThat(shadowing).as("own-map keys hiding a look and feel binding").isEmpty();
+            } finally { release(context); }
+        });
+    }
+
+    /**
+     * Plan 5 (H17): while the release holds, every kit field's input and a token field's input bind Ctrl+H to
+     * {@code "none"}, and a secret keeps the look and feel's; without it, no kit input binds the key at all.
+     */
+    @Test void everyKitFieldAndTokenFieldReleasesCtrlHExactlyWhileTheReleaseHolds() {
+        withFlatLafEitherCtrlH(() -> {
+            var context = KitFixtures.context();
+            var nodes = new ArrayList<Node>();
+            for (var kind : FieldKind.values()) nodes.add(kind == FieldKind.NUMBER
+                ? new Field("f-" + kind, READY, kind, "1", "", "Number", "", Optional.of(new Numeric(0, 9, 1, 0)))
+                : blank("f-" + kind, kind));
+            nodes.add(new TokenField("tags", READY, "Tags", "", List.of("work")));
+            nodes.add(new Secret("secret", READY, "", "Password", "", SecretKind.INPUT, "", ""));
+            try (var view = new KitView(context, new ViewSpec(new Stack("root", READY, LayoutRole.VERTICAL, nodes, "")), e -> { })) {
+                var inputs = new ArrayList<JTextComponent>();
+                collect(view, inputs);
+                assertThat(inputs).hasSize(FieldKind.values().length + 2);
+                for (var input : inputs) {
+                    boolean secret = input instanceof JPasswordField;
+                    // The input's own entry, not the look and feel's parent map, which InputMap.get falls back to.
+                    var own = input.getInputMap(JComponent.WHEN_FOCUSED); var keys = own.keys();
+                    Object bound = keys != null && Arrays.asList(keys).contains(TextFields.CTRL_H) ? own.get(TextFields.CTRL_H) : null;
+                    assertThat(bound).as("%s, released %s", input.getName(), TextFields.ctrlHReleased).isEqualTo(TextFields.ctrlHReleased && !secret ? "none" : null);
+                }
             } finally { release(context); }
         });
     }
@@ -267,7 +317,7 @@ class KitKeyBindingAuditTest {
      * focus conditions the kit binds: a kit key in a component's own map that its look and feel also binds must be live.
      */
     @Test void noGalleryControlHidesALookAndFeelBindingWithADeadKitKey() {
-        withFlatLaf(() -> {
+        withFlatLafEitherCtrlH(() -> {
             var base = KitFixtures.context();
             var findings = new java.util.TreeSet<String>();
             try (var icons = dev.jasper.ui.gallery.KitGallery.icons()) {
@@ -283,9 +333,10 @@ class KitKeyBindingAuditTest {
                                 Object lafName = laf.get(stroke);
                                 if (lafName == null) continue;
                                 if ("notify-field-accept".equals(lafName) && component instanceof JTextField field && field.getActionListeners().length == 0) continue;
+                                if (condition == JComponent.WHEN_FOCUSED && releasedCtrlH(own, stroke)) continue;
                                 var action = component.getActionMap().get(own.get(stroke));
                                 if (action != null && action.isEnabled() && String.valueOf(own.get(stroke)).startsWith("number.step.")) continue;
-                                if (action == null || !action.isEnabled()) findings.add(fixture.name() + ": " + component.getClass().getSimpleName() + " " + stroke + " hides " + lafName);
+                                if (action == null || !action.isEnabled()) findings.add((TextFields.ctrlHReleased ? "released Ctrl+H, " : "") + fixture.name() + ": " + component.getClass().getSimpleName() + " " + stroke + " hides " + lafName);
                             }
                         }
                     }

@@ -41,6 +41,8 @@ public final class FakeKitView implements UiView {
  private final Map<String,String> tokenTexts=new HashMap<>();
  /** The token field whose change is being reported: an update meanwhile replaces its tokens whenever it differs from them. */
  private String notifyingTokens;
+ /** Per token field, the token whose chip the keyboard has selected; absent while the typed text has the keys. */
+ private final Map<String,String> tokenSelections=new HashMap<>();
  FakeKitView(FakeKit owner, ViewSpec spec, Consumer<UiEvent> events) {this.owner=owner;this.events=Objects.requireNonNull(events);update(spec);}
  void guard(){owner.guard();if(closed.get())throw new IllegalStateException("View is closed");}
  @Override public UiAnchor anchor(String id){guard();var anchor=new Attachment(id);if(!anchor.isOpen())throw new IllegalArgumentException("Unmounted or ineligible control");anchors.add(anchor);return anchor;}
@@ -77,10 +79,12 @@ public final class FakeKitView implements UiView {
   // A token field shows a list an update changes, or one that differs while it reports a change; its typed text stays.
   tokenLists.keySet().removeIf(id -> !(nodes.get(id) instanceof Nodes.TokenField));
   tokenTexts.keySet().removeIf(id -> !(nodes.get(id) instanceof Nodes.TokenField));
+  tokenSelections.keySet().removeIf(id -> !(nodes.get(id) instanceof Nodes.TokenField));
   for(var node:nodes.values())if(node instanceof Nodes.TokenField field){
    if(!(previous.get(field.id()) instanceof Nodes.TokenField old) || !old.tokens().equals(field.tokens()) || field.id().equals(notifyingTokens) && !field.tokens().equals(tokenLists.get(field.id())))
     tokenLists.put(field.id(),field.tokens());
    tokenTexts.putIfAbsent(field.id(),"");
+   keepSelection(field.id());
   }
   sourceSpec=source;spec=next;for(var a:List.copyOf(anchors))a.isOpen();if(focused!=null&&!nodes.containsKey(focused))focused=null;}finally{updating=false;}
  }
@@ -102,7 +106,7 @@ public final class FakeKitView implements UiView {
   * text, as the host's fields do when the focus leaves them for good.
   */
  private void moveFocus(String id){String leaving=focused;if(leaving!=null&&!leaving.equals(id)&&mounted(spec.root()).get(leaving) instanceof Nodes.Field)suggestionsHidden.add(leaving);focused=id;
-  if(leaving!=null&&!leaving.equals(id)&&mounted(spec.root()).get(leaving) instanceof Nodes.TokenField)commitToken(leaving);}
+  if(leaving!=null&&!leaving.equals(id)&&mounted(spec.root()).get(leaving) instanceof Nodes.TokenField){commitToken(leaving);tokenSelections.remove(leaving);}}
  @Override public void selectAll(String id){guard();if(!(mounted(spec.root()).get(id) instanceof Nodes.Field field) || field.presentation()==Nodes.FieldPresentation.SLIDER)throw new IllegalArgumentException("Not a field node");fieldSelections.put(id,new int[]{0,fieldText.get(id).length()});}
  /** The fake's logical field selection, independently recorded from focus. */
  public int[] fieldSelection(String id){guard();if(!(mounted(spec.root()).get(id) instanceof Nodes.Field field) || field.presentation()==Nodes.FieldPresentation.SLIDER)throw new IllegalArgumentException("Not a field node");return fieldSelections.getOrDefault(id,new int[]{0,0}).clone();}
@@ -122,10 +126,11 @@ public final class FakeKitView implements UiView {
  /** Deliver a typed event through containment; an edit of a read-only field, which a person cannot make, is dropped. */
  public void emit(UiEvent event){guard();if(event instanceof UiEvent.Edited edit && mounted(spec.root()).get(edit.id()) instanceof Nodes.Field field && field.readOnly())return;if(event instanceof UiEvent.Edited edit && mounted(spec.root()).get(edit.id()) instanceof Nodes.Field){fieldText.put(edit.id(),edit.text());fieldSelections.remove(edit.id());suggestionsHidden.remove(edit.id());suggestionSelections.remove(edit.id());}
   if(event instanceof UiEvent.SuggestionChosen chosen && mounted(spec.root()).get(chosen.fieldId()) instanceof Nodes.Field)suggestionsHidden.add(chosen.fieldId());
-  if(event instanceof UiEvent.TokensChanged change && mounted(spec.root()).get(change.id()) instanceof Nodes.TokenField)tokenLists.put(change.id(),change.tokens());try{if(hostEvents.test(event))return;events.accept(Objects.requireNonNull(event));}catch(Throwable failure){owner.failed();}}
+  if(event instanceof UiEvent.TokensChanged change && mounted(spec.root()).get(change.id()) instanceof Nodes.TokenField){tokenLists.put(change.id(),change.tokens());keepSelection(change.id());}try{if(hostEvents.test(event))return;events.accept(Objects.requireNonNull(event));}catch(Throwable failure){owner.failed();}}
  /** Simulate a person typing {@code text} into a field, replacing its text: it reports {@link UiEvent.Edited} as the host's field does, while a read-only field, or one that is hidden, disabled or busy (itself or a container above it), takes nothing.
  * Typed into a {@link Nodes.TokenField} (since 0.29.0), which takes the focus, it replaces the text typed there
- * ({@link #tokenText(String)}) and reports no edit, but each comma in it adds the text before it, and the changed list is
+ * ({@link #tokenText(String)}) and reports no edit, but each separator in it (a comma, a line break or a tab) adds the
+ * text before it, and the changed list is
  * reported once as {@link UiEvent.TokensChanged}, as the host's token field does.
  * @param fieldId field or token field node
  * @param text the text typed */
@@ -162,11 +167,16 @@ public final class FakeKitView implements UiView {
  * while it only loads), ESCAPE hides it and reports the field's {@code cancelAction} when that is not blank. Otherwise
  * ENTER reports the {@code trailingAction} of a single-line field other than PATH, and ESCAPE the {@code cancelAction},
  * when not blank. A field that is hidden, disabled or busy (itself or a container above it) takes no key.
- * <p>In a {@link Nodes.TokenField} (since 0.29.0), ENTER adds the typed text as a token while some is typed, and
- * BACK_SPACE deletes the typed text's last character, or with nothing typed removes the last token, each change reported
- * as {@link UiEvent.TokensChanged}; Enter with nothing typed passes on, as the host's does.
+ * <p>In a {@link Nodes.TokenField} (since 0.29.0), as the host's: ENTER adds the typed text as a token while text other
+ * than white space is typed, and reports nothing otherwise; BACK_SPACE deletes the typed text's last character, or with
+ * nothing typed removes the last token; LEFT with nothing typed selects the last token's chip
+ * ({@link #selectedToken(String)}). While a chip is selected, LEFT, RIGHT, HOME and END move among the chips (RIGHT past
+ * the last returns to the typed text), BACK_SPACE and DELETE remove its token and select the one before or after it
+ * (none when it was the last), ESCAPE returns to the typed text, and ENTER returns there and does what it does there.
+ * Each change is reported as {@link UiEvent.TokensChanged}.
  * @param fieldId field or token field node
- * @param key UP, DOWN, TAB, ENTER or ESCAPE in a field; ENTER or BACK_SPACE in a token field
+ * @param key UP, DOWN, TAB, ENTER or ESCAPE in a field; ENTER, BACK_SPACE, LEFT, RIGHT, HOME, END, DELETE or ESCAPE in a
+ *     token field
  * @since 0.27.0 */
  public void press(String fieldId,String key){guard();if(mounted(spec.root()).get(fieldId) instanceof Nodes.TokenField){pressToken(fieldId,key);return;}
   var field=suggesting(fieldId);Objects.requireNonNull(key);
@@ -222,18 +232,45 @@ public final class FakeKitView implements UiView {
  * @since 0.29.0 */
  public void removeToken(String fieldId,String token){tokenField(fieldId);Objects.requireNonNull(token);var shown=tokenLists.get(fieldId);
   if(!shown.contains(token))throw new IllegalArgumentException("No token "+token+" in "+fieldId);if(!live(fieldId))return;var next=new ArrayList<>(shown);next.remove(token);changeTokens(fieldId,next);}
+ /**
+ * The token whose chip the keyboard has selected in token field {@code fieldId} ({@link #press(String, String)}), the
+ * focus staying in the field; typing, a focus move, or a change that removes the token clears it.
+ * @param fieldId token field node
+ * @return the selected token; empty while the typed text has the keys
+ * @since 0.29.0 */
+ public Optional<String> selectedToken(String fieldId){tokenField(fieldId);return Optional.ofNullable(tokenSelections.get(fieldId));}
  private Nodes.TokenField tokenField(String fieldId){guard();if(!(mounted(spec.root()).get(fieldId) instanceof Nodes.TokenField field))throw new IllegalArgumentException("Not a token field node");return field;}
- private void typeTokens(String fieldId,String text){tokenField(fieldId);if(!live(fieldId))return;moveFocus(fieldId);String[] parts=text.split(",",-1);tokenTexts.put(fieldId,parts[parts.length-1]);
+ private void typeTokens(String fieldId,String text){tokenField(fieldId);if(!live(fieldId))return;moveFocus(fieldId);tokenSelections.remove(fieldId);String[] parts=text.split("[,\\r\\n\\t]",-1);tokenTexts.put(fieldId,parts[parts.length-1]);
   if(parts.length>1)addTokens(fieldId,Arrays.asList(parts).subList(0,parts.length-1));}
- private void pressToken(String fieldId,String key){tokenField(fieldId);Objects.requireNonNull(key);if(!List.of("ENTER","BACK_SPACE").contains(key))throw new IllegalArgumentException("Not a key a token field takes: "+key);
-  if(!live(fieldId))return;moveFocus(fieldId);String typed=tokenTexts.get(fieldId);var shown=tokenLists.get(fieldId);
-  if(key.equals("ENTER")){if(!typed.isBlank())commitToken(fieldId);}
-  else if(!typed.isEmpty())tokenTexts.put(fieldId,typed.substring(0,typed.offsetByCodePoints(typed.length(),-1)));
-  else if(!shown.isEmpty())changeTokens(fieldId,shown.subList(0,shown.size()-1));}
+ private void pressToken(String fieldId,String key){tokenField(fieldId);Objects.requireNonNull(key);
+  if(!List.of("ENTER","BACK_SPACE","LEFT","RIGHT","HOME","END","DELETE","ESCAPE").contains(key))throw new IllegalArgumentException("Not a key a token field takes: "+key);
+  if(!live(fieldId))return;moveFocus(fieldId);String typed=tokenTexts.get(fieldId);var shown=tokenLists.get(fieldId);String chosen=tokenSelections.get(fieldId);
+  if(chosen!=null){int at=shown.indexOf(chosen);
+   switch(key){
+    case "LEFT" -> tokenSelections.put(fieldId,shown.get(Math.max(0,at-1)));
+    case "RIGHT" -> {if(at+1<shown.size())tokenSelections.put(fieldId,shown.get(at+1));else tokenSelections.remove(fieldId);}
+    case "HOME" -> tokenSelections.put(fieldId,shown.getFirst());
+    case "END" -> tokenSelections.put(fieldId,shown.getLast());
+    case "BACK_SPACE","DELETE" -> {var next=new ArrayList<>(shown);next.remove(at);
+     if(next.isEmpty())tokenSelections.remove(fieldId);else tokenSelections.put(fieldId,next.get(key.equals("BACK_SPACE")?Math.max(0,at-1):Math.min(at,next.size()-1)));
+     changeTokens(fieldId,next);}
+    case "ESCAPE" -> tokenSelections.remove(fieldId);
+    default -> {tokenSelections.remove(fieldId);if(!typed.isBlank())commitToken(fieldId);}
+   }
+   return;}
+  switch(key){
+   case "ENTER" -> {if(!typed.isBlank())commitToken(fieldId);}
+   case "BACK_SPACE" -> {if(!typed.isEmpty())tokenTexts.put(fieldId,typed.substring(0,typed.offsetByCodePoints(typed.length(),-1)));else if(!shown.isEmpty())changeTokens(fieldId,shown.subList(0,shown.size()-1));}
+   // The fake's caret is at the end of the typed text: Left reaches the chips only when nothing is typed.
+   case "LEFT" -> {if(typed.isEmpty()&&!shown.isEmpty())tokenSelections.put(fieldId,shown.getLast());}
+   default -> {}
+  }}
+ /** A selection whose token the field no longer shows is cleared. */
+ private void keepSelection(String fieldId){var chosen=tokenSelections.get(fieldId);if(chosen!=null&&!tokenLists.get(fieldId).contains(chosen))tokenSelections.remove(fieldId);}
  /** The typed text becomes a token, or is dropped when the token rule refuses it; it is cleared either way. */
  private void commitToken(String fieldId){if(!live(fieldId))return;String typed=tokenTexts.get(fieldId);if(typed.isEmpty())return;tokenTexts.put(fieldId,"");addTokens(fieldId,List.of(typed));}
  private void addTokens(String fieldId,List<String> typed){var next=new ArrayList<>(tokenLists.get(fieldId));next.addAll(typed);changeTokens(fieldId,Nodes.TokenField.kept(next));}
- private void changeTokens(String fieldId,List<String> next){if(next.equals(tokenLists.get(fieldId)))return;var copy=List.copyOf(next);tokenLists.put(fieldId,copy);String prior=notifyingTokens;notifyingTokens=fieldId;
+ private void changeTokens(String fieldId,List<String> next){if(next.equals(tokenLists.get(fieldId)))return;var copy=List.copyOf(next);tokenLists.put(fieldId,copy);keepSelection(fieldId);String prior=notifyingTokens;notifyingTokens=fieldId;
   try{emit(new UiEvent.TokensChanged(fieldId,copy));}finally{notifyingTokens=prior;}}
  private Nodes.Field suggesting(String fieldId){guard();if(!(mounted(spec.root()).get(fieldId) instanceof Nodes.Field field)||field.presentation()==Nodes.FieldPresentation.SLIDER)throw new IllegalArgumentException("Not a field node");return field;}
  /** Whether the field's list shows: the field takes input, has suggestions or loads them, and nothing has hidden the list. */
@@ -249,7 +286,7 @@ public final class FakeKitView implements UiView {
  private void dispose(CustomContent content){
   // Claim removal before invoking plugin code; reentrant close may consume the remaining snapshot.
   if(contents.get(content.id())!=content)return;contents.remove(content.id());CONTENT_OWNERS.remove(content.component(),this);try{content.lifetime().close();}catch(Throwable failure){owner.failed();}}
- @Override public void close(){if(!closed.compareAndSet(false,true))return;Runnable cleanup=() -> {invalidateAnchors();for(var value:secrets.values())Arrays.fill(value,(char)0);secrets.clear();fieldText.clear();fieldSelections.clear();suggestionSelections.clear();suggestionsHidden.clear();tokenLists.clear();tokenTexts.clear();for(var content:List.copyOf(contents.values()))dispose(content);contents.clear();events=e -> {};hostEvents=e -> false;hostSpec=v -> v;mount=null;owner.removed(this);};if(EventQueue.isDispatchThread())cleanup.run();else EventQueue.invokeLater(cleanup);}
+ @Override public void close(){if(!closed.compareAndSet(false,true))return;Runnable cleanup=() -> {invalidateAnchors();for(var value:secrets.values())Arrays.fill(value,(char)0);secrets.clear();fieldText.clear();fieldSelections.clear();suggestionSelections.clear();suggestionsHidden.clear();tokenLists.clear();tokenTexts.clear();tokenSelections.clear();for(var content:List.copyOf(contents.values()))dispose(content);contents.clear();events=e -> {};hostEvents=e -> false;hostSpec=v -> v;mount=null;owner.removed(this);};if(EventQueue.isDispatchThread())cleanup.run();else EventQueue.invokeLater(cleanup);}
     static List<Nodes.Node> children(Nodes.Node node) {
         var result = new ArrayList<Nodes.Node>();
         switch (node) {

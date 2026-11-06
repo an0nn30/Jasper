@@ -29,7 +29,7 @@ final class ModelChecks {
     /**
      * The token rule: each token trimmed, kept only when it is nonblank, at most 64 characters and free of control
      * characters, and when it does not match an earlier one ignoring the case of ASCII letters; the first 100, in order.
-     * The Browser's {@code BookmarkStore.keptTags} keeps bookmark tags by the same rule, and the two must agree.
+     * It is the Browser's tag rule too: {@code BookmarkStore.keptTags} calls {@code Nodes.TokenField.kept}.
      */
     static List<String> keptTokens(List<String> given) {
         var seen = new HashSet<String>();
@@ -49,7 +49,7 @@ final class ModelChecks {
         var seen = new HashSet<String>();
         for (String token : copy) {
             if (token.isBlank()) throw new IllegalArgumentException("A token must not be blank");
-            if (!token.equals(token.strip())) throw new IllegalArgumentException("A token has no leading or trailing white space: \"" + token + "\"");
+            if (!token.equals(token.strip())) throw new IllegalArgumentException("A token must not have leading or trailing white space: \"" + token + "\"");
             if (token.length() > MAX_TOKEN) throw new IllegalArgumentException("A token holds at most " + MAX_TOKEN + " characters, not " + token.length());
             if (token.chars().anyMatch(Character::isISOControl)) throw new IllegalArgumentException("A token holds no control characters");
             if (!seen.add(folded(token))) throw new IllegalArgumentException("Duplicate token: " + token);

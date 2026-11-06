@@ -71,18 +71,27 @@ class TokenFieldsTest {
 
     static UiEvent.TokensChanged changed(String... tokens) { return new UiEvent.TokensChanged("tags", List.of(tokens)); }
 
+    /** The token whose chip the keyboard has selected, as the kit publishes it on the input; null for none. */
+    static String selected(KitView view) { return (String) control(view).input.getClientProperty(KitOwnership.SELECTED_TOKEN); }
+
+    /** The tokens whose chips show the focus ring. */
+    static List<String> ringed(KitView view) {
+        return control(view).chips.stream().filter(token -> token.chip.component.getClientProperty("Jasper.kit.halo") != null).map(token -> token.token).toList();
+    }
+
     @Test void eachTokenIsAChipOfTheLooksTagFaceWithItsRemoveButtonAndTheTypedTextFollows() {
         for (var kit : List.of(Kit.DEFAULT, KitFixtures.enterprise())) Edt.run(() -> {
             var context = KitFixtures.context(KitFixtures.light(), kit);
             boolean classic = context.faces().tag instanceof ClassicTagFace;
-            try (var view = new KitView(context, spec(List.of("work", "news")), e -> {})) {
+            try (var view = new KitView(context, spec(List.of("work", "\u00C4pfel", "\u00E4pfel")), e -> {})) {
                 KitFixtures.render(view, 420, 90, 1);
                 var control = control(view);
-                assertThat(shown(view)).as("under %s", kit.id()).containsExactly("work", "news");
+                assertThat(shown(view)).as("under %s", kit.id()).containsExactly("work", "\u00C4pfel", "\u00E4pfel");
                 for (var token : control.chips) {
                     var chip = (Indicators.ChipLabel) token.chip.component;
                     assertThat(chip.getParent()).isSameAs(control.surface);
-                    assertThat(chip.getText()).as("the look's tag style").isEqualTo(classic ? token.token.toUpperCase(java.util.Locale.ROOT) : token.token);
+                    // H19: a status tag's classic face writes it in capitals; a token keeps the case the user typed, in every look.
+                    assertThat(chip.getText()).as("as entered, under %s", kit.id()).isEqualTo(token.token);
                     assertThat(chip.edge != null).as("the classic tag's box").isEqualTo(classic);
                     var remove = token.remove;
                     assertThat(remove.getParent()).as("the remove button stands inside its chip").isSameAs(chip);
@@ -100,10 +109,14 @@ class TokenFieldsTest {
                 assertThat(control.label.isVisible()).as("its label stands over it, as a standard field's").isTrue();
                 assertThat(control.label.getText()).isEqualTo("Tags");
                 assertThat(control.input.getAccessibleContext().getAccessibleName()).isEqualTo("Tags");
-                assertThat(control.input.getAccessibleContext().getAccessibleDescription()).isEqualTo("Enter tags…");
+                assertThat(control.input.getAccessibleContext().getAccessibleDescription()).as("the description names the tokens, then the hint")
+                    .isEqualTo("Tags: work, \u00C4pfel, \u00E4pfel. Enter tags\u2026");
                 assertThat(control.surface.hint).as("the hint shows only while the field is empty").isEmpty();
                 view.update(spec(List.of()));
-                assertThat(control(view).surface.hint).isEqualTo("Enter tags…");
+                assertThat(control(view).surface.hint).isEqualTo("Enter tags\u2026");
+                assertThat(control(view).input.getAccessibleContext().getAccessibleDescription()).isEqualTo("Enter tags\u2026");
+                view.update(spec(tags(new ControlState(true, true, false, "Too many tags"), List.of("work"))));
+                assertThat(control(view).input.getAccessibleContext().getAccessibleDescription()).as("an error in place of the hint").isEqualTo("Tags: work. Too many tags");
             } finally { KitViewTest.release(context); }
         });
     }
@@ -118,6 +131,7 @@ class TokenFieldsTest {
                 assertThat(press(input, KeyEvent.VK_ENTER)).isTrue();
                 assertThat(events).containsExactly(changed("work", "news"));
                 assertThat(input.getText()).isEmpty();
+                assertThat(input.getAccessibleContext().getAccessibleDescription()).as("each change names the tokens again").isEqualTo("Tags: work, news. Enter tags\u2026");
                 assertThat(shown(view)).containsExactly("work", "news");
 
                 type(input, "reading,later,soon");
@@ -136,6 +150,111 @@ class TokenFieldsTest {
                 assertThat(events).as("blank text reports nothing").hasSize(3);
                 assertThat(input.getText()).isEmpty();
                 assertThat(control(view).tokens).containsExactly("work", "news", "reading", "later", "soon");
+            } finally { KitViewTest.release(context); }
+        });
+    }
+
+    /**
+     * A pasted list: a line break (LF or CR LF) and a tab separate tokens as a comma does, all added in one change, and the
+     * text after the last separator stays typed. Once a document filter is installed, the field's document no longer
+     * turns line breaks into spaces itself.
+     */
+    @Test void lineBreaksAndTabsInAPasteSeparateTokensAsCommasDo() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+            try (var view = new KitView(context, spec(List.of()), events::add)) {
+                var input = control(view).input;
+                type(input, "work\nnews\r\nhome\tx");
+                assertThat(events).containsExactly(changed("work", "news", "home"));
+                assertThat(input.getText()).isEqualTo("x");
+                press(input, KeyEvent.VK_ENTER);
+                assertThat(events.getLast()).isEqualTo(changed("work", "news", "home", "x"));
+            } finally { KitViewTest.release(context); }
+        });
+    }
+
+    /**
+     * H18: the field stays one Tab stop and the keyboard reaches every chip. Left with the caret at the start selects the
+     * last chip, drawn with the focus ring and announced as the input's active descendant; Left, Right, Home and End move
+     * among the chips; Backspace or Delete removes the selected one and selects its neighbour; Right past the last chip,
+     * Escape, typing and the focus leaving return to the typed text.
+     */
+    @Test void theKeyboardSelectsAnyChipAndRemovesIt() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+            try (var view = new KitView(context, spec(List.of("a", "b", "c", "d", "e")), events::add)) {
+                KitFixtures.render(view, 480, 90, 1);
+                var control = control(view); var input = control.input;
+                for (var token : control.chips) {
+                    assertThat(token.chip.component.isFocusable()).as("no chip is a Tab stop").isFalse();
+                    assertThat(token.remove.isFocusable()).isFalse();
+                }
+                var announced = new ArrayList<Object>();
+                input.getAccessibleContext().addPropertyChangeListener(event -> {
+                    if (javax.accessibility.AccessibleContext.ACCESSIBLE_ACTIVE_DESCENDANT_PROPERTY.equals(event.getPropertyName())) announced.add(event.getNewValue());
+                });
+                type(input, "zz");
+                press(input, KeyEvent.VK_LEFT);
+                assertThat(selected(view)).as("Left with the caret after typed text moves the caret").isNull();
+                assertThat(input.getCaretPosition()).isEqualTo(1);
+                input.setText("");
+
+                assertThat(press(input, KeyEvent.VK_LEFT)).isTrue();
+                assertThat(selected(view)).isEqualTo("e");
+                assertThat(ringed(view)).as("drawn with the focus ring").containsExactly("e");
+                assertThat(announced).as("announced as the input's active descendant").containsExactly(control.chips.getLast().chip.component);
+                assertThat(((javax.accessibility.Accessible) announced.getLast()).getAccessibleContext().getAccessibleName()).isEqualTo("e");
+                press(input, KeyEvent.VK_LEFT); press(input, KeyEvent.VK_LEFT); press(input, KeyEvent.VK_LEFT);
+                assertThat(selected(view)).isEqualTo("b");
+                press(input, KeyEvent.VK_HOME);
+                assertThat(selected(view)).isEqualTo("a");
+                press(input, KeyEvent.VK_LEFT);
+                assertThat(selected(view)).as("the first chip stays selected").isEqualTo("a");
+                press(input, KeyEvent.VK_END);
+                assertThat(selected(view)).isEqualTo("e");
+                press(input, KeyEvent.VK_HOME); press(input, KeyEvent.VK_RIGHT);
+                assertThat(selected(view)).isEqualTo("b");
+                assertThat(events).as("moving reports nothing").isEmpty();
+
+                assertThat(press(input, KeyEvent.VK_BACK_SPACE)).isTrue();
+                assertThat(events).containsExactly(changed("a", "c", "d", "e"));
+                assertThat(selected(view)).as("Backspace selects the chip before").isEqualTo("a");
+                assertThat(ringed(view)).containsExactly("a");
+                assertThat(press(input, KeyEvent.VK_ESCAPE)).as("Escape stays with the field").isTrue();
+                assertThat(selected(view)).isNull();
+                assertThat(ringed(view)).isEmpty();
+                type(input, "f");
+                assertThat(input.getText()).isEqualTo("f");
+                press(input, KeyEvent.VK_ENTER);
+                assertThat(events.getLast()).isEqualTo(changed("a", "c", "d", "e", "f"));
+
+                press(input, KeyEvent.VK_LEFT); press(input, KeyEvent.VK_LEFT); press(input, KeyEvent.VK_LEFT);
+                assertThat(press(input, KeyEvent.VK_DELETE)).isTrue();
+                assertThat(events.getLast()).isEqualTo(changed("a", "c", "e", "f"));
+                assertThat(selected(view)).as("Delete selects the chip after").isEqualTo("e");
+                press(input, KeyEvent.VK_RIGHT);
+                assertThat(selected(view)).isEqualTo("f");
+                press(input, KeyEvent.VK_RIGHT);
+                assertThat(selected(view)).as("Right past the last chip returns to the typed text").isNull();
+                press(input, KeyEvent.VK_LEFT);
+                type(input, "g");
+                assertThat(selected(view)).as("typing returns to the typed text").isNull();
+                assertThat(input.getText()).isEqualTo("g");
+                input.setText("");
+                press(input, KeyEvent.VK_LEFT);
+                focusLost(input, false);
+                assertThat(selected(view)).as("and so does the focus leaving").isNull();
+                assertThat(events).hasSize(3);
+            } finally { KitViewTest.release(context); }
+        });
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+            try (var view = new KitView(context, spec(List.of("x")), events::add)) {
+                var input = control(view).input;
+                press(input, KeyEvent.VK_LEFT);
+                press(input, KeyEvent.VK_BACK_SPACE);
+                assertThat(events).containsExactly(changed());
+                assertThat(selected(view)).as("when the last chip goes, the typed text has the keys").isNull();
             } finally { KitViewTest.release(context); }
         });
     }
@@ -171,7 +290,7 @@ class TokenFieldsTest {
             var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
             try (var view = new KitView(context, spec(List.of("work")), events::add)) {
                 var input = control(view).input;
-                for (String refused : List.of("Work", "WORK ", "x".repeat(65), "a\tb")) {
+                for (String refused : List.of("Work", "WORK ", "x".repeat(65), "a\u007fb")) {
                     type(input, refused);
                     press(input, KeyEvent.VK_ENTER);
                     assertThat(input.getText()).as("%s is dropped", refused).isEmpty();
@@ -251,6 +370,29 @@ class TokenFieldsTest {
                 for (var chip : chips) assertThat(chip.getX() + chip.getWidth()).isLessThanOrEqualTo(control.surface.getWidth());
                 assertThat(control.input.getY()).as("the typed text on the last line").isGreaterThanOrEqualTo(chips.getLast().getY());
             } finally { KitViewTest.release(context); }
+        });
+    }
+
+    /**
+     * Plan 5 (H17): where kit fields release Ctrl+H (Windows and Linux), the token field leaves it to the window's keymap,
+     * as every kit text field does; elsewhere it deletes backward. Backspace deletes typed text on every platform.
+     */
+    @Test void ctrlHIsLeftToTheWindowWhereKitFieldsReleaseItWhileBackspaceStillDeletes() {
+        for (boolean released : new boolean[] {false, true}) Edt.run(() -> {
+            boolean prior = TextFields.ctrlHReleased;
+            TextFields.ctrlHReleased = released;
+            var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+            try (var view = new KitView(context, spec(List.of("work")), events::add)) {
+                var input = control(view).input;
+                type(input, "abc");
+                boolean took = SwingUtilities.processKeyBindings(new KeyEvent(input, KeyEvent.KEY_PRESSED, System.currentTimeMillis(),
+                    java.awt.event.InputEvent.CTRL_DOWN_MASK, KeyEvent.VK_H, KeyEvent.CHAR_UNDEFINED));
+                assertThat(took).as("released %s: the field takes Ctrl+H", released).isEqualTo(!released);
+                assertThat(input.getText()).isEqualTo(released ? "abc" : "ab");
+                press(input, KeyEvent.VK_BACK_SPACE);
+                assertThat(input.getText()).isEqualTo(released ? "ab" : "a");
+                assertThat(events).as("deleting typed text reports nothing").isEmpty();
+            } finally { TextFields.ctrlHReleased = prior; KitViewTest.release(context); }
         });
     }
 

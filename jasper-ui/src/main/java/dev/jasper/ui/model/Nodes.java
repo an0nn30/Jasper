@@ -439,10 +439,13 @@ public final class Nodes {
     }
 
     /**
-     * A field of tokens (SDK 0.29.0): each a chip of the look's tag face with a "Remove" button inside it, the typed text
-     * after them. Enter, a comma and a permanent focus loss add the typed text; Enter with nothing typed passes on;
-     * Backspace with nothing typed and a chip's button remove a token; text {@link #kept(List)} would not keep is
-     * dropped; each change reports {@link UiEvent.TokensChanged} once. An update that changes {@code tokens}, or one
+     * A field of tokens (SDK 0.29.0): each a chip of the look's tag face, its text as entered, with a "Remove" button
+     * inside it, the typed text after them. Enter (with text typed), a comma, a line break, a tab and a permanent focus
+     * loss add the typed text; Enter with nothing typed passes on; Backspace with nothing typed and a chip's button remove
+     * a token. Left at the caret's start selects the last chip; Left, Right, Home and End move among the chips, Backspace
+     * or Delete removes the selected one and selects a neighbour, and Right past the last, Escape and typing return to the
+     * typed text. Text {@link #kept(List)} would not keep is dropped; each change reports {@link UiEvent.TokensChanged}
+     * once. An update that changes {@code tokens}, or one
      * that comes while the field reports a change and differs from what it shows, replaces them and keeps the typed
      * text. {@code label} is drawn as a STANDARD field's is and is the accessible name; {@code hint} shows while the
      * field has no tokens and nothing typed. The tokens are as {@link #kept(List)} keeps them.

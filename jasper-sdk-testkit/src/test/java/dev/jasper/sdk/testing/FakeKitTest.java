@@ -117,7 +117,7 @@ class FakeKitTest { @Test void kitOwnsCreatedViews() throws Exception {
   view.type("tags","newz");assertThat(view.focused()).as("typing takes the focus").contains("tags");
   view.press("tags","BACK_SPACE");assertThat(view.tokenText("tags")).isEqualTo("new");
   view.type("tags","news");view.press("tags","ENTER");
-  view.type("tags","Work, ,"+"x".repeat(65)+",a\tb,later");
+  view.type("tags","Work, ,"+"x".repeat(65)+",a\u0007b,later");
   assertThat(view.tokenText("tags")).isEqualTo("later");
   view.clickInto("title");
   assertThat(events).containsExactly(changed.apply(java.util.List.of("work","news")),changed.apply(java.util.List.of("work","news","later")));
@@ -140,6 +140,22 @@ class FakeKitTest { @Test void kitOwnsCreatedViews() throws Exception {
   FakeKitView[] holder={null};var kept=new java.util.ArrayList<dev.jasper.sdk.ui.UiEvent>();
   var limited=kit.create(spec.apply(ready,java.util.List.of("a","b")),event -> {kept.add(event);
    if(event instanceof dev.jasper.sdk.ui.UiEvent.TokensChanged change)holder[0].update(spec.apply(ready,change.tokens().subList(0,Math.min(2,change.tokens().size()))));});
+  var keys=new java.util.ArrayList<dev.jasper.sdk.ui.UiEvent>();var chips=kit.create(spec.apply(ready,java.util.List.of("a","b","c")),keys::add);
+  chips.type("tags","z");chips.press("tags","LEFT");assertThat(chips.selectedToken("tags")).as("Left with text typed moves the caret").isEmpty();
+  chips.press("tags","BACK_SPACE");chips.press("tags","LEFT");assertThat(chips.selectedToken("tags")).contains("c");
+  chips.press("tags","HOME");assertThat(chips.selectedToken("tags")).contains("a");chips.press("tags","LEFT");assertThat(chips.selectedToken("tags")).contains("a");
+  chips.press("tags","END");chips.press("tags","LEFT");assertThat(chips.selectedToken("tags")).contains("b");
+  chips.press("tags","DELETE");assertThat(chips.selectedToken("tags")).contains("c");
+  chips.clickInto("title");assertThat(chips.selectedToken("tags")).as("the focus leaving deselects").isEmpty();
+  chips.press("tags","LEFT");chips.press("tags","BACK_SPACE");chips.press("tags","BACK_SPACE");
+  assertThat(chips.selectedToken("tags")).as("the last one gone").isEmpty();assertThat(chips.tokens("tags")).isEmpty();
+  chips.press("tags","ESCAPE");chips.press("tags","RIGHT");chips.press("tags","DELETE");
+  assertThat(keys).containsExactly(changed.apply(java.util.List.of("a","c")),changed.apply(java.util.List.of("a")),changed.apply(java.util.List.of()));
+  assertThatIllegalArgumentException().isThrownBy(() -> chips.selectedToken("title"));chips.close();
+  var pasted=new java.util.ArrayList<dev.jasper.sdk.ui.UiEvent>();var paste=kit.create(spec.apply(ready,java.util.List.of()),pasted::add);
+  paste.type("tags","work\nnews\r\nhome\tx");
+  assertThat(pasted).as("line breaks and tabs separate as commas do, in one change").containsExactly(changed.apply(java.util.List.of("work","news","home")));
+  assertThat(paste.tokenText("tags")).isEqualTo("x");paste.close();
   holder[0]=limited;limited.type("tags","c,");
   assertThat(kept).containsExactly(changed.apply(java.util.List.of("a","b","c")));
   assertThat(limited.tokens("tags")).as("an update while the field reports replaces what it shows").containsExactly("a","b");
@@ -190,5 +206,6 @@ class FakeKitContractTest extends KitContractTest {
  protected void removeToken(dev.jasper.sdk.ui.UiView view,String id,String token){((FakeKitView)view).removeToken(id,token);}
  /** The fake's focus moves as {@code focus} moves it, which a token field it leaves answers by adding its typed text. */
  protected void leave(dev.jasper.sdk.ui.UiView view,String id,String to){view.focus(to);}
+ protected java.util.Optional<String> selectedToken(dev.jasper.sdk.ui.UiView view,String id){return ((FakeKitView)view).selectedToken(id);}
  protected void stop(dev.jasper.sdk.ui.UiKit kit){((FakeKit)kit).close();}
 }

@@ -392,6 +392,8 @@ class ViewSpecTest {
         assertThatIllegalArgumentException().isThrownBy(() -> new TokenField("tags", ControlState.READY, "Tags", "", more));
         for (var refused : List.of(List.of("work", "WORK"), List.of(" "), List.of("work "), List.of("x".repeat(65)), List.of("a\u007fb")))
             assertThatIllegalArgumentException().as("%s", refused).isThrownBy(() -> new TokenField("tags", ControlState.READY, "Tags", "", refused));
+        assertThatIllegalArgumentException().isThrownBy(() -> new TokenField("tags", ControlState.READY, "Tags", "", List.of("work ")))
+            .withMessage("A token must not have leading or trailing white space: \"work \"");
         assertThat(TokenField.kept(List.of(" work ", "Work", "", "x".repeat(65), "a\nb", "news"))).containsExactly("work", "news");
         assertThat(TokenField.kept(more)).isEqualTo(hundred);
         assertThat(new UiEvent.TokensChanged("tags", List.of("work")).tokens()).containsExactly("work");

@@ -791,14 +791,23 @@ public final class Nodes {
 
     /**
      * A field of short tokens, such as a bookmark's tags (since 0.29.0). Each token shows as a chip in the look's tag
-     * style, with a remove button inside it named "Remove" and the token, and the user types the next token after the
-     * chips, which wrap onto further lines as the field fills. Enter or a comma adds the typed text as a token, and so
-     * does the focus leaving the field for good; Enter with nothing typed passes on, to the form's PRIMARY button.
-     * Backspace with nothing typed removes the last token, and a chip's remove button removes its own. Typed text that
-     * {@link #kept(List)} would not keep beside the tokens (blank, too long, holding a control character, a duplicate,
-     * or past the hundredth) is dropped. Every change reports {@link UiEvent.TokensChanged} with the whole list, once.
-     * The field shows each change at once; an update that changes {@code tokens}, or one that comes while the field
-     * reports a change and differs from what it shows, replaces the tokens it shows and keeps the text being typed.
+     * style, in the case the user typed it in every look, with a remove button inside it named "Remove" and the token;
+     * the user types the next token after the chips, which wrap onto further lines as the field fills. Enter adds the
+     * typed text as a token while text other than white space is typed, and so does the focus leaving the field for
+     * good; a comma, a line break or a tab, typed or pasted, ends the token before it. Enter with nothing typed passes
+     * on, to the form's PRIMARY button. Backspace with nothing typed removes the last token, and a chip's remove button
+     * removes its own.
+     *
+     * <p>The field is one Tab stop, and the keyboard reaches every chip from the typed text: Left with the caret at its
+     * start selects the last chip, which shows the focus ring and is announced as it is selected; Left, Right, Home and
+     * End move among the chips; Backspace or Delete removes the selected chip's token and selects the chip before or
+     * after it; and Right past the last chip, Escape and typing return to the typed text, the typing going into it.
+     *
+     * <p>Typed text that {@link #kept(List)} would not keep beside the tokens (blank, too long, holding a control
+     * character, a duplicate, or past the hundredth) is dropped. Every change reports {@link UiEvent.TokensChanged} with
+     * the whole list, once. The field shows each change at once; an update that changes {@code tokens}, or one that comes
+     * while the field reports a change and differs from what it shows, replaces the tokens it shows and keeps the text
+     * being typed.
      *
      * @param id the node id
      * @param state the node's state; a nonblank error shows under the field
@@ -821,8 +830,8 @@ public final class Nodes {
          * The tokens a token field keeps of {@code given}: each is trimmed (as {@link String#strip()} trims), and kept
          * only when it is nonblank, at most 64 characters and free of control characters, and when it does not match an
          * earlier one ignoring the case of ASCII letters, so "Work" and "work" are one token and "\u00C4pfel" and
-         * "\u00E4pfel" two; the first 100 are kept, in the order given. Jasper's Browser keeps bookmark tags by the same
-         * rule ({@code BookmarkStore.keptTags}), and the two must agree.
+         * "\u00E4pfel" two; the first 100 are kept, in the order given. This is the rule Jasper's Browser keeps bookmark
+         * tags by ({@code BookmarkStore.keptTags} calls it).
          *
          * @param given the tokens given
          * @return those kept, in order

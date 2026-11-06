@@ -29,8 +29,8 @@ final class ModelChecks {
     /**
      * The token rule: each token trimmed, kept only when it is nonblank, at most 64 characters and free of control
      * characters, and when it does not match an earlier one ignoring the case of ASCII letters; the first 100, in order.
-     * The SDK's {@code Nodes.TokenField.kept} and the Browser's {@code BookmarkStore.keptTags} keep the same rule, and the
-     * three must agree.
+     * The SDK's {@code Nodes.TokenField.kept} keeps the same rule, which the module cannot call, and the two must agree
+     * (jasper-app's {@code KitValuesTest} checks them).
      */
     static List<String> keptTokens(List<String> given) {
         var seen = new HashSet<String>();
@@ -50,7 +50,7 @@ final class ModelChecks {
         var seen = new HashSet<String>();
         for (String token : copy) {
             if (token.isBlank()) throw new IllegalArgumentException("A token must not be blank");
-            if (!token.equals(token.strip())) throw new IllegalArgumentException("A token has no leading or trailing white space: \"" + token + "\"");
+            if (!token.equals(token.strip())) throw new IllegalArgumentException("A token must not have leading or trailing white space: \"" + token + "\"");
             if (token.length() > MAX_TOKEN) throw new IllegalArgumentException("A token holds at most " + MAX_TOKEN + " characters, not " + token.length());
             if (token.chars().anyMatch(Character::isISOControl)) throw new IllegalArgumentException("A token holds no control characters");
             if (!seen.add(folded(token))) throw new IllegalArgumentException("Duplicate token: " + token);

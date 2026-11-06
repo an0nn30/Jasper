@@ -249,8 +249,11 @@ class TextFieldsTest {
         assertThat(TextFields.releasesCtrlH("Mac OS X")).isFalse();
         assertThat(TextFields.releasesCtrlH("Linux")).isTrue();
         assertThat(TextFields.releasesCtrlH("Windows 11")).isTrue();
-        boolean released = TextFields.releasesCtrlH(System.getProperty("os.name", ""));
-        Edt.run(() -> {
+        assertThat(TextFields.ctrlHReleased).as("this platform's").isEqualTo(TextFields.releasesCtrlH(System.getProperty("os.name", "")));
+        // Both platforms' paths, whichever this one is.
+        for (boolean released : new boolean[] {false, true}) Edt.run(() -> {
+            boolean prior = TextFields.ctrlHReleased;
+            TextFields.ctrlHReleased = released;
             var context = KitFixtures.context();
             try (var view = new KitView(context, stack(field("a", FieldKind.TEXT, "abc"), field("b", FieldKind.TEXTAREA, "abc"),
                     field("c", FieldKind.SEARCH, "abc")), e -> {})) {
@@ -266,7 +269,7 @@ class TextFieldsTest {
                         System.currentTimeMillis(), 0, java.awt.event.KeyEvent.VK_BACK_SPACE, java.awt.event.KeyEvent.CHAR_UNDEFINED));
                     assertThat(input.getText()).as(id + " after Backspace").isEqualTo(released ? "ab" : "a");
                 }
-            } finally { release(context); }
+            } finally { TextFields.ctrlHReleased = prior; release(context); }
         });
     }
     @Test void disabledOrBusyFieldsAndBrowseCannotEmitEditsOrActions() {

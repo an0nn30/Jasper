@@ -100,7 +100,7 @@ class BookmarkStoreTest {
             .containsExactly("Work", "\u00C4pfel", "\u00E4pfel");
     }
 
-    /** Plan 5 Task 6: the tag rule and the SDK's token rule keep the same tags of the same input (F22). */
+    /** Plan 5 Task 6 (H20): the tag rule is the SDK's token rule, so both keep the same tags of the same input (F22). */
     @Test void theTagRuleIsTheTokenFieldsRule() {
         var given = new java.util.ArrayList<>(List.of(" work ", "Work", "", "   ", "x".repeat(64), "y".repeat(65), "a\tb", "a\u0085b",
             "\u00C4pfel", "\u00E4pfel", "news"));

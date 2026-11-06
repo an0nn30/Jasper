@@ -353,14 +353,18 @@ that fill in the defaults; the [SDK reference](sdk-reference.html#dev.jasper.sdk
   `listId`.
 
 [`TokenField`](sdk-reference.html#dev.jasper.sdk.ui.Nodes.TokenField)`(label, hint, tokens)` (SDK 0.29.0) holds short
-tokens, such as a bookmark's tags. Each token shows as a chip in the look's tag style, with a remove button inside it
-named "Remove" and the token, and the user types the next token after the chips, which wrap as the field fills. The
-label shows as a `STANDARD` field's does and is the accessible name; the hint shows while there are no tokens and
-nothing is typed.
+tokens, such as a bookmark's tags. Each token shows as a chip in the look's tag style, in the case the user typed it,
+with a remove button inside it named "Remove" and the token, and the user types the next token after the chips, which
+wrap as the field fills. The label shows over the field as a `STANDARD` field's does, except in a `FormRow`, a
+`SettingRow` or a prompt, and is always the accessible name; the hint shows while there are no tokens and nothing is
+typed.
 
-- Enter or a comma adds the typed text as a token, and so does the focus leaving the field; Enter with nothing typed
-  reaches the form's `PRIMARY`. Backspace with nothing typed removes the last token. Each change reports
-  `TokensChanged` with the whole list, once.
+- Enter adds the typed text as a token, and so does the focus leaving the field; a comma, a line break or a tab, typed
+  or pasted, ends the token before it. Enter with nothing typed reaches the form's `PRIMARY`. Backspace with nothing
+  typed removes the last token. Each change reports `TokensChanged` with the whole list, once.
+- The field is one Tab stop. Left with the caret at the start of the typed text selects the last chip, which shows the
+  focus ring; Left, Right, Home and End move among the chips; Backspace or Delete removes the selected chip's token and
+  selects the chip before or after it; Right past the last chip, Escape and typing return to the typed text.
 - The tokens follow [`TokenField.kept`](sdk-reference.html#dev.jasper.sdk.ui.Nodes.TokenField.kept(List)): trimmed,
   nonblank, at most 64 characters, without control characters, no two matching ignoring the case of ASCII letters, and
   at most 100. Typed text the rule refuses is dropped, and a field whose `tokens` break it is refused.
@@ -602,9 +606,10 @@ event dispatch thread, so run the test in `SwingUtilities.invokeAndWait`. A plug
   answers by selecting all its text; `setComposing(id, true)` plays an input method.
 - `press(id, key)` presses `UP`, `DOWN`, `TAB`, `ENTER` or `ESCAPE` in a field as a person would, and
   `suggestions(id)` and `selectedSuggestion(id)` show what its list of suggestions shows.
-- In a token field, `type(id, text)` types the next token (each comma adds the text before it), `press(id, key)` takes
-  `ENTER` and `BACK_SPACE`, `removeToken(id, token)` clicks a token's remove button, and `tokens(id)` and
-  `tokenText(id)` show its tokens and the text typed; moving the focus elsewhere adds the typed text.
+- In a token field, `type(id, text)` types the next token (each comma, line break or tab adds the text before it),
+  `press(id, key)` takes `ENTER`, `BACK_SPACE`, `LEFT`, `RIGHT`, `HOME`, `END`, `DELETE` and `ESCAPE`,
+  `removeToken(id, token)` clicks a token's remove button, and `tokens(id)`, `tokenText(id)` and `selectedToken(id)`
+  show its tokens, the text typed and the chip the keyboard selected; moving the focus elsewhere adds the typed text.
 - `choose(id, path...)` chooses an item of a menu button's menu or a button's hold menu as a person would, by item ids
   from the menu down through submenus; a disabled item, a submenu, a separator and the children of a disabled submenu
   report nothing.

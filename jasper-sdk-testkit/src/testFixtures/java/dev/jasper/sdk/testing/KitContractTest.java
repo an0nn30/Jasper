@@ -25,8 +25,8 @@ public abstract class KitContractTest {
     /** The titles of the suggestions field {@code id} shows, in order; empty while it shows none. */
     protected abstract List<String> suggestions(UiView view,String id);
     /**
-     * Presses {@code key} (UP, DOWN, TAB, ENTER or ESCAPE; in a token field ENTER or BACK_SPACE) in field {@code id} as a
-     * person would, the focus in the field.
+     * Presses {@code key} (UP, DOWN, TAB, ENTER or ESCAPE; in a token field ENTER, BACK_SPACE, LEFT, RIGHT, HOME, END,
+     * DELETE or ESCAPE) in field {@code id} as a person would, the focus in the field.
      */
     protected abstract void press(UiView view,String id,String key);
     /** The tokens token field {@code id} shows, in order. */
@@ -35,6 +35,8 @@ public abstract class KitContractTest {
     protected abstract void removeToken(UiView view,String id,String token);
     /** Moves the focus for good from field {@code id} to node {@code to}, as a click on that node does. */
     protected abstract void leave(UiView view,String id,String to);
+    /** The token whose chip the keyboard has selected in token field {@code id}; empty while the typed text has the keys. */
+    protected abstract Optional<String> selectedToken(UiView view,String id);
     /**
      * Chooses, as a person would, the item {@code path} names in node {@code id}'s menu (a menu button's, or a button's
      * hold menu): item ids from the menu down, through a submenu by its id; a disabled submenu does not open.
@@ -238,6 +240,42 @@ public abstract class KitContractTest {
             assertThat(events.getLast()).as("and keeps the typed text").isEqualTo(changed.apply(new String[] {"a", "b", "draft"}));
             press(view, "tags", "ENTER");
             assertThat(events).as("Enter with nothing typed reports nothing of the field's").hasSize(6);
+            type(view, "tags", "c\nd\r\ne\tf");
+            assertThat(events.getLast()).as("line breaks and tabs separate as commas do, in one change").isEqualTo(changed.apply(new String[] {"a", "b", "draft", "c", "d", "e"}));
+            assertThat(events).hasSize(7);
+        } finally { view.close(); stop(kit); }
+    }); }
+
+    /**
+     * Plan 5 Task 6 (H18): on both runtimes the keyboard reaches every token: Left with nothing typed selects the last,
+     * Left, Right, Home and End move among them, Backspace removes the selected one and selects the one before, Delete
+     * the one after, and Escape, Right past the last and typing return to the typed text.
+     */
+    @Test void aTokenFieldsKeyboardRemovesAnyToken() throws Exception { edt(() -> {
+        var kit = kit("owner"); var events = new ArrayList<UiEvent>();
+        var view = kit.create(new ViewSpec(new Nodes.TokenField("tags", ControlState.READY, "Tags", "", List.of("a", "b", "c", "d", "e"))), events::add);
+        try {
+            press(view, "tags", "LEFT");
+            assertThat(selectedToken(view, "tags")).contains("e");
+            press(view, "tags", "LEFT"); press(view, "tags", "LEFT"); press(view, "tags", "LEFT");
+            assertThat(selectedToken(view, "tags")).contains("b");
+            press(view, "tags", "BACK_SPACE");
+            assertThat(selectedToken(view, "tags")).as("the one before").contains("a");
+            press(view, "tags", "ESCAPE");
+            assertThat(selectedToken(view, "tags")).isEmpty();
+            type(view, "tags", "f");
+            press(view, "tags", "ENTER");
+            press(view, "tags", "LEFT"); press(view, "tags", "HOME"); press(view, "tags", "RIGHT");
+            assertThat(selectedToken(view, "tags")).contains("c");
+            press(view, "tags", "DELETE");
+            assertThat(selectedToken(view, "tags")).as("the one after").contains("d");
+            press(view, "tags", "END"); press(view, "tags", "RIGHT");
+            assertThat(selectedToken(view, "tags")).as("Right past the last").isEmpty();
+            press(view, "tags", "LEFT"); type(view, "tags", "g");
+            assertThat(selectedToken(view, "tags")).as("typing").isEmpty();
+            assertThat(events).containsExactly(new UiEvent.TokensChanged("tags", List.of("a", "c", "d", "e")),
+                new UiEvent.TokensChanged("tags", List.of("a", "c", "d", "e", "f")), new UiEvent.TokensChanged("tags", List.of("a", "d", "e", "f")));
+            assertThat(tokens(view, "tags")).containsExactly("a", "d", "e", "f");
         } finally { view.close(); stop(kit); }
     }); }
 

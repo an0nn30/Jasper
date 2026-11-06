@@ -57,5 +57,7 @@ class HostedKitContractTest extends KitContractTest {
  /** As the focus leaves field {@code id} for node {@code to} for good: the input's focus listeners hear a permanent loss to it. */
  protected void leave(UiView view,String id,String to){var root=((HostedKitView)view).component();var field=input(root,id+".input");var opposite=named(root,to);
   for(var listener:field.getFocusListeners())listener.focusLost(new java.awt.event.FocusEvent(field,java.awt.event.FocusEvent.FOCUS_LOST,false,opposite));}
+ /** The token the kit's keyboard selection holds in token field {@code id}, as the kit publishes it on the input. */
+ protected java.util.Optional<String> selectedToken(UiView view,String id){return java.util.Optional.ofNullable((String)input(((HostedKitView)view).component(),id+".input").getClientProperty(dev.jasper.ui.swing.KitOwnership.SELECTED_TOKEN));}
  protected void stop(UiKit kit){((HostedKit)kit).close();}
 }

@@ -449,7 +449,8 @@ class UiValuesTest {
         assertThatIllegalArgumentException().isThrownBy(() -> tags(List.of("work", "Work"))).withMessage("Duplicate token: Work");
         assertThatIllegalArgumentException().isThrownBy(() -> tags(List.of(" ")));
         assertThatIllegalArgumentException().isThrownBy(() -> tags(List.of("")));
-        assertThatIllegalArgumentException().as("untrimmed").isThrownBy(() -> tags(List.of(" work")));
+        assertThatIllegalArgumentException().as("untrimmed").isThrownBy(() -> tags(List.of(" work")))
+            .withMessage("A token must not have leading or trailing white space: \" work\"");
         assertThatIllegalArgumentException().isThrownBy(() -> tags(List.of("x".repeat(65))));
         assertThatIllegalArgumentException().isThrownBy(() -> tags(List.of("a\tb")));
         assertThatIllegalArgumentException().as("a C1 control").isThrownBy(() -> tags(List.of("a\u0085b")));

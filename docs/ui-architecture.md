@@ -468,15 +468,22 @@ the title; and a field's `listId` naming an `ItemList` in the same view.
   input's forward traversal keys meanwhile. A choice, Escape, a permanent focus loss and a press outside hide the list
   until the next edit; it appears on screen only while the input has the focus, and never over another open menu. A
   TEXTAREA, a NUMBER field and a field with a `listId` take no suggestions.
-- Token fields (`TokenFields`): a field's box (`FieldSurface`, painted by the field policy) holding a chip per token,
-  an `Indicators.ChipControl` in the neutral hue that the kit's `tag` face styles and paints, with a non-focusable ghost
-  remove button ("Remove" and the token) in its trailing padding, then the input. The chips flow in lines `ICON_GAP`
-  apart; the input follows the last one while four widths of 'm' fit beside it, and otherwise takes a line of its own.
-  One line stands centred in `FIELD_HEIGHT`, and each further line adds the room a line leaves there. A key listener on
-  the input takes Enter while text is typed and Backspace while none is, before the bindings, so Enter with nothing
-  typed reaches the form; a document filter adds the text before each comma typed or pasted; a permanent focus loss adds
-  the typed text too. `TokenField.kept` decides what stays. An update replaces the shown tokens when its tokens change,
-  or when they differ from the shown ones while the field reports a change; the typed text stays.
+- Token fields (`TokenFields`): a field's box (`FieldSurface`, painted by the field policy) holding a chip per token, an
+  `Indicators.ChipControl` in the neutral hue that the kit's `tag` face styles and paints (its text as entered: the chip
+  is `entered`, which the classic face does not upper-case), with a non-focusable ghost remove button ("Remove" and the
+  token) in its trailing padding, then the input. The chips flow in lines `ICON_GAP` apart; the input follows the last
+  one while four widths of 'm' fit beside it, and otherwise takes a line of its own. One line stands centred in
+  `FIELD_HEIGHT`, and each further line adds the room a line leaves there. A key listener on the input takes Enter while
+  nonblank text is typed and Backspace while none is, before the bindings, so Enter with nothing typed reaches the form;
+  a document filter adds the text before each comma, line break or tab typed or pasted (once a filter is installed, the
+  document no longer turns line breaks into spaces); a permanent focus loss adds the typed text too. The chips are no
+  Tab stops: the focus stays in the input while Left at the caret's start selects the last chip (`selected`), which
+  `ThemePainting.focusRing` gives the view's focus halo, `KitOwnership.SELECTED_TOKEN` publishes on the input and the
+  input announces as its accessible active descendant, the caret hidden meanwhile; the key listener then takes Left,
+  Right, Home, End, Backspace, Delete and Escape for the chips, and any other key, typing, a press or a focus loss
+  returns to the typed text. The input's accessible description names the tokens ("Tags: work, news") before the hint or
+  error. `TokenField.kept` decides what stays. An update replaces the shown tokens when its tokens change, or when they
+  differ from the shown ones while the field reports a change; the typed text stays.
 - Field actions: `trailingAction` (Enter, not TEXTAREA or PATH), `alternateAction` (Shift+Enter, not TEXTAREA),
   `cancelAction` (Escape) and `listId`, which drives an `ItemList` with the arrow and page keys while the field keeps
   focus. A list named by a field's `listId` reserves its `visibleRows` selectable-row height even when filtered or

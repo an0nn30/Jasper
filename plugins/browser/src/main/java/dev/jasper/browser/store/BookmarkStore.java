@@ -1,11 +1,10 @@
 package dev.jasper.browser.store;
 
 import dev.jasper.sdk.Subscription;
+import dev.jasper.sdk.ui.Nodes;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
@@ -20,10 +19,6 @@ import java.util.stream.Stream;
  * through a future, on the database's thread.
  */
 public final class BookmarkStore {
-    /** The longest tag kept. */
-    static final int MAX_TAG = 64;
-    /** The most tags a bookmark has. */
-    static final int MAX_TAGS = 100;
     /** What parts a bookmark's tags in one column: a control character, which no tag has. */
     private static final String TAG_SEPARATOR = String.valueOf((char) 0x1F);
     /** A bookmark's tags in one column, in the order given. */
@@ -252,25 +247,17 @@ public final class BookmarkStore {
     }
 
     /**
-     * The tag rule: each tag is trimmed, and kept only when it is nonblank, at most 64 characters and free of control
-     * characters; one that matches an earlier one ignoring the case of ASCII letters, as SQLite's {@code NOCASE} does, is
-     * dropped, so "Work" and "work" are one tag and "\u00C4pfel" and "\u00E4pfel" two; and the first 100 are kept, in the
-     * order given. The SDK's token field keeps its tokens by the same rule ({@code Nodes.TokenField.kept}), and the two
-     * must agree.
+     * The tag rule, which is the SDK's token rule ({@link Nodes.TokenField#kept(List)}), so the Edit Bookmark panel's
+     * token field keeps exactly the tags this store keeps: each tag is trimmed, and kept only when it is nonblank, at most
+     * 64 characters and free of control characters; one that matches an earlier one ignoring the case of ASCII letters,
+     * as SQLite's {@code NOCASE} does, is dropped, so "Work" and "work" are one tag and "\u00C4pfel" and "\u00E4pfel"
+     * two; and the first 100 are kept, in the order given.
      *
      * @param tags the tags given
      * @return those kept
      */
     public static List<String> keptTags(List<String> tags) {
-        var seen = new HashSet<String>();
-        var kept = new ArrayList<String>();
-        for (String given : tags) {
-            String tag = given.strip();
-            if (kept.size() < MAX_TAGS && !tag.isEmpty() && tag.length() <= MAX_TAG && tag.chars().noneMatch(Character::isISOControl)
-                    && seen.add(folded(tag)))
-                kept.add(tag);
-        }
-        return List.copyOf(kept);
+        return Nodes.TokenField.kept(tags);
     }
 
     /** {@code tag} with its ASCII letters in lower case, as SQLite's {@code NOCASE} compares it. */

@@ -23,6 +23,18 @@ final class TextFields {
     static boolean releasesCtrlH(String osName) {
         return !osName.toLowerCase(java.util.Locale.ROOT).contains("mac");
     }
+    /**
+     * Whether the kit's fields release Ctrl+H on this platform ({@link #releasesCtrlH}); tests set it to take the other
+     * platforms' path. Read as each field is made.
+     */
+    static boolean ctrlHReleased = releasesCtrlH(System.getProperty("os.name", ""));
+    /**
+     * While {@link #ctrlHReleased} holds, binds Ctrl+H in {@code input}'s focused map to {@code "none"}, which hides the
+     * look and feel's Delete Backward and names no action, so the key passes on to the window's keymap.
+     */
+    static void releaseCtrlH(JTextComponent input) {
+        if (ctrlHReleased) input.getInputMap(JComponent.WHEN_FOCUSED).put(CTRL_H, "none");
+    }
     static class FieldControl extends ControlRegistry.Control {
         boolean panelSearch, settings;
         /** A three-column manager's list search: a full-size field with the measured column glyph and gap. */
@@ -63,8 +75,7 @@ final class TextFields {
             if (input instanceof JTextArea area) { area.setLineWrap(true); area.setWrapStyleWord(true); }
             input.setOpaque(false); input.setBorder(new EmptyBorder(0, 0, 0, 0)); KitOwnership.mark(input, node.id() + ".input");
             if (node.kind() == Nodes.FieldKind.PORT) ((AbstractDocument)input.getDocument()).setDocumentFilter(new NumericFilter());
-            // "none" hides the look and feel's binding and names no action, so the key passes on to the window's keymap.
-            if (releasesCtrlH(System.getProperty("os.name", ""))) input.getInputMap(JComponent.WHEN_FOCUSED).put(CTRL_H, "none");
+            releaseCtrlH(input);
             if (node.kind() != Nodes.FieldKind.TEXTAREA && node.kind() != Nodes.FieldKind.PATH) bindSubmit();
             if (node.kind() != Nodes.FieldKind.TEXTAREA) {
                 bindKey("shift ENTER", "field.alternate", () -> !((Nodes.Field)this.node).alternateAction().isBlank(),
