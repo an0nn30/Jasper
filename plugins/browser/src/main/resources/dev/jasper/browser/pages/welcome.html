@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Welcome</title>
+{{style}}
+</head>
+<body>
+<main>
+<h1>Welcome Back</h1>
+<section aria-labelledby="top-sites-heading">
+<div class="toolbar">
+<h2 id="top-sites-heading" class="grow">Top Sites</h2>
+<button type="button" id="refresh">Refresh</button>
+</div>
+<p id="failure" class="failure" role="alert" hidden></p>
+<ul class="tiles" id="sites"></ul>
+<p id="no-sites" class="muted" hidden>Sites you visit often show here.</p>
+</section>
+<section aria-labelledby="quick-actions">
+<h2 id="quick-actions">Quick Actions</h2>
+<ul class="tiles">
+<li><a class="tile" href="jasper-about:bookmarks">Bookmarks</a></li>
+<li><a class="tile" href="jasper-about:history">History</a></li>
+<li><a class="tile" href="jasper-about:settings">Settings</a></li>
+</ul>
+</section>
+</main>
+{{script}}
+</body>
+</html>

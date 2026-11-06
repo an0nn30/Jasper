@@ -20,8 +20,13 @@ the Markdown preview is the Editor's Basic one, and while Jasper is itself the s
   your [default browser](#making-jasper-your-default-browser), links from other apps can open here, as
   [below](#links-from-terminals-and-jasper).
 
-The start page is `jasper-about:welcome` by default: Jasper's welcome page, in the workspace theme's colours, whose
-**Settings** opens Settings › Tools › Browser. An open welcome page shows a theme change the next time it loads.
+The start page is `jasper-about:welcome` by default: Jasper's welcome page, in the workspace theme's colours. It shows
+**Top Sites**, the eight sites you visit most, with **Refresh**, and Quick Actions: **Bookmarks**, **History** and
+**Settings**, which opens Settings › Tools › Browser. An open welcome page shows a theme change the next time it loads.
+
+The first time the welcome page loads, it shows three onboarding pages instead: Meet the Jasper Browser, What Can It Do?
+and Let’s Get You Set Up. **Start Browsing** on the last one finishes the onboarding, which is remembered in
+`onboarding-finished` in the plugin's data folder, and shows the welcome page.
 
 Each page is the item of one pane. Its tab shows the page's title; while a page without a title loads, the tab keeps
 its previous name, and once loaded it shows the address's host, else "Web Browser". The tab's icon is the page's

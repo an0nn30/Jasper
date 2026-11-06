@@ -50,3 +50,16 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .more { display: block; margin: 16px auto 0; }
 .actions { display: flex; gap: 8px; justify-content: flex-end; margin: 32px 0 0; }
 [hidden] { display: none !important; }
+a.button {
+  display: inline-block; padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--card);
+  color: var(--text); text-decoration: none;
+}
+a.button:hover { border-color: var(--accent); text-decoration: none; }
+a.button.primary { background: var(--accent); border-color: var(--accent); color: var(--background); font-weight: 600; }
+.onboarding { max-width: 640px; }
+.lead { margin: 0 0 24px; font-size: 16px; }
+.features { margin: 0; padding: 0; list-style: none; }
+.feature { padding: 12px 0; border-bottom: 1px solid var(--border); }
+.feature h2 { margin: 0 0 4px; font-size: 15px; color: var(--text); }
+.feature p { margin: 0; color: var(--muted); }
+.feature label { display: flex; gap: 8px; align-items: center; }

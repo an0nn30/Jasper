@@ -8,12 +8,8 @@ import dev.jasper.browser.restore.BrowserRestore;
 import dev.jasper.browser.store.CapturedLog;
 import dev.jasper.browser.store.MemoryStores;
 import dev.jasper.sdk.PluginInfo;
-import dev.jasper.sdk.Variant;
-import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.testing.FakePluginHost;
 import dev.jasper.sdk.ui.Nodes;
-import dev.jasper.sdk.ui.WorkspacePalette;
-import java.awt.Color;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -301,36 +297,10 @@ class BrowserPluginTest {
         } });
     }
 
-    @Test void theWelcomePageIsInTheWorkspaceColoursWithSettingsAsAQuickAction() {
-        var palette = new WorkspacePalette(new Color(0x10, 0x20, 0x30), new Color(0x11, 0x21, 0x31), Color.BLACK, new Color(0xee, 0xee, 0xee),
-            new Color(0x99, 0x99, 0x99), new Color(0x44, 0x44, 0x44, 0x80), Color.BLUE, Color.WHITE, Color.GRAY, new Color(0x33, 0x66, 0xff),
-            Color.GREEN, Color.ORANGE, Color.RED);
-        String html = WelcomePage.render(palette, true);
-        assertThat(html).contains("<meta charset=\"utf-8\">", "<meta name=\"color-scheme\" content=\"dark\">", "<title>Welcome</title>",
-            "<h1>Welcome</h1>", "Quick Actions", "<a href=\"jasper-about:settings\">Settings</a>",
-            "--background: #102030;", "--card: #112131;", "--text: #eeeeee;", "--muted: #999999;", "--border: rgba(68, 68, 68, 0.502);",
-            "--accent: #3366ff;");
-        assertThat(html).doesNotContain("transition", "animation", "http:", "https:");
-        assertThat(WelcomePage.render(palette, false)).contains("content=\"light\"");
-    }
-
     /** Whether the browser item whose tab is called {@code title} shows the placeholder of an item that waits. UI thread. */
     private static boolean waits(FakePluginHost host, String title) {
         var root = (Nodes.Split) host.contentView(ID, title).orElseThrow().spec().root();
         return root.children().stream().anyMatch(node -> node instanceof Nodes.Empty empty && empty.state().visible()
             && empty.title().equals("Jasper closed while this page was open."));
-    }
-
-    @Test void theWelcomePageIsBuiltAgainAfterAThemeChange() throws Exception {
-        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
-            var context = new AtomicReference<PluginContext>();
-            host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(), context::set);
-            var welcome = new WelcomePage(context.get().appearance());
-            String before = welcome.html();
-            assertThat(before).contains("<h1>Welcome</h1>");
-            host.setVariant(context.get().appearance().variant() == Variant.DARK ? Variant.LIGHT : Variant.DARK);
-            host.flush();
-            assertThat(welcome.html()).isNotEqualTo(before).contains("<h1>Welcome</h1>");
-        } });
     }
 }

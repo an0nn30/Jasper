@@ -19,6 +19,9 @@ import dev.jasper.browser.palette.VisitedScope;
 import dev.jasper.browser.pages.AboutPages;
 import dev.jasper.browser.pages.BookmarksPage;
 import dev.jasper.browser.pages.HistoryPage;
+import dev.jasper.browser.pages.Onboarding;
+import dev.jasper.browser.pages.OnboardingPages;
+import dev.jasper.browser.pages.WelcomePage;
 import dev.jasper.browser.preview.PreviewService;
 import dev.jasper.browser.restore.BrowserRestore;
 import dev.jasper.browser.routing.BrowserRole;
@@ -47,7 +50,7 @@ import java.util.concurrent.RejectedExecutionException;
 
 /**
  * The Browser: web pages as Jasper items. Its start registers New Browser Tab, New Browser Window and the Browser split
- * item, the globe they show, the Web menu, Settings › Browser, the Bookmarks notification group, the welcome page, the
+ * item, the globe they show, the Web menu, Settings › Browser, the Bookmarks notification group, the welcome page and the onboarding pages, the
  * history page and its queries, the Bookmarks and Browser History palette scopes, the error page with its Try Again and Continue actions, View Source's page, the Browser
  * as Jasper's web browser, the terminal's Open URL in Split items and the restorer of saved browser items, publishes
  * the Markdown previews' service ({@link MarkdownPreviews}), and makes Chromium's engine, which starts Chromium only
@@ -100,20 +103,26 @@ public class BrowserPlugin implements Plugin {
         // it, as naming their types loads Chromium's classes. Jasper's own pages ask Java through a router of their own,
         // read and answered on the background executor.
         Chromium engine = chromium;
+        // Spec section 1: whether the onboarding is finished, read from its marker on the background executor.
+        var onboarding = new Onboarding(data.resolve("onboarding-finished"), context.background());
         var items = new BrowserItems(context, settings::read, stores, page -> {
             PageNavigation.prepare(engine);
             PageDialogs.prepare(engine);
             AboutQueries.prepare(engine, about, context.background());
+            // Before the first page asks for the welcome page, so that Chromium's IO thread only reads the answer from memory.
+            onboarding.load();
             page.start(engine);
         });
         this.items = items;
-        var welcome = new WelcomePage(context.appearance());
-        about.register(WelcomePage.NAME, welcome::html);
         about.registerAction(WelcomePage.SETTINGS, () -> { if (running) items.showSettings(); });
         // Jasper's pages built from their templates, in the workspace theme. Spec section 10: the history and bookmarks
         // pages, whose queries are answered from the history and the bookmarks; the asking browser is not needed yet.
         var pages = new AboutPages(context.appearance(), about);
         var history = stores.history();
+        // The welcome page, which sends the user to the onboarding until it is finished, and the onboarding's pages. No
+        // setting is offered on the setup page yet.
+        WelcomePage.register(about, pages, history, onboarding);
+        new OnboardingPages(pages, about, onboarding, System.getProperty("os.name", "").startsWith("Mac"), List.of(), EventQueue::invokeLater).register();
         about.register(HistoryPage.NAME, () -> pages.render(HistoryPage.NAME, Map.of()));
         about.registerQueries(HistoryPage.NAME, (browser, request) -> HistoryPage.answer(history, request));
         var bookmarks = stores.bookmarks();
