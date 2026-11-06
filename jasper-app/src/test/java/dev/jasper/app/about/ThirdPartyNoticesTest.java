@@ -67,6 +67,15 @@ class ThirdPartyNoticesTest {
             .containsPattern("(?m)^@types/geojson +7946\\.0\\.16 +MIT ");
         assertThat(notice).as("the file's banner names DOMPurify's version").containsPattern("(?m)^dompurify +3\\.4\\.12 ")
             .doesNotContainPattern("(?m)^dompurify +3\\.4\\.14 ");
+        assertThat(notice).as("the file's own constant names cytoscape's version").containsPattern("(?m)^cytoscape +3\\.34\\.0 ")
+            .doesNotContainPattern("(?m)^cytoscape +3\\.34\\.1 ");
+        // Ruling N26: what @mermaid-js/parser's own dist bundles, which npm's dependency metadata does not show, with the
+        // Apache License 2.0's text for chevrotain.
+        String parser = notice.substring(notice.indexOf("Bundled inside @mermaid-js/parser's dist:"), notice.indexOf("Type declarations, not in the file:"));
+        assertThat(parser).containsPattern("(?m)^chevrotain +11\\.1\\.2 +Apache-2\\.0 +@mermaid-js/parser$")
+            .containsPattern("(?m)^langium +4\\.2\\.1 +MIT +@mermaid-js/parser$").doesNotContain("@chevrotain/types");
+        assertThat(notice.substring(notice.indexOf("Type declarations, not in the file:"))).containsPattern("(?m)^@chevrotain/types +11\\.1\\.2 ");
+        assertThat(notice).endsWith(ThirdPartyNotices.read("apache-2.0.txt"));
         var table = Toml.parse(ThirdPartyNotices.read("notices.toml")).getArrayOrEmpty("component");
         var files = IntStream.range(0, table.size()).mapToObj(table::getTable)
             .filter(component -> "Mermaid".equals(component.getString("name"))).findFirst().orElseThrow().getArrayOrEmpty("files");

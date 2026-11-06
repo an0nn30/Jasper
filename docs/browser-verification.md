@@ -282,7 +282,7 @@ The user has no Linux host yet; CI's `linux-packages` job has not run (the Actio
   the default. Most lines use `plugins/editor/src/test/resources/markdown/github-features.md`, which holds every
   construct the preview draws.
 - Mermaid 11.17.2 is bundled by slice 1b, on `claude/browser-mermaid` (worktree `.claude/worktrees/browser-mermaid`)
-  until it merges: the Mermaid lines (2, 5's diagrams, 9's Mermaid node, and the two slice 1b lines) run from there.
+  until it merges: the Mermaid lines (2, 5's diagrams, 9's Mermaid node, and the slice 1b lines) run from there.
 - Each line is recorded pass or fail. Every line is pending.
 
 #### First: what only the GUI can show (ruling N-F38)
@@ -373,6 +373,9 @@ Each is pending.
 - **A loosening diagram (Review Focus 1):** a flowchart whose first line is
   `%%{init: {"securityLevel": "loose"}}%%`, with `click A call alert(1)` and `click B "javascript:alert(2)"`, draws,
   and clicking A and B runs no script and goes nowhere: no alert, and the preview stays on its document.
+- **A diagram's link to the network (Review Focus 1):** with `python3 -m http.server 8000` running, a flowchart with
+  `click C href "http://127.0.0.1:8000/z"` draws, and neither its drawing nor a click on C makes any request to that
+  server.
 - **Mermaid's first load:** the first diagram of a run draws (Mermaid's file is read off Chromium's IO thread, and its
   request goes on once read), and browser pages stay responsive meanwhile.
 

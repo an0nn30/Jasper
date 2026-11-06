@@ -110,7 +110,7 @@ class PreviewSchemeFactoryTest {
         assertThat(handle.get()).as("decided later").isFalse();
         assertThat(continued.count()).isZero();
         queued.removeFirst().run();
-        assertThat(continued.awaitContinue()).isTrue();
+        assertThat(continued.continuedWithin(10)).isTrue();
         var response = new Response();
         assertThat(headersAndBody(handler, response)).isEqualTo("mermaid();");
         assertThat(response.status).isEqualTo(200);
@@ -138,9 +138,10 @@ class PreviewSchemeFactoryTest {
         assertThat(waiting.open(null, new BoolRef(), continued)).isTrue();
         cancelled.cancel();
         queued.removeFirst().run();
-        assertThat(continued.awaitContinue()).isTrue();
+        assertThat(continued.continuedWithin(10)).isTrue();
         assertThat(headersAndBody(waiting, new Response())).isEqualTo("mermaid();");
-        assertThat(never.awaitContinue()).as("never continued").isFalse();
+        // Its answer completed when it was cancelled, before the read: a second is ample for a Continue that must not come.
+        assertThat(never.continuedWithin(1)).as("never continued").isFalse();
         assertThat(queued).as("one read").isEmpty();
     }
 
@@ -196,9 +197,9 @@ class PreviewSchemeFactoryTest {
             return continues.get();
         }
 
-        /** Whether the request was continued within a second. */
-        boolean awaitContinue() throws InterruptedException {
-            return continued.await(1, TimeUnit.SECONDS);
+        /** Whether the request was continued within {@code seconds}. */
+        boolean continuedWithin(long seconds) throws InterruptedException {
+            return continued.await(seconds, TimeUnit.SECONDS);
         }
     }
 

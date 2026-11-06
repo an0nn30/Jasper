@@ -1,5 +1,6 @@
 package dev.jasper.browser.engine;
 
+import dev.jasper.browser.store.CapturedLog;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -10,6 +11,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -123,10 +125,20 @@ class PreviewSchemeTest {
         assertThat(reads).hasValue(2);
     }
 
-    /** A read that fails, or that the executor refuses (the plugin's background executor after its stop), is a 404. */
+    /**
+     * A read that fails, which is logged, or that the executor refuses (the plugin's background executor after its
+     * stop), is a 404.
+     */
     @Test void aFileWhoseReadFailsOrIsRefusedIs404() {
         var failing = new PreviewScheme(name -> { throw new IllegalStateException("unreadable"); }, Runnable::run);
-        assertThat(answer(failing, "GET", failing.open().shell() + "mermaid.min.js")).satisfies(PreviewSchemeTest::isNotFound);
+        try (var log = new CapturedLog(PreviewScheme.class.getName())) {
+            assertThat(answer(failing, "GET", failing.open().shell() + "mermaid.min.js")).satisfies(PreviewSchemeTest::isNotFound);
+            assertThat(log.records()).singleElement().satisfies(logged -> {
+                assertThat(logged.getLevel()).isEqualTo(Level.WARNING);
+                assertThat(logged.getMessage()).isEqualTo("The Markdown preview's third_party/mermaid.min.js could not be read");
+                assertThat(logged.getThrown()).isInstanceOf(IllegalStateException.class).hasMessage("unreadable");
+            });
+        }
         var refused = new PreviewScheme(name -> new byte[] {1}, task -> { throw new RejectedExecutionException("stopped"); });
         var origin = refused.open();
         assertThat(answer(refused, "GET", origin.shell() + "mermaid.min.js")).satisfies(PreviewSchemeTest::isNotFound);

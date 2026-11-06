@@ -11,7 +11,7 @@ which has plans 4a, 4b and 4c merged; the plan `1364c1dc3`, then commits `8676bf
 `ea57ab1af` and the checklist `11e04ff16`, then the fix wave `af2f1e1ed` to `8031cee59` and its docs, then the targeted
 round `21b3b42f2` and its docs (N23); merged into local `main`, not pushed; see `docs/STATUS.md`). Executed with
 per-task subagents and reviews. The pre-flight scan's findings F1-F38 were adopted as rulings (N0, cited N-F*n*), and the
-controller's further rulings are N1-N24; plan 4a's R0-R48, its sandbox ruling and the banners of 4b and 4c bind. The
+controller's further rulings are N1-N26; plan 4a's R0-R48, its sandbox ruling and the banners of 4b and 4c bind. The
 task reviews and the final review recorded these deviations from the plan's text, each with its ruling:
 - **Versions:** no SDK change (`JasperSdk.VERSION` stays 0.28.0, every bundled range `>=0.28.0, <0.29`); the Browser
   is 0.2.0 and exports `dev.jasper.browser.api` (no `@since`); the Editor is 0.19.0 and requires
@@ -44,11 +44,15 @@ task reviews and the final review recorded these deviations from the plan's text
     - **the NOTICE lists Mermaid's npm production dependency tree as of its publication** (N25, the commit "Notices:
       Mermaid's full dependency tree", after the first slice 1b commit listed only the 22 direct `dependencies`): the
       controller resolved its 123 rows from npm's metadata by date, each the newest version in its parent's range then,
-      with that version's licence (khroma's names none; its npm readme says MIT). The NOTICE says the tree
-      over-approximates the bundle: the 32 `@types` declarations, listed apart, and Node-only tooling, such as d3-dsv's
-      command-line dependencies, are not in the file. Then come the licence banners the file keeps; where they name a
-      version, it is used (DOMPurify 3.4.12, where the range's newest was 3.4.14; lodash-es twice; four of
-      cytoscape's);
+      with that version's licence (khroma's names none; its npm readme says MIT). The NOTICE says that tree
+      over-approximates the bundle (the type declarations, listed apart, and Node-only tooling, such as d3-dsv's
+      command-line dependencies, are not in the file), and, under N26 (the commit "Notices: what Mermaid's parser
+      bundles"), lists beside it the 15 packages `@mermaid-js/parser`'s own dist bundles, which npm's dependency
+      metadata does not show: its devDependencies langium 4.2.1 and chevrotain ~11.1.2 and what they require, resolved
+      by date, with `@chevrotain/types` under the type declarations. Where the file names a version, in its licence
+      banners or a version constant, that version is used: DOMPurify 3.4.12 (the range's newest was 3.4.14) and
+      cytoscape 3.34.0 (3.34.1). Then come the licence banners the file keeps (lodash-es twice, four of cytoscape's) and
+      the Apache License 2.0's text, from `apache-2.0.txt`, for chevrotain and the `@chevrotain` packages;
     - `MermaidBundleTest`: the hash, a size of 1 to 8 MiB, every origin serving the file at `/mermaid.min.js`, and the
       bundle's own defaults (`securityLevel:"strict"` and the `secure` list `secure`, `securityLevel`, `startOnLoad`,
       `maxTextSize`, `suppressErrorRendering`, `maxEdges`) and its `sanitize`, which deletes every key that list names
@@ -236,7 +240,7 @@ task reviews and the final review recorded these deviations from the plan's text
 
 Not run:
 - **Task 9**, the user's GUI check on macOS, with their OK: pending (checklist `11e04ff16`, with the fix wave's three
-  lines and slice 1b's two: [checklist](../../browser-verification.md#plan-9-the-chromium-markdown-preview)); the
+  lines and slice 1b's three: [checklist](../../browser-verification.md#plan-9-the-chromium-markdown-preview)); the
   GUI-only risks come first (N-F38): if a document does not show, update and count in Find, `markdown_preview`'s
   default goes to `basic` before anything is pushed.
 - **Windows and Linux** (no hosts), benchmarks and the memory run: deferred.
