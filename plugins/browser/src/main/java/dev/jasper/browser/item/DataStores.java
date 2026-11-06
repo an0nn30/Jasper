@@ -11,6 +11,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -28,6 +29,7 @@ public final class DataStores implements AutoCloseable {
     private final Stores plugins;
     private final Supplier<Stores> memory;
     private final Supplier<PageContext> contexts;
+    private final BooleanSupplier devNullMode;
     // Filled and emptied on Chromium's thread or the UI thread, read on the background executor.
     private final Map<Integer, DataStore> browsers = new ConcurrentHashMap<>();
     private final List<DataStore> devNull = new ArrayList<>();
@@ -43,7 +45,18 @@ public final class DataStores implements AutoCloseable {
      * @param persistent the history and bookmarks in the plugin's data folder, which these close
      */
     public DataStores(Stores persistent) {
-        this(persistent, () -> new Stores(BrowserDatabase.memory(), EventQueue::invokeLater), PageContext::memory);
+        this(persistent, () -> false);
+    }
+
+    /**
+     * As {@link #DataStores(Stores)}, with {@code devNullMode} saying whether the Use /dev/null mode setting is on now,
+     * which {@link #forNewItem()} reads.
+     *
+     * @param persistent the history and bookmarks in the plugin's data folder, which these close
+     * @param devNullMode whether new items open in /dev/null; read each time one opens, on the UI thread
+     */
+    public DataStores(Stores persistent, BooleanSupplier devNullMode) {
+        this(persistent, () -> new Stores(BrowserDatabase.memory(), EventQueue::invokeLater), PageContext::memory, devNullMode);
     }
 
     /**
@@ -51,6 +64,12 @@ public final class DataStores implements AutoCloseable {
      * by {@code contexts}: a test's.
      */
     DataStores(Stores persistent, Supplier<Stores> memory, Supplier<PageContext> contexts) {
+        this(persistent, memory, contexts, () -> false);
+    }
+
+    /** As the constructor above, with {@code devNullMode} saying whether new items open in /dev/null. */
+    DataStores(Stores persistent, Supplier<Stores> memory, Supplier<PageContext> contexts, BooleanSupplier devNullMode) {
+        this.devNullMode = Objects.requireNonNull(devNullMode, "devNullMode");
         plugins = Objects.requireNonNull(persistent, "persistent");
         this.memory = Objects.requireNonNull(memory, "memory");
         this.contexts = Objects.requireNonNull(contexts, "contexts");
@@ -82,6 +101,19 @@ public final class DataStores implements AutoCloseable {
         var store = new DataStore(true, contexts.get(), memory.get(), this::ended);
         devNull.add(store);
         return store;
+    }
+
+    /**
+     * The store a new item opens in: a new /dev/null store while Use /dev/null mode is on, else the persistent one. For
+     * New Browser Tab, New Browser Window, the split item, the links Jasper opens to the Browser and the palette's rows;
+     * not for a page's links and popups, which open in their opener's store, nor for a restored item, which comes back in
+     * the mode it was saved in. Turning the setting on or off changes no item that is open.
+     *
+     * @return the store
+     * @throws IllegalStateException once these have closed, while the setting is on
+     */
+    public DataStore forNewItem() {
+        return devNullMode.getAsBoolean() ? newDevNull() : persistent();
     }
 
     /**

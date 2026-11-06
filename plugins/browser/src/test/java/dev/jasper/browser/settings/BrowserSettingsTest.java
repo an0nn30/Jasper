@@ -5,6 +5,7 @@ import dev.jasper.browser.settings.BrowserSettings.LinkOpening;
 import dev.jasper.browser.settings.BrowserSettings.LocalFileOpening;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.Subscription;
+import dev.jasper.sdk.settings.Applies;
 import dev.jasper.sdk.settings.Choice;
 import dev.jasper.sdk.settings.PluginSettings;
 import dev.jasper.sdk.settings.Setting;
@@ -39,11 +40,12 @@ class BrowserSettingsTest {
             });
             List<SettingSpec<?>> specs = recording.get().specs;
             assertThat(specs).extracting(SettingSpec::key).containsExactly("start_page", "page_zoom", "open_links_from_terminal",
-                "open_local_web_files", "search_engine", "custom_search_url", "custom_suggestions_url");
+                "open_local_web_files", "search_engine", "custom_search_url", "custom_suggestions_url", "devnull_mode");
             assertThat(specs).extracting(SettingSpec::label).containsExactly("Start page", "Page zoom", "Open Links From Terminal",
-                "Open Local Web Files", "Default Search Engine", "Custom Search URL", "Custom Search Suggestions URL");
+                "Open Local Web Files", "Default Search Engine", "Custom Search URL", "Custom Search Suggestions URL",
+                "Use /dev/null mode (no history, cookies, or other data saved)");
             assertThat(specs).extracting(SettingSpec::section).containsExactly("General", "General", "Link Opening", "Link Opening",
-                "Search Engine", "Search Engine", "Search Engine");
+                "Search Engine", "Search Engine", "Search Engine", "Privacy & Data");
             assertThat(specs).allSatisfy(spec -> assertThat(spec.description()).isNotBlank());
             assertThat(specs.get(1).kind()).isEqualTo(SettingKind.integer(25, 500));
             assertThat(specs.get(1).unit()).isEqualTo("%");
@@ -58,6 +60,11 @@ class BrowserSettingsTest {
             assertThat(specs.get(4).defaultValue()).isEqualTo(SearchEngine.GOOGLE);
             assertThat(specs.get(5).defaultValue()).isEqualTo("");
             assertThat(specs.get(6).defaultValue()).isEqualTo("");
+            assertThat(specs.get(7).kind()).isEqualTo(SettingKind.bool());
+            assertThat(specs.get(7).defaultValue()).isEqualTo(false);
+            assertThat(specs.get(7).applies()).isEqualTo(Applies.LIVE);
+            assertThat(specs.get(7).description()).isEqualTo("Browser tabs, windows and panes opened after you turn this on keep cookies, "
+                + "history and all other browser data in memory, and lose them when that tab and the tabs it opened have all closed.");
             assertThat(host.failures()).isEmpty();
         } });
     }
@@ -77,7 +84,7 @@ class BrowserSettingsTest {
             String refused = "The URL must start with https:// or http:// and contain %s";
             assertThat(host.settingsReports(ID)).containsExactly("custom_search_url: " + refused, "custom_suggestions_url: " + refused);
             assertThat(declared.get().read()).isEqualTo(new BrowserSettings(BrowserSettings.WELCOME, 100, LinkOpening.ASK, LocalFileOpening.ASK,
-                SearchEngine.CUSTOM, "", ""));
+                SearchEngine.CUSTOM, "", "", false));
             host.setSetting(ID, "custom_search_url", "https://search.example.com/?q=%s");
             host.setSetting(ID, "custom_suggestions_url", "https://search.example.com/suggest?q=%s");
             assertThat(host.settingsReports(ID)).isEmpty();
@@ -92,6 +99,18 @@ class BrowserSettingsTest {
         } });
     }
 
+    @Test void devNullModeIsReadFromItsKey() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var declared = new AtomicReference<BrowserSettings.Declared>();
+            host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(),
+                plugin -> declared.set(BrowserSettings.declare(plugin.settings())));
+            assertThat(declared.get().read().devNullMode()).as("off by default").isFalse();
+            host.setSetting(ID, "devnull_mode", true);
+            assertThat(declared.get().read().devNullMode()).isTrue();
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
     @Test void aSnapshotReadsTheFileTheRememberedChoiceIsWrittenAsItsTokenAndChangesAreHeard() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
             host.setSetting(ID, "open_local_web_files", "editor");
@@ -99,7 +118,7 @@ class BrowserSettingsTest {
             host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(),
                 plugin -> declared.set(BrowserSettings.declare(plugin.settings())));
             assertThat(declared.get().read()).isEqualTo(new BrowserSettings(BrowserSettings.WELCOME, 100, LinkOpening.ASK,
-                LocalFileOpening.DEFAULT_EDITOR, SearchEngine.GOOGLE, "", ""));
+                LocalFileOpening.DEFAULT_EDITOR, SearchEngine.GOOGLE, "", "", false));
             var heard = new CopyOnWriteArrayList<LinkOpening>();
             declared.get().onLinksChanged(heard::add);
 
@@ -142,9 +161,9 @@ class BrowserSettingsTest {
                 assertThat(declared.get().read().pageZoom()).as("the default").isEqualTo(100);
             }
             assertThatThrownBy(() -> new BrowserSettings(BrowserSettings.WELCOME, 24, LinkOpening.ASK, LocalFileOpening.ASK,
-                SearchEngine.GOOGLE, "", "")).isInstanceOf(IllegalArgumentException.class);
+                SearchEngine.GOOGLE, "", "", false)).isInstanceOf(IllegalArgumentException.class);
             assertThatThrownBy(() -> new BrowserSettings(BrowserSettings.WELCOME, 501, LinkOpening.ASK, LocalFileOpening.ASK,
-                SearchEngine.GOOGLE, "", "")).isInstanceOf(IllegalArgumentException.class);
+                SearchEngine.GOOGLE, "", "", false)).isInstanceOf(IllegalArgumentException.class);
             assertThat(host.failures()).isEmpty();
         } });
     }

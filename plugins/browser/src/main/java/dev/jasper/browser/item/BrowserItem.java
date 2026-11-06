@@ -132,6 +132,8 @@ public final class BrowserItem implements AutoCloseable {
     private DevToolsItem devTools;
     // The Edit Bookmark panel opened last, which may have closed since; null before the first.
     private BookmarkPanel panel;
+    // The /dev/null indicator's popover opened last, which may have closed since; null before the first.
+    private DevNullPopover devNullPopover;
     private URI url;
     // Where the item's restore state says it is: what it loads first until it shows, then where its page committed.
     private URI saved;
@@ -243,6 +245,8 @@ public final class BrowserItem implements AutoCloseable {
             view.close();
             throw failure;
         }
+        // A /dev/null item's saved record holds no page title: the workspace keeps this one, in the turn the tab opened.
+        if (store.devNull()) tab.setSavedTitle(Optional.of(TabTitle.UNTITLED));
         tab.setFocusTarget(this::focusContent);
         // Copy, Paste and the font size commands have no key of their own: Jasper's run them, on the keys the keymap gives
         // those, as in Editor tabs. Find's are the Editor's, which on macOS are Jasper's own.
@@ -290,6 +294,15 @@ public final class BrowserItem implements AutoCloseable {
      */
     public DataStore store() {
         return store;
+    }
+
+    /**
+     * Whether the item is in /dev/null mode: its store is a /dev/null group's.
+     *
+     * @return whether it is
+     */
+    public boolean devNull() {
+        return store.devNull();
     }
 
     /**
@@ -595,6 +608,7 @@ public final class BrowserItem implements AutoCloseable {
      */
     void flush() {
         if (panel != null) panel.close();
+        if (devNullPopover != null) devNullPopover.close();
         history.flush();
     }
 
@@ -698,7 +712,7 @@ public final class BrowserItem implements AutoCloseable {
      * its token, which ends with the item.
      */
     private Optional<RestoreState> restore(URI at) {
-        return BrowserRestore.state(SourcePage.saved(at), target, ownZoom);
+        return BrowserRestore.state(SourcePage.saved(at), target, ownZoom, store.devNull());
     }
 
     /** Increase or Decrease Font Size: the page shows at {@code percent}, which the item saves as its own zoom. */
@@ -782,6 +796,7 @@ public final class BrowserItem implements AutoCloseable {
                 render();
                 view.selectAll(BrowserToolbar.ADDRESS);
             }
+            case BrowserToolbar.DEVNULL -> toggleDevNullPopover();
             case BrowserToolbar.SETTINGS -> items.showSettings();
             case BrowserToolbar.SHOW_HISTORY, BrowserToolbar.HISTORY -> showHistory();
             case BrowserToolbar.BOOKMARKS -> showBookmarks();
@@ -814,6 +829,20 @@ public final class BrowserItem implements AutoCloseable {
             }
             if (!closed && !items.closed() && tab != null && loadStarts == started) openPanel(bookmark);
         }));
+    }
+
+    /** The /dev/null indicator: opens its popover, or closes it when it is open. */
+    private void toggleDevNullPopover() {
+        if (devNullPopover != null && devNullPopover.open()) {
+            devNullPopover.close();
+            return;
+        }
+        if (devNullPopover != null && devNullPopover.justClosed()) return; // the click that closed it
+        try {
+            devNullPopover = DevNullPopover.show(items.context(), view);
+        } catch (IllegalArgumentException | IllegalStateException unanchored) { // the view or its indicator cannot anchor now
+            items.context().log().log(System.Logger.Level.DEBUG, "The /dev/null popover could not open", unanchored);
+        }
     }
 
     /** The bookmark's panel, from the menu button; none while the button cannot anchor one. */
@@ -911,7 +940,8 @@ public final class BrowserItem implements AutoCloseable {
 
     private ViewSpec spec() {
         Nodes.Node bar = toolbar.node(shown(errors.address()), page.loading(), errors.canGoBack(), page.canGoForward(), icon(),
-            page.history(), items.settings(), errors.notSecure(), Optional.of(stores.bookmarkIndex().has(errors.address())));
+            page.history(), items.settings(), errors.notSecure(), store.devNull(),
+            store.devNull() ? Optional.empty() : Optional.of(stores.bookmarkIndex().has(errors.address())));
         // A waiting item keeps the canvas's slot, hidden: a slot that leaves the view closes its content, the page.
         Nodes.Node canvas = new Nodes.Custom(PAGE, waiting ? HIDDEN : ControlState.READY, CONTENT, Nodes.CustomKind.PREVIEW, "Web page");
         return new ViewSpec(new Nodes.Split(ROOT, ControlState.READY, Nodes.SplitKind.DOCUMENT,

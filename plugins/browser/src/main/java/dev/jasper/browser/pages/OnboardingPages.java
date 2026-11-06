@@ -81,7 +81,9 @@ public final class OnboardingPages {
         new Feature("Snippets in page fields", "Insert a snippet into the page field you are typing in.",
             "Insert a snippet into the page field you are typing in."),
         new Feature("Copy on select", "With Copy on select on, selecting text in a page copies it.",
-            "With Copy on select on, selecting text in a page copies it."));
+            "With Copy on select on, selecting text in a page copies it."),
+        new Feature("/dev/null mode", "Browse without keeping history, cookies or other data: turn it on in Settings › Tools › Browser › Privacy & Data.",
+            "Browse without keeping history, cookies or other data: turn it on in Settings › Tools › Browser › Privacy & Data."));
 
     private final AboutPages pages;
     private final AboutScheme about;

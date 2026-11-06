@@ -29,15 +29,16 @@ import java.util.function.Consumer;
  *     for none
  * @param customSuggestionsUrl the Custom engine's suggestion URL, an http or https address with {@code %s} for the
  *     typed text; empty for none
+ * @param devNullMode whether browser tabs, windows and panes opened from now on are in /dev/null mode: Use /dev/null mode
  */
 public record BrowserSettings(String startPage, int pageZoom, LinkOpening links, LocalFileOpening localFiles,
-                              SearchEngine searchEngine, String customSearchUrl, String customSuggestionsUrl) {
+                              SearchEngine searchEngine, String customSearchUrl, String customSuggestionsUrl, boolean devNullMode) {
     /** Jasper's welcome page, the default start page. */
     public static final String WELCOME = "jasper-about:welcome";
     static final String START_PAGE = "start_page", PAGE_ZOOM = "page_zoom", LINKS = "open_links_from_terminal",
         LOCAL_FILES = "open_local_web_files", SEARCH_ENGINE = "search_engine", CUSTOM_SEARCH = "custom_search_url",
-        CUSTOM_SUGGESTIONS = "custom_suggestions_url";
-    private static final String GENERAL = "General", LINK_OPENING = "Link Opening", SEARCH = "Search Engine";
+        CUSTOM_SUGGESTIONS = "custom_suggestions_url", DEVNULL_MODE = "devnull_mode";
+    private static final String GENERAL = "General", LINK_OPENING = "Link Opening", SEARCH = "Search Engine", PRIVACY = "Privacy & Data";
     private static final String NO_TEMPLATE = "The URL must start with https:// or http:// and contain " + SearchEngine.TERMS;
 
     /** Open Links From Terminal: where a web link the user opens in Jasper goes. */
@@ -93,7 +94,7 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
      * Declares the Browser's settings, which Settings › Browser shows: Start page and Page zoom, a percent from 25 to 500,
      * under General, Open Links From Terminal and Open Local Web Files under Link Opening, then Default Search Engine,
      * Custom Search URL and Custom Search Suggestions URL under Search Engine, each custom URL empty or an http or https
-     * address with {@code %s} in it. UI thread, while the plugin starts.
+     * address with {@code %s} in it, and Use /dev/null mode under Privacy & Data. UI thread, while the plugin starts.
      *
      * @param settings the plugin's settings
      * @return the declared settings, which read the current values
@@ -138,7 +139,12 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
             .description("With Custom: where the address field's search suggestions come from, an http:// or https:// "
                 + "address that answers OpenSearch JSON, with %s where the typed text goes. Empty shows none.")
             .keywords("search", "suggestions", "custom", "url", "opensearch", "autocomplete"));
-        return new Declared(startPage, pageZoom, links, localFiles, engine, customSearch, customSuggestions);
+        Setting<Boolean> devNull = settings.declare(SettingSpec.of(DEVNULL_MODE, SettingKind.bool(), false)
+            .label("Use /dev/null mode (no history, cookies, or other data saved)").section(PRIVACY)
+            .description("Browser tabs, windows and panes opened after you turn this on keep cookies, history and all other "
+                + "browser data in memory, and lose them when that tab and the tabs it opened have all closed.")
+            .keywords("private", "incognito", "privacy", "history", "cookies", "data", "dev null", "devnull", "memory"));
+        return new Declared(startPage, pageZoom, links, localFiles, engine, customSearch, customSuggestions, devNull);
     }
 
     /** A custom URL: empty, or a {@link SearchEngine#template template}, an http or https address with {@code %s}. */
@@ -171,10 +177,11 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
         private final Setting<LocalFileOpening> localFiles;
         private final Setting<SearchEngine> engine;
         private final Setting<String> customSearch, customSuggestions;
+        private final Setting<Boolean> devNull;
 
         private Declared(Setting<String> startPage, Setting<Integer> pageZoom, Setting<LinkOpening> links,
                          Setting<LocalFileOpening> localFiles, Setting<SearchEngine> engine, Setting<String> customSearch,
-                         Setting<String> customSuggestions) {
+                         Setting<String> customSuggestions, Setting<Boolean> devNull) {
             this.startPage = startPage;
             this.pageZoom = pageZoom;
             this.links = links;
@@ -182,6 +189,7 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
             this.engine = engine;
             this.customSearch = customSearch;
             this.customSuggestions = customSuggestions;
+            this.devNull = devNull;
         }
 
         /**
@@ -191,7 +199,7 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
          */
         public BrowserSettings read() {
             return new BrowserSettings(startPage.get(), pageZoom.get(), links.get(), localFiles.get(), engine.get(), customSearch.get(),
-                customSuggestions.get());
+                customSuggestions.get(), devNull.get());
         }
 
         /**

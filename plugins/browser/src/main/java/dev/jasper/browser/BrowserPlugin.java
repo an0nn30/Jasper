@@ -9,6 +9,7 @@ import dev.jasper.browser.engine.PreviewScheme;
 import dev.jasper.browser.engine.RunMarker;
 import dev.jasper.browser.item.BookmarkPanel;
 import dev.jasper.browser.item.BrowserItems;
+import dev.jasper.browser.item.DataStore;
 import dev.jasper.browser.item.DataStores;
 import dev.jasper.browser.item.ErrorPage;
 import dev.jasper.browser.item.SourcePage;
@@ -110,7 +111,7 @@ public class BrowserPlugin implements Plugin {
         stores = new Stores(database, EventQueue::invokeLater);
         // The persistent store holds them; a /dev/null group's store, made as its first item opens, holds its own in
         // memory. Making them opens nothing.
-        var dataStores = new DataStores(stores);
+        var dataStores = new DataStores(stores, () -> settings.read().devNullMode());
         this.dataStores = dataStores;
         // Spec section 15: "Bookmark Removed" and "Bookmark Deleted" post in a group of their own, which Settings lists.
         context.notifications().group(BookmarkPanel.GROUP);
@@ -176,10 +177,13 @@ public class BrowserPlugin implements Plugin {
         var role = new BrowserRole(context, items, settings, engine::state);
         context.platform().browser(role);
         WebAddressItems.register(context, role, settings);
-        // Spec section 16: a saved item comes back at once, in the persistent store, and its page loads the first time it
+        // Spec section 16: a saved item comes back at once, in the persistent store, or in a new /dev/null one if it was in
+        // /dev/null mode, and its page loads the first time it
         // shows, or, after a run that ended while Chromium ran, once the user loads it.
         context.windows().restorer(BrowserRestore.KIND, request -> {
-            items.restore(request.state(), settings.read().startAddress(), request.window(), endedWhileRunning, dataStores.persistent());
+            // A saved /dev/null item comes back in a new store of its own, any other in the persistent one, whatever the setting.
+            DataStore store = BrowserRestore.devNull(request.state()) ? dataStores.newDevNull() : dataStores.persistent();
+            items.restore(request.state(), settings.read().startAddress(), request.window(), endedWhileRunning, store);
             return Optional.empty();
         });
         running = true;

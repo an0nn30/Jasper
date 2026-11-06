@@ -33,6 +33,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -497,6 +498,62 @@ class BrowserItemTest {
             assertThat(persistent.store()).isSameAs(items.dataStores().persistent());
             ItemTestAccess.page(persistent).openItem("https://example.org/", TabPlacement.NEXT_TAB);
             assertThat(items.items().getLast().store()).isSameAs(items.dataStores().persistent());
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /**
+     * Plan 6: with Use /dev/null mode on, a new item opens in a new /dev/null store; turning it off changes no open item,
+     * and the next new item opens in the persistent store. A page's popup stays in its opener's store whatever it says.
+     */
+    @Test void newItemsFollowTheSettingAndTurningItOffChangesNoOpenItem() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var items = items(host, page -> { });
+            var ordinary = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            assertThat(ordinary.devNull()).as("off by default").isFalse();
+            assertThat(ordinary.store()).isSameAs(items.dataStores().persistent());
+
+            host.setSetting(ID, "devnull_mode", true);
+            var first = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            var second = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            assertThat(first.devNull()).isTrue();
+            assertThat(first.store().devNull()).isTrue();
+            assertThat(second.store()).as("each in a group of its own").isNotSameAs(first.store());
+            assertThat(ordinary.devNull()).as("turning it on changes no open item").isFalse();
+            ItemTestAccess.page(ordinary).openItem("https://example.org/", TabPlacement.NEXT_TAB);
+            assertThat(items.items().getLast().devNull()).as("a popup follows its opener, not the setting").isFalse();
+
+            host.setSetting(ID, "devnull_mode", false);
+            assertThat(first.devNull()).as("turning it off changes no open item").isTrue();
+            ItemTestAccess.page(first).openItem("https://example.org/", TabPlacement.NEXT_TAB);
+            assertThat(items.items().getLast().store()).as("a popup of an open /dev/null item").isSameAs(first.store());
+            var after = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            assertThat(after.devNull()).isFalse();
+            assertThat(after.store()).isSameAs(items.dataStores().persistent());
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /**
+     * Plan 6 (F2): a /dev/null item saves the tab title "Web Browser", whatever page it shows; it saves no address, and
+     * keeps its target and zoom. An ordinary item saves what it shows.
+     */
+    @Test void aDevNullItemSavesNoPageTitleAndNoAddress() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var items = items(host, page -> { });
+            var devNull = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.of("docs"), Optional.empty(), items.dataStores().newDevNull());
+            assertThat(host.savedTitle(devNull.tab())).isEqualTo("Web Browser");
+            PageTestAccess.titleChanged(devNull.page(), "A secret page");
+            devNull.load(URI.create("https://secret.example/private?q=1"));
+            assertThat(host.contentPresentation(devNull.tab()).title()).as("the tab shows it").isEqualTo("A secret page");
+            assertThat(host.savedTitle(devNull.tab())).as("the record does not").isEqualTo("Web Browser");
+            assertThat(host.restoreState(devNull.tab()).orElseThrow().values()).containsOnly(Map.entry("devnull", "true"),
+                Map.entry("target", "docs"));
+
+            var ordinary = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            PageTestAccess.titleChanged(ordinary.page(), "A public page");
+            assertThat(host.savedTitle(ordinary.tab())).isEqualTo("A public page");
+            assertThat(host.restoreState(ordinary.tab()).orElseThrow().values()).containsEntry("url", "https://example.com");
             assertThat(host.failures()).isEmpty();
         } });
     }
@@ -1200,7 +1257,8 @@ class BrowserItemTest {
             context.set(plugin);
             settings.set(BrowserSettings.declare(plugin.settings()));
         });
-        var stores = new DataStores(persistent, memory::make, () -> PageTestAccess.recordingContext(new AtomicInteger()));
+        var stores = new DataStores(persistent, memory::make, () -> PageTestAccess.recordingContext(new AtomicInteger()),
+            () -> settings.get().read().devNullMode());
         return new BrowserItems(context.get(), settings.get()::read, stores, start, later, fetches);
     }
 

@@ -55,22 +55,22 @@ class BrowserRestoreTest {
 
     @Test void aUrlOverTheBudgetIsSavedWithoutItsQueryAndFragment() {
         URI url = URI.create("https://example.com/search?q=" + "a".repeat(5_000) + "#results");
-        assertThat(BrowserRestore.state(url, Optional.empty(), OptionalInt.empty())).get().satisfies(state -> {
+        assertThat(BrowserRestore.state(url, Optional.empty(), OptionalInt.empty(), false)).get().satisfies(state -> {
             assertThat(state.kind()).isEqualTo(BrowserRestore.KIND).isEqualTo("dev.jasper.browser.page");
             assertThat(state.values()).containsExactly(entry("url", "https://example.com/search"));
         });
         URI fragment = URI.create("https://example.com/page#" + "f".repeat(5_000));
-        assertThat(BrowserRestore.state(fragment, Optional.of("docs"), OptionalInt.empty()).orElseThrow().values())
+        assertThat(BrowserRestore.state(fragment, Optional.of("docs"), OptionalInt.empty(), false).orElseThrow().values())
             .containsOnly(entry("url", "https://example.com/page"), entry("target", "docs"));
     }
 
     @Test void aUrlStillOverTheBudgetWithoutItsQuerySavesNoUrl() {
         URI url = URI.create("https://example.com/" + "p".repeat(5_000) + "?q=1");
-        assertThat(BrowserRestore.state(url, Optional.empty(), OptionalInt.empty())).get().satisfies(state -> {
+        assertThat(BrowserRestore.state(url, Optional.empty(), OptionalInt.empty(), false)).get().satisfies(state -> {
             assertThat(state.kind()).isEqualTo(BrowserRestore.KIND);
             assertThat(state.values()).as("no url: the item comes back at the start page").isEmpty();
         });
-        assertThat(BrowserRestore.state(url, Optional.of("docs"), OptionalInt.empty()).orElseThrow().values())
+        assertThat(BrowserRestore.state(url, Optional.of("docs"), OptionalInt.empty(), false).orElseThrow().values())
             .containsExactly(entry("target", "docs"));
     }
 
@@ -80,39 +80,39 @@ class BrowserRestoreTest {
         URI fits = URI.create(prefix + "p".repeat(RestoreState.MAX_CHARACTERS - "url".length() - prefix.length()) + "?q");
         URI whole = URI.create(fits.toString().substring(0, fits.toString().length() - 2));
         assertThat(whole.toString().length() + "url".length()).isEqualTo(RestoreState.MAX_CHARACTERS);
-        assertThat(BrowserRestore.state(whole, Optional.empty(), OptionalInt.empty()).orElseThrow().values())
+        assertThat(BrowserRestore.state(whole, Optional.empty(), OptionalInt.empty(), false).orElseThrow().values())
             .containsExactly(entry("url", whole.toString()));
-        assertThat(BrowserRestore.state(fits, Optional.empty(), OptionalInt.empty()).orElseThrow().values()).as("one character over, with its query")
+        assertThat(BrowserRestore.state(fits, Optional.empty(), OptionalInt.empty(), false).orElseThrow().values()).as("one character over, with its query")
             .containsExactly(entry("url", whole.toString()));
-        assertThat(BrowserRestore.state(whole, Optional.of("t"), OptionalInt.empty()).orElseThrow().values()).as("the target's entry takes 7")
+        assertThat(BrowserRestore.state(whole, Optional.of("t"), OptionalInt.empty(), false).orElseThrow().values()).as("the target's entry takes 7")
             .containsExactly(entry("target", "t"));
         String shorter = whole.toString().substring(0, whole.toString().length() - "target".length() - 1);
-        assertThat(BrowserRestore.state(URI.create(shorter), Optional.of("t"), OptionalInt.empty()).orElseThrow().values())
+        assertThat(BrowserRestore.state(URI.create(shorter), Optional.of("t"), OptionalInt.empty(), false).orElseThrow().values())
             .containsOnly(entry("url", shorter), entry("target", "t"));
     }
 
     @Test void dataAndBlobPagesSaveNoUrl() {
         for (String address : List.of("data:text/html,Hello%20there", "DATA:text/plain;base64,SGk=",
                 "blob:https://example.com/0c0e9c4a-4b5e-4f4c-9a39-0d2f0b6d2b8e")) {
-            assertThat(BrowserRestore.state(URI.create(address), Optional.empty(), OptionalInt.empty()).orElseThrow().values()).as(address).isEmpty();
-            assertThat(BrowserRestore.state(URI.create(address), Optional.of("docs"), OptionalInt.empty()).orElseThrow().values()).as(address)
+            assertThat(BrowserRestore.state(URI.create(address), Optional.empty(), OptionalInt.empty(), false).orElseThrow().values()).as(address).isEmpty();
+            assertThat(BrowserRestore.state(URI.create(address), Optional.of("docs"), OptionalInt.empty(), false).orElseThrow().values()).as(address)
                 .containsExactly(entry("target", "docs"));
         }
     }
 
     @Test void jasperAboutPagesSaveTheirUrl() {
-        assertThat(BrowserRestore.state(START, Optional.empty(), OptionalInt.empty()).orElseThrow().values())
+        assertThat(BrowserRestore.state(START, Optional.empty(), OptionalInt.empty(), false).orElseThrow().values())
             .containsExactly(entry("url", "jasper-about:welcome"));
-        assertThat(BrowserRestore.url(BrowserRestore.state(START, Optional.empty(), OptionalInt.empty()).orElseThrow())).contains(START);
+        assertThat(BrowserRestore.url(BrowserRestore.state(START, Optional.empty(), OptionalInt.empty(), false).orElseThrow())).contains(START);
     }
 
     @Test void aUrlAndATargetRoundTrip() {
         URI url = URI.create("https://example.com/a%20b?q=%E2%9C%93&x=1#part");
-        RestoreState state = BrowserRestore.state(url, Optional.of("docs"), OptionalInt.empty()).orElseThrow();
+        RestoreState state = BrowserRestore.state(url, Optional.of("docs"), OptionalInt.empty(), false).orElseThrow();
         assertThat(state.values()).containsOnly(entry("url", url.toString()), entry("target", "docs"));
         assertThat(BrowserRestore.url(state)).contains(url);
         assertThat(BrowserRestore.target(state)).contains("docs");
-        RestoreState untargeted = BrowserRestore.state(url, Optional.empty(), OptionalInt.empty()).orElseThrow();
+        RestoreState untargeted = BrowserRestore.state(url, Optional.empty(), OptionalInt.empty(), false).orElseThrow();
         assertThat(untargeted.values()).containsOnlyKeys("url");
         assertThat(BrowserRestore.target(untargeted)).isEmpty();
     }
@@ -120,17 +120,17 @@ class BrowserRestoreTest {
     /** Spec section 16: an item never saves credentials, so a URL is saved without its user name and password. */
     @Test void aUrlIsSavedWithoutItsUserNameAndPassword() {
         URI url = URI.create("https://ada:s%40cret@example.com:8443/a%2Fb%20c?q=%E2%9C%93&x=1#part");
-        RestoreState state = BrowserRestore.state(url, Optional.of("docs"), OptionalInt.empty()).orElseThrow();
+        RestoreState state = BrowserRestore.state(url, Optional.of("docs"), OptionalInt.empty(), false).orElseThrow();
         assertThat(state.values()).containsOnly(entry("url", "https://example.com:8443/a%2Fb%20c?q=%E2%9C%93&x=1#part"), entry("target", "docs"));
         assertThat(BrowserRestore.url(state)).contains(URI.create("https://example.com:8443/a%2Fb%20c?q=%E2%9C%93&x=1#part"));
-        assertThat(BrowserRestore.state(URI.create("http://ada@example.com/"), Optional.empty(), OptionalInt.empty()).orElseThrow().values())
+        assertThat(BrowserRestore.state(URI.create("http://ada@example.com/"), Optional.empty(), OptionalInt.empty(), false).orElseThrow().values())
             .as("a user name alone").containsExactly(entry("url", "http://example.com/"));
-        assertThat(BrowserRestore.state(URI.create("ftp://ada:pw@example.com"), Optional.empty(), OptionalInt.empty()).orElseThrow().values())
+        assertThat(BrowserRestore.state(URI.create("ftp://ada:pw@example.com"), Optional.empty(), OptionalInt.empty(), false).orElseThrow().values())
             .as("no path").containsExactly(entry("url", "ftp://example.com"));
-        assertThat(BrowserRestore.state(URI.create("http://ada:pw@[::1]:8080/x"), Optional.empty(), OptionalInt.empty()).orElseThrow().values())
+        assertThat(BrowserRestore.state(URI.create("http://ada:pw@[::1]:8080/x"), Optional.empty(), OptionalInt.empty(), false).orElseThrow().values())
             .as("an IPv6 host").containsExactly(entry("url", "http://[::1]:8080/x"));
         // java.net.URI reads an authority whose host has an underscore as a registry, with no user information of its own.
-        assertThat(BrowserRestore.state(URI.create("http://admin:hunter2@build_server:8080/job"), Optional.empty(), OptionalInt.empty())
+        assertThat(BrowserRestore.state(URI.create("http://admin:hunter2@build_server:8080/job"), Optional.empty(), OptionalInt.empty(), false)
             .orElseThrow().values()).as("a host with an underscore").containsExactly(entry("url", "http://build_server:8080/job"));
         assertThat(BrowserRestore.withoutUserInfo(URI.create("https://a@b@host.example/x"))).as("up to the last @")
             .hasToString("https://host.example/x");
@@ -167,25 +167,25 @@ class BrowserRestoreTest {
         for (String target : List.of("", "t".repeat(257), "a\u0007b", "line\nbreak", "tab\there", "del\u007f"))
             assertThat(BrowserRestore.target(saved(Map.of("target", target)))).as(target).isEmpty();
         assertThat(BrowserRestore.target(saved(Map.of()))).isEmpty();
-        assertThat(BrowserRestore.state(EXAMPLE, Optional.of("bad\u0000target"), OptionalInt.empty()).orElseThrow().values())
+        assertThat(BrowserRestore.state(EXAMPLE, Optional.of("bad\u0000target"), OptionalInt.empty(), false).orElseThrow().values())
             .as("an invalid target is not saved")
             .containsExactly(entry("url", EXAMPLE.toString()));
     }
 
     @Test void aZoomRoundTripsWithTheUrlAndTheTarget() {
         URI url = URI.create("https://example.com/docs?q=1#part");
-        RestoreState state = BrowserRestore.state(url, Optional.of("docs"), OptionalInt.of(150)).orElseThrow();
+        RestoreState state = BrowserRestore.state(url, Optional.of("docs"), OptionalInt.of(150), false).orElseThrow();
         assertThat(state.values()).containsOnly(entry("url", url.toString()), entry("target", "docs"), entry("zoom", "150"));
         assertThat(BrowserRestore.zoom(state)).hasValue(150);
         assertThat(BrowserRestore.url(state)).contains(url);
         assertThat(BrowserRestore.target(state)).contains("docs");
         for (int percent : new int[] { Zoom.MIN, 100, Zoom.MAX })
-            assertThat(BrowserRestore.zoom(BrowserRestore.state(EXAMPLE, Optional.empty(), OptionalInt.of(percent)).orElseThrow()))
+            assertThat(BrowserRestore.zoom(BrowserRestore.state(EXAMPLE, Optional.empty(), OptionalInt.of(percent), false).orElseThrow()))
                 .hasValue(percent);
-        RestoreState none = BrowserRestore.state(url, Optional.empty(), OptionalInt.empty()).orElseThrow();
+        RestoreState none = BrowserRestore.state(url, Optional.empty(), OptionalInt.empty(), false).orElseThrow();
         assertThat(none.values()).as("an item with no zoom of its own").containsOnlyKeys("url");
         assertThat(BrowserRestore.zoom(none)).isEmpty();
-        assertThat(BrowserRestore.state(URI.create("data:text/html,Hi"), Optional.empty(), OptionalInt.of(90)).orElseThrow().values())
+        assertThat(BrowserRestore.state(URI.create("data:text/html,Hi"), Optional.empty(), OptionalInt.of(90), false).orElseThrow().values())
             .as("a data: page saves its zoom, not its url").containsExactly(entry("zoom", "90"));
     }
 
@@ -193,26 +193,26 @@ class BrowserRestoreTest {
     @Test void aLongUrlWithAZoomKeepsTheZoom() {
         String prefix = "https://example.com/";
         URI whole = URI.create(prefix + "p".repeat(RestoreState.MAX_CHARACTERS - "url".length() - prefix.length()));
-        assertThat(BrowserRestore.state(whole, Optional.empty(), OptionalInt.empty()).orElseThrow().values()).containsOnlyKeys("url");
-        assertThat(BrowserRestore.state(whole, Optional.empty(), OptionalInt.of(150)).orElseThrow().values())
+        assertThat(BrowserRestore.state(whole, Optional.empty(), OptionalInt.empty(), false).orElseThrow().values()).containsOnlyKeys("url");
+        assertThat(BrowserRestore.state(whole, Optional.empty(), OptionalInt.of(150), false).orElseThrow().values())
             .as("the zoom's entry takes 7: the url goes").containsExactly(entry("zoom", "150"));
         String shorter = whole.toString().substring(0, whole.toString().length() - "zoom150".length());
-        assertThat(BrowserRestore.state(URI.create(shorter), Optional.empty(), OptionalInt.of(150)).orElseThrow().values())
+        assertThat(BrowserRestore.state(URI.create(shorter), Optional.empty(), OptionalInt.of(150), false).orElseThrow().values())
             .containsOnly(entry("url", shorter), entry("zoom", "150"));
 
         String base = prefix + "p".repeat(RestoreState.MAX_CHARACTERS - "url".length() - prefix.length() - 21);
         URI query = URI.create(base + "?" + "q".repeat(20));
         assertThat(query.toString().length() + "url".length()).isEqualTo(RestoreState.MAX_CHARACTERS);
-        assertThat(BrowserRestore.state(query, Optional.empty(), OptionalInt.empty()).orElseThrow().values())
+        assertThat(BrowserRestore.state(query, Optional.empty(), OptionalInt.empty(), false).orElseThrow().values())
             .containsExactly(entry("url", query.toString()));
-        assertThat(BrowserRestore.state(query, Optional.empty(), OptionalInt.of(150)).orElseThrow().values())
+        assertThat(BrowserRestore.state(query, Optional.empty(), OptionalInt.of(150), false).orElseThrow().values())
             .as("beside the zoom, without its query").containsOnly(entry("url", base), entry("zoom", "150"));
 
         URI search = URI.create("https://example.com/search?q=" + "a".repeat(5_000) + "#results");
-        assertThat(BrowserRestore.state(search, Optional.of("docs"), OptionalInt.of(25)).orElseThrow().values())
+        assertThat(BrowserRestore.state(search, Optional.of("docs"), OptionalInt.of(25), false).orElseThrow().values())
             .containsOnly(entry("url", "https://example.com/search"), entry("target", "docs"), entry("zoom", "25"));
         URI path = URI.create(prefix + "p".repeat(5_000));
-        assertThat(BrowserRestore.state(path, Optional.of("t".repeat(256)), OptionalInt.of(500)).orElseThrow().values())
+        assertThat(BrowserRestore.state(path, Optional.of("t".repeat(256)), OptionalInt.of(500), false).orElseThrow().values())
             .containsOnly(entry("target", "t".repeat(256)), entry("zoom", "500"));
     }
 
@@ -230,7 +230,7 @@ class BrowserRestoreTest {
             assertThat(BrowserRestore.zoom(saved(Map.of("zoom", zoom)))).as(zoom).isEmpty();
         assertThat(BrowserRestore.zoom(saved(Map.of()))).isEmpty();
         for (int outside : new int[] { Zoom.MIN - 1, Zoom.MAX + 1 })
-            assertThatThrownBy(() -> BrowserRestore.state(EXAMPLE, Optional.empty(), OptionalInt.of(outside)))
+            assertThatThrownBy(() -> BrowserRestore.state(EXAMPLE, Optional.empty(), OptionalInt.of(outside), false))
                 .as(Integer.toString(outside)).isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -239,7 +239,7 @@ class BrowserRestoreTest {
             var asked = new java.util.ArrayList<Page>();
             var items = restoring(host, asked::add);
             UUID window = host.addTerminalWindow();
-            RestoreState saved = BrowserRestore.state(EXAMPLE, Optional.of("docs"), OptionalInt.empty()).orElseThrow();
+            RestoreState saved = BrowserRestore.state(EXAMPLE, Optional.of("docs"), OptionalInt.empty(), false).orElseThrow();
             Optional<UUID> tab = host.restoreTab(ID, window, "Docs", saved);
             assertThat(tab).as("the restorer opened its tab").isPresent();
             BrowserItem item = items.items().getLast();
@@ -275,7 +275,7 @@ class BrowserRestoreTest {
             var asked = new java.util.ArrayList<Page>();
             var items = restoring(host, asked::add, true);
             UUID window = host.addTerminalWindow();
-            RestoreState saved = BrowserRestore.state(EXAMPLE, Optional.of("docs"), OptionalInt.empty()).orElseThrow();
+            RestoreState saved = BrowserRestore.state(EXAMPLE, Optional.of("docs"), OptionalInt.empty(), false).orElseThrow();
             Optional<UUID> tab = host.restoreTab(ID, window, "Docs", saved);
             assertThat(tab).isPresent();
             assertThat(host.restoreTab(ID, window, "Saved", saved(Map.of()))).isPresent();
@@ -309,7 +309,7 @@ class BrowserRestoreTest {
             UUID window = host.addTerminalWindow();
             for (int i = 0; i < 40; i++)
                 assertThat(host.restoreTab(ID, window, "Page " + i,
-                    BrowserRestore.state(URI.create("https://example.com/" + i), Optional.empty(), OptionalInt.empty()).orElseThrow())).isPresent();
+                    BrowserRestore.state(URI.create("https://example.com/" + i), Optional.empty(), OptionalInt.empty(), false).orElseThrow())).isPresent();
             assertThat(items.items()).hasSize(40).allSatisfy(item -> assertThat(ItemTestAccess.pageAsked(item)).isFalse());
             assertThat(host.windowTabs(window)).hasSize(40);
             assertThat(asked).isEmpty();
@@ -332,7 +332,7 @@ class BrowserRestoreTest {
                 BrowserItem item = items.items().getLast();
                 assertThat(item.url()).as(values.toString()).isEqualTo(START);
                 assertThat(item.target()).isEmpty();
-                assertThat(host.restoreState(tab.get())).contains(BrowserRestore.state(START, Optional.empty(), OptionalInt.empty()).orElseThrow());
+                assertThat(host.restoreState(tab.get())).contains(BrowserRestore.state(START, Optional.empty(), OptionalInt.empty(), false).orElseThrow());
             }
             assertThat(host.notifications().lines()).as("the restorer asks nothing").isEmpty();
             assertThat(host.declinedRestores()).isEmpty();
@@ -446,7 +446,7 @@ class BrowserRestoreTest {
             var items = restoring(host, page -> { });
             UUID window = host.addTerminalWindow();
             Optional<UUID> large = host.restoreTab(ID, window, "Large",
-                BrowserRestore.state(EXAMPLE, Optional.empty(), OptionalInt.of(498)).orElseThrow());
+                BrowserRestore.state(EXAMPLE, Optional.empty(), OptionalInt.of(498), false).orElseThrow());
             BrowserItem item = items.items().getLast();
             command(host, item, "font-bigger");
             assertThat(BrowserRestore.zoom(host.restoreState(large.orElseThrow()).orElseThrow())).hasValue(500);
@@ -455,7 +455,7 @@ class BrowserRestoreTest {
             assertThat(PageTestAccess.zoomLevel(ItemTestAccess.page(item))).isEqualTo(Zoom.cefLevel(500));
 
             Optional<UUID> small = host.restoreTab(ID, window, "Small",
-                BrowserRestore.state(EXAMPLE, Optional.empty(), OptionalInt.of(27)).orElseThrow());
+                BrowserRestore.state(EXAMPLE, Optional.empty(), OptionalInt.of(27), false).orElseThrow());
             item = items.items().getLast();
             command(host, item, "font-smaller");
             assertThat(BrowserRestore.zoom(host.restoreState(small.orElseThrow()).orElseThrow())).hasValue(25);
@@ -476,7 +476,7 @@ class BrowserRestoreTest {
             SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
                 var items = restoring(host, page -> { }, wait);
                 UUID window = host.addTerminalWindow();
-                RestoreState saved = BrowserRestore.state(EXAMPLE, Optional.of("docs"), OptionalInt.of(150)).orElseThrow();
+                RestoreState saved = BrowserRestore.state(EXAMPLE, Optional.of("docs"), OptionalInt.of(150), false).orElseThrow();
                 Optional<UUID> tab = host.restoreTab(ID, window, "Docs", saved);
                 BrowserItem item = items.items().getLast();
                 assertThat(ItemTestAccess.waiting(item)).isEqualTo(wait);
@@ -540,6 +540,56 @@ class BrowserRestoreTest {
         return new RestoreState(BrowserRestore.KIND, Map.of("url", url.toString(), "target", target));
     }
 
+    /** Plan 6: a /dev/null item saves devnull = "true" and no address, and keeps its target and zoom. */
+    @Test void aDevNullItemSavesNoUrlButKeepsItsTargetAndZoom() {
+        URI url = URI.create("https://secret.example/private?q=1");
+        RestoreState state = BrowserRestore.state(url, Optional.of("docs"), OptionalInt.of(150), true).orElseThrow();
+        assertThat(state.values()).containsOnly(Map.entry("devnull", "true"), Map.entry("target", "docs"), Map.entry("zoom", "150"));
+        assertThat(BrowserRestore.devNull(state)).isTrue();
+        assertThat(BrowserRestore.url(state)).isEmpty();
+        assertThat(BrowserRestore.target(state)).contains("docs");
+        assertThat(BrowserRestore.zoom(state)).hasValue(150);
+        RestoreState ordinary = BrowserRestore.state(url, Optional.empty(), OptionalInt.empty(), false).orElseThrow();
+        assertThat(ordinary.values()).containsOnlyKeys("url");
+        assertThat(BrowserRestore.devNull(ordinary)).isFalse();
+    }
+
+    @Test void onlyTheExactValueTrueIsDevNull() {
+        for (String value : List.of("TRUE", "True", "1", "yes", "false", "", " true", "true "))
+            assertThat(BrowserRestore.devNull(saved(Map.of("devnull", value)))).as(value).isFalse();
+        assertThat(BrowserRestore.devNull(saved(Map.of("devnull", "true")))).isTrue();
+        assertThat(BrowserRestore.devNull(saved(Map.of()))).isFalse();
+    }
+
+    /**
+     * Plan 6: a saved /dev/null item comes back in a new /dev/null store of its own at the start page, whatever address it
+     * carries, saving no address; a saved ordinary item comes back in the persistent store, with the setting on too.
+     */
+    @Test void aSavedDevNullItemComesBackAtTheStartPageInANewStoreAndAnOrdinaryOneInThePersistentStore() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var items = restoring(host, page -> { });
+            host.setSetting(ID, "devnull_mode", true);
+            UUID window = host.addTerminalWindow();
+            var withAddress = saved(Map.of("devnull", "true", "url", "https://secret.example/"));
+            assertThat(host.restoreTab(ID, window, "Web Browser", withAddress)).isPresent();
+            BrowserItem one = items.items().getLast();
+            assertThat(one.devNull()).isTrue();
+            assertThat(one.url()).isEqualTo(START);
+            assertThat(host.savedTitle(one.tab())).isEqualTo("Web Browser");
+            assertThat(host.restoreState(one.tab()).orElseThrow().values()).containsOnly(Map.entry("devnull", "true"));
+            assertThat(host.restoreTab(ID, window, "Web Browser", saved(Map.of("devnull", "true")))).isPresent();
+            BrowserItem two = items.items().getLast();
+            assertThat(two.store()).as("a store of its own").isNotSameAs(one.store());
+
+            assertThat(host.restoreTab(ID, window, "Docs", saved(Map.of("url", EXAMPLE.toString(), "devnull", "TRUE")))).isPresent();
+            BrowserItem ordinary = items.items().getLast();
+            assertThat(ordinary.devNull()).as("with the setting on, a saved ordinary item is persistent").isFalse();
+            assertThat(ordinary.store().devNull()).isFalse();
+            assertThat(ordinary.url()).isEqualTo(EXAMPLE);
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
     private static RestoreState state(URI url, String target, int zoom) {
         return new RestoreState(BrowserRestore.KIND, Map.of("url", url.toString(), "target", target, "zoom", Integer.toString(zoom)));
     }
@@ -573,10 +623,13 @@ class BrowserRestoreTest {
         var items = new AtomicReference<BrowserItems>();
         host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(), started -> {
             context.set(started);
-            var stores = new DataStores(memory.make());
-            items.set(new BrowserItems(started, BrowserSettings.declare(started.settings())::read, stores, start));
+            var declared = BrowserSettings.declare(started.settings());
+            var stores = new DataStores(memory.make(), () -> declared.read().devNullMode());
+            items.set(new BrowserItems(started, declared::read, stores, start));
             started.windows().restorer(BrowserRestore.KIND, request -> {
-                items.get().restore(request.state(), START, request.window(), wait, stores.persistent());
+                // As the plugin's restorer chooses the store, which BrowserPluginTest checks in the plugin itself.
+                items.get().restore(request.state(), START, request.window(), wait,
+                    BrowserRestore.devNull(request.state()) ? stores.newDevNull() : stores.persistent());
                 return Optional.empty();
             });
         });

@@ -54,7 +54,7 @@ class OnboardingPagesTest {
     @Test void everyFeatureRowShowsWithCmdOnMacOsAndCtrlElsewhere() throws Exception {
         assertThat(OnboardingPages.FEATURES).extracting(OnboardingPages.Feature::title).containsExactly("Pages beside your terminals",
             "Links from the terminal", "An address field that searches", "Find in page", "Bookmarks and history",
-            "Snippets in page fields", "Copy on select");
+            "Snippets in page fields", "Copy on select", "/dev/null mode");
         for (boolean macOs : new boolean[] {true, false}) {
             try (var other = new PagesFixture()) {
                 var pages = new OnboardingPages(other.pages, other.about, onboarding, macOs, List.of(), Runnable::run);
