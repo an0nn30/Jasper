@@ -13,9 +13,11 @@
  * reads DevTools' answer. {@link dev.jasper.browser.page.PageFind} is find in page, behind the item's find bar:
  * {@code find.js} runs in each of the page's frames, highlights the matches and answers its count through the
  * {@code links} package's message router, and the {@code json} package writes the query into the script.
- * {@code PageText} puts text another plugin inserts where the user is typing in a page: {@code insert-text.js} runs in
- * an isolated world of the main frame through DevTools, and Return is pressed through DevTools too
- * ({@link dev.jasper.browser.page.Page#insertIntoField}, {@link dev.jasper.browser.page.Page#pressReturn}).
+ * {@code PageText} puts text another plugin inserts where the user is typing in a page, through DevTools and never the
+ * clipboard: {@code insert-text.js} runs in an isolated world of the main frame, else {@code Input.insertText} types the
+ * text where the focus is, and Return is pressed through DevTools too
+ * ({@link dev.jasper.browser.page.Page#insertIntoField}, {@link dev.jasper.browser.page.Page#insertText},
+ * {@link dev.jasper.browser.page.Page#pressReturn}).
  * {@link dev.jasper.browser.page.DialogPlace} is where the {@code dialogs} package shows a page's dialogs, as its item
  * gives it. {@code PageMenu} is the client's one context-menu handler: Jasper shows the page's right-click menu,
  * {@code PageMenuItems} for what is under the pointer, at the {@link dev.jasper.browser.page.MenuPlace} the item gives,

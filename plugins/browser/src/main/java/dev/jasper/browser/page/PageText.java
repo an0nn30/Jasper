@@ -6,36 +6,57 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.function.BiFunction;
 import org.cef.browser.CefDevToolsClient;
 
 /**
  * Text put where the user is typing in a page, and Return pressed there, for the text another plugin inserts into its
- * item (spec section 15, Snippets in page fields), through the page's DevTools client. Chromium's Java API inserts no
- * text and presses no key, so DevTools does: {@code Page.getFrameTree} names the main frame, {@code
- * Page.createIsolatedWorld} gives it a world of Jasper's own, and {@code Runtime.evaluate} runs {@code insert-text.js}
- * there, the text as a JSON string literal, with no user activation, as activation would let the page open popups; its
- * answer comes back by value. The world is asked for at each insertion, not kept, as each new document of the main
- * frame drops its worlds' contexts. Return is {@code Input.dispatchKeyEvent}'s key down, with Return's text, which a
- * form submits on, then its key up once the down is answered. DevTools' answers are read as untrusted input, within
- * bounds, as the page's own scripts can shape the frame tree; anything else is a field that did not take the text. Each
- * call after the first is made on the UI thread, as the page's other DevTools calls are. Only {@link #insert} and
- * {@link #pressReturn} touch Chromium. Any thread.
+ * item (spec section 15, Snippets in page fields; H30), through the page's DevTools client. Chromium's Java API inserts
+ * no text and presses no key, so DevTools does. None of it touches the clipboard.
+ *
+ * <p>{@link #insertIntoField} asks, in order:
+ * <ol>
+ *   <li>{@code Page.getFrameTree}, for the main frame's id;</li>
+ *   <li>{@code Page.createIsolatedWorld}, for a world of Jasper's own in it, {@value #WORLD};</li>
+ *   <li>{@code Runtime.enable}, which reports every context, that world's unique id among them; then
+ *       {@code Runtime.disable};</li>
+ *   <li>{@code Runtime.evaluate}, which runs {@code insert-text.js} with the text, a JSON string literal, in that unique
+ *       context only.</li>
+ * </ol>
+ * The script runs with no user activation, which would let the page open popups. A navigation between the calls cannot
+ * run the script in the new document's world, because a context id may repeat in another renderer process and a unique
+ * id never does. Its answer comes back by value. The world is asked for at each insertion, not kept, as each new document
+ * drops its worlds' contexts. Runtime is enabled for one insertion at a time, so an insertion waits for the one before.
+ * While it is enabled, which takes a moment, the page could notice that DevTools is attached.
+ *
+ * <p>Only the script's own true or false is an answer. Every call times out after five seconds, and a late call, an
+ * error answer, a refused call and an answer that cannot be read each fail the insertion, as the text may still go in or
+ * nothing can tell. DevTools' answers are read as untrusted input, within bounds, as the page's own scripts can shape
+ * the frame tree.
+ *
+ * <p>{@link #insertText} types text with {@code Input.insertText} into whatever has the focus, cross-origin frames
+ * included. {@link #pressReturn} sends {@code Input.dispatchKeyEvent}'s key down, with Return's text, which a form submits
+ * on, then its key up. Both are trusted input, so they give the page user activation, as the user's own typing does.
+ *
+ * <p>Each answer is read where it arrives, and each later call is made on the UI thread, as the page's other DevTools
+ * calls are. The methods run on the UI thread; their futures complete on any thread.
  */
 final class PageText {
     /** The name of Jasper's isolated world in the main frame. */
     static final String WORLD = "Jasper text insertion";
-    /** The longest main frame id kept, in characters: Chromium's are 32. */
+    /** The longest main frame id and unique context id kept, in characters: Chromium's are shorter. */
     static final int MAX_ID = 256;
-    /** The longest frame tree read, in characters, and how deep it nests at most: a page that has more is pasted into. */
+    /** The longest frame tree read, in characters, and how deep it nests at most. */
     static final int MAX_TREE = 1 << 20, MAX_TREE_DEPTH = 64;
-    /** The longest other answer read, in characters, and how deep it nests at most. */
+    /** The longest other answer or event read, in characters, and how deep it nests at most. */
     static final int MAX_ANSWER = 1 << 16, MAX_ANSWER_DEPTH = 16;
     /** The page script: a function of the text. */
     static final String SOURCE = source();
@@ -43,83 +64,151 @@ final class PageText {
     static final String RETURN_DOWN = "{\"type\":\"keyDown\",\"key\":\"Enter\",\"code\":\"Enter\",\"windowsVirtualKeyCode\":13,"
         + "\"text\":\"\\r\",\"unmodifiedText\":\"\\r\"}",
         RETURN_UP = "{\"type\":\"keyUp\",\"key\":\"Enter\",\"code\":\"Enter\",\"windowsVirtualKeyCode\":13}";
-    // How long each DevTools call may take before its answer is given up.
-    private static final long TIMEOUT_SECONDS = 5;
-    private static final CompletableFuture<Optional<String>> NO_ANSWER = CompletableFuture.completedFuture(Optional.empty());
+    /** How long each DevTools call may take before it fails. */
+    static final Duration TIMEOUT = Duration.ofSeconds(5);
+    private static final String CONTEXT_CREATED = "Runtime.executionContextCreated";
     private static final System.Logger LOG = System.getLogger(PageText.class.getName());
 
-    private PageText() { }
+    private final BiFunction<String, String, CompletableFuture<String>> devTools;
+    private final Executor ui;
+    private final Duration timeout;
+    // The insertion under way, or the last: the next waits for it. UI thread.
+    private CompletableFuture<?> last = CompletableFuture.completedFuture(null);
+    // The world whose report the insertion under way waits for, while Runtime is enabled for it; else null.
+    private volatile Awaited awaited;
+
+    private record Awaited(String frame, int context, CompletableFuture<String> uniqueId) { }
 
     /**
-     * Puts {@code text} into the field that has {@code browser}'s focus, as {@code insert-text.js} finds it. Any thread.
+     * Text insertion through {@code devTools}: Chromium's, or a test's. It must hear every event DevTools reports
+     * ({@link #event}).
      *
-     * @param browser a page's browser, or null while the page has none ready
+     * @param devTools calls a DevTools method with its parameters, a JSON object or null for none, and answers what DevTools
+     *     answered; an error answer fails the future
+     * @param ui runs a task on the UI thread
+     * @param timeout how long each call may take before it fails
+     */
+    PageText(BiFunction<String, String, CompletableFuture<String>> devTools, Executor ui, Duration timeout) {
+        this.devTools = Objects.requireNonNull(devTools, "devTools");
+        this.ui = Objects.requireNonNull(ui, "ui");
+        this.timeout = Objects.requireNonNull(timeout, "timeout");
+    }
+
+    /**
+     * Text insertion through {@code browser}'s DevTools client, which tells it its events from now on.
+     *
+     * @param browser a page's ready browser
+     * @return the insertion; empty when the browser has no DevTools client
+     */
+    static Optional<PageText> of(PageBrowser browser) {
+        try {
+            CefDevToolsClient client = browser.getDevToolsClient();
+            if (client == null) return Optional.empty();
+            var text = new PageText((method, parameters) -> parameters == null ? client.executeDevToolsMethod(method)
+                : client.executeDevToolsMethod(method, parameters), EventQueue::invokeLater, TIMEOUT);
+            // Added once, before Runtime is first enabled: JCEF walks its listeners unsynchronized as each event arrives,
+            // and no domain reports events on this client until then.
+            client.addEventListener(text::event);
+            return Optional.of(text);
+        } catch (RuntimeException failure) {
+            LOG.log(System.Logger.Level.WARNING, "A page's DevTools could not be reached", failure);
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Puts {@code text} into the field that has the page's focus, as {@code insert-text.js} finds it, once the insertion
+     * before has ended.
+     *
      * @param text the text
-     * @return true when the field took the text; false without a browser, without a field the script reaches, and when
-     *     DevTools fails or gives anything else before the script runs, or refuses to run it. It fails when the script's
-     *     answer takes more than five seconds, as the text may still go in then; never otherwise
+     * @return true when the field took the text; false when the script found no field it reaches focused. It fails when
+     *     any call is late, refused or answered with an error, or its answer cannot be read
      */
-    static CompletableFuture<Boolean> insert(PageBrowser browser, String text) {
-        if (browser == null) return CompletableFuture.completedFuture(false);
-        try {
-            CefDevToolsClient client = browser.getDevToolsClient();
-            if (client == null) return CompletableFuture.completedFuture(false);
-            // Until the script runs, nothing went in, so any failure is a field that did not take the text. Each answer is
-            // read where it arrives, and each next call is made on the UI thread, as the page's other DevTools calls are.
-            CompletableFuture<OptionalInt> world = ask(client, "Page.getFrameTree", null, MAX_TREE)
-                .thenApply(tree -> tree.flatMap(PageText::mainFrame))
-                .thenComposeAsync(frame -> frame.map(id -> ask(client, "Page.createIsolatedWorld", isolatedWorld(id), MAX_ANSWER))
-                    .orElse(NO_ANSWER), EventQueue::invokeLater)
-                .thenApply(answer -> answer.map(PageText::context).orElse(OptionalInt.empty()))
-                .exceptionally(failure -> OptionalInt.empty());
-            return world.thenComposeAsync(context -> context.isEmpty() ? CompletableFuture.completedFuture(false)
-                : evaluate(client, context.getAsInt(), text), EventQueue::invokeLater);
-        } catch (RuntimeException failure) {
-            LOG.log(System.Logger.Level.WARNING, "Text could not be put into a page", failure);
-            return CompletableFuture.completedFuture(false);
-        }
+    CompletableFuture<Boolean> insertIntoField(String text) {
+        Objects.requireNonNull(text, "text");
+        CompletableFuture<Boolean> inserted = last.handle((done, failure) -> null).thenComposeAsync(ignored -> insertNow(text), ui);
+        last = inserted;
+        return inserted;
     }
 
     /**
-     * Runs {@code insert-text.js} with {@code text} in {@code context}: whether the field took the text; false when
-     * DevTools refuses to run it, as for a context gone with its document or a closed browser; failed when the answer is
-     * late, as the text may still go in.
-     */
-    private static CompletableFuture<Boolean> evaluate(CefDevToolsClient client, int context, String text) {
-        CompletableFuture<String> call;
-        try {
-            call = client.executeDevToolsMethod("Runtime.evaluate", evaluation(context, text));
-        } catch (RuntimeException refused) {
-            LOG.log(System.Logger.Level.WARNING, "Text could not be put into a page", refused);
-            return CompletableFuture.completedFuture(false);
-        }
-        return call.orTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS).handle((answer, failure) -> {
-            if (failure == null) return inserted(answer);
-            if (cause(failure) instanceof TimeoutException late) throw new CompletionException(late);
-            return false; // an error answer: nothing ran
-        });
-    }
-
-    /**
-     * Presses Return where {@code browser}'s focus is: its key down, then, once DevTools has answered it however it did,
-     * its key up, so no key is left down. Any thread.
+     * Types {@code text} into whatever has the page's focus, a cross-origin frame's field included, as an input method
+     * commits it: {@code Input.insertText}.
      *
-     * @param browser a page's browser, or null while the page has none ready, which presses nothing
+     * @param text the text
+     * @return done once DevTools has answered; failed when the call is late, refused or answered with an error
      */
-    static void pressReturn(PageBrowser browser) {
-        if (browser == null) return;
-        try {
-            CefDevToolsClient client = browser.getDevToolsClient();
-            if (client == null) return;
-            client.executeDevToolsMethod("Input.dispatchKeyEvent", RETURN_DOWN)
-                .handleAsync((down, failure) -> client.executeDevToolsMethod("Input.dispatchKeyEvent", RETURN_UP), EventQueue::invokeLater)
-                .thenCompose(up -> up)
-                .whenComplete((up, failure) -> {
-                    if (failure != null) LOG.log(System.Logger.Level.DEBUG, "Return could not be pressed in a page", failure);
+    CompletableFuture<Void> insertText(String text) {
+        Objects.requireNonNull(text, "text");
+        return call("Input.insertText", typing(text)).thenApply(answer -> null);
+    }
+
+    /** Presses Return where the page's focus is: its key down, then its key up, whatever the down's answer. */
+    void pressReturn() {
+        call("Input.dispatchKeyEvent", RETURN_DOWN)
+            .handleAsync((down, failure) -> {
+                if (failure != null) LOG.log(System.Logger.Level.DEBUG, "Return's key down failed in a page", failure);
+                return call("Input.dispatchKeyEvent", RETURN_UP);
+            }, ui)
+            .thenCompose(up -> up)
+            .whenComplete((up, failure) -> {
+                if (failure != null) LOG.log(System.Logger.Level.DEBUG, "Return's key up failed in a page", failure);
+            });
+    }
+
+    /**
+     * An event DevTools reports: the world the insertion under way waits for is reported with its unique id. Any thread.
+     *
+     * @param method the event's method
+     * @param parameters its parameters, a JSON object
+     */
+    void event(String method, String parameters) {
+        Awaited waiting = awaited;
+        if (waiting == null || !CONTEXT_CREATED.equals(method)) return;
+        uniqueId(parameters, waiting.frame(), waiting.context()).ifPresent(waiting.uniqueId()::complete);
+    }
+
+    private CompletableFuture<Boolean> insertNow(String text) {
+        CompletableFuture<String> frame = call("Page.getFrameTree", null)
+            .thenApply(tree -> mainFrame(tree).orElseThrow(() -> unreadable("Page.getFrameTree")));
+        return frame.thenComposeAsync(id -> call("Page.createIsolatedWorld", isolatedWorld(id)), ui)
+            .thenApply(world -> context(world).orElseThrow(() -> unreadable("Page.createIsolatedWorld")))
+            .thenComposeAsync(context -> uniqueContext(frame.join(), context), ui)
+            .thenComposeAsync(unique -> call("Runtime.evaluate", evaluation(unique, text)), ui)
+            .thenApply(answer -> answered(answer).orElseThrow(() -> unreadable("Runtime.evaluate")));
+    }
+
+    /**
+     * The unique id of the world {@code context} in {@code frame}, as {@code Runtime.enable} reports it: Runtime is
+     * disabled again however that ends, before the answer goes on.
+     */
+    private CompletableFuture<String> uniqueContext(String frame, int context) {
+        var reported = new CompletableFuture<String>();
+        awaited = new Awaited(frame, context, reported);
+        return call("Runtime.enable", null)
+            .thenCompose(enabled -> reported.orTimeout(timeout.toMillis(), TimeUnit.MILLISECONDS))
+            .whenCompleteAsync((unique, failure) -> {
+                awaited = null;
+                call("Runtime.disable", null).whenComplete((disabled, notDisabled) -> {
+                    if (notDisabled != null) LOG.log(System.Logger.Level.DEBUG, "Runtime could not be disabled in a page", notDisabled);
                 });
-        } catch (RuntimeException failure) {
-            LOG.log(System.Logger.Level.WARNING, "Return could not be pressed in a page", failure);
+            }, ui);
+    }
+
+    /** Calls {@code method}: its answer, failed when the call is refused, answered with an error or late. */
+    private CompletableFuture<String> call(String method, String parameters) {
+        CompletableFuture<String> answer;
+        try {
+            answer = devTools.apply(method, parameters);
+        } catch (RuntimeException refused) {
+            return CompletableFuture.failedFuture(refused);
         }
+        if (answer == null) return CompletableFuture.failedFuture(new IllegalStateException("DevTools gave no answer to " + method));
+        return answer.orTimeout(timeout.toMillis(), TimeUnit.MILLISECONDS);
+    }
+
+    private static IllegalStateException unreadable(String method) {
+        return new IllegalStateException("DevTools answered " + method + " with what Jasper cannot read");
     }
 
     /**
@@ -155,54 +244,72 @@ final class PageText {
      * @return the world's context; empty for anything else, and never an exception
      */
     static OptionalInt context(String answer) {
-        Map<String, Object> root = answer(answer).orElse(null);
+        Map<String, Object> root = object(answer).orElse(null);
         return root != null && root.get("executionContextId") instanceof Long id && id == id.intValue()
             ? OptionalInt.of(id.intValue()) : OptionalInt.empty();
     }
 
     /**
-     * What {@code Runtime.evaluate} is asked: {@link #SOURCE} called with {@code text}, a JSON string literal, in
-     * {@code context}, its answer by value, without user activation, awaiting nothing, its exceptions unreported.
+     * The unique id in a {@code Runtime.executionContextCreated} event, when it reports Jasper's world {@code context}:
+     * the context of that id, named {@link #WORLD}, in {@code frame}, and not the frame's default world, so a context of
+     * another renderer process that took the same id is not taken for it.
      *
-     * @param context the isolated world's context
+     * @param event the event's parameters
+     * @param frame the main frame's id
+     * @param context the world's context, as {@code Page.createIsolatedWorld} answered it
+     * @return the unique id, of 1 to {@link #MAX_ID} characters; empty for any other event, and never an exception
+     */
+    static Optional<String> uniqueId(String event, String frame, int context) {
+        Map<String, Object> root = object(event).orElse(null);
+        if (root == null || !(root.get("context") instanceof Map<?, ?> created) || !(created.get("auxData") instanceof Map<?, ?> aux)
+            || !(created.get("id") instanceof Long id) || id != context || !WORLD.equals(created.get("name"))
+            || !frame.equals(aux.get("frameId")) || !Boolean.FALSE.equals(aux.get("isDefault"))
+            || !(created.get("uniqueId") instanceof String unique) || unique.isEmpty() || unique.length() > MAX_ID) return Optional.empty();
+        return Optional.of(unique);
+    }
+
+    /**
+     * What {@code Runtime.evaluate} is asked: {@link #SOURCE} called with {@code text}, a JSON string literal, in the
+     * context {@code unique} names, its answer by value, without user activation, awaiting nothing, its exceptions
+     * unreported.
+     *
+     * @param unique the isolated world's unique context id
      * @param text the text
      * @return the parameters, a JSON object
      */
-    static String evaluation(int context, String text) {
+    static String evaluation(String unique, String text) {
         String expression = SOURCE + "\n(" + StrictJson.quote(text) + ");";
-        return "{\"expression\":" + StrictJson.quote(expression) + ",\"contextId\":" + context
+        return "{\"expression\":" + StrictJson.quote(expression) + ",\"uniqueContextId\":" + StrictJson.quote(unique)
             + ",\"returnByValue\":true,\"userGesture\":false,\"awaitPromise\":false,\"silent\":true}";
     }
 
     /**
-     * Whether DevTools' answer to {@code Runtime.evaluate} says the field took the text: its {@code result} is the
-     * boolean {@code true} by value, and nothing threw.
+     * What the script answered in DevTools' answer to {@code Runtime.evaluate}: its {@code result}, a boolean by value,
+     * when nothing threw.
      *
      * @param answer what DevTools answered
-     * @return whether it does; false for anything else, and never an exception
+     * @return whether the field took the text; empty for anything else, and never an exception
      */
-    static boolean inserted(String answer) {
-        Map<String, Object> root = answer(answer).orElse(null);
-        return root != null && !root.containsKey("exceptionDetails") && root.get("result") instanceof Map<?, ?> result
-            && "boolean".equals(result.get("type")) && Boolean.TRUE.equals(result.get("value"));
+    static Optional<Boolean> answered(String answer) {
+        Map<String, Object> root = object(answer).orElse(null);
+        if (root == null || root.containsKey("exceptionDetails") || !(root.get("result") instanceof Map<?, ?> result)
+            || !"boolean".equals(result.get("type")) || !(result.get("value") instanceof Boolean value)) return Optional.empty();
+        return Optional.of(value);
     }
 
-    /** Calls {@code method} with {@code parameters}, or none: its answer, empty when it fails, is longer than {@code max} or is late. */
-    private static CompletableFuture<Optional<String>> ask(CefDevToolsClient client, String method, String parameters, int max) {
-        CompletableFuture<String> call = parameters == null ? client.executeDevToolsMethod(method)
-            : client.executeDevToolsMethod(method, parameters);
-        return call.orTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            .handle((answer, failure) -> failure == null && answer != null && answer.length() <= max ? Optional.of(answer) : Optional.empty());
+    /**
+     * What {@code Input.insertText} is asked: {@code text}, a JSON string.
+     *
+     * @param text the text
+     * @return the parameters, a JSON object
+     */
+    static String typing(String text) {
+        return "{\"text\":" + StrictJson.quote(text) + "}";
     }
 
-    /** A short answer as a JSON object. */
-    private static Optional<Map<String, Object>> answer(String text) {
+    /** A short answer or event as a JSON object. */
+    private static Optional<Map<String, Object>> object(String text) {
         return text == null || text.length() > MAX_ANSWER ? Optional.empty() : StrictJson.object(text, MAX_ANSWER_DEPTH);
-    }
-
-    /** What {@code failure} is, as a stage of a future wraps it. */
-    private static Throwable cause(Throwable failure) {
-        return failure instanceof CompletionException && failure.getCause() != null ? failure.getCause() : failure;
     }
 
     private static String source() {

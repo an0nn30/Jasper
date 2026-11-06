@@ -2,7 +2,8 @@
  * The Browser's text insertion, behind Snippets in page fields: text another plugin inserts into a browser item goes
  * where the user is typing in its page. Jasper runs this function, called with the text, in an isolated world of the
  * page's main frame through DevTools (Runtime.evaluate), and reads back what it returns: true when the field took the
- * text, false when no field it reaches has the focus, and Jasper then pastes the text instead. The isolated world shares
+ * text, false when no field it reaches has the focus, and Jasper then types the text where the focus is with DevTools'
+ * Input.insertText, never the clipboard. The isolated world shares
  * the page's nodes but none of its scripts' globals, so no page script can replace execCommand, a value setter or
  * activeElement to steer the text or read it. The page still sees the input events the insertion fires, as it sees
  * typing.

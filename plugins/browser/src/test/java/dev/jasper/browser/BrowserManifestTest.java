@@ -22,11 +22,11 @@ class BrowserManifestTest {
 
     /**
      * Opening a page in the application's default browser goes through {@code Platform.browser}, which needs the first;
-     * the Bookmarks and Browser History scopes need the second; a snippet pasted into a page with no field focused puts
-     * the clipboard's text back, which needs the third.
+     * the Bookmarks and Browser History scopes need the second. Text inserted into a page never goes through the
+     * clipboard (H30), so the Browser reads none.
      */
-    @Test void theBrowserDeclaresBrowserProvidePaletteContributeAndClipboardRead() throws IOException {
-        assertThat(list("capabilities")).containsExactly("browser.provide", "palette.contribute", "clipboard.read");
+    @Test void theBrowserDeclaresBrowserProvideAndPaletteContribute() throws IOException {
+        assertThat(list("capabilities")).containsExactly("browser.provide", "palette.contribute");
     }
 
     /** The Markdown preview's API is the one package other plugins may compile against. */

@@ -956,7 +956,7 @@ class EditorPluginTest {
      * finds the Markdown previews it publishes, as production looks them up. Without that requirement it finds none.
      */
     @Test void theEditorFindsTheBrowsersMarkdownPreviewsWhenItRequiresTheBrowser() throws Exception {
-        var browser = new PluginInfo("dev.jasper.browser", "Browser", "0.2.0", Set.of("browser.provide", "palette.contribute", "clipboard.read"));
+        var browser = new PluginInfo("dev.jasper.browser", "Browser", "0.2.0", Set.of("browser.provide", "palette.contribute"));
         for (boolean requires : List.of(true, false)) {
             try (var host = host()) {
                 host.start(browser, Set.of(), Set.of(), new dev.jasper.browser.BrowserPlugin());

@@ -9,5 +9,5 @@ icon_hue = "blue"
 icon_selected_ink = "foreground"
 icon = "icons/browser.svg"
 enabled_by_default = true
-capabilities = ["browser.provide", "palette.contribute", "clipboard.read"]
+capabilities = ["browser.provide", "palette.contribute"]
 exports = ["dev.jasper.browser.api"]

@@ -49,11 +49,16 @@ public final class Page implements AutoCloseable {
     private ObjIntConsumer<Page> historyJumper;
     // Given the page, reads the HTML its main frame shows: Chromium's, or a test's.
     private Function<Page, CompletableFuture<Optional<String>>> sourceReader = page -> chromiumSource(page.readyBrowser());
-    // Given the page and a text, puts the text where the user is typing in it; given the page, presses Return in it, and
-    // pastes the clipboard into its focused frame: Chromium's, or a test's.
-    private BiFunction<Page, String, CompletableFuture<Boolean>> textInserter = (page, text) -> PageText.insert(page.readyBrowser(), text);
-    private Consumer<Page> returnPresser = page -> PageText.pressReturn(page.readyBrowser());
-    private Consumer<Page> paster = page -> page.onFocusedFrame(CefFrame::paste);
+    // Given the page and a text, puts the text into the field the user is typing in, or types it where the focus is; given
+    // the page, presses Return in it: through its browser's DevTools, or a test's.
+    private BiFunction<Page, String, CompletableFuture<Boolean>> fieldInserter =
+        (page, typed) -> page.pageText().map(text -> text.insertIntoField(typed)).orElseGet(Page::noBrowser);
+    private BiFunction<Page, String, CompletableFuture<Void>> textInserter =
+        (page, typed) -> page.pageText().map(text -> text.insertText(typed)).orElseGet(Page::noBrowser);
+    private Consumer<Page> returnPresser = page -> page.pageText().ifPresent(PageText::pressReturn);
+    // The page's text insertion through its browser's DevTools, made the first time it is asked for once the browser is
+    // ready; null before.
+    private PageText pageText;
     private final List<Consumer<String>> loadStarts = new CopyOnWriteArrayList<>();
     private final List<BiConsumer<String, Reached>> visits = new CopyOnWriteArrayList<>();
     private final List<Consumer<NavigationButton>> navigationButtons = new CopyOnWriteArrayList<>();
@@ -286,31 +291,48 @@ public final class Page implements AutoCloseable {
 
     /** Pastes the clipboard into the page's focused frame, as its Edit menu's Paste would. */
     public void paste() {
-        if (!closed) paster.accept(this);
+        onFocusedFrame(CefFrame::paste);
     }
 
     /**
      * Puts {@code text} into the field the user is typing in on the page, as text another plugin inserts into its item
-     * asks (spec section 15): {@link PageText} runs {@code insert-text.js} in an isolated world of the main frame, which
-     * follows the focus through same-origin frames and open shadow roots to an {@code <input>} that takes text, a
+     * asks (spec section 15). {@link PageText} runs {@code insert-text.js} in an isolated world of the main frame. The
+     * script follows the focus through same-origin frames and open shadow roots to an {@code <input>} that takes text, a
      * {@code <textarea>} or an editable element, and inserts the text there as typing would. It completes on any thread.
      *
      * @param text the text
-     * @return true when the focused field took the text; false when the page has no such field focused, its focus is in
-     *     a cross-origin frame, before the page has its browser and after {@link #close()}. It fails when DevTools did
-     *     not answer the script in time, as the text may still go in
+     * @return true when the focused field took the text; false when the script found no such field focused, as with the
+     *     focus in a cross-origin frame. It fails before the page has its browser, after {@link #close()}, and when a
+     *     DevTools call is late, refused or answered with an error, as the text may still go in or nothing can tell
      */
     public CompletableFuture<Boolean> insertIntoField(String text) {
         Objects.requireNonNull(text, "text");
-        if (closed) return CompletableFuture.completedFuture(false);
-        CompletableFuture<Boolean> inserted = textInserter.apply(this, text);
-        return inserted == null ? CompletableFuture.completedFuture(false) : inserted;
+        if (closed) return noBrowser();
+        CompletableFuture<Boolean> inserted = fieldInserter.apply(this, text);
+        return inserted == null ? noBrowser() : inserted;
+    }
+
+    /**
+     * Types {@code text} into whatever has the page's focus, a cross-origin frame's field included, as an input method
+     * commits text: DevTools' {@code Input.insertText} ({@link PageText}), without the clipboard. It is trusted input, so
+     * the page gets user activation from it, as from the user's own typing. It completes on any thread.
+     *
+     * @param text the text
+     * @return done once DevTools has answered; failed before the page has its browser, after {@link #close()}, and when
+     *     the call is late, refused or answered with an error
+     */
+    public CompletableFuture<Void> insertText(String text) {
+        Objects.requireNonNull(text, "text");
+        if (closed) return noBrowser();
+        CompletableFuture<Void> typed = textInserter.apply(this, text);
+        return typed == null ? noBrowser() : typed;
     }
 
     /**
      * Presses Return in the page, where its focus is, as the user would, after text inserted into its item asks for it:
-     * Return's key down, with its text, then its key up, through DevTools ({@link PageText}). Nothing before the page has
-     * its browser or after {@link #close()}.
+     * Return's key down, with its text, then its key up whatever the down's answer, through DevTools ({@link PageText}).
+     * The key events are trusted input, so the page gets user activation from them, as from the user's own Return.
+     * Nothing before the page has its browser or after {@link #close()}.
      */
     public void pressReturn() {
         if (!closed) returnPresser.accept(this);
@@ -1022,8 +1044,13 @@ public final class Page implements AutoCloseable {
         sourceReader = Objects.requireNonNull(replacement, "replacement");
     }
 
-    /** Has the page put text where the user types with {@code replacement} from now on, as a test's answering one. */
-    void useTextInserter(BiFunction<Page, String, CompletableFuture<Boolean>> replacement) {
+    /** Has the page put text into its focused field with {@code replacement} from now on, as a test's answering one. */
+    void useFieldInserter(BiFunction<Page, String, CompletableFuture<Boolean>> replacement) {
+        fieldInserter = Objects.requireNonNull(replacement, "replacement");
+    }
+
+    /** Has the page type text where its focus is with {@code replacement} from now on, as a test's answering one. */
+    void useTextInserter(BiFunction<Page, String, CompletableFuture<Void>> replacement) {
         textInserter = Objects.requireNonNull(replacement, "replacement");
     }
 
@@ -1032,9 +1059,20 @@ public final class Page implements AutoCloseable {
         returnPresser = Objects.requireNonNull(replacement, "replacement");
     }
 
-    /** Has the page paste the clipboard with {@code replacement} from now on, as a test's recording one. */
-    void usePaster(Consumer<Page> replacement) {
-        paster = Objects.requireNonNull(replacement, "replacement");
+    /**
+     * The page's text insertion through its browser's DevTools, made the first time it is asked for: none before the
+     * browser is ready, after {@link #close()}, or for a browser without a DevTools client.
+     */
+    private Optional<PageText> pageText() {
+        PageBrowser ready = readyBrowser();
+        if (ready == null || closed) return Optional.empty();
+        if (pageText == null) pageText = PageText.of(ready).orElse(null);
+        return Optional.ofNullable(pageText);
+    }
+
+    /** What text inserted into a page without its browser gives: a failure, so its item does nothing more. */
+    private static <T> CompletableFuture<T> noBrowser() {
+        return CompletableFuture.failedFuture(new IllegalStateException("The page has no browser to insert text into"));
     }
 
     /** Has the page find with {@code replacement} from now on, as a test's recording one. */
