@@ -64,6 +64,18 @@ class OnboardingTest {
         assertThat(other).exists();
     }
 
+    /** A request asked before the read has run is answered "not finished", and the same request after it, "finished". */
+    @Test void aRequestAskedBeforeTheReadSeesNotFinishedAndOneAfterSeesFinished() throws IOException {
+        Files.createFile(marker());
+        List<Runnable> held = new ArrayList<>();
+        var onboarding = new Onboarding(marker(), held::add);
+        onboarding.load();
+        boolean before = onboarding.finished();
+        held.removeFirst().run();
+        assertThat(before).isFalse();
+        assertThat(onboarding.finished()).isTrue();
+    }
+
     @Test void anUnwritableFolderStillFinishesTheRunAndTheFailureIsLogged() throws IOException {
         Path file = Files.createFile(folder.resolve("a-file"));
         var onboarding = new Onboarding(file.resolve("onboarding-finished"), Runnable::run);

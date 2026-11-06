@@ -64,9 +64,10 @@ class OnboardingPagesTest {
                     var feature = OnboardingPages.FEATURES.get(at);
                     assertThat(rows.get(at)).isEqualTo(Map.of("title", feature.title(), "text", macOs ? feature.macOs() : feature.other()));
                 }
-                String links = (String) ((Map<?, ?>) rows.get(1)).get("text");
-                assertThat(links).contains(macOs ? "Cmd-click" : "Ctrl-click").contains(macOs ? "Cmd+Shift-click" : "Ctrl+Shift-click")
-                    .doesNotContain(macOs ? "Ctrl" : "Cmd");
+                String key = macOs ? "Cmd" : "Ctrl";
+                assertThat(((Map<?, ?>) rows.get(1)).get("text")).isEqualTo(key + "-click a link in a terminal to open it in a browser tab, or "
+                    + key + "+Shift-click to open it in a split. Open Links From Terminal, in Settings › Tools › Browser, chooses whether "
+                    + "Jasper asks first or sends links to your default browser.");
             }
         }
     }
@@ -74,7 +75,7 @@ class OnboardingPagesTest {
     @Test void theSetupPageHoldsItsCopyAndStartBrowsingFinishes() {
         register(true, List.of());
         String html = fixture.html("onboarding-setup");
-        assertThat(html).contains("<h1>Let’s Get You Set Up</h1>", "You can change these at any time in Settings › Browser.",
+        assertThat(html).contains("<h1>Let’s Get You Set Up</h1>", "You can change these at any time in Settings › Tools › Browser.",
             "<a class=\"button\" href=\"jasper-about:onboarding-features\">Back</a>", "Start Browsing", "'finish'", "location.replace(")
             .doesNotContain("{{");
         assertThat(AboutPages.resource("onboarding-setup.js")).contains("jasper-about:welcome");
