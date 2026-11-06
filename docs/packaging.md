@@ -189,8 +189,8 @@ without the cache and then without the user's options ([start-up recovery](diagn
 - **Native libraries** (macOS, Windows): each is byte-identical to its jar entry and (macOS) validly signed, and a
   headless probe with the image's runtime, options and class path loads them from `native/` and extracts nothing.
 - **macOS**: the three bridges (architecture, signature, exported JNI symbols); `Info.plist` identifier
-  `dev.jasper.app`, version, Local Network text, [document types](#macos-open-with) and
-  [URL types](#macos-web-links); the icon file and catalog;
+  `dev.jasper.app`, version, the Local Network, [camera and microphone](#macos-camera-and-microphone) texts,
+  [document types](#macos-open-with) and [URL types](#macos-web-links); the icon file and catalog;
   the launcher's app-specific UUID; Chromium's framework and `jcef Helper` apps in
   `Contents/runtime/Contents/Frameworks/cef_server.app`, the renderer helper signed by JetBrains (team `2ZEFAR8TH3`);
   `codesign --verify --deep --strict` of the runtime bundle and of the app; a trained cache accepted by
@@ -312,6 +312,13 @@ reliable permission tracking, which the ad-hoc signature is not
 [TN3178](https://developer.apple.com/documentation/technotes/tn3178-checking-for-and-resolving-build-uuid-problems)).
 Command-line tools started from Apple's Terminal are exempt from the permission, so a working
 `./gradlew :jasper-app:run` there does not show that the packaged app has it.
+
+### macOS camera and microphone
+
+A web page in the Browser that the user allows opens the camera or the microphone, and macOS ends a process that does
+so without a usage description in its `Info.plist`. `packageApp` sets `NSCameraUsageDescription` to "Web pages in
+Jasper's browser use your camera only when you allow it." and `NSMicrophoneUsageDescription` to "Web pages in Jasper's
+browser use your microphone only when you allow it." for macOS's prompts.
 
 ### macOS Open With
 

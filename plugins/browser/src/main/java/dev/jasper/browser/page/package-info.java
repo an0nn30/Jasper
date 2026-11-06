@@ -25,11 +25,15 @@
  * {@code PageText} reads it with {@code selection.js} in the same isolated world
  * ({@link dev.jasper.browser.page.Page#selectedText}).
  * {@link dev.jasper.browser.page.DialogPlace} is where the {@code dialogs} package shows a page's dialogs, as its item
- * gives it. {@code PageMenu} is the client's one context-menu handler: Jasper shows the page's right-click menu,
- * {@code PageMenuItems} for what is under the pointer, at the {@link dev.jasper.browser.page.MenuPlace} the item gives,
- * over its tab, and Chromium shows none; its View Source reads the page's HTML through {@code Page.source}, and its
- * Inspect Element opens the page's {@link dev.jasper.browser.page.DevTools}: a canvas of their own, which the page
- * makes, and Chromium's DevTools browser, which the page's browser makes, on the page's client.
+ * gives it. {@code MediaAccess} is the client's one permission handler: a page's camera and microphone requests are its
+ * top-level site's, as the {@code permissions} package names it, and go through the page's
+ * {@link dev.jasper.browser.page.PagePrivacy} to its item, which answers them; screen capture, and any request of a
+ * browser that is no page's, are cancelled. {@code PageMenu} is the client's one context-menu handler: Jasper shows
+ * the page's right-click menu, {@code PageMenuItems} for what is under the pointer, at the
+ * {@link dev.jasper.browser.page.MenuPlace} the item gives, over its tab, and Chromium shows none; its View Source
+ * reads the page's HTML through {@code Page.source}, and its Inspect Element opens the page's
+ * {@link dev.jasper.browser.page.DevTools}: a canvas of their own, which the page makes, and Chromium's DevTools
+ * browser, which the page's browser makes, on the page's client.
  * Each main-frame load start reaches its page with how the load reached it, the {@code store} package's
  * {@link dev.jasper.browser.store.Reached}, read from Chromium's transition, for its item's history
  * ({@link dev.jasper.browser.page.Page#onVisit}).

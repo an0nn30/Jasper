@@ -34,12 +34,12 @@ import org.cef.browser.CefRequestContext;
 /**
  * One page as its item drives it, in plain types: the canvas it is drawn on, where it is, its title and favicon,
  * whether it loads, where it can go and its history, its find in page, its zoom, its failed loads and the certificates
- * it may go on past, the HTML it shows, what the user selects in it, its {@link DevTools}, and what it is asked to do. Its
- * Chromium browser is made only once {@link #start} asks for it, the first time its item shows; until then the page
- * holds the address it will load and the zoom it will show at, and asks nothing of Chromium. Its browser is made in its
- * browsing group's {@link PageContext}: Chromium's global context, or a /dev/null group's own in memory. Every method
- * runs on the UI thread, and so does every callback it makes, except where a method says otherwise. This is the one
- * class that makes a {@link PageView}: the page's, and each of its DevTools'.
+ * it may go on past, the HTML it shows, what the user selects in it, its {@link DevTools}, its {@link PagePrivacy} hooks,
+ * and what it is asked to do. Its Chromium browser is made only once {@link #start} asks for it, the first time its item
+ * shows; until then the page holds the address it will load and the zoom it will show at, and asks nothing of Chromium.
+ * Its browser is made in its browsing group's {@link PageContext}: Chromium's global context, or a /dev/null group's
+ * own in memory. Every method runs on the UI thread, and so does every callback it makes, except where a method says
+ * otherwise. This is the one class that makes a {@link PageView}: the page's, and each of its DevTools'.
  */
 public final class Page implements AutoCloseable {
     /** The longest {@link #source} waits for Chromium's HTML. */
@@ -48,6 +48,7 @@ public final class Page implements AutoCloseable {
     static final int TITLE_READ_MILLIS = 250;
     private static final System.Logger LOG = System.getLogger(Page.class.getName());
     private final PageView view = new PageView();
+    private final PagePrivacy privacy = new PagePrivacy();
     private final Runnable changed;
     private final Favicons favicons;
     // Where the answers of the page's DevTools runs are read: the plugin's background executor.
@@ -192,11 +193,20 @@ public final class Page implements AutoCloseable {
     }
 
     /**
+     * The page's privacy hooks, through which its site's camera and microphone requests reach its item. Any thread.
+     *
+     * @return the hooks, the same each time
+     */
+    public PagePrivacy privacy() {
+        return privacy;
+    }
+
+    /**
      * Makes the page's browser: asks {@code chromium} for its client, starting Chromium when no page has yet, and for its
      * group's request context, and makes the browser in that context once the client, the context and what
      * {@link #makeAfter} gave are all ready, which then loads what the page was last asked to. Only the browser waits for
-     * them: Chromium's start waits for none. The client's display, load, keyboard and context-menu handlers are installed
-     * before any page is made on it. Once; nothing after {@link #close()}.
+     * them: Chromium's start waits for none. The client's display, load, keyboard, context-menu and permission handlers
+     * are installed before any page is made on it. Once; nothing after {@link #close()}.
      *
      * @param chromium the plugin's Chromium
      */
@@ -206,6 +216,7 @@ public final class Page implements AutoCloseable {
         started = true;
         PageEvents.prepare(chromium);
         PageMenu.prepare(chromium);
+        MediaAccess.prepare(chromium);
         CompletableFuture<CefClient> client = chromium.client();
         CompletableFuture<CefRequestContext> inContext = context.context(chromium);
         // What the item waits for counts once done, however it ended.
@@ -1064,6 +1075,7 @@ public final class Page implements AutoCloseable {
         itemShower = () -> { };
         dialogPlace = null;
         menuPlace = null;
+        privacy.close();
         dropFaviconFetch();
         titleRead.stop();
         if (find != null) find.close();

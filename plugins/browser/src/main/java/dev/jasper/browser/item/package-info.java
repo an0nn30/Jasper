@@ -15,7 +15,8 @@
  * its own request context and history and bookmarks in memory, which closes with the last item of the group; the links
  * and popups an item's page opens open in its store, and Jasper's pages answer from the store of the browser that asks.
  * Each store keeps its site permissions through the {@code permissions} package, and the menu button's
- * {@code PrivacyMenu} resets those of the page's site.
+ * {@code PrivacyMenu} resets those of the page's site. An item's {@code SitePermissions} answers its page's camera and
+ * microphone requests from its store, or with the {@code dialogs} package's prompt.
  * View Source shows
  * {@link dev.jasper.browser.item.SourcePage}, a page's source fetched again through the {@code http} package or as the
  * item's {@code SourcePages} captured it; both take the theme's colours and their tokens from the {@code pages}

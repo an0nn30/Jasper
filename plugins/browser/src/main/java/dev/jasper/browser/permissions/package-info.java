@@ -5,6 +5,6 @@
  * page's address belongs to, and {@link dev.jasper.browser.permissions.PermissionStore} keeps one data store's decisions,
  * a {@link dev.jasper.browser.permissions.Grant} for each, in the {@code permissions} table of that store's database,
  * read from a cache on any thread. Depends on the {@code store} package's database, the SDK and the JDK; it names no
- * Chromium type, and no type of the {@code page}, {@code item} or {@code pages} packages, which use it.
+ * Chromium type, and no type of the {@code page}, {@code dialogs}, {@code item} or {@code pages} packages, which use it.
  */
 package dev.jasper.browser.permissions;
