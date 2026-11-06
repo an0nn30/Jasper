@@ -34,7 +34,8 @@ import org.cef.network.CefCookieManager;
  * {@link ChromiumApp} makes for it alone (F20), so no page's handler sees it: an off-screen browser at
  * {@code about:blank} with a 1 by 1 view, which clears the browser cache through its DevTools, then each origin's
  * storage ({@code Storage.clearDataForOrigin}, every storage type), with at most 8 calls in flight, each bounded by 5
- * seconds as {@code PageText}'s are, and closes once done. Every call is made on the UI thread while Chromium runs, and
+ * seconds as {@code PageText}'s are, and closes once done; a site whose storage cannot be cleared blocks no other, and is
+ * left to the next start's wipe (V26). Every call is made on the UI thread while Chromium runs, and
  * none once it has stopped. Loaded only while Chromium runs.
  */
 final class ProfileClearing {
@@ -42,6 +43,7 @@ final class ProfileClearing {
     static final Duration CALL_LIMIT = Duration.ofSeconds(5);
     /** The most DevTools calls in flight at once. */
     static final int IN_FLIGHT = 8;
+    private static final System.Logger LOG = System.getLogger(ProfileClearing.class.getName());
     // A cookie's domain as a web site's host: letters, digits, hyphens and underscores in dot-separated labels.
     private static final Pattern DOMAIN = Pattern.compile("[a-z0-9_-]+(?:\\.[a-z0-9_-]+)*");
 
@@ -167,8 +169,9 @@ final class ProfileClearing {
      * @param running whether Chromium still runs
      * @param limit how long each call may take
      * @param inFlight the most calls in flight
-     * @return completes once every call has answered; fails with the first call that failed, was late, threw or answered
-     *     nothing, and once Chromium has stopped; completed by the caller, it makes no further call
+     * @return completes once every call has answered, a site's that failed, was late, threw or answered nothing logged for
+     *     debugging and left to the next start's wipe (V26); fails when the cache's call does, and once Chromium has
+     *     stopped; completed by the caller, it makes no further call
      */
     static CompletableFuture<Void> clearOrigins(BiFunction<String, String, CompletableFuture<String>> devTools, List<String> origins,
                                                 Executor ui, BooleanSupplier running, Duration limit, int inFlight) {
@@ -217,8 +220,10 @@ final class ProfileClearing {
                 call("Storage.clearDataForOrigin", "{\"origin\":" + StrictJson.quote(origin) + ",\"storageTypes\":\"all\"}")
                     .whenComplete((answer, failure) -> ui.execute(() -> {
                         inFlight--;
-                        if (failure != null) cleared.completeExceptionally(failure);
-                        else next();
+                        // V26: one site blocks no other; the next start's wipe clears it. The site is not logged.
+                        if (failure != null)
+                            LOG.log(System.Logger.Level.DEBUG, "A site's storage could not be cleared; the next start's wipe clears it", failure);
+                        next();
                     }));
             }
             if (inFlight == 0 && !left.hasNext()) cleared.complete(null);

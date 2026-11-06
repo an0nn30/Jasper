@@ -24,17 +24,21 @@ import java.util.function.Supplier;
  * by section, as the generated page grouped them, and in Privacy &amp; Data, after them, iTerm2's Clear All Cookies,
  * Clear Website Data and Manage Site Permissions. Each clearing asks first, through the plugin's prompt, and runs only
  * once the user accepts; Clear Website Data tells its success once the clearing has completed, and a clearing that
- * fails is told by the clearing itself. Manage Permissions opens the persistent store's site permissions page. UI
- * thread.
+ * fails is told by the clearing itself. Each clearing runs once at a time: while it runs, its button is busy and asks
+ * nothing. Manage Permissions opens the persistent store's site permissions page. UI thread.
  */
 public final class BrowserSettingsPanel implements SettingsPanel {
     static final String PAGE = "browser.settings", CLEAR_COOKIES = "browser.settings.clear-cookies",
         CLEAR_DATA = "browser.settings.clear-data", PERMISSIONS = "browser.settings.permissions";
     private static final String COOKIES_TITLE = "Clear Cookies", COOKIES_QUESTION = "This will remove all cookies from all websites. Continue?";
-    // iTerm2's text, with what the next start's wipe does to sign-ins made before it (the user's V1).
-    private static final String DATA_TITLE = "Clear Website Data", DATA_QUESTION = "This will remove all browsing data including cookies, "
-        + "cache, and local storage. The next time Jasper starts, it also signs you out of any site you sign in to before then. Continue?",
+    // iTerm2's text, naming all it deletes (ruling V24), with what the next start's wipe does to sign-ins made before it
+    // (the user's V1).
+    private static final String DATA_TITLE = "Clear Website Data", DATA_QUESTION = "This will remove all browsing data including history, "
+        + "bookmarks, site permissions, cookies, cache and local storage. The next time Jasper starts, it also signs you out of any site "
+        + "you sign in to before then. Continue?",
         DATA_CLEARED = "All website data has been cleared successfully!";
+    // A clearing's button while it runs: busy, and pressed it does nothing.
+    private static final ControlState CLEARING = new ControlState(true, false, true, "");
     private static final String PERMISSIONS_DESCRIPTION =
         "View and revoke permissions granted to websites (camera, microphone, notifications, audio playback).";
 
@@ -82,6 +86,8 @@ public final class BrowserSettingsPanel implements SettingsPanel {
     private SettingsPanelHost host;
     private UiView view;
     private String query = "";
+    // The clearings under way, which outlive an opening of Settings; null before the first.
+    private CompletableFuture<Void> cookiesClearing, dataClearing;
 
     /**
      * The page over {@code settings}, whose buttons do {@code actions}.
@@ -123,18 +129,47 @@ public final class BrowserSettingsPanel implements SettingsPanel {
     private void event(UiEvent event) {
         if (view == null || !(event instanceof UiEvent.Action action)) return;
         switch (action.id()) {
-            case CLEAR_COOKIES -> actions.show().accept(new Prompt(COOKIES_TITLE, COOKIES_QUESTION, true, () -> actions.clearCookies().get()));
-            case CLEAR_DATA -> actions.show().accept(new Prompt(DATA_TITLE, DATA_QUESTION, true, this::clearWebsiteData));
+            case CLEAR_COOKIES -> {
+                if (!running(cookiesClearing)) actions.show().accept(new Prompt(COOKIES_TITLE, COOKIES_QUESTION, true, this::clearCookies));
+            }
+            case CLEAR_DATA -> {
+                if (!running(dataClearing)) actions.show().accept(new Prompt(DATA_TITLE, DATA_QUESTION, true, this::clearWebsiteData));
+            }
             case PERMISSIONS -> actions.managePermissions().run();
             default -> { }
         }
     }
 
-    /** Clears the website data, and tells its success once it has completed; a failure is the clearing's to tell. */
+    /** Clears the cookies, unless a clearing of them runs. UI thread. */
+    private void clearCookies() {
+        if (running(cookiesClearing)) return;
+        CompletableFuture<Void> clearing = actions.clearCookies().get();
+        cookiesClearing = clearing;
+        follow(clearing);
+    }
+
+    /**
+     * Clears the website data, unless a clearing of it runs, and tells its success once it has completed; a failure is
+     * the clearing's to tell. UI thread.
+     */
     private void clearWebsiteData() {
-        actions.clearWebsiteData().get().whenComplete((cleared, failure) -> {
+        if (running(dataClearing)) return;
+        CompletableFuture<Void> clearing = actions.clearWebsiteData().get();
+        dataClearing = clearing;
+        clearing.whenComplete((cleared, failure) -> {
             if (failure == null) EventQueue.invokeLater(() -> actions.show().accept(new Prompt(DATA_TITLE, DATA_CLEARED, false, () -> { })));
         });
+        follow(clearing);
+    }
+
+    /** Shows {@code clearing}'s button busy until it has ended. */
+    private void follow(CompletableFuture<Void> clearing) {
+        render();
+        clearing.whenComplete((cleared, failure) -> EventQueue.invokeLater(this::render));
+    }
+
+    private static boolean running(CompletableFuture<Void> clearing) {
+        return clearing != null && !clearing.isDone();
     }
 
     private void render() {
@@ -147,9 +182,9 @@ public final class BrowserSettingsPanel implements SettingsPanel {
             var rows = new ArrayList<Nodes.Node>();
             for (Setting<?> setting : section.settings()) rows.add(host.row(setting));
             if (section.title().equals(BrowserSettings.PRIVACY)) {
-                rows.add(row(CLEAR_COOKIES, "Clear All Cookies", "", "Clear Cookies"));
-                rows.add(row(CLEAR_DATA, "Clear Website Data", "", "Clear All Data"));
-                rows.add(row(PERMISSIONS, "Manage Site Permissions", PERMISSIONS_DESCRIPTION, "Manage Permissions"));
+                rows.add(row(CLEAR_COOKIES, "Clear All Cookies", "", "Clear Cookies", running(cookiesClearing)));
+                rows.add(row(CLEAR_DATA, "Clear Website Data", "", "Clear All Data", running(dataClearing)));
+                rows.add(row(PERMISSIONS, "Manage Site Permissions", PERMISSIONS_DESCRIPTION, "Manage Permissions", false));
             }
             String id = PAGE + "." + section.title().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-");
             sections.add(new Nodes.Section(id, ControlState.READY, section.title(), new Nodes.Card(id + ".card", ControlState.READY,
@@ -158,9 +193,9 @@ public final class BrowserSettingsPanel implements SettingsPanel {
         return new Nodes.Stack(PAGE, ControlState.READY, Nodes.LayoutRole.SETTINGS_PAGE, sections);
     }
 
-    /** A row of the page's own, arranged as Settings' standard rows, with its button where their control is. */
-    private Nodes.SettingRow row(String id, String title, String description, String button) {
-        var press = new Nodes.Button(id, ControlState.READY, button, "", Nodes.ButtonKind.SECONDARY, id, "");
+    /** A row of the page's own, arranged as Settings' standard rows, with its button where their control is, busy while it runs. */
+    private Nodes.SettingRow row(String id, String title, String description, String button, boolean busy) {
+        var press = new Nodes.Button(id, busy ? CLEARING : ControlState.READY, button, "", Nodes.ButtonKind.SECONDARY, id, "");
         var trailing = new Nodes.Stack(id + ":controls", ControlState.READY, Nodes.LayoutRole.SETTINGS_TRAILING, List.of(press));
         return new Nodes.SettingRow(id + ":row", ControlState.READY, title, description, trailing, false, matches(title, description, button));
     }

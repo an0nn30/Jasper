@@ -798,7 +798,7 @@ class ChromiumStateTest {
         Chromium chromium = chromium(recording, LIMIT);
         var live = live(chromium);
         Path cookies = profile();
-        var cleared = chromium.clearWebsiteData(Set.of("https://a.example"));
+        var cleared = chromium.clearWebsiteData(Set.of("https://a.example"), false);
         assertThat(cleared).as("nothing on the caller's thread").isNotDone();
         assertThat(clearMarker()).doesNotExist();
         assertThat(starts).as("the clearing's work, on the worker").hasSize(1);
@@ -822,7 +822,7 @@ class ChromiumStateTest {
     @Test void aClearingQueuedBeforeTheStartWipesBeforeTheStartEnters() throws Exception {
         Chromium chromium = chromium(recording, LIMIT);
         Path cookies = profile();
-        var cleared = chromium.clearWebsiteData(Set.of());
+        var cleared = chromium.clearWebsiteData(Set.of(), false);
         chromium.client();
         assertThat(starts).as("the clearing, then the start").hasSize(2);
         runNext();
@@ -846,7 +846,7 @@ class ChromiumStateTest {
         runNext();
         assertThat(succeeded(cookiesCleared)).isTrue();
         assertThat(Files.readString(clearMarker())).isEqualTo("cookies");
-        var cleared = chromium.clearWebsiteData(Set.of("https://a.example"));
+        var cleared = chromium.clearWebsiteData(Set.of("https://a.example"), false);
         runNext();
         assertThat(succeeded(cleared)).isTrue();
         assertThat(Files.readString(clearMarker())).as("all wins").isEqualTo("all");
@@ -866,7 +866,7 @@ class ChromiumStateTest {
         Chromium chromium = chromium(recording, LIMIT);
         var live = live(chromium);
         startEntered(chromium);
-        var cleared = chromium.clearWebsiteData(Set.of("https://a.example"));
+        var cleared = chromium.clearWebsiteData(Set.of("https://a.example"), false);
         runNext();
         assertThat(Files.readString(clearMarker())).isEqualTo("all");
         flushUi();
@@ -887,7 +887,7 @@ class ChromiumStateTest {
         Chromium chromium = chromium(recording, LIMIT);
         var live = live(chromium);
         startEntered(chromium);
-        var cleared = chromium.clearWebsiteData(Set.of("https://a.example"));
+        var cleared = chromium.clearWebsiteData(Set.of("https://a.example"), false);
         var cookiesCleared = chromium.clearCookies();
         runNext();
         runNext();
@@ -907,7 +907,7 @@ class ChromiumStateTest {
         Chromium chromium = chromium(recording, LIMIT);
         var live = live(chromium);
         startEntered(chromium);
-        var cleared = chromium.clearWebsiteData(Set.of("https://a.example"));
+        var cleared = chromium.clearWebsiteData(Set.of("https://a.example"), false);
         runNext();
         EventQueue.invokeAndWait(chromium::close);
         await(cleared);
@@ -928,7 +928,7 @@ class ChromiumStateTest {
         chromium.clearsWithin(Duration.ofMillis(100));
         live(chromium);
         startEntered(chromium);
-        var cleared = chromium.clearWebsiteData(Set.of());
+        var cleared = chromium.clearWebsiteData(Set.of(), false);
         runNext();
         assertThat(failure(await(cleared))).isInstanceOf(TimeoutException.class).hasMessage("Chromium did not clear its data within 60 seconds");
         end(chromium);
@@ -952,7 +952,7 @@ class ChromiumStateTest {
         assertThat(succeeded(cookiesCleared)).isTrue();
         assertThat(clearMarker()).doesNotExist();
 
-        var cleared = chromium.clearWebsiteData(Set.of("https://a.example"));
+        var cleared = chromium.clearWebsiteData(Set.of("https://a.example"), false);
         runNext();
         await(cleared);
         assertThat(live).hasSize(3).endsWith("storage on the UI thread: [http://b.example, http://c.example, https://a.example, "
@@ -1026,8 +1026,11 @@ class ChromiumStateTest {
         end(later);
     }
 
-    /** Cookies that cannot be deleted as Chromium starts keep their marker for the next start, and Chromium goes on. */
-    @Test void markedCookiesThatCannotBeDeletedKeepTheirMarkerAndTheStartGoesOn() throws Exception {
+    /**
+     * Review round 1's item 8: cookies that cannot be deleted as Chromium starts are not left silently: the marker becomes
+     * a wipe at the next start, the failure is told as Clear Cookies' own, and Chromium goes on.
+     */
+    @Test void markedCookiesThatCannotBeDeletedMarkAWipeAreToldAndTheStartGoesOn() throws Exception {
         var chromiumLog = Logger.getLogger(Chromium.class.getName());
         var logged = new CopyOnWriteArrayList<String>();
         var listening = new Handler() {
@@ -1041,17 +1044,108 @@ class ChromiumStateTest {
         try {
             ProfileWipe.mark(data, ProfileWipe.Mark.COOKIES);
             Chromium chromium = chromium(recording, LIMIT);
+            var toldOf = new CopyOnWriteArrayList<String>();
+            chromium.onClearFailed(cause -> toldOf.add(cause.getMessage() + (EventQueue.isDispatchThread() ? " on the UI thread" : "")));
             startEntered(chromium);
             var gate = chromium.beforeClient(() -> CompletableFuture.failedFuture(new IllegalStateException("refused")));
-            assertThat(succeeded(gate)).isTrue();
-            assertThat(starts).as("no marker to take back").isEmpty();
-            assertThat(Files.readString(clearMarker())).isEqualTo("cookies");
+            assertThat(succeeded(gate)).as("the start goes on").isTrue();
+            runNext(); // the wipe marked, on the worker
+            assertThat(Files.readString(clearMarker())).as("the next start wipes").isEqualTo("all");
+            flushUi();
+            assertThat(toldOf).containsExactly("refused on the UI thread");
             assertThat(logged).singleElement().asString().startsWith("WARNING Chromium could not delete the cookies Clear Cookies left");
             end(chromium);
         } finally {
             chromiumLog.removeHandler(listening);
             chromiumLog.setUseParentHandlers(parents);
         }
+    }
+
+    /**
+     * Review round 1's item 5: a profile whose wipe could not move it keeps its marker, and Chromium starts with it as
+     * usual (V1); its cookies still go before the client is made, as a Clear Cookies' would.
+     */
+    @Test void aProfileTheWipeCouldNotMoveHasItsCookiesDeletedBeforeTheClient() throws Exception {
+        Path cookies = profile();
+        ProfileWipe.mark(data, ProfileWipe.Mark.ALL);
+        Chromium chromium = chromium(recording, LIMIT);
+        chromium.wipesWith(new ProfileWipe.Disk() {
+            @Override public void move(Path from, Path to) throws java.io.IOException {
+                throw new java.nio.file.FileSystemException(from.toString(), to.toString(), "in use");
+            }
+        });
+        var wipeLog = Logger.getLogger(ProfileWipe.class.getName());
+        boolean parents = wipeLog.getUseParentHandlers();
+        wipeLog.setUseParentHandlers(false);
+        try {
+            startEntered(chromium);
+        } finally {
+            wipeLog.setUseParentHandlers(parents);
+        }
+        assertThat(cookies).as("kept whole").isRegularFile();
+        var asked = new AtomicInteger();
+        var gate = chromium.beforeClient(() -> {
+            asked.incrementAndGet();
+            return CompletableFuture.completedFuture(Set.of());
+        });
+        assertThat(asked).as("the cookies go all the same").hasValue(1);
+        assertThat(succeeded(gate)).isTrue();
+        runNext();
+        assertThat(Files.readString(clearMarker())).as("the wipe stays marked").isEqualTo("all");
+        end(chromium);
+    }
+
+    /**
+     * Review round 1's item 12: a close between the cookies' deletion and the storage's clearing touches nothing more:
+     * the storage is never asked, and the marker waits for the next start.
+     */
+    @Test void aCloseBetweenTheCookiesAndTheStorageTouchesNothingMore() throws Exception {
+        Chromium chromium = chromium(recording, LIMIT);
+        var deleting = new CompletableFuture<Set<String>>();
+        var storage = new AtomicInteger();
+        chromium.clearLiveWith(() -> deleting, origins -> {
+            storage.incrementAndGet();
+            return CompletableFuture.completedFuture(null);
+        });
+        startEntered(chromium);
+        EventQueue.invokeAndWait(() -> chromium.clientCreated(null));
+        var cleared = chromium.clearWebsiteData(Set.of("https://a.example"), false);
+        runNext();
+        flushUi();
+        assertThat(cleared).as("the cookies are being deleted").isNotDone();
+        EventQueue.invokeAndWait(chromium::close);
+        deleting.complete(Set.of(".b.example"));
+        await(cleared);
+        flushUi();
+        assertThat(succeeded(cleared)).isTrue();
+        assertThat(storage).as("nothing native after the close").hasValue(0);
+        assertThat(Files.readString(clearMarker())).isEqualTo("all");
+        chromium.terminated();
+    }
+
+    /**
+     * Ruling V25: a clearing whose database ran in memory marks the database for the next start with the wipe; before
+     * any start the profile is wiped at once, and the database's mark stays until the database's files go.
+     */
+    @Test void aClearingThatMarksTheDatabaseKeepsThatMarkPastTheProfilesWipe() throws Exception {
+        Chromium chromium = chromium(recording, LIMIT);
+        Path cookies = profile();
+        var cleared = chromium.clearWebsiteData(Set.of(), true);
+        runNext();
+        assertThat(succeeded(cleared)).isTrue();
+        assertThat(cookies).doesNotExist();
+        assertThat(Files.readString(clearMarker())).isEqualTo("database");
+
+        var live = live(chromium);
+        startEntered(chromium);
+        EventQueue.invokeAndWait(() -> chromium.clientCreated(null));
+        var again = chromium.clearWebsiteData(Set.of(), true);
+        runNext();
+        await(again);
+        assertThat(succeeded(again)).isTrue();
+        assertThat(live).hasSize(2);
+        assertThat(Files.readString(clearMarker())).isEqualTo("all database");
+        end(chromium);
     }
 
     /**

@@ -71,7 +71,7 @@ public final class PermissionsPage {
                     yield changed(permissions.revoke(origin, type.get()), reload);
                 }
                 case "clear-site" -> asked.get("origin") instanceof String origin ? changed(permissions.clearSite(origin), reload) : notUnderstood();
-                case "clear-all" -> changed(permissions.clearAll(), reload);
+                case "clear-all" -> changed(permissions.clearAll().sites(), reload);
                 default -> notUnderstood();
             };
         } catch (RuntimeException failure) {

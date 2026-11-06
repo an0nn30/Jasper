@@ -5,6 +5,7 @@ import dev.jasper.browser.settings.BrowserSettingsPanel.Prompt;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.testing.FakeKitView;
 import dev.jasper.sdk.testing.FakePluginHost;
+import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.UiEvent;
 import java.awt.EventQueue;
@@ -104,9 +105,9 @@ class BrowserSettingsPanelTest {
             assertThat(prompts).hasSize(2);
             Prompt asked = prompts.get(1);
             assertThat(asked.title()).isEqualTo("Clear Website Data");
-            assertThat(asked.message()).as("iTerm2's text, with the next start's sign-out (V1)").isEqualTo(
-                "This will remove all browsing data including cookies, cache, and local storage. The next time Jasper starts, "
-                    + "it also signs you out of any site you sign in to before then. Continue?");
+            assertThat(asked.message()).as("V24: all it deletes, with the next start's sign-out (V1)").isEqualTo(
+                "This will remove all browsing data including history, bookmarks, site permissions, cookies, cache and local "
+                    + "storage. The next time Jasper starts, it also signs you out of any site you sign in to before then. Continue?");
             assertThat(asked.question()).isTrue();
             assertThat(ran).containsExactly("cookies");
             asked.accepted().run();
@@ -164,6 +165,51 @@ class BrowserSettingsPanelTest {
         flushUi();
         assertThat(prompts).as("Clear Cookies tells nothing after").hasSize(4);
         assertThat(host.failures()).isEmpty();
+    }
+
+    /**
+     * Review round 1's item 9: one clearing of each kind at a time. While one runs, its button is busy and a press of it
+     * asks nothing; once it has ended, failed or not, the button is ready again.
+     */
+    @Test void aClearingThatRunsIgnoresItsButtonUntilItHasEnded() throws Exception {
+        onUi(() -> {
+            FakeKitView view = page();
+            view.emit(new UiEvent.Action(BrowserSettingsPanel.CLEAR_DATA));
+            prompts.getFirst().accepted().run();
+            assertThat(button(view, BrowserSettingsPanel.CLEAR_DATA).state()).as("busy while it runs").isEqualTo(new ControlState(true, false, true, ""));
+            assertThat(button(view, BrowserSettingsPanel.CLEAR_COOKIES).state()).as("the other clearing is its own").isEqualTo(ControlState.READY);
+            view.emit(new UiEvent.Action(BrowserSettingsPanel.CLEAR_DATA));
+            assertThat(prompts).as("a second press asks nothing").hasSize(1);
+            view.emit(new UiEvent.Action(BrowserSettingsPanel.CLEAR_COOKIES));
+            prompts.get(1).accepted().run();
+            assertThat(button(view, BrowserSettingsPanel.CLEAR_COOKIES).state().busy()).isTrue();
+            view.emit(new UiEvent.Action(BrowserSettingsPanel.CLEAR_COOKIES));
+            assertThat(prompts).hasSize(2);
+        });
+        cookies.completeExceptionally(new IllegalStateException("refused"));
+        data.complete(null);
+        flushUi();
+        onUi(() -> {
+            FakeKitView view = host.settingsPanelView(ID).orElseThrow();
+            assertThat(button(view, BrowserSettingsPanel.CLEAR_DATA).state()).as("ended").isEqualTo(ControlState.READY);
+            assertThat(button(view, BrowserSettingsPanel.CLEAR_COOKIES).state()).as("failed").isEqualTo(ControlState.READY);
+            assertThat(prompts).as("the success").hasSize(3);
+            view.emit(new UiEvent.Action(BrowserSettingsPanel.CLEAR_DATA));
+            assertThat(prompts).as("asks again").hasSize(4);
+            assertThat(ran).containsExactly("data", "cookies");
+        });
+    }
+
+    /** A clearing accepted twice before it shows busy, as from two prompts, runs once. */
+    @Test void aSecondAcceptWhileAClearingRunsRunsNothing() throws Exception {
+        onUi(() -> {
+            FakeKitView view = page();
+            view.emit(new UiEvent.Action(BrowserSettingsPanel.CLEAR_DATA));
+            Prompt first = prompts.getFirst();
+            first.accepted().run();
+            first.accepted().run();
+            assertThat(ran).containsExactly("data");
+        });
     }
 
     @Test void manageSitePermissionsRunsItsActionWithoutAsking() throws Exception {

@@ -11,6 +11,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Consumer;
 
 /**
  * The plugin's data folder, which holds the history and bookmarks ({@code browser.sqlite}) and Chromium's profile, its
@@ -19,8 +20,10 @@ import java.util.Set;
  * others from the folder, keeping the owner's, which leaves {@code rwx------} for the folder the host made; then from
  * {@code browser.sqlite} and its write-ahead log and shared memory, those that exist, as SQLite gives the files it makes
  * beside the database the database's permissions, and the database makes a new {@code browser.sqlite} its owner's
- * alone before SQLite opens it ({@code createOwnerOnly}). It runs on whichever thread needs the folder first: the
- * database's, before the file opens, or Chromium's worker, before Chromium writes there. Permissions that cannot be set
+ * alone before SQLite opens it ({@code createOwnerOnly}). Before it restricts the database's files, it hands them to its
+ * {@code beforeDatabase}, which deletes them when a Clear Website Data that could not erase them marked them (ruling
+ * V25), so the database never opens them. It runs on whichever thread needs the folder first: the database's, before
+ * the file opens, or Chromium's worker, before Chromium writes there. Permissions that cannot be set
  * are logged once, as a warning, and the folder is used all the same. On Windows it does nothing. Making one does no
  * I/O.
  */
@@ -38,6 +41,7 @@ public final class DataFolder {
 
     private final Path folder;
     private final Restriction restriction;
+    private final Consumer<List<Path>> beforeDatabase;
     private boolean restricted; // guarded by this
 
     /**
@@ -46,13 +50,26 @@ public final class DataFolder {
      * @param folder the folder, which need not exist yet
      */
     public DataFolder(Path folder) {
-        this(folder, DataFolder::ownerOnly);
+        this(folder, DataFolder::ownerOnly, files -> { });
     }
 
-    /** As {@link #DataFolder(Path)}, each path made its owner's alone by {@code restriction}. */
-    DataFolder(Path folder, Restriction restriction) {
+    /**
+     * The data folder {@code folder}, whose first {@link #restrict()} hands the database's files to {@code beforeDatabase}
+     * before the database opens them.
+     *
+     * @param folder the folder, which need not exist yet
+     * @param beforeDatabase given the database's file, its write-ahead log and its shared memory, once, on the thread that
+     *     uses the folder first; it deletes them when a clearing marked them
+     */
+    public DataFolder(Path folder, Consumer<List<Path>> beforeDatabase) {
+        this(folder, DataFolder::ownerOnly, beforeDatabase);
+    }
+
+    /** As {@link #DataFolder(Path, Consumer)}, each path made its owner's alone by {@code restriction}. */
+    DataFolder(Path folder, Restriction restriction, Consumer<List<Path>> beforeDatabase) {
         this.folder = Objects.requireNonNull(folder, "folder").toAbsolutePath();
         this.restriction = Objects.requireNonNull(restriction, "restriction");
+        this.beforeDatabase = Objects.requireNonNull(beforeDatabase, "beforeDatabase");
     }
 
     /**
@@ -71,7 +88,7 @@ public final class DataFolder {
 
     /**
      * Makes the folder, if it is missing, and it and the database's files in it its owner's alone, the first time it is
-     * called; later calls do nothing. It does file I/O, so never on the UI thread. Any other thread; a second caller
+     * called, after handing those files to {@code beforeDatabase}; later calls do nothing. It does file I/O, so never on the UI thread. Any other thread; a second caller
      * waits until the first is done.
      */
     public synchronized void restrict() {
@@ -81,8 +98,13 @@ public final class DataFolder {
             Files.createDirectories(folder);
             restriction.apply(folder);
             Path file = database();
-            for (Path made : List.of(file, file.resolveSibling(DATABASE + "-wal"), file.resolveSibling(DATABASE + "-shm")))
-                if (Files.exists(made)) restriction.apply(made);
+            List<Path> files = List.of(file, file.resolveSibling(DATABASE + "-wal"), file.resolveSibling(DATABASE + "-shm"));
+            try {
+                beforeDatabase.accept(files);
+            } catch (RuntimeException failure) {
+                LOG.log(System.Logger.Level.WARNING, "The browser's database files could not be checked for a clearing", failure);
+            }
+            for (Path made : files) if (Files.exists(made)) restriction.apply(made);
         } catch (IOException | RuntimeException failure) {
             LOG.log(System.Logger.Level.WARNING, "The browser's data folder could not be made its owner's alone: " + folder, failure);
         }

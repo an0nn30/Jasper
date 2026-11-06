@@ -225,12 +225,27 @@ public final class PermissionStore {
     }
 
     /**
+     * What {@link #clearAll()} did: the sites a decision was stored for, and the rows' deletion.
+     *
+     * @param sites the sites, which the cache held a decision for
+     * @param written completes once the rows are deleted; fails, the failure already logged and told, when they are not,
+     *     and at once once the store's data store has closed
+     */
+    public record Cleared(Set<String> sites, CompletableFuture<Void> written) {
+        /** Requires both. */
+        public Cleared {
+            sites = Set.copyOf(sites);
+            Objects.requireNonNull(written, "written");
+        }
+    }
+
+    /**
      * Forgets every decision stored. Any thread.
      *
-     * @return the sites a decision was stored for
+     * @return the sites a decision was stored for, and the rows' deletion
      */
-    public Set<String> clearAll() {
-        return change(grants -> {
+    public Cleared clearAll() {
+        Changed changed = change(grants -> {
             Set<String> origins = grants.keySet().stream().map(Key::origin).collect(Collectors.toUnmodifiableSet());
             grants.clear();
             return origins;
@@ -238,7 +253,8 @@ public final class PermissionStore {
             try (var delete = connection.createStatement()) {
                 delete.executeUpdate("DELETE FROM permissions");
             }
-        }).affected();
+        });
+        return new Cleared(changed.affected(), changed.written());
     }
 
     /**

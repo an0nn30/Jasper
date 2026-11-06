@@ -51,6 +51,19 @@ public final class DatabaseFixtures {
     }
 
     /**
+     * Writes {@code browser.sqlite} in {@code folder} as a file that is not a database, so a database asked for it runs in
+     * memory instead.
+     *
+     * @param folder the data folder
+     * @throws Exception if the file cannot be written
+     */
+    public static void notADatabase(Path folder) throws Exception {
+        byte[] noise = new byte[8_192];
+        new java.util.Random(7).nextBytes(noise);
+        java.nio.file.Files.write(folder.resolve(DataFolder.DATABASE), noise);
+    }
+
+    /**
      * A database in memory, its schema made as usual, whose connection throws {@code IllegalStateException} for each
      * statement {@code refused} names, as it is prepared; every other call goes to SQLite.
      *

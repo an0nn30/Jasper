@@ -38,6 +38,9 @@ class WebsiteDataTest {
     @TempDir Path folder;
     private final MemoryStores memory = new MemoryStores();
     private final List<Set<String>> chromiumAsked = new CopyOnWriteArrayList<>();
+    // Whether each of Chromium's clearings was asked to mark the database's file too.
+    private final List<Boolean> databaseMarked = new CopyOnWriteArrayList<>();
+    private final List<Set<String>> reloaded = new CopyOnWriteArrayList<>();
     private final List<String> told = new CopyOnWriteArrayList<>();
     private final List<URI> open = new CopyOnWriteArrayList<>();
     private volatile CompletableFuture<Void> chromium = CompletableFuture.completedFuture(null), cookies = CompletableFuture.completedFuture(null);
@@ -161,12 +164,21 @@ class WebsiteDataTest {
         assertThat(told).isEmpty();
     }
 
-    /** A clearing that fails posts "Website data could not be cleared" with its cause, and the database is not erased. */
-    @Test void aFailedClearingIsToldAndErasesNothing() throws Exception {
+    /**
+     * Ruling V26: a Chromium clearing that fails, as past its bound, still has the database's rows erased once it has
+     * ended, and the failure is told as "Website data could not be cleared" with its cause.
+     */
+    @Test void aFailedChromiumClearingStillErasesTheDatabaseAndIsTold() throws Exception {
         DataStore persistent = persistent(memory.make());
         done(persistent.stores().history().record("https://kept.example/", Reached.LINK, 1_000));
-        chromium = CompletableFuture.failedFuture(new java.util.concurrent.TimeoutException("Chromium did not clear its data within 60 seconds"));
+        done(persistent.stores().bookmarks().add("https://kept.example/", "Kept", 1_000));
+        done(persistent.permissions().set("https://kept.example", Permission.CAMERA, Decision.ALLOWED));
+        chromium = new CompletableFuture<>();
         CompletableFuture<Void> cleared = onUi(() -> data(persistent).clearAll());
+        await(() -> !chromiumAsked.isEmpty());
+        memory.settle();
+        assertThat(done(persistent.stores().history().visits(10))).as("Chromium's clearing has not ended").hasSize(1);
+        chromium.completeExceptionally(new java.util.concurrent.TimeoutException("Chromium did not clear its data within 60 seconds"));
         assertThat(failure(cleared)).hasMessage("Chromium did not clear its data within 60 seconds");
         flushUi();
         assertThat(told).containsExactly("Website data could not be cleared|Chromium did not clear its data within 60 seconds");
@@ -174,7 +186,73 @@ class WebsiteDataTest {
             assertThat(record.getLevel()).isEqualTo(java.util.logging.Level.WARNING);
             assertThat(record.getMessage()).isEqualTo("Website data could not be cleared");
         });
-        assertThat(done(persistent.stores().history().visits(10))).as("not erased").hasSize(1);
+        assertThat(done(persistent.stores().history().visits(10))).as("erased all the same").isEmpty();
+        assertThat(done(persistent.stores().bookmarks().all())).isEmpty();
+        assertThat(persistent.permissions().all()).isEmpty();
+    }
+
+    /** Review round 1's item 1: the pages showing a site whose permission went load again, as the permissions page has them. */
+    @Test void clearingThePermissionsReloadsThePagesOfTheirSites() throws Exception {
+        DataStore persistent = persistent(memory.make());
+        done(persistent.permissions().set("https://camera.example", Permission.CAMERA, Decision.ALLOWED));
+        done(persistent.permissions().set("https://sound.example", Permission.AUDIO_PLAYBACK, Decision.BLOCKED));
+        done(onUi(() -> data(persistent).clearAll()));
+        flushUi();
+        assertThat(reloaded).singleElement().asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.collection(String.class))
+            .containsExactlyInAnyOrder("https://camera.example", "https://sound.example");
+        done(onUi(() -> data(persistent).clearAll()));
+        flushUi();
+        assertThat(reloaded).as("no site's permission went: nothing loads again").hasSize(1);
+    }
+
+    /**
+     * Ruling V25: a database that runs in memory, as its file could not be used, hides its file's rows: the clearing
+     * erases what it can, has the file marked for deletion with the next start's wipe, and fails, told with why.
+     */
+    @Test void aDatabaseRunningInMemoryMarksItsFileAndFailsTheClearing() throws Exception {
+        Path data = Files.createDirectories(folder.resolve("data"));
+        dev.jasper.browser.store.DatabaseFixtures.notADatabase(data);
+        var unavailable = new CopyOnWriteArrayList<Throwable>();
+        plugins = new Stores(BrowserDatabase.file(new DataFolder(data), unavailable::add), EventQueue::invokeLater);
+        DataStore persistent = persistent(plugins);
+        done(plugins.history().record("https://memory.example/", Reached.LINK, 1_000));
+        assertThat(unavailable).as("the file could not be used").hasSize(1);
+        CompletableFuture<Void> cleared = onUi(() -> data(persistent).clearAll());
+        assertThat(failure(cleared)).hasMessage(WebsiteData.IN_MEMORY);
+        assertThat(databaseMarked).as("the file is marked for the next start").containsExactly(true);
+        assertThat(done(plugins.history().visits(10))).as("what is in memory is erased").isEmpty();
+        flushUi();
+        assertThat(told).containsExactly("Website data could not be cleared|" + WebsiteData.IN_MEMORY);
+        assertThat(data.resolve("browser.sqlite")).as("deleted at the next start, before the database opens").isRegularFile();
+
+        databaseMarked.clear();
+        told.clear();
+        onUi(() -> {
+            stores.close();
+            return null;
+        });
+        DataStore memoryOnly = persistent(memory.make());
+        done(onUi(() -> data(memoryOnly).clearAll()));
+        assertThat(databaseMarked).as("a database never asked for a file marks none").containsExactly(false);
+    }
+
+    /** Review round 1's item 7: a permissions table whose rows cannot be deleted fails the clearing. */
+    @Test void aPermissionsDeleteThatFailsFailsTheClearing() throws Exception {
+        DataStore persistent = persistent(memory.make());
+        done(persistent.permissions().set("https://camera.example", Permission.CAMERA, Decision.ALLOWED));
+        done(persistent.stores().database().call(connection -> {
+            try (var statement = connection.createStatement()) {
+                statement.execute("CREATE TEMP TRIGGER refused BEFORE DELETE ON permissions BEGIN SELECT RAISE(ABORT, 'refused'); END");
+            }
+            return null;
+        }));
+        try (var permissionsLog = new CapturedLog(dev.jasper.browser.permissions.PermissionStore.class.getName())) {
+            CompletableFuture<Void> cleared = onUi(() -> data(persistent).clearAll());
+            assertThat(failure(cleared)).isInstanceOf(java.sql.SQLException.class).hasMessageContaining("refused");
+            flushUi();
+            assertThat(told).singleElement().asString().startsWith("Website data could not be cleared|");
+            assertThat(permissionsLog.records()).as("the store's own warning").hasSize(1);
+        }
     }
 
     /**
@@ -217,15 +295,16 @@ class WebsiteDataTest {
         });
     }
 
-    /** The clearing of {@code persistent}, with Chromium's two clearings recorded. */
+    /** The clearing of {@code persistent}, with Chromium's two clearings and the reloads recorded. */
     private WebsiteData data(DataStore persistent) {
         return new WebsiteData(() -> {
             cookiesAsked++;
             return cookies;
-        }, origins -> {
+        }, (origins, database) -> {
             chromiumAsked.add(Set.copyOf(origins));
+            databaseMarked.add(database);
             return chromium;
-        }, persistent, () -> List.copyOf(open), Runnable::run, (title, cause) -> told.add(title + "|" + cause.getMessage()));
+        }, persistent, () -> List.copyOf(open), reloaded::add, Runnable::run, (title, cause) -> told.add(title + "|" + cause.getMessage()));
     }
 
     /** Whether the database's file or its log holds the marker's bytes. */

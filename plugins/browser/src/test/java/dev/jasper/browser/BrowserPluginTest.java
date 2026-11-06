@@ -547,6 +547,28 @@ class BrowserPluginTest {
         } });
     }
 
+    /**
+     * Ruling V25: a database file a Clear Website Data could not reach, as the database ran in memory, is deleted before
+     * the plugin's database next opens; the profile's wipe stays marked for Chromium's start.
+     */
+    @Test void aDatabaseFileAClearingMarkedIsDeletedBeforeThePluginsDatabaseOpens(@TempDir Path root) throws Exception {
+        Path data = Files.createDirectories(root.resolve(ID).resolve("data"));
+        dev.jasper.browser.store.DatabaseFixtures.plan5(data, "https://cleared.example/");
+        Files.writeString(data.resolve("chromium-clear"), "all database");
+        var plugin = new BrowserPlugin();
+        var host = new AtomicReference<FakePluginHost>();
+        SwingUtilities.invokeAndWait(() -> {
+            host.set(new FakePluginHost(root));
+            host.get().start(INFO, Set.of(), Set.of(), plugin);
+        });
+        try {
+            assertThat(plugin.stores().history().list("", Optional.empty(), 10).get(10, TimeUnit.SECONDS).entries()).as("a new file").isEmpty();
+            assertThat(Files.readString(data.resolve("chromium-clear"))).isEqualTo("all");
+        } finally {
+            SwingUtilities.invokeAndWait(() -> host.get().close());
+        }
+    }
+
     /** A clearing that failed posts its error with the reason, while the plugin runs. */
     @Test void aClearingThatFailedPostsAnErrorWhileThePluginRuns() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {

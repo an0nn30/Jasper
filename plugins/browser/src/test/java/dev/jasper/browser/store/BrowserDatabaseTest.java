@@ -286,7 +286,7 @@ class BrowserDatabaseTest {
 
     /** H37: a folder whose permissions cannot be set is logged once, as a warning, and the database opens all the same. */
     @Test void aDataFolderWhosePermissionsCannotBeSetIsLoggedOnceAndStillOpens() throws Exception {
-        var folder = new DataFolder(data, path -> { throw new IOException("Operation not permitted"); });
+        var folder = new DataFolder(data, path -> { throw new IOException("Operation not permitted"); }, files -> { });
         try (var log = new CapturedLog(DataFolder.class)) {
             BrowserDatabase database = BrowserDatabase.file(folder, this::unavailable);
             opened.add(database);
@@ -309,6 +309,62 @@ class BrowserDatabaseTest {
         assertThat(database.started()).isFalse();
         assertThat(database.call(connection -> "never")).isCompletedExceptionally();
         assertThat(data.resolve("browser.sqlite")).doesNotExist();
+    }
+
+    /**
+     * Ruling V25: whether a database asked for a file uses none, as Clear Website Data must know: once a call has
+     * answered, true when the file could not be used and it runs in memory, or SQLite cannot run at all; false for a
+     * file in use and for a database in memory.
+     */
+    @Test void aDatabaseAskedForAFileTellsWhetherItUsesNone() throws Exception {
+        BrowserDatabase used = file(data.resolve("used").resolve("browser.sqlite"));
+        assertThat(used.fileUnused()).as("before its first call").isFalse();
+        done(used.call(connection -> null));
+        assertThat(used.fileUnused()).isFalse();
+        Path folder = Files.createDirectories(data.resolve("unusable"));
+        DatabaseFixtures.notADatabase(folder);
+        BrowserDatabase unusable = file(folder.resolve("browser.sqlite"));
+        done(unusable.call(connection -> null));
+        assertThat(unusable.fileUnused()).as("in memory instead").isTrue();
+        BrowserDatabase none = BrowserDatabase.file(data.resolve("none.sqlite"), this::unavailable, url -> {
+            throw new SQLException("Error opening connection", new UnsatisfiedLinkError("no sqlitejdbc in java.library.path"));
+        });
+        opened.add(none);
+        assertThat(none.call(connection -> null)).failsWithin(10, TimeUnit.SECONDS);
+        assertThat(none.fileUnused()).as("no database at all").isTrue();
+        BrowserDatabase memory = BrowserDatabase.memory();
+        opened.add(memory);
+        done(memory.call(connection -> null));
+        assertThat(memory.fileUnused()).as("never asked for a file").isFalse();
+        assertThat(unavailable).hasSize(2);
+    }
+
+    /**
+     * Ruling V25: a data folder's first use, before the database opens, lets a clearing that marked the database delete
+     * its file, its log and its shared memory, so the database opens a new file.
+     */
+    @Test void aDataFoldersFirstUseDeletesAMarkedDatabaseBeforeItOpens() throws Exception {
+        Path folder = Files.createDirectories(data.resolve("marked"));
+        DatabaseFixtures.plan5(folder, "https://cleared.example/");
+        var asked = new CopyOnWriteArrayList<List<Path>>();
+        var dataFolder = new DataFolder(folder, files -> {
+            asked.add(files);
+            for (Path file : files) {
+                try {
+                    Files.deleteIfExists(file);
+                } catch (IOException failure) {
+                    throw new java.io.UncheckedIOException(failure);
+                }
+            }
+        });
+        BrowserDatabase database = BrowserDatabase.file(dataFolder, this::unavailable);
+        opened.add(database);
+        assertThat(done(new HistoryStore(database).list("", Optional.empty(), 10)).entries()).as("a new file").isEmpty();
+        Path file = folder.resolve("browser.sqlite").toAbsolutePath();
+        assertThat(asked).containsExactly(List.of(file, file.resolveSibling("browser.sqlite-wal"), file.resolveSibling("browser.sqlite-shm")));
+        dataFolder.restrict();
+        assertThat(asked).as("once, at the first use").hasSize(1);
+        assertThat(unavailable).isEmpty();
     }
 
     /**

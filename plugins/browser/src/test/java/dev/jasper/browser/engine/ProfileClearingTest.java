@@ -12,6 +12,10 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -55,27 +59,82 @@ class ProfileClearingTest {
         assertThat(calls).containsExactly("Network.clearBrowserCache null");
     }
 
-    @Test void aFailedCallFailsTheClearingAndNoMoreAreMade() {
-        var cleared = ProfileClearing.clearOrigins(this::devTools, List.of("https://a.example", "https://b.example", "https://c.example"),
-            ui::add, () -> true, Duration.ofSeconds(5), 2);
-        answerAll();
-        assertThat(calls).hasSize(3);
-        answers.get(1).completeExceptionally(new IllegalStateException("DevTools answered with an error"));
-        runUi();
-        assertThat(cleared).isCompletedExceptionally();
-        answers.get(2).complete("{}");
-        runUi();
-        assertThat(calls).as("c.example is not asked").hasSize(3);
+    /**
+     * Ruling V26: one site's storage that cannot be cleared, its call failed, late or thrown, blocks no other: it is
+     * logged for debugging, without the site, and left to the next start's wipe, and the clearing goes on and ends.
+     */
+    @Test void aSiteThatCannotBeClearedIsLeftToTheWipeAndTheRestGoOn() throws Exception {
+        var log = Logger.getLogger(ProfileClearing.class.getName());
+        var logged = new CopyOnWriteArrayList<LogRecord>();
+        var listening = new Handler() {
+            @Override public void publish(LogRecord record) { logged.add(record); }
+            @Override public void flush() { }
+            @Override public void close() { }
+        };
+        Level level = log.getLevel();
+        boolean parents = log.getUseParentHandlers();
+        log.setLevel(Level.ALL);
+        log.setUseParentHandlers(false);
+        log.addHandler(listening);
+        try {
+            var cleared = ProfileClearing.clearOrigins(this::devTools, List.of("https://a.example", "https://b.example", "https://c.example"),
+                ui::add, () -> true, Duration.ofSeconds(5), 2);
+            answerAll();
+            assertThat(calls).hasSize(3);
+            answers.get(1).completeExceptionally(new IllegalStateException("DevTools answered with an error"));
+            runUi();
+            assertThat(cleared).as("goes on").isNotDone();
+            answerAll();
+            assertThat(calls).as("c.example is asked all the same").hasSize(4);
+            answerAll();
+            assertThat(cleared).isCompleted();
+            assertThat(cleared.isCompletedExceptionally()).isFalse();
+
+            var late = ProfileClearing.clearOrigins(this::devTools, List.of("https://late.example"), ui::add, () -> true, Duration.ofMillis(50), 8);
+            runUi();
+            answers.getLast().complete("{}"); // the cache
+            for (long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(10); !late.isDone() && System.nanoTime() < until; ) {
+                runUi();
+                Thread.onSpinWait();
+            }
+            assertThat(late.isCompletedExceptionally()).as("a late site's answer is left to the wipe too").isFalse();
+
+            BiFunction<String, String, CompletableFuture<String>> throwingForSites = (method, parameters) -> {
+                if (parameters != null) throw new IllegalStateException("closed");
+                return CompletableFuture.completedFuture("{}");
+            };
+            var threw = ProfileClearing.clearOrigins(throwingForSites, List.of("https://thrown.example"), ui::add, () -> true,
+                Duration.ofSeconds(5), 8);
+            runUi();
+            assertThat(threw.isCompletedExceptionally()).isFalse();
+            assertThat(threw).isCompleted();
+        } finally {
+            log.removeHandler(listening);
+            log.setUseParentHandlers(parents);
+            log.setLevel(level);
+        }
+        assertThat(logged).hasSize(3).allSatisfy(record -> {
+            assertThat(record.getLevel()).isEqualTo(Level.FINE);
+            assertThat(record.getMessage()).isEqualTo("A site's storage could not be cleared; the next start's wipe clears it");
+            assertThat(record.getMessage() + record.getThrown()).doesNotContain("example");
+        });
     }
 
-    @Test void aLateAnswerFailsTheClearing() throws Exception {
-        var cleared = ProfileClearing.clearOrigins(this::devTools, List.of("https://a.example"), ui::add, () -> true, Duration.ofMillis(50), 8);
-        for (long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(10); !cleared.isDone() && System.nanoTime() < until; ) {
+    /** The browser cache's call still fails the clearing, failed or late, and no site is asked then. */
+    @Test void aCacheThatCannotBeClearedFailsTheClearing() throws Exception {
+        var cleared = ProfileClearing.clearOrigins(this::devTools, List.of("https://a.example"), ui::add, () -> true, Duration.ofSeconds(5), 8);
+        runUi();
+        answers.getFirst().completeExceptionally(new IllegalStateException("DevTools answered with an error"));
+        runUi();
+        assertThat(cleared).isCompletedExceptionally();
+        assertThat(calls).as("no site asked").hasSize(1);
+
+        var late = ProfileClearing.clearOrigins(this::devTools, List.of("https://a.example"), ui::add, () -> true, Duration.ofMillis(50), 8);
+        for (long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(10); !late.isDone() && System.nanoTime() < until; ) {
             runUi();
             Thread.onSpinWait();
         }
-        assertThat(cleared).isCompletedExceptionally();
-        assertThat(cleared.handle((done, failure) -> failure).join()).isInstanceOf(TimeoutException.class);
+        assertThat(late.handle((done, failure) -> failure).join()).isInstanceOf(TimeoutException.class);
     }
 
     /** Once Chromium stops, or the clearing is given up, no further call is made. */

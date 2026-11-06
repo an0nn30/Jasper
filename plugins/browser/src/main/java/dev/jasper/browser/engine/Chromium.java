@@ -16,6 +16,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
@@ -123,6 +124,10 @@ public final class Chromium implements AutoCloseable {
     private volatile Duration clearLimit = CLEAR_LIMIT;
     private volatile Supplier<CompletableFuture<Set<String>>> liveCookies;
     private volatile Function<List<String>, CompletableFuture<Void>> liveStorage;
+    // How the start's wipe moves and deletes: the file system's own, or a test's that refuses.
+    private volatile ProfileWipe.Disk wipeDisk = ProfileWipe.Disk.REAL;
+    // Told, on the UI thread, why cookies a Clear Cookies left for the start could not be deleted.
+    private volatile Consumer<Throwable> clearFailed = cause -> { };
 
     /**
      * A Chromium that starts nothing until {@link #client()} is first called.
@@ -431,7 +436,7 @@ public final class Chromium implements AutoCloseable {
      *     fails, or the clearing takes longer than 60 seconds
      */
     public CompletableFuture<Void> clearCookies() {
-        return clear(Mark.COOKIES, Set.of());
+        return clear(Mark.COOKIES, Set.of(), false);
     }
 
     /**
@@ -441,26 +446,43 @@ public final class Chromium implements AutoCloseable {
      * worker, which runs the start afterwards. While Chromium starts, the clearing waits for the client (F16); once
      * Chromium runs, it clears live: the cookies' domains are read and the cookies deleted, then a helper browser of a
      * client of its own clears the browser cache and the storage of {@code origins} and of the cookies' sites, as https and
-     * http origins ({@link ProfileClearing}). A start that fails, a failed start and a closed Chromium leave the marker,
-     * which suffices, and touch nothing native. A {@code /dev/null} group's in-memory context is never touched. Any
-     * thread.
+     * http origins ({@link ProfileClearing}); a site whose storage cannot be cleared is left to the next start's wipe
+     * (V26). A start that fails, a failed start and a closed Chromium leave the marker, which suffices, and touch nothing
+     * native. A {@code /dev/null} group's in-memory context is never touched. Any thread.
      *
      * @param origins the sites whose storage is cleared live, as {@code scheme://host[:port]}
+     * @param database whether the marker also has the browser's database files deleted at the next start, before the
+     *     database opens, as when the database ran in memory and could not erase its file (V25)
      * @return completes once the profile is wiped, or cleared live, or marked; fails when the marker cannot be written,
-     *     the profile cannot be wiped before a start, the live clearing fails, or the clearing takes longer than 60
-     *     seconds
+     *     the profile cannot be wiped before a start, the cookies or the browser cache cannot be cleared live, or the
+     *     clearing takes longer than 60 seconds
      */
-    public CompletableFuture<Void> clearWebsiteData(Set<String> origins) {
-        return clear(Mark.ALL, Set.copyOf(origins));
+    public CompletableFuture<Void> clearWebsiteData(Set<String> origins, boolean database) {
+        return clear(Mark.ALL, Set.copyOf(origins), database);
+    }
+
+    /**
+     * Has {@code told} hear, on the UI thread, why the cookies a Clear Cookies before this start left could not be
+     * deleted as Chromium started; the next start then wipes the profile.
+     *
+     * @param told told the cause
+     */
+    public void onClearFailed(Consumer<Throwable> told) {
+        clearFailed = Objects.requireNonNull(told, "told");
+    }
+
+    /** Has the start's wipe move and delete through {@code disk}: a test's that refuses. */
+    void wipesWith(ProfileWipe.Disk disk) {
+        wipeDisk = Objects.requireNonNull(disk, "disk");
     }
 
     /** A clearing of {@code mark}, on the worker, bounded as F16 has it; the caller gets a copy of its future. */
-    private CompletableFuture<Void> clear(Mark mark, Set<String> origins) {
+    private CompletableFuture<Void> clear(Mark mark, Set<String> origins, boolean database) {
         var done = new CompletableFuture<Void>();
         CompletableFuture.delayedExecutor(clearLimit.toMillis(), TimeUnit.MILLISECONDS)
             .execute(() -> done.completeExceptionally(new TimeoutException(SLOW_CLEAR)));
         try {
-            worker.execute(() -> clearOnWorker(mark, origins, done));
+            worker.execute(() -> clearOnWorker(mark, origins, database, done));
         } catch (RejectedExecutionException refused) {
             done.completeExceptionally(refused);
         }
@@ -471,14 +493,14 @@ public final class Chromium implements AutoCloseable {
      * The clearing's work on the worker, which alone enters the start: a start not entered yet enters only after it.
      * Worker.
      */
-    private void clearOnWorker(Mark mark, Set<String> origins, CompletableFuture<Void> done) {
+    private void clearOnWorker(Mark mark, Set<String> origins, boolean database, CompletableFuture<Void> done) {
         if (done.isDone()) return;
         try {
             restrictData.run();
-            ProfileWipe.mark(dataDir, mark);
+            ProfileWipe.mark(dataDir, mark, database);
             switch (life.clearing()) {
                 case BEFORE_START -> {
-                    if (mark == Mark.ALL && ProfileWipe.runIfMarked(dataDir) == Mark.ALL)
+                    if (mark == Mark.ALL && ProfileWipe.runIfMarked(dataDir, wipeDisk) == Mark.ALL)
                         throw new IOException("Chromium's profile is in use and could not be cleared: " + dataDir.resolve(ProfileWipe.PROFILE));
                     done.complete(null);
                 }
@@ -564,9 +586,10 @@ public final class Chromium implements AutoCloseable {
     }
 
     /**
-     * What the client waits for as Chromium initializes: the cookies a Clear Cookies before this start marked are
-     * deleted first, so before any page, and their marker then goes, on the worker. Cookies that cannot be deleted are
-     * logged and keep their marker for the next start, and Chromium goes on. Chromium's thread.
+     * What the client waits for as Chromium initializes: the cookies a Clear Cookies before this start marked, or those
+     * of a profile whose wipe could not move it, are deleted first, so before any page, and a {@code cookies} mark then
+     * goes, on the worker. Cookies that cannot be deleted are logged and told ({@link #onClearFailed}), the profile is
+     * marked for the next start's wipe, and Chromium goes on. Chromium's thread.
      *
      * @param cookies deletes every cookie, answering their domains
      * @return completes once nothing waits; never fails
@@ -575,12 +598,33 @@ public final class Chromium implements AutoCloseable {
         if (!cookiesPending) return CompletableFuture.completedFuture(null);
         var open = new CompletableFuture<Void>();
         live(cookies).whenComplete((domains, failure) -> {
-            if (failure != null)
-                LOG.log(System.Logger.Level.WARNING, "Chromium could not delete the cookies Clear Cookies left; the next start tries again", failure);
-            else takeBackCookies(() -> { });
+            if (failure == null) takeBackCookies(() -> { });
+            else cookiesStayed(failure);
             open.complete(null);
         });
         return open;
+    }
+
+    /**
+     * Review round 1's item 8: the cookies the start was to delete stayed, so they are not left silently: the next start
+     * wipes the profile, marked on the worker, and the failure is told.
+     */
+    private void cookiesStayed(Throwable failure) {
+        Throwable cause = failure instanceof CompletionException && failure.getCause() != null ? failure.getCause() : failure;
+        LOG.log(System.Logger.Level.WARNING, "Chromium could not delete the cookies Clear Cookies left; the next start wipes its profile", cause);
+        try {
+            worker.execute(() -> {
+                try {
+                    ProfileWipe.mark(dataDir, Mark.ALL);
+                } catch (IOException | RuntimeException unmarked) {
+                    LOG.log(System.Logger.Level.WARNING, "The browser's clearing marker could not be written", unmarked);
+                }
+            });
+        } catch (RejectedExecutionException stopped) {
+            // The plugin has stopped: the cookies' marker stays for the next start.
+        }
+        Consumer<Throwable> told = clearFailed;
+        EventQueue.invokeLater(() -> told.accept(cause));
     }
 
     /** The live deletion of the cookies: a test's stand-in, or Chromium's own. */
@@ -717,7 +761,8 @@ public final class Chromium implements AutoCloseable {
     boolean enter() {
         if (!life.enter()) return false;
         restrictData.run();
-        cookiesPending = ProfileWipe.runIfMarked(dataDir) == Mark.COOKIES;
+        // Review round 1's item 5: a profile whose wipe could not move it still has its cookies deleted.
+        cookiesPending = ProfileWipe.runIfMarked(dataDir, wipeDisk) != Mark.NONE;
         marker.started();
         return true;
     }

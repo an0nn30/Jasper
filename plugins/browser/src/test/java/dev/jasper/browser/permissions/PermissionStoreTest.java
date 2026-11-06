@@ -132,9 +132,11 @@ class PermissionStoreTest {
         assertThat(store.clearSite(A)).containsExactly(A);
         assertThat(store.all()).extracting(Grant::origin).containsExactly(B);
         done(store.set(A, Permission.CAMERA, Decision.ALLOWED));
-        assertThat(store.clearAll()).containsExactlyInAnyOrder(A, B);
+        PermissionStore.Cleared cleared = store.clearAll();
+        assertThat(cleared.sites()).containsExactlyInAnyOrder(A, B);
+        done(cleared.written());
         assertThat(store.all()).isEmpty();
-        assertThat(store.clearAll()).isEmpty();
+        assertThat(store.clearAll().sites()).isEmpty();
         assertThat(reread(database).all()).as("the rows go too").isEmpty();
     }
 
@@ -211,7 +213,8 @@ class PermissionStoreTest {
         assertThat(store.all()).isEmpty();
         assertThat(store.decision(A, Permission.CAMERA)).isEmpty();
         assertThat(store.set(B, Permission.MICROPHONE, Decision.ALLOWED)).as("no change after").failsWithin(10, TimeUnit.SECONDS);
-        assertThat(store.clearAll()).isEmpty();
+        assertThat(store.clearAll().sites()).isEmpty();
+        assertThat(store.clearAll().written()).as("no write after").failsWithin(10, TimeUnit.SECONDS);
         assertThatThrownBy(() -> done(store.load())).isInstanceOf(ExecutionException.class);
         settle();
         assertThat(store.all()).as("a later load brings none back").isEmpty();
@@ -236,6 +239,31 @@ class PermissionStoreTest {
             assertThat(log.records()).extracting(LogRecord::getLevel).containsExactly(Level.WARNING);
         }
         assertThat(store.decision(A, Permission.CAMERA)).contains(Decision.ALLOWED);
+    }
+
+    /**
+     * Review round 1's item 7: Clear All answers its write too, so Clear Website Data fails when the rows' deletion
+     * fails; the cache is empty all the same, and the failure is told once.
+     */
+    @Test void clearAllAnswersItsWriteWhichFailsWhenTheDeleteFails() throws Exception {
+        BrowserDatabase database = memory();
+        PermissionStore store = store(database);
+        done(store.set(A, Permission.CAMERA, Decision.ALLOWED));
+        done(database.call(connection -> {
+            try (var statement = connection.createStatement()) {
+                statement.execute("CREATE TEMP TRIGGER refused BEFORE DELETE ON permissions BEGIN SELECT RAISE(ABORT, 'refused'); END");
+            }
+            return null;
+        }));
+        try (var log = new CapturedLog(PermissionStore.class.getName())) {
+            PermissionStore.Cleared cleared = store.clearAll();
+            assertThat(cleared.sites()).containsExactly(A);
+            assertThatThrownBy(() -> done(cleared.written())).isInstanceOf(ExecutionException.class).hasCauseInstanceOf(SQLException.class);
+            settle();
+            assertThat(store.all()).isEmpty();
+            assertThat(unsaved).singleElement().isInstanceOf(SQLException.class);
+            assertThat(log.records()).extracting(LogRecord::getLevel).containsExactly(Level.WARNING);
+        }
     }
 
     /** Parks {@code database}'s thread until the answer is run, so the work given meanwhile queues behind it. */

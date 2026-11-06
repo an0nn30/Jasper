@@ -6,6 +6,7 @@ import dev.jasper.browser.engine.AboutQueries;
 import dev.jasper.browser.engine.AboutScheme;
 import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.engine.PreviewScheme;
+import dev.jasper.browser.engine.ProfileWipe;
 import dev.jasper.browser.engine.RunMarker;
 import dev.jasper.browser.item.BookmarkPanel;
 import dev.jasper.browser.item.BrowserItems;
@@ -116,8 +117,11 @@ public class BrowserPlugin implements Plugin {
         var origins = new PreviewScheme();
         // H37: the data folder holds the history and Chromium's cookies, so it is made its owner's alone, with no I/O
         // now: on the database's thread before it opens, or on Chromium's worker before Chromium writes there.
-        var folder = new DataFolder(data);
+        // Plan 6's V25: a database file a Clear Website Data could not reach goes at the folder's first use, before it opens.
+        var folder = new DataFolder(data, files -> ProfileWipe.wipeMarkedDatabase(data, files));
         chromium = new Chromium(data, folder::restrict, worker, about, origins, this::startFailed);
+        // Cookies a Clear Cookies left for Chromium's start that could not be deleted then are told as its failure.
+        chromium.onClearFailed(cause -> notCleared(WebsiteData.COOKIES_NOT_CLEARED, cause));
         // Spec section 18: the Editor's Chromium Markdown preview. A preview asks for Chromium only once it first shows.
         previews = new PreviewService(origins, chromium, context.background());
         context.services().publish(MarkdownPreviews.class, previews);
@@ -154,7 +158,7 @@ public class BrowserPlugin implements Plugin {
         // Plan 6 Task 8: Settings › Tools › Browser is the Browser's own page: the declared rows by section, and the
         // persistent store's Clear Cookies, Clear Website Data and Manage Site Permissions. Making it opens nothing.
         var websiteData = new WebsiteData(chromium, dataStores.persistent(), () -> persistentAddresses(items, dataStores),
-            EventQueue::invokeLater, this::notCleared);
+            sites -> { if (running) items.reloadShowing(dataStores.persistent(), sites); }, EventQueue::invokeLater, this::notCleared);
         context.settings().page(new BrowserSettingsPanel(context.kit(), settings, new BrowserSettingsPanel.Actions(websiteData::clearCookies,
             websiteData::clearAll, this::managePermissions, this::show)));
         // Jasper's pages built from their templates, in the workspace theme. Spec section 10: the history and bookmarks

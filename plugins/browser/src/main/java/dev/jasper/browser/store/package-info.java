@@ -11,7 +11,8 @@
  * ({@link dev.jasper.browser.store.VisitIndex}), which load in the background when first asked and follow the stores'
  * changes.
  * {@link dev.jasper.browser.store.DataFolder} makes the plugin's data folder, which holds the database and Chromium's
- * profile, its owner's alone before either is written there.
+ * profile, its owner's alone before either is written there, and first hands the database's files to the plugin, which
+ * deletes them when a Clear Website Data that could not erase them marked them.
  * {@code SqliteOpener} is the one class that names an {@code org.sqlite} type, and only the database's thread loads it,
  * so the plugin's start loads no sqlite-jdbc class; {@code SqliteNatives} chooses the folder sqlite-jdbc extracts its
  * native library into. Depends on the {@code restore} package, the SDK, the JDK and sqlite-jdbc, and names no Chromium

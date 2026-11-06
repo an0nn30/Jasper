@@ -22,7 +22,7 @@ import java.util.function.IntFunction;
  * address. Until the onboarding ({@link OnboardingPages}) is finished the page redirects to its first page.
  */
 public final class WelcomePage {
-    /** The page's name, and the name of the action that opens Settings › Browser. */
+    /** The page's name, and the name of the action that opens Settings › Tools › Browser. */
     public static final String NAME = "welcome", SETTINGS = "settings";
     /** How many sites the page shows at most. */
     static final int TOP_SITES = 8;

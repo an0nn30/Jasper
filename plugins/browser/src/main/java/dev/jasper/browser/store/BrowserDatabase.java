@@ -88,6 +88,8 @@ public final class BrowserDatabase implements AutoCloseable {
     private boolean opened;
     private Connection connection;
     private Throwable failure;
+    // Set on the store's thread as the database opens, before the first call answers.
+    private volatile boolean fileUnused;
 
     /** Where a file's database lives: its file, in the folder made its owner's alone before the file opens. */
     private record Place(DataFolder folder, Path file) { }
@@ -158,6 +160,17 @@ public final class BrowserDatabase implements AutoCloseable {
         return result;
     }
 
+    /**
+     * Whether the database was asked for a file and uses none: the file could not be used and it runs in memory, or SQLite
+     * cannot run at all (ruling V25). Clear Website Data then cannot erase the file's rows. Known once a call has
+     * answered; false before, and for a database in memory. Any thread.
+     *
+     * @return whether it uses no file it was asked for
+     */
+    public boolean fileUnused() {
+        return fileUnused;
+    }
+
     /** Whether the first call has started the database's thread. */
     boolean started() {
         synchronized (lock) {
@@ -219,6 +232,7 @@ public final class BrowserDatabase implements AutoCloseable {
                 return;
             } catch (Throwable unusable) { // As in run: an UnsatisfiedLinkError from the native library too.
                 failure = unusable;
+                fileUnused = true;
                 tell(unusable);
             }
         }
