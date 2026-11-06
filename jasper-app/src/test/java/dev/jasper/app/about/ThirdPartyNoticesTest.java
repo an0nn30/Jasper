@@ -57,9 +57,16 @@ class ThirdPartyNoticesTest {
         assertThat(mermaid.modules()).isEmpty();
         assertThat(ThirdPartyNotices.read(mermaid.text())).startsWith("The MIT License (MIT)\n\nCopyright (c) 2014 - 2022 Knut Sveidqvist\n")
             .contains("Permission is hereby granted, free of charge", "THE SOFTWARE IS PROVIDED \"AS IS\"");
-        assertThat(ThirdPartyNotices.read(mermaid.notice().orElseThrow())).contains("mermaid-11.17.2.tgz", "package/dist/mermaid.min.js",
-            "581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8", "dompurify", "(MPL-2.0 OR Apache-2.0)", "d3-sankey",
-            "BSD-3-Clause", "khroma", "MIT © Fabio Spampinato, Andrew Maney", "@mermaid-js/parser", "DOMPurify 3.4.12", "lodash-es");
+        String notice = ThirdPartyNotices.read(mermaid.notice().orElseThrow());
+        assertThat(notice).contains("mermaid-11.17.2.tgz", "package/dist/mermaid.min.js",
+            "581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8", "production dependency tree", "(MPL-2.0 OR Apache-2.0)",
+            "d3-sankey", "BSD-3-Clause", "khroma", "MIT © Fabio Spampinato, Andrew Maney", "@mermaid-js/parser", "DOMPurify 3.4.12", "lodash-es");
+        // Ruling N25: the full tree, transitive packages and type declarations included, each with its version and licence.
+        assertThat(notice).containsPattern("(?m)^@chevrotain/types +11\\.1\\.2 +Apache-2\\.0 ")
+            .containsPattern("(?m)^robust-predicates +3\\.0\\.3 +Unlicense ").containsPattern("(?m)^internmap +2\\.0\\.0 +ISC ")
+            .containsPattern("(?m)^@types/geojson +7946\\.0\\.16 +MIT ");
+        assertThat(notice).as("the file's banner names DOMPurify's version").containsPattern("(?m)^dompurify +3\\.4\\.12 ")
+            .doesNotContainPattern("(?m)^dompurify +3\\.4\\.14 ");
         var table = Toml.parse(ThirdPartyNotices.read("notices.toml")).getArrayOrEmpty("component");
         var files = IntStream.range(0, table.size()).mapToObj(table::getTable)
             .filter(component -> "Mermaid".equals(component.getString("name"))).findFirst().orElseThrow().getArrayOrEmpty("files");

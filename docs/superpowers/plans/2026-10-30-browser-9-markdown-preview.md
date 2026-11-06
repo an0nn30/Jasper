@@ -41,12 +41,14 @@ task reviews and the final review recorded these deviations from the plan's text
     - the "Mermaid" notices component (`files`, `text = "mermaid.LICENSE.txt"`, the tarball's `LICENSE`, and
       `notice = "mermaid.NOTICE.txt"`); `verifyThirdPartyNotices` refuses it without its `files` line ("…
       ships but no component in notices.toml lists it in files"), checked and restored;
-    - **the NOTICE lists the 22 packages Mermaid's `package.json` names in `dependencies`, not N-F17's full production
-      tree:** each with its range, the newest version in it on npm at Mermaid's publication, and that version's licence
-      from npm's metadata (khroma's names none; its npm readme says MIT), and then the licence banners the file keeps
-      (DOMPurify 3.4.12, which the banner names where the range's newest was 3.4.14; lodash-es twice; four of
-      cytoscape's). The transitive packages would need more npm metadata, which the approval did not cover, so the
-      NOTICE says it does not name them;
+    - **the NOTICE lists Mermaid's npm production dependency tree as of its publication** (N25, the commit "Notices:
+      Mermaid's full dependency tree", after the first slice 1b commit listed only the 22 direct `dependencies`): the
+      controller resolved its 123 rows from npm's metadata by date, each the newest version in its parent's range then,
+      with that version's licence (khroma's names none; its npm readme says MIT). The NOTICE says the tree
+      over-approximates the bundle: the 32 `@types` declarations, listed apart, and Node-only tooling, such as d3-dsv's
+      command-line dependencies, are not in the file. Then come the licence banners the file keeps; where they name a
+      version, it is used (DOMPurify 3.4.12, where the range's newest was 3.4.14; lodash-es twice; four of
+      cytoscape's);
     - `MermaidBundleTest`: the hash, a size of 1 to 8 MiB, every origin serving the file at `/mermaid.min.js`, and the
       bundle's own defaults (`securityLevel:"strict"` and the `secure` list `secure`, `securityLevel`, `startOnLoad`,
       `maxTextSize`, `suppressErrorRendering`, `maxEdges`) and its `sanitize`, which deletes every key that list names
@@ -243,8 +245,6 @@ Not run:
   no test starts Chromium.
 
 Known gaps and follow-ups:
-- **Mermaid's NOTICE** names the packages Mermaid's `package.json` lists in `dependencies` and the banners the file
-  keeps, not the transitive packages the file bundles too (N-F17's full tree), whose npm metadata no approval covered.
 - **Mermaid in the GUI:** diagrams drawing, a broken diagram's message, and that a loosening diagram runs nothing are
   Task 9's lines; no test runs Mermaid.
 - **The page's messages are parsed on Chromium's UI thread** (N24): `PreviewPage.received` parses geometry there,

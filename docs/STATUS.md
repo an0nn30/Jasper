@@ -240,6 +240,8 @@ where it applied):
   proportional), R3 (emoji families after the generics) and R4 (docs).
 - N24: the page's messages are parsed on Chromium's UI thread (AppKit's main thread on macOS), bounded by the 4 MiB
   message limit, and recorded as a known gap.
+- N25 (slice 1b): Mermaid's NOTICE lists its npm production dependency tree as of its publication, which
+  over-approximates the bundle, with the version the file's own banners name where they name one (DOMPurify 3.4.12).
 
 The final review ("With fixes", base `420bfd63a`, head `11e04ff16`) and the docs review (Approved, one Important) were
 answered by one fix wave, W1-W10 (the banner has each): the page reports a layout's clamp of its scroll as not the
@@ -285,12 +287,12 @@ the memory run are deferred.
 download ("Yes, download it"), the Browser bundles `package/dist/mermaid.min.js` of npm's `mermaid-11.17.2.tgz`,
 unmodified (3,572,661 bytes, SHA-256 `581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8`), under its
 `third_party/`: 11.17.2 is the newest 11.x at least two weeks old (N-F17), in place of the plan's 11.12.0. The Mermaid
-notices component lists it in `files`, with `mermaid.LICENSE.txt` and `mermaid.NOTICE.txt` (the 22 packages Mermaid's
-`package.json` names in `dependencies`, and the licence banners the file keeps; not the transitive packages of N-F17's
-full tree), and `MermaidBundleTest` pins the hash, the size and the strict defaults that a diagram's `%%{init}%%` cannot
-change. The Chromium preview draws `mermaid` fences, and a diagram's `click` callbacks do nothing; Basic shows them as
-code. The preview's files are read on the plugin's background executor, never on Chromium's IO thread (Task 4's minor),
-and `verifyThirdPartyNotices` leaves out what the jar does, such as `.DS_Store` and `*~` (Task 1a's minor). The
+notices component lists it in `files`, with `mermaid.LICENSE.txt` and `mermaid.NOTICE.txt` (Mermaid's npm production
+dependency tree as of its publication, 123 rows that over-approximate the bundle, and the licence banners the file
+keeps, N25), and `MermaidBundleTest` pins the hash, the size and the strict defaults that a diagram's `%%{init}%%`
+cannot change. The Chromium preview draws `mermaid` fences, and a diagram's `click` callbacks do nothing; Basic shows
+them as code. The preview's files are read on the plugin's background executor, never on Chromium's IO thread (Task 4's
+minor), and `verifyThirdPartyNotices` leaves out what the jar does, such as `.DS_Store` and `*~` (Task 1a's minor). The
 setting's description and `mermaid` keyword, `settings.toml`, the Editor and Browser guides and README's Editor row name
 Mermaid again (N8 and N12 undone). N2 and N14: `autolink.LICENSE.txt` matches upstream's at tag `autolink-0.12.0` but
 for upstream's one trailing blank line, and stays as it is (the user's "Yes, check it"). Plan 5's H30 is now the user's
