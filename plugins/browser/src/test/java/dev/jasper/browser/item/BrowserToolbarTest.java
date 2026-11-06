@@ -320,7 +320,7 @@ class BrowserToolbarTest {
         UUID window = host.addTerminalWindow();
         host.activateTerminalWindow(window);
         host.setSetting(ID, "start_page", START);
-        host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of("browser.provide")), Set.of(), Set.of(), new BrowserPlugin());
+        host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of("browser.provide", "palette.contribute")), Set.of(), Set.of(), new BrowserPlugin());
         assertThat(host.invoke("dev.jasper.browser.new_tab", window, null)).isTrue();
         assertThat(host.contentTabs()).singleElement();
         assertThat(URI.create(host.contentPresentation(host.contentTabs().getFirst()).location())).isEqualTo(URI.create(START));

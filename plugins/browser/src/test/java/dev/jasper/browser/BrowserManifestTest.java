@@ -20,9 +20,12 @@ class BrowserManifestTest {
         assertThat(string("icon")).isEqualTo("icons/browser.svg");
     }
 
-    /** Opening a page in the application's default browser goes through {@code Platform.browser}, which needs this. */
-    @Test void theBrowserDeclaresBrowserProvideAndNothingElseYet() throws IOException {
-        assertThat(list("capabilities")).containsExactly("browser.provide");
+    /**
+     * Opening a page in the application's default browser goes through {@code Platform.browser}, which needs the first;
+     * the Bookmarks and Browser History scopes need the second.
+     */
+    @Test void theBrowserDeclaresBrowserProvideAndPaletteContribute() throws IOException {
+        assertThat(list("capabilities")).containsExactly("browser.provide", "palette.contribute");
     }
 
     /** The Markdown preview's API is the one package other plugins may compile against. */

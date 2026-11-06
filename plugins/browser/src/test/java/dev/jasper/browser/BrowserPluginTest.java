@@ -36,7 +36,7 @@ import static org.assertj.core.api.Assertions.tuple;
 /** The plugin's registrations and its part in Chromium's life, on the SDK's fake host; nothing here starts Chromium. */
 class BrowserPluginTest {
     private static final String ID = "dev.jasper.browser";
-    private static final PluginInfo INFO = new PluginInfo(ID, "Browser", "0.1.0", Set.of("browser.provide"));
+    private static final PluginInfo INFO = new PluginInfo(ID, "Browser", "0.1.0", Set.of("browser.provide", "palette.contribute"));
 
     @Test void aChromiumThatCannotStartPostsOneNotificationWithTheReasonWhileThePluginRuns() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
@@ -84,6 +84,20 @@ class BrowserPluginTest {
             host.stopAll();
             assertThat(plugin.stores().closed()).isDone();
             assertThat(MemoryStores.started(plugin.stores())).isFalse();
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /** Spec section 11: the start registers the Bookmarks and Browser History scopes, which read nothing until searched. */
+    @Test void theStartRegistersTheBookmarksAndBrowserHistoryScopesWithoutOpeningTheDatabase() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var plugin = new BrowserPlugin();
+            UUID window = host.addTerminalWindow();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            assertThat(host.searchScope("dev.jasper.browser.scope.bookmarks", "", window, null)).isEmpty();
+            assertThat(host.searchScope("dev.jasper.browser.scope.history", "", window, null)).isEmpty();
+            assertThat(MemoryStores.started(plugin.stores())).isFalse();
+            host.stopAll();
             assertThat(host.failures()).isEmpty();
         } });
     }

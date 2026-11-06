@@ -35,7 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class WebAddressItemsTest {
     private static final String ID = "dev.jasper.browser", LINKS = "open_links_from_terminal";
     private static final String RIGHT = "dev.jasper.browser.open_url_split_right", DOWN = "dev.jasper.browser.open_url_split_down";
-    private static final PluginInfo INFO = new PluginInfo(ID, "Browser", "0.1.0", Set.of("browser.provide"));
+    private static final PluginInfo INFO = new PluginInfo(ID, "Browser", "0.1.0", Set.of("browser.provide", "palette.contribute"));
     private static final List<String> SHOWN = List.of("web-address:" + RIGHT, "web-address:" + DOWN);
 
     // Stores in memory, one for each BrowserItems a test makes.

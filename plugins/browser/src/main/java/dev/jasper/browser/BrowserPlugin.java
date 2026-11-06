@@ -13,6 +13,9 @@ import dev.jasper.browser.item.ErrorPage;
 import dev.jasper.browser.item.SourcePage;
 import dev.jasper.browser.item.WebMenu;
 import dev.jasper.browser.links.PageNavigation;
+import dev.jasper.browser.palette.BookmarksScope;
+import dev.jasper.browser.palette.PaletteOpener;
+import dev.jasper.browser.palette.VisitedScope;
 import dev.jasper.browser.pages.AboutPages;
 import dev.jasper.browser.pages.BookmarksPage;
 import dev.jasper.browser.pages.HistoryPage;
@@ -45,7 +48,7 @@ import java.util.concurrent.RejectedExecutionException;
 /**
  * The Browser: web pages as Jasper items. Its start registers New Browser Tab, New Browser Window and the Browser split
  * item, the globe they show, the Web menu, Settings › Browser, the Bookmarks notification group, the welcome page, the
- * history page and its queries, the error page with its Try Again and Continue actions, View Source's page, the Browser
+ * history page and its queries, the Bookmarks and Browser History palette scopes, the error page with its Try Again and Continue actions, View Source's page, the Browser
  * as Jasper's web browser, the terminal's Open URL in Split items and the restorer of saved browser items, publishes
  * the Markdown previews' service ({@link MarkdownPreviews}), and makes Chromium's engine, which starts Chromium only
  * when a browser item or a Markdown preview first shows, so starting the plugin, and restoring its items, loads no
@@ -139,6 +142,11 @@ public class BrowserPlugin implements Plugin {
         file.add(NEW_TAB);
         file.add(NEW_WINDOW);
         WebMenu.register(context, items);
+        // Spec section 11: bookmarks and visited sites in the command palette. They read the indexes, which load when the
+        // palette first asks, so the start reads nothing.
+        var opener = new PaletteOpener(items, engine::unavailable, this::tell);
+        context.palette().register(new BookmarksScope(stores.bookmarkIndex(), opener::open));
+        context.palette().register(new VisitedScope(stores.visitIndex(), opener::open));
         // Spec section 9: the links Jasper opens come to the Browser first.
         var role = new BrowserRole(context, items, settings, engine::state);
         context.platform().browser(role);

@@ -27,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class WebMenuTest {
     private static final String ID = "dev.jasper.browser";
-    private static final PluginInfo INFO = new PluginInfo(ID, "Browser", "0.1.0", Set.of("browser.provide"));
+    private static final PluginInfo INFO = new PluginInfo(ID, "Browser", "0.1.0", Set.of("browser.provide", "palette.contribute"));
     private static final String MENU = "top:dev.jasper.browser.web", NEW_TAB = "dev.jasper.browser.new_tab";
     private static final String OPEN_LOCATION = "dev.jasper.browser.open_location", BACK = "dev.jasper.browser.back",
         FORWARD = "dev.jasper.browser.forward", RELOAD = "dev.jasper.browser.reload", HISTORY = "dev.jasper.browser.history";
