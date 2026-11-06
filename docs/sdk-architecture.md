@@ -252,10 +252,10 @@ where the look draws one (`TitleInset`).
   window or a shown modal dialog it owns, directly or through a dialog, or while `WindowInput.showsModal` finds the
   window's root marked by an overlay or a visible modal dialog owned by its native window, Jasper's own included.
 - **Anchors and popovers.** `UiView.anchor(id)` mints a `UiAnchor` only for a mounted, visible, enabled, not busy
-  `Button`, `MenuButton` or PICKER `Choice`. Hiding, disabling, busying, removing, retyping or reparenting the control, closing its
-  surface or stopping the plugin invalidates it for good; a refresh of the same control keeps it. `Windows.popover`
-  attaches non-modal content from the anchor's own plugin; an anchor also owns a `DialogSpec` dialog above the
-  surface that shows it. Neither passes view ownership to another plugin.
+  `Button`, `MenuButton` or PICKER `Choice`. Hiding, disabling, busying, removing, retyping or reparenting the control,
+  closing its surface or stopping the plugin invalidates it for good; a refresh of the same control keeps it.
+  `Windows.popover` attaches non-modal content from the anchor's own plugin; an anchor also owns a `DialogSpec` dialog
+  above the surface that shows it. Neither passes view ownership to another plugin.
 - **File pickers.** `WindowSurface.chooseFile`, `Windows.chooseFiles`, `chooseDirectory`, `chooseSaveFile` and
   `choose` all open Jasper's own file chooser document-modally over the owner (over a modal dialog the owner shows), with
   its I/O on a worker; a save target that exists is confirmed first. `HostedUi` checks the plugin's lifetime and the UI

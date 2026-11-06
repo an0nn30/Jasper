@@ -19,15 +19,15 @@ import java.util.function.Function;
  * A browser item's toolbar along the top of its page (spec section 6), as SDK nodes the kit draws: Back and Forward,
  * each disabled when the page cannot go there and each holding the page's twelve nearest history entries that way in
  * its hold menu, then, as Chrome's do, a separator and Show Full History, which opens Jasper's history page (plan 5's
- * H2); Reload, which is Stop while the page loads; the address field, with the site icon at its left; and the
- * menu button, which holds Add Bookmark, or Remove Bookmark while the page is bookmarked, a separator, Manage Bookmarks
- * and History, then a separator and Settings (spec section 6). The site icon is the page's icon, else the globe, and
- * dragging it drags the page's address; while the page is one Jasper goes on to past a certificate error, "Not secure", in the warning colour, stands
- * in its place (spec section 14). The click that brings the focus into the field selects all its text. The toolbar keeps what is typed into
- * the field and the engine's suggestions for it: the field shows the page's address, or a results page's search terms,
- * until something is typed, then that text and its {@link Suggestions}, the rows of Jasper's bookmarks and history for
- * it last, and the page's again once a load or Escape gives the text up. Its item handles what the nodes report. UI
- * thread.
+ * H2); Reload, which is Stop while the page loads; the address field, with the site icon at its left; and the menu
+ * button, which holds Add Bookmark, or Remove Bookmark while the page is bookmarked, a separator, Manage Bookmarks and
+ * History, then a separator and Settings (spec section 6). The site icon is the page's icon, else the globe, and
+ * dragging it drags the page's address; while the page is one Jasper goes on to past a certificate error, "Not secure",
+ * in the warning colour, stands in its place (spec section 14). The click that brings the focus into the field selects
+ * all its text. The toolbar keeps what is typed into the field and the engine's suggestions for it: the field shows the
+ * page's address, or a results page's search terms, until something is typed, then that text and its
+ * {@link Suggestions}, the rows of Jasper's bookmarks and history for it last, and the page's again once a load or
+ * Escape gives the text up. Its item handles what the nodes report. UI thread.
  */
 final class BrowserToolbar {
     /** The toolbar's row and its nodes; a button reports its own id. */

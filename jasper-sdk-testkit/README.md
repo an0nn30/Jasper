@@ -212,5 +212,5 @@ declarative views and `AnchorContractTest` for anchored popovers and dialogs. Th
 part of `jasper-sdk-testkit-<version>.jar`. The testkit runs them against the fake (`FakeContractTest`,
 `FakeKitContractTest`, `FakeAnchorContractTest`); `jasper-app` runs them against the real runtime on the event dispatch
 thread (`AppContractTest`, `HostedKitContractTest`, `ClassicHostedKitContractTest`, which repeats the kit cases under
-the Enterprise look's kit, and `HostedAnchorContractTest` and `ClassicHostedAnchorContractTest`). When the two disagree, the implementation is wrong, not the
-contract, so a behaviour the two share belongs in a contract test.
+the Enterprise look's kit, and `HostedAnchorContractTest` and `ClassicHostedAnchorContractTest`). When the two
+disagree, the implementation is wrong, not the contract, so a behaviour the two share belongs in a contract test.

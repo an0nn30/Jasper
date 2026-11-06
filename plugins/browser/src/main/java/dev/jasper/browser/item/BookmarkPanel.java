@@ -26,9 +26,11 @@ import java.util.Optional;
 /**
  * The Edit Bookmark panel (spec section 10), which Add Bookmark opens once the page is bookmarked: a popover from the
  * item's menu button holding the bookmark's Title and URL, read-only, and its Tags, a token field, the one place tags
- * are edited. Save gives the bookmark the tags shown and closes it. Delete Bookmark closes it and asks, over the item's
- * tab, "Are you sure you want to delete this bookmark?"; Delete then deletes it and says "Bookmark Deleted". The panel
- * closes at its page's next main-frame load start, when its item closes, and on Escape or a click outside. UI thread.
+ * are edited. Save closes it. Delete Bookmark closes it and asks, over the item's tab, "Are you sure you want to delete
+ * this bookmark?"; Delete then deletes it and says "Bookmark Deleted". The panel also closes at its page's next
+ * main-frame load start, when its item closes, and on Escape or a click outside. However it closes, the bookmark keeps
+ * the tags the panel shows, but for Escape, which drops them (plan 5's H23); tags it opened with are not written again.
+ * UI thread.
  */
 public final class BookmarkPanel {
     /** The group the bookmark notifications post in, which the plugin declares as it starts. */
@@ -45,11 +47,13 @@ public final class BookmarkPanel {
     private final Bookmark bookmark;
     private final NotificationGroup group;
     private final ContentTab owner;
-    // The tags as the field shows them, which Save stores.
+    // The tags as the field shows them, which the bookmark keeps as the panel closes.
     private List<String> tags;
     private PluginPopover popover;
     private UiView view;
     private List<Subscription> ends = List.of();
+    // Whether Save, Delete Bookmark or Escape closed the panel, which keep the tags or drop them themselves.
+    private boolean settled;
     private boolean closed;
 
     private BookmarkPanel(PluginContext context, Stores stores, Bookmark bookmark, NotificationGroup group, ContentTab owner) {
@@ -83,7 +87,10 @@ public final class BookmarkPanel {
         return panel;
     }
 
-    /** Closes the panel, its content with it. */
+    /**
+     * Closes the panel, its content with it, as a click outside does: the bookmark keeps the tags shown. Its page's load
+     * start and close close it so too.
+     */
     void close() {
         if (popover != null) popover.close();
     }
@@ -95,21 +102,43 @@ public final class BookmarkPanel {
             view = context.kit().create(spec(), this::event);
             shown.setContent(view);
             shown.onClosed(this::ended);
-            shown.show();
+            // The page is listened to before the popover shows; a page closed already closes the panel at once.
+            ends = List.of(page.onLoadStart(address -> close()), page.onClose(this::close));
+            if (closed) stopListening();
+            else shown.show();
         } catch (RuntimeException | Error failure) {
             if (view != null) view.close();
             shown.close();
             throw failure;
         }
-        ends = List.of(page.onLoadStart(address -> close()), page.onClose(this::close));
         if (!closed) view.focus(TAGS);
     }
 
-    /** The popover closed, however it did: the page is no longer listened to. */
+    /** The popover closed, however it did: the page is no longer listened to, and unless the panel settled, the tags kept. */
     private void ended() {
         closed = true;
+        stopListening();
+        if (!settled) keepTags();
+    }
+
+    private void stopListening() {
         for (Subscription end : ends) end.close();
         ends = List.of();
+    }
+
+    /** Save and Delete Bookmark keep the tags shown, and Escape drops them; each closes the panel. */
+    private void settle(boolean keep) {
+        settled = true;
+        if (keep) keepTags();
+        close();
+    }
+
+    /** The bookmark gets the tags shown, unless they are its own: each write reads the bookmarks again. */
+    private void keepTags() {
+        if (tags.equals(bookmark.tags())) return;
+        stores.bookmarks().tags(bookmark.id(), tags).whenComplete((saved, failure) -> {
+            if (failure != null) LOG.log(System.Logger.Level.DEBUG, "A bookmark's tags were not saved", failure);
+        });
     }
 
     private void event(UiEvent event) {
@@ -119,18 +148,15 @@ public final class BookmarkPanel {
                 tags = changed.tokens();
                 view.update(spec());
             }
-            case UiEvent.Action action when action.id().equals(SAVE) -> {
-                stores.bookmarks().tags(bookmark.id(), tags).whenComplete((saved, failure) -> {
-                    if (failure != null) LOG.log(System.Logger.Level.DEBUG, "A bookmark's tags were not saved", failure);
-                });
-                close();
-            }
+            case UiEvent.Action action when action.id().equals(SAVE) -> settle(true);
             case UiEvent.Action action when action.id().equals(DELETE) -> {
-                close();
+                // The tags typed before are kept, so the question's Cancel leaves the bookmark as the panel showed it (H25).
+                settle(true);
                 // Asked once the popover has gone, from a turn of its own: a modal shows and waits.
                 EventQueue.invokeLater(this::ask);
             }
-            case UiEvent.Action action when action.id().equals(CANCEL) -> close();
+            // Escape.
+            case UiEvent.Action action when action.id().equals(CANCEL) -> settle(false);
             default -> { }
         }
     }

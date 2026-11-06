@@ -46,13 +46,13 @@ import java.util.concurrent.RejectedExecutionException;
  * The Browser: web pages as Jasper items. Its start registers New Browser Tab, New Browser Window and the Browser split
  * item, the globe they show, the Web menu, Settings › Browser, the Bookmarks notification group, the welcome page, the
  * history page and its queries, the error page with its Try Again and Continue actions, View Source's page, the Browser
- * as Jasper's web browser,
- * the terminal's Open URL in Split items and the restorer of saved browser items, publishes the Markdown previews'
- * service ({@link MarkdownPreviews}), and makes Chromium's engine, which starts Chromium only when a browser item or a
- * Markdown preview first shows, so starting the plugin, and restoring its items, loads no Chromium class. After a run
- * that ended while Chromium ran, the items it restores wait to be loaded. It makes the items' history and bookmarks too,
- * in {@code browser.sqlite} in its data folder, which opens only once an item first shows or its address field is
- * edited, so the start opens no database and loads no sqlite-jdbc class (spec section 19).
+ * as Jasper's web browser, the terminal's Open URL in Split items and the restorer of saved browser items, publishes
+ * the Markdown previews' service ({@link MarkdownPreviews}), and makes Chromium's engine, which starts Chromium only
+ * when a browser item or a Markdown preview first shows, so starting the plugin, and restoring its items, loads no
+ * Chromium class. After a run that ended while Chromium ran, the items it restores wait to be loaded. It makes the
+ * items' history and bookmarks too, in {@code browser.sqlite} in its data folder, which opens only once an item first
+ * shows or its address field is edited, so the start opens no database and loads no sqlite-jdbc class
+ * (spec section 19).
  */
 public class BrowserPlugin implements Plugin {
     static final String NEW_TAB = "dev.jasper.browser.new_tab", NEW_WINDOW = "dev.jasper.browser.new_window";

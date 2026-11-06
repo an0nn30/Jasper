@@ -10,6 +10,7 @@ import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.testing.FakeKitView;
 import dev.jasper.sdk.testing.FakePluginHost;
+import dev.jasper.sdk.ui.DialogSpec;
 import dev.jasper.sdk.ui.MenuItem;
 import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.TabPlacement;
@@ -21,6 +22,7 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.AfterEach;
@@ -40,6 +42,7 @@ class BookmarkPanelTest {
     private static final String GROUP = "dev.jasper.browser.bookmarks";
     private final MemoryStores memory = new MemoryStores();
     private FakePluginHost host;
+    private PluginContext context;
     private BrowserItem item;
     private FakeKitView view;
 
@@ -102,16 +105,21 @@ class BookmarkPanelTest {
         assertThat(onUi(() -> host.notifications().lines())).isEmpty();
     }
 
-    @Test void deleteBookmarkAsksAndCancelKeepsTheBookmark() throws Exception {
+    /** H23 and H25: the tags typed before Delete Bookmark are kept, so its Cancel leaves the bookmark as the panel showed it. */
+    @Test void deleteBookmarkAsksAndCancelKeepsTheBookmarkWithTheTagsTypedBeforeIt() throws Exception {
         Stores stores = open(A);
         onUi(() -> view.choose(BrowserToolbar.MENU, BrowserToolbar.BOOKMARK_ADD));
         memory.settle();
         onUi(() -> {
+            panel().type(BookmarkPanel.TAGS, "work,");
             panel().emit(new UiEvent.Action(BookmarkPanel.DELETE));
             assertThat(host.popoverViews(ID)).as("the panel closes first").isEmpty();
         });
         onUi(() -> {
             FakeKitView question = host.windowView(ID, "Delete Bookmark").orElseThrow();
+            assertThat(host.dialogPresentation(ID, "Delete Bookmark")).contains(DialogSpec.Presentation.OVERLAY);
+            assertThat(context.windows().hasModal(item.tab())).as("a modal over the item's window").isTrue();
+            assertThat(host.windows()).containsExactly("dialog|Delete Bookmark|true");
             var form = (Nodes.Form) question.spec().root();
             assertThat(((Nodes.Text) Views.node(form, BookmarkPanel.QUESTION)).text()).isEqualTo("Are you sure you want to delete this bookmark?");
             assertThat(form.actions()).extracting(Nodes.Button::label, Nodes.Button::kind).containsExactly(
@@ -122,8 +130,131 @@ class BookmarkPanelTest {
             assertThat(host.windowView(ID, "Delete Bookmark")).isEmpty();
         });
         memory.settle();
-        assertThat(bookmarks(stores)).extracting(Bookmark::url).containsExactly(A);
+        assertThat(bookmarks(stores)).singleElement().satisfies(bookmark -> {
+            assertThat(bookmark.url()).isEqualTo(A);
+            assertThat(bookmark.tags()).isEqualTo(List.of("work"));
+        });
         assertThat(onUi(() -> host.notifications().lines())).isEmpty();
+    }
+
+    /** The question is the item's tab's: it closes with the tab, and nothing is deleted. */
+    @Test void theDeleteQuestionClosesWithTheItemsTab() throws Exception {
+        Stores stores = open(A);
+        onUi(() -> view.choose(BrowserToolbar.MENU, BrowserToolbar.BOOKMARK_ADD));
+        memory.settle();
+        onUi(() -> panel().emit(new UiEvent.Action(BookmarkPanel.DELETE)));
+        onUi(() -> {
+            assertThat(host.windowView(ID, "Delete Bookmark")).isPresent();
+            item.close();
+            assertThat(host.windowView(ID, "Delete Bookmark")).as("closed with the tab").isEmpty();
+        });
+        memory.settle();
+        assertThat(bookmarks(stores)).extracting(Bookmark::url).containsExactly(A);
+    }
+
+    /** H23: Escape, the form's cancel, closes the panel and keeps the bookmark's tags as they were. */
+    @Test void escapeClosesThePanelAndDiscardsTheTagsTyped() throws Exception {
+        Stores stores = open(A);
+        onUi(() -> view.choose(BrowserToolbar.MENU, BrowserToolbar.BOOKMARK_ADD));
+        memory.settle();
+        var writes = writes(stores);
+        onUi(() -> {
+            FakeKitView panel = panel();
+            panel.type(BookmarkPanel.TAGS, "work,");
+            assertThat(((Nodes.Form) panel.spec().root()).cancelAction()).as("Escape").isEqualTo(BookmarkPanel.CANCEL);
+            panel.emit(new UiEvent.Action(BookmarkPanel.CANCEL));
+            assertThat(host.popoverViews(ID)).isEmpty();
+        });
+        memory.settle();
+        assertThat(bookmarks(stores)).singleElement().satisfies(bookmark -> assertThat(bookmark.tags()).isEmpty());
+        assertThat(writes).as("nothing written").hasValue(0);
+    }
+
+    /** H23: the page's next load start keeps the tags the panel shows, then closes it, and so does the item's close. */
+    @Test void aLoadStartAndTheItemsCloseKeepTheTagsShown() throws Exception {
+        Stores stores = open(A);
+        onUi(() -> view.choose(BrowserToolbar.MENU, BrowserToolbar.BOOKMARK_ADD));
+        memory.settle();
+        var writes = writes(stores);
+        onUi(() -> {
+            panel().type(BookmarkPanel.TAGS, "work,");
+            PageTestAccess.loadStarted(item.page(), B, Reached.LINK);
+            assertThat(host.popoverViews(ID)).isEmpty();
+        });
+        memory.settle();
+        assertThat(bookmarks(stores)).singleElement().satisfies(bookmark -> assertThat(bookmark.tags()).containsExactly("work"));
+        assertThat(writes).as("one write").hasValue(1);
+        onUi(() -> {
+            PageTestAccess.addressChanged(item.page(), B);
+            view.choose(BrowserToolbar.MENU, BrowserToolbar.BOOKMARK_ADD);
+        });
+        memory.settle();
+        onUi(() -> {
+            panel().type(BookmarkPanel.TAGS, "news,");
+            item.close();
+        });
+        memory.settle();
+        assertThat(bookmarks(stores)).filteredOn(bookmark -> bookmark.url().equals(B)).singleElement()
+            .satisfies(bookmark -> assertThat(bookmark.tags()).containsExactly("news"));
+    }
+
+    /**
+     * H23: a click outside, which closes the popover as its host does, keeps the tags shown. The panel is opened here as
+     * its item opens it, and closed through {@link BookmarkPanel#close}, what the host's dismissal amounts to.
+     */
+    @Test void aClickOutsideKeepsTheTagsShown() throws Exception {
+        Stores stores = open(A);
+        Bookmark bookmark = stores.bookmarks().add(A, "A page", 1L).get(10, TimeUnit.SECONDS);
+        onUi(() -> {
+            BookmarkPanel shown = BookmarkPanel.open(context, view.anchor(BrowserToolbar.MENU), stores, bookmark,
+                context.notifications().group(BookmarkPanel.GROUP), item.page(), item.tab());
+            panel().type(BookmarkPanel.TAGS, "work, news,");
+            shown.close();
+            assertThat(host.popoverViews(ID)).isEmpty();
+        });
+        memory.settle();
+        assertThat(bookmarks(stores)).singleElement().satisfies(kept -> assertThat(kept.tags()).containsExactly("work", "news"));
+    }
+
+    /** H23: a panel that closes with the tags it opened with writes nothing, as each write reads the bookmarks again. */
+    @Test void aCloseWithTheTagsUnchangedWritesNothing() throws Exception {
+        Stores stores = open(A);
+        onUi(() -> view.choose(BrowserToolbar.MENU, BrowserToolbar.BOOKMARK_ADD));
+        memory.settle();
+        var writes = writes(stores);
+        onUi(() -> {
+            panel().type(BookmarkPanel.TAGS, "work,");
+            panel().press(BookmarkPanel.TAGS, "BACK_SPACE");
+            assertThat(panel().tokens(BookmarkPanel.TAGS)).as("typed, then removed").isEmpty();
+            PageTestAccess.loadStarted(item.page(), B, Reached.LINK);
+        });
+        memory.settle();
+        assertThat(writes).as("the load start's close").hasValue(0);
+        onUi(() -> {
+            PageTestAccess.addressChanged(item.page(), B);
+            view.choose(BrowserToolbar.MENU, BrowserToolbar.BOOKMARK_ADD);
+        });
+        memory.settle();
+        writes.set(0);
+        onUi(() -> panel().emit(new UiEvent.Action(BookmarkPanel.SAVE)));
+        memory.settle();
+        assertThat(writes).as("an unchanged Save").hasValue(0);
+        assertThat(bookmarks(stores)).allSatisfy(bookmark -> assertThat(bookmark.tags()).isEmpty());
+    }
+
+    /** Add Bookmark for a page bookmarks never keep, which its disabled item would not report, stores nothing and opens nothing. */
+    @Test void aRefusedAddOpensNoPanelAndStoresNothing() throws Exception {
+        Stores stores = open("jasper-about:welcome");
+        onUi(() -> {
+            assertThat(menu().getFirst().enabled()).isFalse();
+            view.emit(new UiEvent.Action(BrowserToolbar.BOOKMARK_ADD));
+        });
+        memory.settle();
+        assertThat(bookmarks(stores)).isEmpty();
+        onUi(() -> {
+            assertThat(host.popoverViews(ID)).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        });
     }
 
     @Test void deleteBookmarkAsksThenDeletesItAndSaysSo() throws Exception {
@@ -221,17 +352,17 @@ class BookmarkPanelTest {
         Stores stores = memory.make();
         onUi(() -> {
             host = new FakePluginHost();
-            var context = new AtomicReference<PluginContext>();
             var settings = new AtomicReference<BrowserSettings.Declared>();
             host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(), plugin -> {
-                context.set(plugin);
+                context = plugin;
                 settings.set(BrowserSettings.declare(plugin.settings()));
             });
             // Title waits never end, and the engine is never asked: neither is what these tests are about.
-            var items = new BrowserItems(context.get(), settings.get()::read, stores, page -> { }, (delay, task) -> () -> { },
+            var items = new BrowserItems(context, settings.get()::read, stores, page -> { }, (delay, task) -> () -> { },
                 request -> new CompletableFuture<>());
             item = items.open(URI.create(address), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
-            view = host.contentView(ID, URI.create(address).getHost()).orElseThrow();
+            String tabTitle = Optional.ofNullable(URI.create(address).getHost()).orElse(TabTitle.UNTITLED);
+            view = host.contentView(ID, tabTitle).orElseThrow();
             return null;
         });
         return stores;
@@ -251,6 +382,13 @@ class BookmarkPanelTest {
     private static List<String> rowLabels(Nodes.Form form) {
         return form.sections().stream().filter(Nodes.Card.class::isInstance).flatMap(card -> ((Nodes.Card) card).children().stream())
             .filter(Nodes.FormRow.class::isInstance).map(row -> ((Nodes.FormRow) row).label()).toList();
+    }
+
+    /** Counts the bookmark store's writes from now on: each add, tags, removal or deletion that changed something. */
+    private static AtomicInteger writes(Stores stores) {
+        var writes = new AtomicInteger();
+        stores.bookmarks().onChanged(writes::incrementAndGet);
+        return writes;
     }
 
     private static List<Bookmark> bookmarks(Stores stores) throws Exception {
