@@ -30,7 +30,7 @@ class WebMenuTest {
     private static final PluginInfo INFO = new PluginInfo(ID, "Browser", "0.1.0", Set.of("browser.provide"));
     private static final String MENU = "top:dev.jasper.browser.web", NEW_TAB = "dev.jasper.browser.new_tab";
     private static final String OPEN_LOCATION = "dev.jasper.browser.open_location", BACK = "dev.jasper.browser.back",
-        FORWARD = "dev.jasper.browser.forward", RELOAD = "dev.jasper.browser.reload";
+        FORWARD = "dev.jasper.browser.forward", RELOAD = "dev.jasper.browser.reload", HISTORY = "dev.jasper.browser.history";
     private static final URI EXAMPLE = URI.create("https://example.com"), OTHER = URI.create("https://example.org");
 
     /** Each item's action, title, macOS key and Linux and Windows key, in the menu's order. */
@@ -40,7 +40,8 @@ class WebMenuTest {
         new Expected(OPEN_LOCATION, "Open Location…", "cmd+l", "ctrl+l"),
         new Expected(BACK, "Back", "cmd+[", "alt+left"),
         new Expected(FORWARD, "Forward", "cmd+]", "alt+right"),
-        new Expected(RELOAD, "Reload Page", "cmd+r", "ctrl+r"));
+        new Expected(RELOAD, "Reload Page", "cmd+r", "ctrl+r"),
+        new Expected(HISTORY, "History", "cmd+y", "ctrl+h"));
 
     // Stores in memory, one for each BrowserItems a test makes.
     private final MemoryStores memory = new MemoryStores();
@@ -64,11 +65,23 @@ class WebMenuTest {
         } });
     }
 
-    @Test void theMenuHoldsOpenLocationThenBackAndForwardThenReloadPage() throws Exception {
+    /** Spec section 7: History, which iTerm2 keeps beside Reload Page, and its own palette words. */
+    @Test void historyIsAnItemOfItsOwnWithItsPaletteWords() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            host.start(INFO, Set.of(), Set.of(), new BrowserPlugin());
+            assertThat(host.actionSpec(HISTORY)).get().satisfies(spec -> {
+                assertThat(spec.title()).isEqualTo("History");
+                assertThat(spec.keywords()).contains("browser", "web", "page", "history", "visited");
+            });
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    @Test void theMenuHoldsOpenLocationThenBackAndForwardThenReloadPageAndHistory() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
             host.start(INFO, Set.of(), Set.of(), new BrowserPlugin());
             assertThat(host.menu(MENU)).containsExactly("item:" + OPEN_LOCATION, "---", "item:" + BACK, "item:" + FORWARD,
-                "---", "item:" + RELOAD);
+                "---", "item:" + RELOAD, "item:" + HISTORY);
             assertThat(host.failures()).isEmpty();
         } });
     }
@@ -108,7 +121,8 @@ class WebMenuTest {
             host.activateTerminalWindow(second);
             items.open(OTHER, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
             for (Expected item : ITEMS) assertThat(host.invoke(item.id(), second, null)).isTrue();
-            assertThat(ran).containsExactly(OPEN_LOCATION + " " + OTHER, BACK + " " + OTHER, FORWARD + " " + OTHER, RELOAD + " " + OTHER);
+            assertThat(ran).containsExactly(OPEN_LOCATION + " " + OTHER, BACK + " " + OTHER, FORWARD + " " + OTHER, RELOAD + " " + OTHER,
+                HISTORY + " " + OTHER);
             ran.clear();
             assertThat(host.invoke(BACK, first, null)).isTrue();
             assertThat(ran).as("the window it runs in").containsExactly(BACK + " " + EXAMPLE);
@@ -141,6 +155,24 @@ class WebMenuTest {
             assertThat(host.contentView(ID, "example.org").orElseThrow().focused()).as("the other window's item").isEmpty();
             // Back, Forward and Reload Page ask a page that has no browser yet, which does nothing.
             for (String action : List.of(BACK, FORWARD, RELOAD)) assertThat(host.invoke(action, first, null)).isTrue();
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /** Spec section 7: History loads Jasper's history page in the focused browser item of the window it runs in. */
+    @Test void historyLoadsTheHistoryPageInThatWindowsItem() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var items = items(host);
+            WebMenu.register(items.context(), items);
+            UUID first = host.addTerminalWindow();
+            host.activateTerminalWindow(first);
+            BrowserItem example = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            UUID second = host.addTerminalWindow();
+            host.activateTerminalWindow(second);
+            BrowserItem other = items.open(OTHER, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            assertThat(host.invoke(HISTORY, first, null)).isTrue();
+            assertThat(example.url()).isEqualTo(URI.create("jasper-about:history"));
+            assertThat(other.url()).as("the other window's item").isEqualTo(OTHER);
             assertThat(host.failures()).isEmpty();
         } });
     }

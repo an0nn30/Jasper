@@ -12,6 +12,8 @@ import dev.jasper.browser.item.ErrorPage;
 import dev.jasper.browser.item.SourcePage;
 import dev.jasper.browser.item.WebMenu;
 import dev.jasper.browser.links.PageNavigation;
+import dev.jasper.browser.pages.AboutPages;
+import dev.jasper.browser.pages.HistoryPage;
 import dev.jasper.browser.preview.PreviewService;
 import dev.jasper.browser.restore.BrowserRestore;
 import dev.jasper.browser.routing.BrowserRole;
@@ -30,6 +32,7 @@ import dev.jasper.sdk.ui.TabPlacement;
 import java.awt.EventQueue;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -39,8 +42,8 @@ import java.util.concurrent.RejectedExecutionException;
 
 /**
  * The Browser: web pages as Jasper items. Its start registers New Browser Tab, New Browser Window and the Browser split
- * item, the globe they show, the Web menu, Settings › Browser, the welcome page, the error page with its Try Again and
- * Continue actions, View Source's page, the Browser as Jasper's web browser,
+ * item, the globe they show, the Web menu, Settings › Browser, the welcome page, the history page and its queries, the
+ * error page with its Try Again and Continue actions, View Source's page, the Browser as Jasper's web browser,
  * the terminal's Open URL in Split items and the restorer of saved browser items, publishes the Markdown previews'
  * service ({@link MarkdownPreviews}), and makes Chromium's engine, which starts Chromium only when a browser item or a
  * Markdown preview first shows, so starting the plugin, and restoring its items, loads no Chromium class. After a run
@@ -99,6 +102,12 @@ public class BrowserPlugin implements Plugin {
         var welcome = new WelcomePage(context.appearance());
         about.register(WelcomePage.NAME, welcome::html);
         about.registerAction(WelcomePage.SETTINGS, () -> { if (running) items.showSettings(); });
+        // Jasper's pages built from their templates, in the workspace theme. Spec section 10: the history page, whose
+        // queries are answered from the history; the asking browser is not needed yet.
+        var pages = new AboutPages(context.appearance(), about);
+        var history = stores.history();
+        about.register(HistoryPage.NAME, () -> pages.render(HistoryPage.NAME, Map.of()));
+        about.registerQueries(HistoryPage.NAME, (browser, request) -> HistoryPage.answer(history, request));
         // Spec section 14: a failed load's page, and what its Try Again and Continue ask of the item whose page it is.
         var errors = new ErrorPage(context.appearance());
         about.register(ErrorPage.NAME, errors::html);

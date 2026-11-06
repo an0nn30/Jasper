@@ -69,18 +69,30 @@ class BrowserToolbarTest {
     }
 
     /**
-     * Spec section 6: Back and Forward hold the page's history, nearest entry first, while a short press still goes back
-     * or forward; with nothing that way the button holds no menu.
+     * Spec section 6: Back and Forward hold the page's history, nearest entry first, then, as Chrome's do, a separator and
+     * Show Full History (plan 5's H2), while a short press still goes back or forward; with nothing that way the button
+     * holds no menu.
      */
-    @Test void backAndForwardHoldThePagesHistory() {
+    @Test void backAndForwardHoldThePagesHistoryThenShowFullHistory() {
         var toolbar = new BrowserToolbar(typed -> List.of());
         var history = new History(1, List.of(new Entry(1, "https://example.com/one", "One"), new Entry(2, START, "Here"),
             new Entry(3, "https://example.com/three", "Three"), new Entry(4, "https://example.com/four", "Four")));
         Nodes.Stack bar = toolbar.node(START, false, true, true, Optional.empty(), history, GOOGLE, false);
         Nodes.Button back = Views.button(bar, BrowserToolbar.BACK), forward = Views.button(bar, BrowserToolbar.FORWARD);
-        assertThat(back.holdMenu()).isEqualTo(NavigationHistory.backMenu(history)).extracting(MenuItem::label).containsExactly("One");
-        assertThat(forward.holdMenu()).isEqualTo(NavigationHistory.forwardMenu(history)).extracting(MenuItem::label)
-            .containsExactly("Three", "Four");
+        assertThat(back.holdMenu()).startsWith(NavigationHistory.backMenu(history).toArray(MenuItem[]::new)).hasSize(3);
+        assertThat(back.holdMenu()).extracting(MenuItem::label).containsExactly("One", "", "Show Full History");
+        assertThat(forward.holdMenu()).startsWith(NavigationHistory.forwardMenu(history).toArray(MenuItem[]::new))
+            .extracting(MenuItem::label).containsExactly("Three", "Four", "", "Show Full History");
+        for (Nodes.Button button : List.of(back, forward)) {
+            List<MenuItem> menu = button.holdMenu();
+            assertThat(menu.get(menu.size() - 2).separator()).as("a separator before it").isTrue();
+            assertThat(menu.getLast()).satisfies(full -> {
+                assertThat(full.action()).isEqualTo(BrowserToolbar.SHOW_HISTORY);
+                assertThat(full.enabled()).isTrue();
+                assertThat(full.separator()).isFalse();
+                assertThat(NavigationHistory.entryId(full.action())).as("no entry of the page's").isEmpty();
+            });
+        }
         assertThat(back.action()).isEqualTo(BrowserToolbar.BACK);
         assertThat(forward.action()).isEqualTo(BrowserToolbar.FORWARD);
         Nodes.Stack last = toolbar.node(START, false, true, false, Optional.empty(), new History(1, history.entries().subList(0, 2)), GOOGLE, false);

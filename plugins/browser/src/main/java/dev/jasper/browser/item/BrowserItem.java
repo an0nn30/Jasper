@@ -7,6 +7,7 @@ import dev.jasper.browser.page.MenuPlace;
 import dev.jasper.browser.page.NavigationButton;
 import dev.jasper.browser.page.NavigationHistory;
 import dev.jasper.browser.page.Page;
+import dev.jasper.browser.pages.HistoryPage;
 import dev.jasper.browser.restore.BrowserRestore;
 import dev.jasper.browser.settings.BrowserSettings;
 import dev.jasper.browser.store.Stores;
@@ -64,7 +65,8 @@ import javax.swing.JComponent;
  * down, which the item saves as its own zoom, or back to Page zoom, which leaves it none; on Windows and Linux,
  * Ctrl+wheel over the page steps the zoom too, unsaved. Chromium keeps one zoom per host, so two items on one host that
  * show at once share the zoom set last (an engine-forced gap). The mouse's back and forward buttons over the page go
- * back and forward, and an entry chosen from Back's or Forward's hold menu goes to that entry of the page's history. It
+ * back and forward, and an entry chosen from Back's or Forward's hold menu goes to that entry of the page's history,
+ * while their Show Full History loads Jasper's history page ({@link #showHistory}). It
  * saves its URL, its own zoom and its target with Jasper's workspace ({@link BrowserRestore}): what it loads first until
  * it shows, then where each committed navigation takes its page.
  * Restored after a run that ended while Chromium ran, an item waits: in place of the canvas it says that Jasper closed
@@ -288,6 +290,14 @@ public final class BrowserItem implements AutoCloseable {
     /** Pastes the clipboard into the page. */
     public void paste() {
         if (!closed) page.paste();
+    }
+
+    /**
+     * Loads Jasper's history page, and the page takes the focus, as Web › History and the hold menus' Show Full History
+     * do.
+     */
+    public void showHistory() {
+        if (!closed) loadAndFocus(HistoryPage.ADDRESS);
     }
 
     /** Focuses the address field and selects its text, as Open Location does. */
@@ -609,6 +619,7 @@ public final class BrowserItem implements AutoCloseable {
                 view.selectAll(BrowserToolbar.ADDRESS);
             }
             case BrowserToolbar.SETTINGS -> items.showSettings();
+            case BrowserToolbar.SHOW_HISTORY -> showHistory();
             case LOAD_PAGE -> {
                 endWait();
                 page.focus();

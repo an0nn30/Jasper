@@ -186,7 +186,8 @@ class BrowserItemTest {
 
     /**
      * Spec section 6: the item's Back and Forward hold its page's history as last read, and choosing an entry sends the
-     * page there as Jasper's own navigation (4a's R41 and R42); an entry the history no longer has does nothing.
+     * page there as Jasper's own navigation (4a's R41 and R42); an entry the history no longer has does nothing. Each
+     * menu's Show Full History loads Jasper's history page (plan 5's H2).
      */
     @Test void backAndForwardHoldThePagesHistoryAndAChosenEntrySendsThePageThere() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
@@ -199,9 +200,10 @@ class BrowserItemTest {
                 new Entry(6, "https://example.com/", "Example Domain"), new Entry(9, "https://ada:secret@example.net/", "")));
             PageTestAccess.loadingChanged(page, false, true, true);
             PageTestAccess.historyRead(page, history);
-            assertThat(Views.button(view, BrowserToolbar.BACK).holdMenu()).extracting(MenuItem::label).containsExactly("Example Org");
+            assertThat(Views.button(view, BrowserToolbar.BACK).holdMenu()).extracting(MenuItem::label)
+                .containsExactly("Example Org", "", "Show Full History");
             assertThat(Views.button(view, BrowserToolbar.FORWARD).holdMenu()).extracting(MenuItem::label)
-                .containsExactly("https://example.net/");
+                .containsExactly("https://example.net/", "", "Show Full History");
             var navigations = new AtomicInteger();
             page.onNavigate(navigations::incrementAndGet);
             String back = Views.button(view, BrowserToolbar.BACK).holdMenu().getFirst().id();
@@ -215,6 +217,9 @@ class BrowserItemTest {
             assertThat(navigations).as("an entry the history no longer has").hasValue(1);
             view.choose(BrowserToolbar.FORWARD, Views.button(view, BrowserToolbar.FORWARD).holdMenu().getFirst().id());
             assertThat(navigations).hasValue(2);
+            view.choose(BrowserToolbar.FORWARD, Views.button(view, BrowserToolbar.FORWARD).holdMenu().getLast().id());
+            assertThat(item.url()).as("Show Full History").isEqualTo(URI.create("jasper-about:history"));
+            assertThat(navigations).as("a load the page tells of").hasValue(3);
             assertThat(((FakeKit) items.context().kit()).failures()).isEmpty();
             assertThat(host.failures()).isEmpty();
         } });

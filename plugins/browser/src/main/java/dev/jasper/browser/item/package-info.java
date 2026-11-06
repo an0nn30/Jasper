@@ -15,7 +15,8 @@
  * item's {@code SourcePages} captured it; both take the theme's colours and their tokens from the {@code pages}
  * package's {@link dev.jasper.browser.pages.PageHtml}. Inspect Element shows a page's DevTools in its item's
  * {@code DevToolsItem}, a pane below the item's that is never saved. Each item records its page's loads and titles in
- * the {@code store} package's history ({@code HistoryRecorder}). Each item saves its restore state through the
+ * the {@code store} package's history ({@code HistoryRecorder}), and the Web menu's History and the hold menus' Show
+ * Full History load the {@code pages} package's history page. Each item saves its restore state through the
  * {@code restore} package, and {@code BrowserItems} opens saved ones again.
  */
 package dev.jasper.browser.item;

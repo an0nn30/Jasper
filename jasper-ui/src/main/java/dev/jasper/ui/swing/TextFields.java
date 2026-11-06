@@ -12,7 +12,17 @@ import javax.swing.text.*;
 
 /** Persistent documents, guarded numeric edits and literal labels/validation for ordinary fields. */
 final class TextFields {
+    /** Ctrl+H, which the look and feel binds to Delete Backward. */
+    private static final KeyStroke CTRL_H = KeyStroke.getKeyStroke("ctrl H");
     private TextFields() {}
+    /**
+     * Whether a field leaves Ctrl+H to the window's keymap on the platform {@code osName} names: on Windows and Linux,
+     * where Jasper's browser opens History on it, as Chrome's address bar does, from every field. macOS keeps it as
+     * Delete Backward. Backspace deletes on every platform.
+     */
+    static boolean releasesCtrlH(String osName) {
+        return !osName.toLowerCase(java.util.Locale.ROOT).contains("mac");
+    }
     static class FieldControl extends ControlRegistry.Control {
         boolean panelSearch, settings;
         /** A three-column manager's list search: a full-size field with the measured column glyph and gap. */
@@ -53,6 +63,8 @@ final class TextFields {
             if (input instanceof JTextArea area) { area.setLineWrap(true); area.setWrapStyleWord(true); }
             input.setOpaque(false); input.setBorder(new EmptyBorder(0, 0, 0, 0)); KitOwnership.mark(input, node.id() + ".input");
             if (node.kind() == Nodes.FieldKind.PORT) ((AbstractDocument)input.getDocument()).setDocumentFilter(new NumericFilter());
+            // "none" hides the look and feel's binding and names no action, so the key passes on to the window's keymap.
+            if (releasesCtrlH(System.getProperty("os.name", ""))) input.getInputMap(JComponent.WHEN_FOCUSED).put(CTRL_H, "none");
             if (node.kind() != Nodes.FieldKind.TEXTAREA && node.kind() != Nodes.FieldKind.PATH) bindSubmit();
             if (node.kind() != Nodes.FieldKind.TEXTAREA) {
                 bindKey("shift ENTER", "field.alternate", () -> !((Nodes.Field)this.node).alternateAction().isBlank(),

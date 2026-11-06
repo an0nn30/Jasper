@@ -17,7 +17,8 @@ import java.util.function.Function;
 /**
  * A browser item's toolbar along the top of its page (spec section 6), as SDK nodes the kit draws: Back and Forward,
  * each disabled when the page cannot go there and each holding the page's twelve nearest history entries that way in
- * its hold menu; Reload, which is Stop while the page loads; the address field, with the site icon at its left; and the
+ * its hold menu, then, as Chrome's do, a separator and Show Full History, which opens Jasper's history page (plan 5's
+ * H2); Reload, which is Stop while the page loads; the address field, with the site icon at its left; and the
  * menu button, which holds Settings. The site icon is the page's icon, else the globe, and dragging it drags the page's
  * address; while the page is one Jasper goes on to past a certificate error, "Not secure", in the warning colour, stands
  * in its place (spec section 14). The click that brings the focus into the field selects all its text. The toolbar keeps what is typed into
@@ -36,6 +37,11 @@ final class BrowserToolbar {
     static final String ENTER = "browser.address.enter", ESCAPE = "browser.address.escape";
     /** What the menu's Settings reports. */
     static final String SETTINGS = "browser.settings";
+    /** What Show Full History, at the end of Back's and Forward's hold menus, reports. */
+    static final String SHOW_HISTORY = "browser.history.show";
+    // What ends a hold menu that lists entries of the page's history: a separator, then Show Full History.
+    private static final List<MenuItem> FULL_HISTORY = List.of(new MenuItem("browser.history.separator", "", "", "", true, true),
+        new MenuItem(SHOW_HISTORY, "Show Full History", "", SHOW_HISTORY, true, false));
     static final String PLACEHOLDER = "Search or enter website name";
     /** What says the page is not secure, in place of the site icon. */
     static final String NOT_SECURE = "browser.address.not-secure";
@@ -147,8 +153,13 @@ final class BrowserToolbar {
         suggesting = false;
     }
 
-    /** Back or Forward: a press goes there, and a held one opens {@code menu}, the page's history that way. */
-    private static Nodes.Button historyButton(String id, boolean enabled, String icon, String tooltip, List<MenuItem> menu) {
+    /**
+     * Back or Forward: a press goes there, and a held one opens {@code entries}, the page's history that way, then Show
+     * Full History; with no entries that way, it holds no menu.
+     */
+    private static Nodes.Button historyButton(String id, boolean enabled, String icon, String tooltip, List<MenuItem> entries) {
+        var menu = new ArrayList<MenuItem>(entries);
+        if (!menu.isEmpty()) menu.addAll(FULL_HISTORY);
         return new Nodes.Button(id, enabled(enabled), "", icon, Nodes.ButtonKind.GHOST, id, tooltip,
             Nodes.ButtonPresentation.STANDARD, Optional.empty(), Optional.empty(), menu);
     }

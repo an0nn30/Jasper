@@ -9,8 +9,9 @@ import java.util.Objects;
 import java.util.function.BiConsumer;
 
 /**
- * The Web menu (browser spec section 7): Open Location…, then Back and Forward, then Reload Page. A window's menu bar
- * shows it only while that window's current item is a browser item. Each item is an action whose keys apply in the
+ * The Web menu (browser spec section 7): Open Location…, then Back and Forward, then Reload Page and History, which
+ * loads Jasper's history page ({@code jasper-about:history}). A window's menu bar shows it only while that window's
+ * current item is a browser item. Each item is an action whose keys apply in the
  * Browser's items, where they win over the same keys bound elsewhere (Search Shell History's Cmd+R among them), and
  * each acts on the focused browser item of the window it runs in; with none there, it does nothing. Every one is bindable
  * in Settings › Keymap. UI thread.
@@ -18,7 +19,7 @@ import java.util.function.BiConsumer;
 public final class WebMenu {
     static final String MENU = "dev.jasper.browser.web";
     static final String OPEN_LOCATION = "dev.jasper.browser.open_location", BACK = "dev.jasper.browser.back",
-        FORWARD = "dev.jasper.browser.forward", RELOAD = "dev.jasper.browser.reload";
+        FORWARD = "dev.jasper.browser.forward", RELOAD = "dev.jasper.browser.reload", HISTORY = "dev.jasper.browser.history";
     private static final List<String> KEYWORDS = List.of("browser", "web", "page");
 
     /** One item: its action, title and keys on macOS and on Linux and Windows, and its own palette words. */
@@ -28,7 +29,9 @@ public final class WebMenu {
         new Item(OPEN_LOCATION, "Open Location…", "cmd+l", "ctrl+l", List.of("address", "url", "location")),
         new Item(BACK, "Back", "cmd+[", "alt+left", List.of("history", "previous")),
         new Item(FORWARD, "Forward", "cmd+]", "alt+right", List.of("history", "next")),
-        new Item(RELOAD, "Reload Page", "cmd+r", "ctrl+r", List.of("refresh")));
+        new Item(RELOAD, "Reload Page", "cmd+r", "ctrl+r", List.of("refresh")),
+        // iTerm2's Cmd+Y, and Chrome's Ctrl+H, which kit text fields leave to the keymap on Windows and Linux.
+        new Item(HISTORY, "History", "cmd+y", "ctrl+h", List.of("history", "visited")));
 
     private WebMenu() { }
 
@@ -67,6 +70,7 @@ public final class WebMenu {
         menu.add(FORWARD);
         menu.addSeparator();
         menu.add(RELOAD);
+        menu.add(HISTORY);
     }
 
     /** What the action {@code id} does to {@code item}. */
@@ -76,6 +80,7 @@ public final class WebMenu {
             case BACK -> item.goBack();
             case FORWARD -> item.goForward();
             case RELOAD -> item.reload();
+            case HISTORY -> item.showHistory();
             default -> throw new IllegalArgumentException("Not a Web menu action: " + id);
         }
     }

@@ -9,6 +9,7 @@ h1 { margin: 0 0 4px; font-size: 28px; font-weight: 600; }
 h2 { margin: 28px 0 8px; font-size: 13px; font-weight: 600; color: var(--muted); }
 .subtitle { margin: 0 0 24px; color: var(--muted); }
 .muted { color: var(--muted); }
+.failure { margin: 0 0 16px; color: var(--error); }
 .grow { flex: 1; min-width: 0; }
 .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 16px; }
 input, select, button { font: inherit; color: var(--text); }
@@ -35,7 +36,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .row:hover { background: var(--card); }
 .title { overflow-wrap: anywhere; }
 .address { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
-.time { flex: none; width: 4em; color: var(--muted); font-variant-numeric: tabular-nums; }
+.time { flex: none; min-width: 4em; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { padding: 1px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--card); font-size: 12px; }
 .chip[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }

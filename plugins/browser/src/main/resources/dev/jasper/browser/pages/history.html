@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>History</title>
+{{style}}
+</head>
+<body>
+<main>
+<h1>Browsing History</h1>
+<p class="subtitle">View and manage your browsing history</p>
+<div class="toolbar">
+<input type="search" id="search" placeholder="Search your browsing history…" aria-label="Search your browsing history" autocomplete="off" autofocus>
+<button type="button" id="clear" class="danger">Clear All History</button>
+</div>
+<p id="failure" class="failure" role="alert" hidden></p>
+<div id="entries"></div>
+<p id="empty" class="empty" hidden>No browsing history</p>
+<button type="button" id="more" class="more" hidden>Load More</button>
+</main>
+{{script}}
+</body>
+</html>

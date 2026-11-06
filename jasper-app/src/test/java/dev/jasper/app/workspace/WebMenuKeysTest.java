@@ -21,9 +21,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * The Browser's Web menu keys (browser spec section 7) as a window resolves them: the Browser's content actions with
- * the Web menu's four default keys, beside History's Search Shell History and SFTP's Back and Forward as those plugins
+ * the Web menu's five default keys, beside History's Search Shell History and SFTP's Back and Forward as those plugins
  * register them. They clash with nothing on either keymap. In a browser item, in its page or its address field, they run
- * the item's actions; in a terminal pane beside it Cmd+R still searches shell history and the others reach the shell.
+ * the item's actions; in a terminal pane beside it Cmd+R still searches shell history and the others reach the shell,
+ * Ctrl+H, the shell's Backspace, among them.
  */
 class WebMenuKeysTest {
     private static final String BROWSER = "dev.jasper.browser", HISTORY = "dev.jasper.history.open";
@@ -34,7 +35,7 @@ class WebMenuKeysTest {
 
     private static final List<Web> WEB = List.of(new Web(BROWSER + ".open_location", "cmd+l", "ctrl+l"),
         new Web(BROWSER + ".back", "cmd+[", "alt+left"), new Web(BROWSER + ".forward", "cmd+]", "alt+right"),
-        new Web(BROWSER + ".reload", "cmd+r", "ctrl+r"));
+        new Web(BROWSER + ".reload", "cmd+r", "ctrl+r"), new Web(BROWSER + ".history", "cmd+y", "ctrl+h"));
 
     @AfterEach void cleanup() throws Exception { closeOwners(); }
 
