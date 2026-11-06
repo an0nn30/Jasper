@@ -215,8 +215,8 @@ keyboard:
   Tags keep the case you type them in, in every look.
 
 **Save** keeps the tags and closes the panel, and Escape closes it, dropping the changes. However else it closes, by a
-click outside, the page's next load, closing the page, or **Delete Bookmark**, the bookmark keeps the tags the panel
-shows.
+click outside, the page's next load, closing the page, quitting Jasper, turning the Browser off or **Delete Bookmark**,
+the bookmark keeps the tags the panel shows.
 **Delete Bookmark** asks "Are you sure you want to delete this bookmark?": **Delete** deletes the bookmark and posts
 "Bookmark Deleted", and **Cancel** keeps it.
 
@@ -237,7 +237,7 @@ else its address, its address as a link, its tags and the day it was added.
 The Browser adds two scopes to the [command palette](command-palette.md#bundled-scopes), both searched in All:
 
 - **Bookmarks** ("Search bookmarks") lists the bookmarks whose title, address or tags hold every word typed, those whose
-  title begins with the text first, then the newest. Its chip with nothing typed lists them all, newest first.
+  title begins with the text first, then the newest. Its chip with nothing typed lists the 200 newest.
   Bookmarks you open appear among the empty query's rows.
 - **Browser History** ("Search visited sites") lists the sites whose title or address holds every word typed, the most
   visited first, then the most recent. Its chip with nothing typed lists the 50 visited most recently, under "Recent".
@@ -255,10 +255,16 @@ browser page too, when the palette opened over the page, or the [Run window](com
 current item is the page: the snippet goes into the field you are typing in, and Paste and run presses Return after it.
 
 Jasper looks for the focused field from the page's top document, through frames of the same origin and open shadow
-roots: an input that takes text (text, search, URL, telephone, email or password), a text area or an editable element,
-not disabled or read-only. The snippet replaces the field's selection, as typing would. When the search finds no such
-field, as when the focus is in a frame of another origin, Jasper types the snippet where the page's focus is, with
-Chromium's DevTools (`Input.insertText`). The clipboard is never used.
+roots: an input that takes text (text, search, URL, telephone, email, number, or password, as a snippet may be a user
+name or a code), a text area or an editable element, not disabled or read-only. The snippet replaces the field's
+selection, as typing would. When the focus is where the search cannot follow it, in a frame of another origin or a
+closed shadow root, Jasper types the snippet there with Chromium's DevTools (`Input.insertText`). The clipboard is never
+used.
+
+When the focus takes no text, Jasper does nothing: nothing is typed and Paste and run presses no Return, which would
+press the page's control. That is so for a button, a link, a checkbox, a disabled or read-only field, the page itself
+with nothing focused, and a number field or an editable element that refuses the snippet. Nor is anything typed or
+pressed once the page has started loading another page.
 
 - Return, and a snippet typed with DevTools, are trusted input, as your own keys are: the page gets user activation
   from them. The page sees the input events of every insertion.
@@ -270,15 +276,18 @@ Chromium's DevTools (`Input.insertText`). The clipboard is never used.
 
 ## Copy on select
 
-With **Copy on select** on (Settings › Terminal, `terminal.copy_on_select`), a selection you make in a page is copied
-to the clipboard about a tenth of a second after you finish it. The setting applies from the next selection.
+With **Copy on select** on (Settings › Terminal, `terminal.copy_on_select`), a selection you make in a browser page,
+though not in a Markdown preview, is copied to the clipboard about a tenth of a second after you finish it. The setting
+applies from the next selection.
 
 - **What finishes a selection:** releasing the mouse button after a drag, a double or triple click, or a Shift+click;
   releasing the keys after Shift with an arrow, Home, End, Page Up or Page Down, or after Cmd+A (Ctrl+A on Linux and
   Windows); and the right-click menu's **Select All**. A plain click copies nothing, and nor does typing, Shift+Tab
   included, or a selection a page's script makes on its own.
 - **Only a changed selection is copied:** a gesture that leaves the selection as it was, such as a drag of a
-  scrollbar, a map or a slider, copies nothing over what you copied since.
+  scrollbar, a map or a slider, copies nothing over what you copied since. On a page that is slow to answer, a
+  selection you finish while Jasper still reads an earlier one is copied once the page answers; one whose read Jasper
+  gave up on, after 5 seconds, is copied only once you change the selection.
 - **Never copied:** the text of a password field or of a field the page masks with CSS; the selection of an email or a
   number field; a selection longer than 1,048,576 characters; and a selection inside a frame of another origin, which
   **Copy** copies.
@@ -727,5 +736,9 @@ Under [Jasper home](getting-started.md#jasper-home):
 | `plugins/dev.jasper.browser/data/browser.sqlite` | [History](#history) and [bookmarks](#bookmarks), in SQLite |
 | `plugins/dev.jasper.browser/data/onboarding-finished` | That the [onboarding](#opening-pages) is finished |
 
-SQLite's native library loads from the copy in `jasper-sqlite` in the system's temporary folder that
-[Remote](remote.md#files) describes, which the Browser writes there when Remote has not.
+SQLite's native library loads from the copy in `jasper-sqlite` (on Linux `jasper-sqlite-<user>`) in the system's
+temporary folder that [Remote](remote.md#files) describes, which the Browser writes there when Remote has not.
+
+On macOS and Linux, before Jasper first opens `browser.sqlite` or starts Chromium, it takes every permission of other
+users away from the `data` folder, and from `browser.sqlite` and its `-wal` and `-shm` files, so no other user of the
+computer can read your history, your bookmarks or Chromium's cookies.

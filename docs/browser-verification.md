@@ -462,8 +462,26 @@ Each is pending.
   after a navigation starts may copy nothing once, and the next gesture copies; a Markdown preview's selection copies
   nothing (H-F34).
 
+#### Lines the final review's fix wave added
+
+Each is pending.
+
+- **Paste and run (H38):** Paste and run with the focus on a page button or a read-only field does nothing: no
+  snippet, and no Return, so the button is not pressed and the read-only field's form is not submitted. With nothing
+  focused, on a link or on a checkbox it does nothing either; in a number field it types the snippet's digits; a page
+  that navigates while the snippet goes in gets nothing more.
+- **Copy on select on a slow page (H36):** a selection finished while the page's script is busy (a loop of a few
+  seconds started from its DevTools console), then a second one, copies the second once the page is free.
+- **The data folder (H37):** once a page has loaded, `ls -ld` shows `drwx------` for `plugins/dev.jasper.browser/data`
+  and `ls -l` shows `-rw-------` for `browser.sqlite`, also when they had wider permissions before the launch.
+- **Quitting with Edit Bookmark open:** tags typed in the open panel are kept after Cmd+Q, and after turning the
+  Browser off in Settings › Plugins.
+- **The bookmarks page:** with a tag chosen, removing it from its last bookmark in Edit Bookmark, then a new search or
+  sort on the page, shows every bookmark and no chip pressed.
+
 ### Plan 5 on Windows and Linux (not run)
 
 The user has no Windows or Linux host yet. Every line above waits for each of them too, with Ctrl in place of Cmd, and
 Narrator or NVDA, and Orca, in place of VoiceOver. On both, Ctrl+H deletes nothing in Settings' text fields or in Edit
-Bookmark's Tags (H17).
+Bookmark's Tags (H17), and in a terminal pane's find bar it deletes the character before the caret. On Linux, the data
+folder line holds too; on Windows the folder keeps its permissions.

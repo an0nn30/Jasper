@@ -4,18 +4,19 @@
 > superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Execution status (2026-11-06): Tasks 1-12 executed and reviewed (Task 6 as 6a and 6b, ruling H5), and Task 13, the
-docs; the final review has not run; Task 14, the user's GUI check on macOS, is pending** (branch
-`claude/browser-history-bookmarks`, worktree `.claude/worktrees/browser-4b-4c-e6deab`, cut from local `main`
-`68265a983`, which has plans 4a, 4b, 4c and 9 merged; the plan `4930f00b6`, then commits `6240e693d` to `986462e5c` and
-the docs; not merged or pushed; see `docs/STATUS.md`). Executed with per-task subagents and reviews. The pre-flight
-scan's findings F1-F39 were adopted as rulings (H0, cited H-F*n*) except where H1-H6 decide otherwise, and the
-controller's further rulings are H1-H36; plan 4a's R0-R48, its sandbox ruling and the banners of 4b, 4c and 9 bind. The
-task reviews recorded these deviations from the plan's text, each with its ruling:
+docs; the final review passed the branch "With fixes" and the docs review "Approved with fixes", and the fix wave that
+followed is done; Task 14, the user's GUI check on macOS, is pending** (branch `claude/browser-history-bookmarks`,
+worktree `.claude/worktrees/browser-4b-4c-e6deab`, cut from local `main` `68265a983`, which has plans 4a, 4b, 4c and 9
+merged; the plan `4930f00b6`, then commits `6240e693d` to `986462e5c`, the docs `01dae94a0` and `4659c642e`, and the fix
+wave `1e9f2f717` to `032fbdcc3` and its docs; not merged or pushed; see `docs/STATUS.md`). Executed with per-task
+subagents and reviews. The pre-flight scan's findings F1-F39 were adopted as rulings (H0, cited H-F*n*) except where
+H1-H6 decide otherwise, and the controller's further rulings are H1-H39; plan 4a's R0-R48, its sandbox ruling and the
+banners of 4b, 4c and 9 bind. The task reviews recorded these deviations from the plan's text, each with its ruling:
 - **Versions:** `JasperSdk.VERSION` 0.28.0 to 0.29.0, every bundled range `>=0.29.0, <0.30` (Task 6a). New SDK members,
   each `@since 0.29.0`: 6b's token field (`Nodes.TokenField`, `TokenField.kept`, `UiEvent.TokensChanged`, and the
   fake's `tokens`, `tokenText`, `removeToken` and `selectedToken`), H21's menu-button anchor (`UiView.anchor` takes a
   `Nodes.MenuButton`), and Task 10's `InsertedText`, `TextTarget`, `ContentTab.setTextInsertion`,
-  `PaletteQuery.textTarget` and `Platform.copyOnSelect()`, with the testkit's `copyOnSelect`, `addTextTarget`,
+  `PaletteQuery.textTarget` and `Platform.copyOnSelect()`, with the testkit's `setCopyOnSelect` (H39), `addTextTarget`,
   `insertedText` and `insertText`. **The Browser stays 0.2.0** (H6, H-F36): `dev.jasper.browser.api` is unchanged; its
   capabilities are `browser.provide` and `palette.contribute`, and it bundles sqlite-jdbc 3.53.4.0, Remote's
   coordinates, which the "SQLite JDBC" notices component already covers. Snippets is 0.5.0 (H-F15).
@@ -139,7 +140,7 @@ task reviews recorded these deviations from the plan's text, each with its rulin
     latest read copies; H35: `selection.js` answers only a selection changed since its last read (a `selectionchange`
     flag in Jasper's world);
   - beyond the brief: CSS-masked fields are never copied, non-breaking spaces copy as spaces, `<object>` frames are
-    followed, and the evaluation's answer is read on `ForkJoinPool.commonPool()`;
+    followed, and the evaluation's answer was read on `ForkJoinPool.commonPool()` (the fix wave's W7 moved it);
   - H-F31: spec 15's "or the selection changes" is dropped: a selection a page makes is no gesture.
 - **Task 13**: the docs. Beyond the brief's files: `docs/plugins.md` (the Browser's capabilities `browser.provide` and
   `palette.contribute`, and its paragraph, H-F26), `tools/sdk-reference/guide/01-overview.html` (the same capabilities)
@@ -156,14 +157,61 @@ task reviews recorded these deviations from the plan's text, each with its rulin
   pluginZip` against `build/sdk-release` passes (1 test, up to date: the docs changed no SDK source); `sdkReference` was
   rerun; source hygiene is clean over 3,360 Java files, and no file the docs touched holds a raw U+00A0, U+2028 or
   U+2029. No GUI was launched.
+- **The final fix wave** (after the final review of `68265a983..4659c642e` and the docs review; rulings H36-H39):
+  - `1e9f2f717` "Browser: the data folder is its owner's alone" (W1, H37): a new `store.DataFolder` takes the group's
+    and others' permissions from the data folder, keeping the owner's (`rwx------` for the folder the host made, and a
+    folder its owner made read-only stays so), and from `browser.sqlite` and its `-wal` and `-shm` where they exist, the
+    first time either the database's thread opens the file or Chromium's worker enters the start, before the marker
+    and Chromium's profile; one failure is logged as a warning and stops nothing; Windows is left alone. `Chromium`
+    takes the restriction as a `Runnable` (`engine` names no `store` type), and `BrowserDatabase.file` takes the
+    `DataFolder`;
+  - `691b62cee` "Browser: Paste and Run presses Return only where text went" (W2, H38): `insert-text.js` answers
+    `inserted`, `unreachable` or `not-editable` (`Page.Insertion`), and only `unreachable` is typed into
+    (`Input.insertText`) and gets Return; a main-frame load start after the insertion began skips both. A closed
+    shadow root is told by the focused element: one a shadow root can be attached to, with no open root, no tabindex,
+    not editable and not scrolling, so it cannot hold the focus itself. Number joins the text-entry types; a number
+    field or an editable element whose document refuses `execCommand` takes nothing (text that is no number would
+    empty a number field's value);
+  - `37912487e` "Browser: a dropped selection read keeps its text" (W3, H36): `selection.js` answers `unchanged`
+    (`Page.Selection.Unchanged`) for no change since the last read, where it answered `none`; a password or masked
+    field, and a field with no selection range, stay `none`. The item keeps a dropped read's non-empty text and copies
+    it when the next read answers `unchanged`, or copies the text that read finds; a read that ran but failed keeps
+    nothing, so the next `unchanged` read copies nothing;
+  - `5bc787e98` "SDK: the testkit's setCopyOnSelect, and its insertText refuses a foreign tab" (W8, W9, W12, H39):
+    `FakePluginHost.setCopyOnSelect(boolean)`, the testkit README, the plugin authoring guide and the SDK reference's
+    testing page, the reference regenerated; `insertText` throws `IllegalArgumentException` for a tab no fake host made;
+    `TextFields.ctrlHReleased` is `volatile`. The contract harness keeps `copyOnSelect(boolean)`, beside its
+    `defaultBrowser(boolean)`;
+  - `032fbdcc3` "Browser: the final review's minor fixes" (W4-W7, W10): `AboutQueries` refuses a sub-frame's query and
+    one from a frame showing no `jasper-about:` address on Chromium's thread; each item closes its open Edit Bookmark
+    panel as the items close at the plugin's stop, before the stores close and before the host closes popovers, so the
+    tags are kept (`BrowserItem.flush`, was `flushHistory`); `bookmarks.js` asks again when a chosen tag is let go;
+    `PageText` reads DevTools' answers on the plugin's background executor, which `Page` now takes and passes to
+    `PageText.of` (the answer's length bound, checked before the parse, bounds the parse); raw U+2028, U+00A0 and emoji
+    in `PageTextTest`, `SqlTest` and `PageMenuItemsTest` are escapes, and two Javadoc blocks are rewrapped;
+  - the docs (W11, W13 and this banner): plan 6's handoff in [What follows](#what-follows); the shortcuts guide scopes
+    Ctrl+H to the text and tag fields of Jasper's settings and plugin panels and names the terminal find bar's
+    Backspace; the Browser guide's Snippets in page fields, Copy on select (never in a Markdown preview, and H36), the
+    Bookmarks scope's 200 newest, the Edit Bookmark panel at quit, the Files section's `jasper-sqlite-<user>` and the
+    data folder's permissions; the command palette's "no opener"; the checklist's new lines; STATUS.
+  - Verification: `node --check` of `insert-text.js`, `selection.js` and `bookmarks.js`, and throwaway node harnesses
+    in the scratchpad, each run first against the script before the change: `insert-text.js` 43 cases (all 43 failed
+    before), `selection.js` 57 (7 failed), `bookmarks.js` 9 (2 failed). `./gradlew check --continue` (JBR 25.0.4.1
+    b635.75 jcef, 14m 32s, after the code and the docs but for these counts): **15,076 tests, 0 failures, 0 errors,
+    103 skipped** (1,352 classes in the 16 build folders, without the example plugin's: jasper-app 5,280 with 90
+    skipped, Editor 5,387 with 4 skipped, Browser 899 with 1 skipped, jasper-ui 1,020, Remote 659 with
+    `PublicationCrashTest` passing, jasper-sdk 135, jasper-sdk-testkit 304), that is, Task 13's 15,063 and the wave's
+    13 new Browser tests; the example external plugin's `check pluginZip` against `build/sdk-release` passes (1 test);
+    `sdkReference` was rerun; source hygiene is clean over 3,361 Java files, and a byte scan of every file the wave
+    touched finds no raw U+00A0, U+2028 or U+2029 (the 8 raw characters the review named are escapes). No GUI was
+    launched.
 
 Not run:
 - **Task 14**, the user's GUI check on macOS, with their OK: pending
   ([checklist](../../browser-verification.md#plan-5-history-bookmarks-and-jasper-integrations)), the GUI-only risks
   first: H-F1's transition flags, CEF's delivery of `Runtime.executionContextCreated` through JBR's out-of-process
   bridge, and whether CEF reports a load start for a failed navigation (H-F19); then the plan's ten lines, line 7 on
-  H30's path and line 8 with H32's gestures, H-F2's frame and H35's no-copy, and the task reviews' lines.
-- **The final review** and its fix wave, with the minors marked for it below (H36 among them).
+  H30's path and line 8 with H32's gestures, H-F2's frame and H35's no-copy, the task reviews' lines and the fix wave's.
 - **Windows and Linux** (no hosts): every GUI line, Ctrl+H's History in kit fields included; benchmarks and the memory
   run: deferred. H4: the second sqlite-jdbc's first open, about 0.1 s in tests (3.1 s once, probably macOS scanning
   the freshly extracted library), at the first browser page, waits for the start-up benchmark.
@@ -177,50 +225,60 @@ Known gaps and follow-ups:
 - **A page can notice Jasper's DevTools:** Runtime's console replay, once per document; the user's DevTools context
   selector shows the "Jasper" world; Jasper's `Runtime.disable` may clear Blink's page-wide
   `ForceMainWorldInitialization` that the user's open DevTools set (cosmetic).
-- **Paste and run with the focus on a button or a link** types nothing and then presses Return on it: the script
-  should tell a focused control that takes no text from a focus it cannot reach (a final-wave fix).
-- **H36, for the final wave:** a read dropped for a later gesture (H34) clears H35's flag, so the re-read answers
-  unchanged and the selection is lost on a slow page; the dropped read's nonempty text is to copy when the re-read
-  answers a distinct "unchanged".
-- **What the rulings cost:** a long search matches on its start only (H16); `Äpfel` and `äpfel` are two tags (H10);
-  a modifier-click on a `file:` row opens nothing (H3); re-selecting the identical range with no `selectionchange`
-  copies nothing (H35); the page can change its selection between the gesture and the read (H-F12); a typed
-  `https://user:pw@host` shows its credentials in the palette's Open URL row, as in the address field; history has no
-  full-text index, and Top Sites sorts every site (H-F29).
+- **What H38 leaves to the page:** a focus in a frame of another origin or a closed shadow root still gets the
+  snippet through `Input.insertText` and Return, so a page that puts the focus on a control in one of them gets Return
+  there; a focused element that could host a shadow root and cannot hold the focus itself is taken for a closed root's
+  host, and a scrolling one or one with a tabindex for a control that takes no text.
+- **What H36 leaves:** a read that ran in the page but answered too late, or failed, consumed the change and keeps no
+  text, so the selection it read is copied only once the user changes the selection.
+- **Kept from the final review** (its items 12-15): a bookmark's title outlives the bookmark in the palette's recents,
+  as the Bookmarks scope is in recents; `VisitedScope` lowercases the 10,000 rows' text on each keystroke and
+  `VisitIndex` is bounded by count only, for the benchmarks to measure; `insert-text.js`'s `setRangeText` fallback can
+  put text past a page that cancels `beforeinput`; the host's card palette binds the item it opened over as the text
+  target, where the fake follows the window's current item at each query.
+- **Outside this plan, or for the GUI check** (the final review declined to judge them): Clear All History leaves
+  Chromium's back and forward lists, `:visited`, the cache and favicons (plan 6's Clear Website Data); a plugin with
+  `terminal.inject` can keep a `TextTarget` past the palette session, as with `PaneHandle`; a page can choose what is
+  selected at the user's gesture (H-F12); history grows without bound and deleted rows stay in SQLite's free pages, as
+  the spec's "Nothing expires" and Chrome's; web pages can detect Jasper through `window.jasperAboutQuery`; Ctrl+H is
+  released in kit fields on Windows and Linux with or without the Browser (H17); H21 moves other plugins' popovers; the
+  dropped "or the selection changes" (H-F31); and CEF's event order, `Runtime.executionContextCreated`'s delivery, the
+  dialog origin and the 302 redirect (Task 14).
+- **What the rulings cost:** a chmod of the data folder at the first open (H37); a third answer kind each for the
+  insertion (H38) and the selection (H36); a long search matches on its start only (H16); `Äpfel` and `äpfel` are two
+  tags (H10); a modifier-click on a `file:` row opens nothing (H3); re-selecting the identical range with no
+  `selectionchange` copies nothing (H35); the page can change its selection between the gesture and the read
+  (H-F12); a typed `https://user:pw@host` shows its credentials in the palette's Open URL row, as in the address field;
+  history has no full-text index, and Top Sites sorts every site (H-F29).
 - **Spec deviations** (H-F31): copy on select drops "or the selection changes"; Add Bookmark is dimmed for an address
   that cannot be stored; history suggestions are capped at 5; the features row's copy (H27); Snippets type through
   DevTools instead of the clipboard (H30).
 - **Remote** (H-F13's follow-up, done here): Remote's `SqliteNatives` now uses the Browser's per-user, owner-only folder
   (H9), and a folder it cannot use is logged and skipped (H11).
 
-Deferred minors, as the task reviews triaged them:
-- 1 (final wave): `HistoryStore.entries()` finds an entry's siblings with an ASCII-folding `LIKE` while the visit key
-  lowers the host with `Locale.ROOT`, so a delete drops the site of a verbatim non-ASCII upper-case host (Chromium
-  reports punycode); `RemotePlugin.extractSqliteNatives`'s arguments are evaluated outside its `try`.
-- 2 (recorded): `retitle(CompletableFuture, String)` trusts that its future came from this store's `record`; a retitle
+Deferred minors, as the task reviews triaged them, less those the fix wave fixed; the final review kept the rest
+recorded:
+- 1: `HistoryStore.entries()` finds an entry's siblings with an ASCII-folding `LIKE` while the visit key lowers the
+  host with `Locale.ROOT`, so a delete drops the site of a verbatim non-ASCII upper-case host (Chromium reports
+  punycode); `RemotePlugin.extractSqliteNatives`'s arguments are evaluated outside its `try`.
+- 2: `retitle(CompletableFuture, String)` trusts that its future came from this store's `record`; a retitle
   after a closing or unavailable record is silently empty.
-- 3 (final wave): web pages' queries reach the background executor before the address check; `about.js`'s refused
-  attributes lack `srcset`, `poster`, `background` and `attributionsrc`; `AboutPagesScriptsTest` misses
-  `parseHTMLUnsafe`, `insertHTML`, a bare `Function(` and `<style` or `style=` in templates; `StrictJson.quote` in
-  `render`'s script is safe only for Jasper's own values; the first render reads templates and mints the secret on
-  Chromium's IO thread, and H15's "no `SecureRandom` at start" does not hold, as `PageHtml` makes one; the
-  `AboutSchemeTest` "DevTools" case is a proxy; `AboutPagesScriptsTest`'s `Path.of(toURI())` needs a classpath
-  folder; older WARNING traces in `AboutSchemeTest`'s output.
+- 3: `about.js`'s refused attributes lack `srcset`, `poster`, `background` and `attributionsrc`;
+  `AboutPagesScriptsTest` misses `parseHTMLUnsafe`, `insertHTML`, a bare `Function(` and `<style` or `style=` in
+  templates; `StrictJson.quote` in `render`'s script is safe only for Jasper's own values; the first render reads
+  templates and mints the secret on Chromium's IO thread, and H15's "no `SecureRandom` at start" does not hold, as
+  `PageHtml` makes one; the `AboutSchemeTest` "DevTools" case is a proxy; `AboutPagesScriptsTest`'s `Path.of(toURI())`
+  needs a classpath folder; older WARNING traces in `AboutSchemeTest`'s output.
 - 4: `WebMenuKeysTest` uses a plain `JTextField`, so Windows and Linux end to end is a GUI line.
-- 5 (final wave): no answer-level test of more than 100 tags or a 65-character tag; a chosen tag the rule drops
-  narrows the filter silently, and with all dropped every bookmark shows (crafted requests only); a chosen tag no
-  bookmark has any more is dropped without asking again, so the chips are stale after a delete.
-- 6b (final wave): the fake selects a chip only with nothing typed, where the host's Left at the caret's start does
-  with text typed (documented); `TextFields.ctrlHReleased` is a non-volatile static the tests write.
-- 8 (final wave): `BookmarksScopeTest` discards a call whose context is null (`:541-543`) and has a convoluted
-  assertion (`:580`); no test of the Visited scope's order on ties or of the `maxResults` cap; `execute` duplicated in
-  both scopes; a `BrowserPlugin` Javadoc wrap.
-- 10 (final wave): no contract case where an insertion throws; the contract test cannot tell a text target read again
-  for the run from one kept; `FakePluginHost.insertText` casts a foreign `ContentTab`, a `ClassCastException` where an
-  `IllegalArgumentException` belongs.
-- 12 (final wave, fixes): `PageText` parses on `ForkJoinPool.commonPool()`, where `context.background()` belongs, with
-  a bound on the parse; `PageTextTest.java:32`'s 151-column Javadoc; raw U+2028 and an emoji at `PageTextTest.java:160`
-  (Task 11) and raw U+00A0 at `PageMenuItemsTest.java:60` and `:84` (4b), which the hygiene script does not flag.
+- 5: no answer-level test of more than 100 tags or a 65-character tag; a chosen tag the rule drops narrows the filter
+  silently, and with all dropped every bookmark shows (crafted requests only, as they need the page's secret).
+- 6b: the fake selects a chip only with nothing typed, where the host's Left at the caret's start does with text typed
+  (documented).
+- 8: `BookmarksScopeTest` discards a call whose context is null (`:541-543`) and has a convoluted assertion (`:580`);
+  no test of the Visited scope's order on ties or of the `maxResults` cap; `execute` duplicated in both scopes; the
+  title-prefix rule compares the whole text.
+- 10: no contract case where an insertion throws; the contract test cannot tell a text target read again for the run
+  from one kept.
 
 **Goal:** Give the browser what iTerm2 keeps of the pages a user visits, and the Jasper integrations around it:
 - history, with the history page and Web › History;
@@ -1180,5 +1238,14 @@ is in the constraints.
   - /dev/null items get `new Stores(BrowserDatabase.memory(), ui)`, and the ☰ bookmark group hides for them;
   - `permissions` joins the schema the same way, and Permissions the Quick Actions;
   - the Ad Blocker becomes a `SetupSwitch`;
-  - Clear Website Data empties the database.
+  - Clear Website Data empties the database;
+  - Jasper's pages answer from the asking item's stores: their queries are routed by the browser identifier the
+    handlers already receive (the `(browser, request)` of the history and bookmarks pages' `registerQueries` in
+    `BrowserPlugin.start`, and of `WelcomePage.register`'s), so a /dev/null item's history page shows its own;
+  - that routing goes through a concurrent map from browser identifier to `Stores` and `CertificateAllowance`, filled
+    on the UI thread as an item's page gets its browser, emptied as it closes, and read on the background executor that
+    answers the queries, because `BrowserItems` and `Page` are UI-thread only and only `engine` and `page` can read the
+    identifier;
+  - pre-flight F10's note: `CertificateAllowance` is package-private in `item`, so it moves beside the per-store data
+    (into `store`, or the per-store holder into `item`).
 - **Plans 6 to 8** each add their `FEATURES` rows.

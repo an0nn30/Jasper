@@ -131,7 +131,8 @@ a ▼ menu, "Choose what to open", which lists All and every scope with its shor
 ## Bundled scopes
 
 Commands is built in; every other scope belongs to a [bundled plugin](plugins.md) and goes when that plugin is
-disabled. Openers are actions, rebindable in Settings › Keymap; "none" means no default shortcut.
+disabled. Openers are actions, rebindable in Settings › Keymap; "none" means no default shortcut, and "no opener" that
+the scope has no opener action.
 
 | Scope (chip) | Id | Enter | Cmd+Enter (Ctrl+Enter) | Shift+Enter | Opener, macOS / Linux and Windows | In All | In recents |
 |---|---|---|---|---|---|---|---|
