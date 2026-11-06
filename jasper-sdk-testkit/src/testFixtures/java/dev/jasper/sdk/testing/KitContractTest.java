@@ -24,8 +24,17 @@ public abstract class KitContractTest {
     protected abstract void clickInto(UiView view,String id);
     /** The titles of the suggestions field {@code id} shows, in order; empty while it shows none. */
     protected abstract List<String> suggestions(UiView view,String id);
-    /** Presses {@code key} (UP, DOWN, TAB, ENTER or ESCAPE) in field {@code id} as a person would, the focus in the field. */
+    /**
+     * Presses {@code key} (UP, DOWN, TAB, ENTER or ESCAPE; in a token field ENTER or BACK_SPACE) in field {@code id} as a
+     * person would, the focus in the field.
+     */
     protected abstract void press(UiView view,String id,String key);
+    /** The tokens token field {@code id} shows, in order. */
+    protected abstract List<String> tokens(UiView view,String id);
+    /** Clicks, as a person would, the remove button of token {@code token} in token field {@code id}. */
+    protected abstract void removeToken(UiView view,String id,String token);
+    /** Moves the focus for good from field {@code id} to node {@code to}, as a click on that node does. */
+    protected abstract void leave(UiView view,String id,String to);
     /**
      * Chooses, as a person would, the item {@code path} names in node {@code id}'s menu (a menu button's, or a button's
      * hold menu): item ids from the menu down, through a submenu by its id; a disabled submenu does not open.
@@ -191,6 +200,44 @@ public abstract class KitContractTest {
             assertThat(events).filteredOn(UiEvent.Edited.class::isInstance).last().isEqualTo(new UiEvent.Edited("address", "ex"));
             view.update(spec.apply(List.of()));
             assertThat(view.spec()).isEqualTo(spec.apply(List.of()));
+        } finally { view.close(); stop(kit); }
+    }); }
+
+    /**
+     * Plan 5 Task 6 (SDK 0.29.0): a token field renders its tokens, and on both runtimes Enter, a comma and the focus
+     * leaving add the typed text, a duplicate in another case is dropped, Backspace with nothing typed and a remove
+     * button remove a token, each change reports the whole list once, and an update that changes the tokens replaces
+     * them and keeps the typed text.
+     */
+    @Test void aTokenFieldReportsItsTokens() throws Exception { edt(() -> {
+        var kit = kit("owner"); var events = new ArrayList<UiEvent>();
+        java.util.function.Function<List<String>, ViewSpec> spec = tokens -> new ViewSpec(new Nodes.Stack("root", ControlState.READY, Nodes.LayoutRole.VERTICAL,
+            List.of(new Nodes.TokenField("tags", ControlState.READY, "Tags", "Enter tags\u2026", tokens),
+                new Nodes.Button("save", ControlState.READY, "Save", "", Nodes.ButtonKind.PRIMARY, "save", ""))));
+        java.util.function.Function<String[], UiEvent> changed = tokens -> new UiEvent.TokensChanged("tags", List.of(tokens));
+        var view = kit.create(spec.apply(List.of("work")), events::add);
+        try {
+            assertThat(view.spec()).isEqualTo(spec.apply(List.of("work")));
+            assertThat(tokens(view, "tags")).containsExactly("work");
+            type(view, "tags", "news");
+            assertThat(events).as("typing alone reports nothing").isEmpty();
+            press(view, "tags", "ENTER");
+            type(view, "tags", "WORK,reading,lat");
+            leave(view, "tags", "save");
+            press(view, "tags", "BACK_SPACE");
+            removeToken(view, "tags", "work");
+            assertThat(events).containsExactly(changed.apply(new String[] {"work", "news"}), changed.apply(new String[] {"work", "news", "reading"}),
+                changed.apply(new String[] {"work", "news", "reading", "lat"}), changed.apply(new String[] {"work", "news", "reading"}),
+                changed.apply(new String[] {"news", "reading"}));
+            assertThat(tokens(view, "tags")).containsExactly("news", "reading");
+            type(view, "tags", "draft");
+            view.update(spec.apply(List.of("a", "b")));
+            assertThat(view.spec()).isEqualTo(spec.apply(List.of("a", "b")));
+            assertThat(tokens(view, "tags")).as("an update replaces the tokens").containsExactly("a", "b");
+            press(view, "tags", "ENTER");
+            assertThat(events.getLast()).as("and keeps the typed text").isEqualTo(changed.apply(new String[] {"a", "b", "draft"}));
+            press(view, "tags", "ENTER");
+            assertThat(events).as("Enter with nothing typed reports nothing of the field's").hasSize(6);
         } finally { view.close(); stop(kit); }
     }); }
 

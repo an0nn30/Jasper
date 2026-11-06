@@ -25,7 +25,7 @@ outside `java.`, `javax.`, `jdk.` and the UI packages in those three. FlatLaf (3
 (2.0.0) are implementation dependencies.
 
 The SDK's `ui` values mirror the model without exposing Swing or UI types: the SDK and module `Nodes` declare the same
-31 node kinds and enum constants, and `dev.jasper.app.plugins.KitValues` translates one into the other. The host and
+32 node kinds and enum constants, and `dev.jasper.app.plugins.KitValues` translates one into the other. The host and
 the testkit implement the same SDK facade. Plugins never load the engine: a plugin class loader's parent is the
 platform loader, so nothing on the application classpath except the SDK is visible to it, and `verifyUiDistribution`
 checks that no plugin runtime or staged plugin jar carries `dev/jasper/ui/`.
@@ -419,14 +419,15 @@ These `KitView` methods serve the app's native hosts; none is part of the plugin
 
 ## Descriptor vocabulary
 
-`Nodes` is the sealed vocabulary of 31 node kinds: `Text`, `Icon`, `Button`, `MenuButton`, `StatusDot`, `Field`,
+`Nodes` is the sealed vocabulary of 32 node kinds: `Text`, `Icon`, `Button`, `MenuButton`, `StatusDot`, `Field`,
 `Secret`, `Choice`, `PickerMenu`, `Toggle`, `Chip`, `Progress`, `Strength`, `Stack`, `FormRow`, `SettingRow`, `Card`,
 `Section`, `Empty`, `ItemList`, `Header`, `Panel`, `Form`, `Split`, `Table`, `Tree`, `Breadcrumbs`, `Custom`,
-`Separator`, `Notice`, `Properties`. Every node carries a `ControlState(visible, enabled, busy, error)`; `error` is
-validation prose and `ControlState.READY` is visible, enabled, idle and without an error. No node carries pixel
-dimensions, delegates or secret values, and no domain meaning is inferred from ids or text. `UiEvent` has 12 kinds:
+`Separator`, `Notice`, `Properties`, `TokenField`. Every node carries a `ControlState(visible, enabled, busy,
+error)`; `error` is validation prose and `ControlState.READY` is visible, enabled, idle and without an error. No node
+carries pixel dimensions, delegates or secret values, and no domain meaning is inferred from ids or text. `UiEvent` has
+13 kinds:
 `Action`, `Edited`, `Selected`, `Toggled`, `Expanded`, `Removed`, `Reordered`, `SecretChanged`, `Clicked`, `Sorted`,
-`ColumnsResized`, `SuggestionChosen`.
+`ColumnsResized`, `SuggestionChosen`, `TokensChanged`.
 
 `ViewSpec` validates the whole tree: unique node ids and `Custom` content ids; depth at most 128 and at most 100,000
 nodes; a `Notice` only in a form's sections or a VERTICAL stack; a `Separator` only in an INLINE or ACTIONS stack and
@@ -467,6 +468,15 @@ the title; and a field's `listId` naming an `ItemList` in the same view.
   input's forward traversal keys meanwhile. A choice, Escape, a permanent focus loss and a press outside hide the list
   until the next edit; it appears on screen only while the input has the focus, and never over another open menu. A
   TEXTAREA, a NUMBER field and a field with a `listId` take no suggestions.
+- Token fields (`TokenFields`): a field's box (`FieldSurface`, painted by the field policy) holding a chip per token,
+  an `Indicators.ChipControl` in the neutral hue that the kit's `tag` face styles and paints, with a non-focusable ghost
+  remove button ("Remove" and the token) in its trailing padding, then the input. The chips flow in lines `ICON_GAP`
+  apart; the input follows the last one while four widths of 'm' fit beside it, and otherwise takes a line of its own.
+  One line stands centred in `FIELD_HEIGHT`, and each further line adds the room a line leaves there. A key listener on
+  the input takes Enter while text is typed and Backspace while none is, before the bindings, so Enter with nothing
+  typed reaches the form; a document filter adds the text before each comma typed or pasted; a permanent focus loss adds
+  the typed text too. `TokenField.kept` decides what stays. An update replaces the shown tokens when its tokens change,
+  or when they differ from the shown ones while the field reports a change; the typed text stays.
 - Field actions: `trailingAction` (Enter, not TEXTAREA or PATH), `alternateAction` (Shift+Enter, not TEXTAREA),
   `cancelAction` (Escape) and `listId`, which drives an `ItemList` with the arrow and page keys while the field keeps
   focus. A list named by a field's `listId` reserves its `visibleRows` selectable-row height even when filtered or

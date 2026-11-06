@@ -15,7 +15,7 @@ final class ControlRegistry {
             case Nodes.Custom ignored -> {} case Nodes.Text ignored -> {} case Nodes.Icon ignored -> {} case Nodes.Button ignored -> {} case Nodes.Field ignored -> {}
             case Nodes.PickerMenu ignored -> {} case Nodes.Secret ignored -> {} case Nodes.Choice ignored -> {} case Nodes.Toggle ignored -> {}
             case Nodes.Chip ignored -> {} case Nodes.StatusDot ignored -> {} case Nodes.Progress ignored -> {} case Nodes.Strength ignored -> {}
-            case Nodes.MenuButton ignored -> {}
+            case Nodes.MenuButton ignored -> {} case Nodes.TokenField ignored -> {}
             case Nodes.ItemList n -> { for(var item:n.items()) { item.leading().ifPresent(ControlRegistry::validate); item.title().forEach(ControlRegistry::validate); item.subtitle().forEach(ControlRegistry::validate); item.trailing().forEach(ControlRegistry::validate); } n.addAction().ifPresent(ControlRegistry::validate); }
             case Nodes.Table n -> { for (var row : n.rows()) row.cellNodes().values().forEach(ControlRegistry::validate); n.empty().ifPresent(ControlRegistry::validate); }
             case Nodes.Tree _, Nodes.Breadcrumbs _, Nodes.Separator _, Nodes.Properties _ -> {}
@@ -38,6 +38,7 @@ final class ControlRegistry {
             case Nodes.PickerMenu menu -> new PickerMenus.MenuControl(view,menu);
             case Nodes.Toggle toggle -> new Switches.ToggleControl(view, toggle);
             case Nodes.Chip chip -> new Indicators.ChipControl(view, chip);
+            case Nodes.TokenField tokens -> new TokenFields.TokenControl(view, tokens);
             case Nodes.StatusDot dot -> new Indicators.DotControl(view, dot);
             case Nodes.Progress progress -> new Indicators.ProgressControl(view, progress);
             case Nodes.Strength strength -> new Indicators.StrengthControl(view, strength);

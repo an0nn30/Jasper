@@ -9,7 +9,7 @@ import java.util.Objects;
 /** Immutable, semantic view vocabulary; no pixel dimensions, delegates or secret values. */
 public final class Nodes {
     private Nodes() {}
-    public sealed interface Node permits Text, Icon, Button, MenuButton, StatusDot, Field, Secret, Choice, PickerMenu, Toggle, Chip, Progress, Strength, Stack, FormRow, SettingRow, Card, Section, Empty, ItemList, Header, Panel, Form, Split, Table, Tree, Breadcrumbs, Custom, Separator, Notice, Properties {
+    public sealed interface Node permits Text, Icon, Button, MenuButton, StatusDot, Field, Secret, Choice, PickerMenu, Toggle, Chip, Progress, Strength, Stack, FormRow, SettingRow, Card, Section, Empty, ItemList, Header, Panel, Form, Split, Table, Tree, Breadcrumbs, Custom, Separator, Notice, Properties, TokenField {
         String id();
         ControlState state();
     }
@@ -436,6 +436,29 @@ public final class Nodes {
             ModelChecks.label(label, "label");
             Objects.requireNonNull(hue);
         }
+    }
+
+    /**
+     * A field of tokens (SDK 0.29.0): each a chip of the look's tag face with a "Remove" button inside it, the typed text
+     * after them. Enter, a comma and a permanent focus loss add the typed text; Enter with nothing typed passes on;
+     * Backspace with nothing typed and a chip's button remove a token; text {@link #kept(List)} would not keep is
+     * dropped; each change reports {@link UiEvent.TokensChanged} once. An update that changes {@code tokens}, or one
+     * that comes while the field reports a change and differs from what it shows, replaces them and keeps the typed
+     * text. {@code label} is drawn as a STANDARD field's is and is the accessible name; {@code hint} shows while the
+     * field has no tokens and nothing typed. The tokens are as {@link #kept(List)} keeps them.
+     */
+    public record TokenField(String id, ControlState state, String label, String hint, List<String> tokens) implements Node {
+        public TokenField {
+            ModelChecks.id(id); Objects.requireNonNull(state);
+            ModelChecks.label(label, "label");
+            Objects.requireNonNull(hint);
+            tokens = ModelChecks.tokens(tokens);
+        }
+        /**
+         * The tokens a token field keeps of {@code given}: trimmed, nonblank, at most 64 characters, without control
+         * characters, the first of those matching ignoring the case of ASCII letters, and the first 100, in order.
+         */
+        public static List<String> kept(List<String> given) { return ModelChecks.keptTokens(given); }
     }
 
     public record Progress(String id, ControlState state, double fraction, String label) implements Node {

@@ -94,7 +94,7 @@ the next tree.</p>
 <thead><tr><th>Kind</th><th>Nodes</th></tr></thead>
 <tbody>
 <tr><td>Text and status</td><td>{@link Nodes.Text} (sixteen roles; the MONO roles mark data values such as hosts, paths and commands, drawn in the data face), {@link Nodes.Icon}, {@link Nodes.StatusDot}, {@link Nodes.Chip}, {@link Nodes.Progress}, {@link Nodes.Strength}, {@link Nodes.Notice}, {@link Nodes.Properties}, {@link Nodes.Separator}</td></tr>
-<tr><td>Controls</td><td>{@link Nodes.Button} (PRIMARY, SECONDARY, GHOST, DESTRUCTIVE_GHOST, LINK), {@link Nodes.MenuButton}, {@link Nodes.Field} (TEXT, SEARCH, PORT, PATH, TEXTAREA, NUMBER), {@link Nodes.Secret}, {@link Nodes.Choice} (DROPDOWN, PICKER, EXCLUSIVE, SEARCHABLE, PREVIEWS, TABS), {@link Nodes.PickerMenu}, {@link Nodes.Toggle}, {@link Nodes.Breadcrumbs}</td></tr>
+<tr><td>Controls</td><td>{@link Nodes.Button} (PRIMARY, SECONDARY, GHOST, DESTRUCTIVE_GHOST, LINK), {@link Nodes.MenuButton}, {@link Nodes.Field} (TEXT, SEARCH, PORT, PATH, TEXTAREA, NUMBER), {@link Nodes.Secret}, {@link Nodes.Choice} (DROPDOWN, PICKER, EXCLUSIVE, SEARCHABLE, PREVIEWS, TABS), {@link Nodes.PickerMenu}, {@link Nodes.Toggle}, {@link Nodes.Breadcrumbs}, {@link Nodes.TokenField}</td></tr>
 <tr><td>Collections</td><td>{@link Nodes.ItemList} with {@link ListItem} rows (SINGLE, DOUBLE, COMPACT, ORDERED, RESULTS), {@link Nodes.Table} with {@link Column}s and {@link TableRow}s, {@link Nodes.Tree} with {@link TreeItem}s</td></tr>
 <tr><td>Layout</td><td>{@link Nodes.Stack} (a {@link Nodes.LayoutRole} such as VERTICAL, INLINE or ACTIONS), {@link Nodes.Card}, {@link Nodes.Section}, {@link Nodes.FormRow}, {@link Nodes.SettingRow}, {@link Nodes.Split}, {@link Nodes.Empty}</td></tr>
 <tr><td>Compositions</td><td>{@link Nodes.Panel} with its {@link Nodes.Header}, for tool windows; {@link Nodes.Form} (PROMPT, PROMPT_COMPACT, SHEET, FULL, SETTINGS, WINDOW), for dialogs and pages</td></tr>
@@ -126,6 +126,7 @@ they concern; item, option, row and column ids in them are local to that node.</
 <tr><td>{@link UiEvent.Sorted}</td><td>A table or tree column header</td></tr>
 <tr><td>{@link UiEvent.ColumnsResized}</td><td>A header boundary drag or double-click fit that has ended; carries the widths of the columns</td></tr>
 <tr><td>{@link UiEvent.SuggestionChosen}</td><td>Tab or Enter on a field's selected {@link Nodes.Suggestion}, or a click on one; carries the field, the suggestion and whether Tab chose it</td></tr>
+<tr><td>{@link UiEvent.TokensChanged}</td><td>A token added to or removed from a {@link Nodes.TokenField}; carries its whole list</td></tr>
 </tbody>
 </table>
 <p>The kit reports what the user asked for; the plugin decides. A toggle's {@code checked} is the state the plugin's tree

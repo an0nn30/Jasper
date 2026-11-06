@@ -45,5 +45,17 @@ class HostedKitContractTest extends KitContractTest {
    if(row==null)return;
   }
   if(!(row instanceof JMenu))row.doClick(0);}
+ /** The tokens the kit's chips show in token field {@code id}: the accessible names of its components named {@code id.token.N}, in order. */
+ protected java.util.List<String> tokens(UiView view,String id){var shown=new java.util.ArrayList<String>();chips(((HostedKitView)view).component(),id+".token.",shown);return shown;}
+ static void chips(Component c,String prefix,java.util.List<String> into){if(c instanceof JComponent chip&&chip.getName()!=null&&chip.getName().startsWith(prefix))into.add(chip.getAccessibleContext().getAccessibleName());
+  if(c instanceof Container p)for(var child:p.getComponents())chips(child,prefix,into);}
+ /** As a person clicks a token's remove button: the kit's shown button in token field {@code id} named "Remove" and the token. */
+ protected void removeToken(UiView view,String id,String token){var root=((HostedKitView)view).component();var button=removal(root,id+".remove.","Remove "+token);
+  if(button==null||!shown(button,root))throw new AssertionError("No shown remove button for "+token);button.doClick(0);}
+ static AbstractButton removal(Component c,String prefix,String name){if(c instanceof AbstractButton b&&b.getName()!=null&&b.getName().startsWith(prefix)&&name.equals(b.getAccessibleContext().getAccessibleName()))return b;
+  if(c instanceof Container p)for(var child:p.getComponents()){var found=removal(child,prefix,name);if(found!=null)return found;}return null;}
+ /** As the focus leaves field {@code id} for node {@code to} for good: the input's focus listeners hear a permanent loss to it. */
+ protected void leave(UiView view,String id,String to){var root=((HostedKitView)view).component();var field=input(root,id+".input");var opposite=named(root,to);
+  for(var listener:field.getFocusListeners())listener.focusLost(new java.awt.event.FocusEvent(field,java.awt.event.FocusEvent.FOCUS_LOST,false,opposite));}
  protected void stop(UiKit kit){((HostedKit)kit).close();}
 }

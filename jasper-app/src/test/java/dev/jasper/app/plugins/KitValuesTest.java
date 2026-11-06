@@ -37,7 +37,8 @@ class KitValuesTest {
     List.of(new Button("details",READY,"Details","",ButtonKind.LINK,"details",""))))),
    new Nodes.Properties("properties",READY,"Properties — minecraft-local",List.of(new PropertyRow("Host","192.168.1.124",true),
     new PropertyRow("Credentials","Vault locked",false,Optional.of(Severity.WARNING)))),
-   new Custom("custom",READY,"document",CustomKind.EDITOR,"Document"));
+   new Custom("custom",READY,"document",CustomKind.EDITOR,"Document"),
+   new TokenField("tags",READY,"Tags","Enter tags\u2026",List.of("work","\u00C4pfel")));
   assertThat(classes(nodes)).hasSize(Node.class.getPermittedSubclasses().length);
   for(var node:nodes){var spec=new ViewSpec(node);assertThat(KitValues.toModule(spec).toString().replace("titleNote=, contextActions=[]", "titleNote=")).isEqualTo(spec.toString());}
  }
@@ -144,7 +145,7 @@ class KitValuesTest {
   assertThat(new MenuItem("old","Old","key","open",true,false).hue()).isEqualTo(Hue.NEUTRAL);
  }
  @Test void everyEventProjectsItsOwnerItemAndPayload(){
-  List<dev.jasper.ui.model.UiEvent> events=List.of(new dev.jasper.ui.model.UiEvent.Action("act"),new dev.jasper.ui.model.UiEvent.Edited("field","text"),new dev.jasper.ui.model.UiEvent.Selected("list",Set.of("a")),new dev.jasper.ui.model.UiEvent.Toggled("toggle",true),new dev.jasper.ui.model.UiEvent.Expanded("tree","branch",true),new dev.jasper.ui.model.UiEvent.Reordered("list","a",2),new dev.jasper.ui.model.UiEvent.Removed("list","a"),new dev.jasper.ui.model.UiEvent.SecretChanged("secret"),new dev.jasper.ui.model.UiEvent.Sorted("table","name"),new dev.jasper.ui.model.UiEvent.Clicked("tree","leaf"),new dev.jasper.ui.model.UiEvent.ColumnsResized("files",Map.of("name",180)),new dev.jasper.ui.model.UiEvent.SuggestionChosen("address","search",true));
+  List<dev.jasper.ui.model.UiEvent> events=List.of(new dev.jasper.ui.model.UiEvent.Action("act"),new dev.jasper.ui.model.UiEvent.Edited("field","text"),new dev.jasper.ui.model.UiEvent.Selected("list",Set.of("a")),new dev.jasper.ui.model.UiEvent.Toggled("toggle",true),new dev.jasper.ui.model.UiEvent.Expanded("tree","branch",true),new dev.jasper.ui.model.UiEvent.Reordered("list","a",2),new dev.jasper.ui.model.UiEvent.Removed("list","a"),new dev.jasper.ui.model.UiEvent.SecretChanged("secret"),new dev.jasper.ui.model.UiEvent.Sorted("table","name"),new dev.jasper.ui.model.UiEvent.Clicked("tree","leaf"),new dev.jasper.ui.model.UiEvent.ColumnsResized("files",Map.of("name",180)),new dev.jasper.ui.model.UiEvent.SuggestionChosen("address","search",true),new dev.jasper.ui.model.UiEvent.TokensChanged("tags",List.of("work","news")));
   assertThat(events).hasSize(UiEvent.class.getPermittedSubclasses().length);for(var event:events)assertThat(KitValues.toSdk(event).toString()).isEqualTo(event.toString());
   assertThat(Arrays.stream(SemanticColor.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.theme.SemanticColor.values()).map(Enum::name).toArray(String[]::new));
  }

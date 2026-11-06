@@ -1,5 +1,6 @@
 package dev.jasper.ui.model;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -47,5 +48,9 @@ public sealed interface UiEvent {
     record SuggestionChosen(String fieldId, String suggestionId, boolean byTab) implements UiEvent {
         public SuggestionChosen { ModelChecks.id(fieldId); ModelChecks.id(suggestionId); }
         @Override public String id() { return fieldId; }
+    }
+    /** A token field's whole list after the user added or removed a token; the field already shows it. */
+    record TokensChanged(String id, List<String> tokens) implements UiEvent {
+        public TokensChanged { ModelChecks.id(id); tokens = ModelChecks.tokens(tokens); }
     }
 }

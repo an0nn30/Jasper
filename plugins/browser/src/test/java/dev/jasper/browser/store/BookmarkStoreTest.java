@@ -100,6 +100,16 @@ class BookmarkStoreTest {
             .containsExactly("Work", "\u00C4pfel", "\u00E4pfel");
     }
 
+    /** Plan 5 Task 6: the tag rule and the SDK's token rule keep the same tags of the same input (F22). */
+    @Test void theTagRuleIsTheTokenFieldsRule() {
+        var given = new java.util.ArrayList<>(List.of(" work ", "Work", "", "   ", "x".repeat(64), "y".repeat(65), "a\tb", "a\u0085b",
+            "\u00C4pfel", "\u00E4pfel", "news"));
+        IntStream.range(0, 100).mapToObj(i -> "tag" + i).forEach(given::add);
+        assertThat(BookmarkStore.keptTags(given)).hasSize(100).isEqualTo(dev.jasper.sdk.ui.Nodes.TokenField.kept(given));
+        assertThat(BookmarkStore.keptTags(given.subList(0, 11))).isEqualTo(dev.jasper.sdk.ui.Nodes.TokenField.kept(given.subList(0, 11)))
+            .containsExactly("work", "x".repeat(64), "\u00C4pfel", "\u00E4pfel", "news");
+    }
+
     @Test void aBookmarkHasAtMost100Tags() throws Exception {
         Bookmark bookmark = add("https://a.example/", "A", 1);
         List<String> many = IntStream.range(0, 101).mapToObj(i -> "tag" + i).toList();

@@ -1,5 +1,6 @@
 package dev.jasper.sdk.ui;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -142,5 +143,17 @@ public sealed interface UiEvent {
          * @return {@link #fieldId()}
          */
         @Override public String id() { return fieldId; }
+    }
+    /**
+     * The tokens of a {@link Nodes.TokenField} changed: the user added one (Enter, a comma, or the focus leaving the field
+     * for good) or removed one (Backspace with nothing typed, or a token's remove button). The field already shows them.
+     *
+     * @param id the token field
+     * @param tokens the field's whole list after the change, each token as {@link Nodes.TokenField#kept(List)} keeps it;
+     *     copied
+     * @since 0.29.0
+     */
+    record TokensChanged(String id, List<String> tokens) implements UiEvent {
+        public TokensChanged { ModelChecks.id(id); tokens = ModelChecks.tokens(tokens); }
     }
 }

@@ -255,7 +255,8 @@ public final class BookmarkStore {
      * The tag rule: each tag is trimmed, and kept only when it is nonblank, at most 64 characters and free of control
      * characters; one that matches an earlier one ignoring the case of ASCII letters, as SQLite's {@code NOCASE} does, is
      * dropped, so "Work" and "work" are one tag and "\u00C4pfel" and "\u00E4pfel" two; and the first 100 are kept, in the
-     * order given. The SDK's token field keeps its tokens by the same rule.
+     * order given. The SDK's token field keeps its tokens by the same rule ({@code Nodes.TokenField.kept}), and the two
+     * must agree.
      *
      * @param tags the tags given
      * @return those kept

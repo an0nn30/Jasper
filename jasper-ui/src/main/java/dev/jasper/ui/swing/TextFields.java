@@ -13,7 +13,7 @@ import javax.swing.text.*;
 /** Persistent documents, guarded numeric edits and literal labels/validation for ordinary fields. */
 final class TextFields {
     /** Ctrl+H, which the look and feel binds to Delete Backward. */
-    private static final KeyStroke CTRL_H = KeyStroke.getKeyStroke("ctrl H");
+    static final KeyStroke CTRL_H = KeyStroke.getKeyStroke("ctrl H");
     private TextFields() {}
     /**
      * Whether a field leaves Ctrl+H to the window's keymap on the platform {@code osName} names: on Windows and Linux,

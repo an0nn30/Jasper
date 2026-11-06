@@ -430,4 +430,42 @@ class UiValuesTest {
         assertThatIllegalArgumentException().isThrownBy(() -> new WebLink(URI.create("https://e.com"), LinkOrigin.EXTERNAL, LinkPlacement.TAB, Optional.of("t"), Optional.empty()));
         assertThat(new WebLink(URI.create("https://e.com"), LinkOrigin.EXTERNAL, LinkPlacement.TAB, Optional.empty(), Optional.empty()).origin()).isEqualTo(LinkOrigin.EXTERNAL);
     }
+
+    static Nodes.TokenField tags(List<String> tokens) { return new Nodes.TokenField("tags", ControlState.READY, "Tags", "Enter tags\u2026", tokens); }
+
+    /**
+     * Plan 5 Task 6 (SDK 0.29.0): a token field's tokens are as the Browser keeps bookmark tags: trimmed, nonblank, at
+     * most 64 characters, without control characters, unique ignoring the case of ASCII letters only, and at most 100.
+     */
+    @Test void aTokenFieldsTokensFollowTheTagRuleAndAHundredAndFirstIsRefused() {
+        var field = tags(new ArrayList<>(List.of("work", "\u00C4pfel", "\u00E4pfel", "x".repeat(64))));
+        assertThat(field.tokens()).containsExactly("work", "\u00C4pfel", "\u00E4pfel", "x".repeat(64));
+        assertThatThrownBy(() -> field.tokens().add("more")).as("copied, and unmodifiable").isInstanceOf(UnsupportedOperationException.class);
+        assertThat(tags(List.of()).tokens()).isEmpty();
+        var hundred = java.util.stream.IntStream.range(0, 100).mapToObj(i -> "tag" + i).toList();
+        assertThat(tags(hundred).tokens()).hasSize(100);
+        var more = new ArrayList<>(hundred); more.add("tag100");
+        assertThatIllegalArgumentException().isThrownBy(() -> tags(more)).withMessage("A token field holds at most 100 tokens, not 101");
+        assertThatIllegalArgumentException().isThrownBy(() -> tags(List.of("work", "Work"))).withMessage("Duplicate token: Work");
+        assertThatIllegalArgumentException().isThrownBy(() -> tags(List.of(" ")));
+        assertThatIllegalArgumentException().isThrownBy(() -> tags(List.of("")));
+        assertThatIllegalArgumentException().as("untrimmed").isThrownBy(() -> tags(List.of(" work")));
+        assertThatIllegalArgumentException().isThrownBy(() -> tags(List.of("x".repeat(65))));
+        assertThatIllegalArgumentException().isThrownBy(() -> tags(List.of("a\tb")));
+        assertThatIllegalArgumentException().as("a C1 control").isThrownBy(() -> tags(List.of("a\u0085b")));
+        assertThatNullPointerException().isThrownBy(() -> tags(java.util.Arrays.asList("work", null)));
+        assertThatIllegalArgumentException().isThrownBy(() -> new Nodes.TokenField("tags", ControlState.READY, " ", "", List.of()));
+        assertThatNullPointerException().isThrownBy(() -> new Nodes.TokenField("tags", ControlState.READY, "Tags", null, List.of()));
+
+        assertThat(Nodes.TokenField.kept(List.of(" work ", "Work", "", "  ", "x".repeat(65), "a\u0000b", "news", "\u00C4pfel", "\u00E4pfel")))
+            .containsExactly("work", "news", "\u00C4pfel", "\u00E4pfel");
+        assertThat(Nodes.TokenField.kept(more)).as("the first hundred").isEqualTo(hundred);
+
+        var changed = new UiEvent.TokensChanged("tags", new ArrayList<>(List.of("work", "news")));
+        assertThat(changed.id()).isEqualTo("tags");
+        assertThat(changed.tokens()).containsExactly("work", "news");
+        assertThatIllegalArgumentException().as("an event carries the rule's tokens too").isThrownBy(() -> new UiEvent.TokensChanged("tags", List.of("work", "WORK")));
+        assertThatIllegalArgumentException().isThrownBy(() -> new UiEvent.TokensChanged(" ", List.of()));
+        assertThat(new ViewSpec(new Nodes.Stack("form", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(field))).root()).isNotNull();
+    }
 }

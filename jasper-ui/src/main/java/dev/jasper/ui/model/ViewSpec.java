@@ -93,7 +93,7 @@ public record ViewSpec(Node root) {
                 for (var item : n.roots()) tree(item, itemIds, branches, 0, values);
                 references(n.selectedIds(), itemIds); references(n.expandedIds(), branches);
             }
-            case Text _, Icon _, Button _, MenuButton _, StatusDot _, Field _, Secret _, Toggle _, Chip _, Progress _, Strength _, Breadcrumbs _, Custom _, Separator _, Properties _ -> { }
+            case Text _, Icon _, Button _, MenuButton _, StatusDot _, Field _, Secret _, Toggle _, Chip _, Progress _, Strength _, Breadcrumbs _, Custom _, Separator _, Properties _, TokenField _ -> { }
         }
         for (var child : children) place(node, child);
         for (var child : children) validate(child, ids, contentIds, lists, listRefs, depth + 1, count);
