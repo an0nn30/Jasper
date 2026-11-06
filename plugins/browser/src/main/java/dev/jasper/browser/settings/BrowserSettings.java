@@ -94,7 +94,7 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
      * Declares the Browser's settings, which Settings › Browser shows: Start page and Page zoom, a percent from 25 to 500,
      * under General, Open Links From Terminal and Open Local Web Files under Link Opening, then Default Search Engine,
      * Custom Search URL and Custom Search Suggestions URL under Search Engine, each custom URL empty or an http or https
-     * address with {@code %s} in it, and Use /dev/null mode under Privacy & Data. UI thread, while the plugin starts.
+     * address with {@code %s} in it, and Use /dev/null mode under Privacy &amp; Data. UI thread, while the plugin starts.
      *
      * @param settings the plugin's settings
      * @return the declared settings, which read the current values

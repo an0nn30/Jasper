@@ -1,7 +1,6 @@
 package dev.jasper.browser.item;
 
 import dev.jasper.browser.page.NavigationHistory;
-import dev.jasper.browser.permissions.Grant;
 import dev.jasper.browser.settings.BrowserSettings;
 import dev.jasper.browser.store.Addresses;
 import dev.jasper.sdk.ui.ControlState;
@@ -20,17 +19,17 @@ import java.util.function.Function;
  * A browser item's toolbar along the top of its page (spec section 6), as SDK nodes the kit draws: Back and Forward,
  * each disabled when the page cannot go there and each holding the page's twelve nearest history entries that way in
  * its hold menu, then, as Chrome's do, a separator and Show Full History, which opens Jasper's history page (plan 5's
- * H2); Reload, which is Stop while the page loads; the address field, with the site icon at its left; and the /dev/null indicator
- * of an item in /dev/null mode, which opens {@link DevNullPopover}; the menu
- * button, which holds Add Bookmark, or Remove Bookmark while the page is bookmarked, a separator, Manage Bookmarks and
- * History, outside /dev/null mode, then the {@link PrivacyMenu}'s Reset items of the permissions stored for the page's
- * site, then Settings, its groups parted by one separator each (spec section 6). The site icon is the page's icon,
- * else the globe, and dragging it drags the page's address; while the page is one Jasper goes on to past a certificate error, "Not secure",
- * in the warning colour, stands in its place (spec section 14). The click that brings the focus into the field selects
- * all its text. The toolbar keeps what is typed into the field and the engine's suggestions for it: the field shows the
- * page's address, or a results page's search terms, until something is typed, then that text and its
- * {@link Suggestions}, the rows of Jasper's bookmarks and history for it last, and the page's again once a load or
- * Escape gives the text up. Its item handles what the nodes report. UI thread.
+ * H2); Reload, which is Stop while the page loads; the address field, with the site icon at its left; and the
+ * /dev/null indicator of an item in /dev/null mode, which opens {@link DevNullPopover}; the menu button, which holds Add
+ * Bookmark, or Remove Bookmark while the page is bookmarked, a separator, Manage Bookmarks and History, outside
+ * /dev/null mode, then the item's {@link PrivacyMenu} group, the Reset items of the permissions stored for the page's
+ * site, then Settings, its groups parted by one separator each (spec section 6). The site icon is the page's icon, else
+ * the globe, and dragging it drags the page's address; while the page is one Jasper goes on to past a certificate
+ * error, "Not secure", in the warning colour, stands in its place (spec section 14). The click that brings the focus
+ * into the field selects all its text. The toolbar keeps what is typed into the field and the engine's suggestions for
+ * it: the field shows the page's address, or a results page's search terms, until something is typed, then that text
+ * and its {@link Suggestions}, the rows of Jasper's bookmarks and history for it last, and the page's again once a load
+ * or Escape gives the text up. Its item handles what the nodes report. UI thread.
  */
 final class BrowserToolbar {
     /** The toolbar's row and its nodes; a button reports its own id. */
@@ -90,12 +89,12 @@ final class BrowserToolbar {
      * @param devNull whether the item is in /dev/null mode: its indicator then stands between the field and the menu button
      * @param bookmarked whether the page's address is bookmarked, which decides between Add Bookmark and Remove Bookmark;
      *     empty for a menu without the bookmark items, as in plan 6's /dev/null mode
-     * @param site the permissions stored for the page's site, which the menu offers to reset
+     * @param privacy the menu's privacy group, as the item's {@link PrivacyMenu} gives it
      * @return the toolbar's row
      */
     Nodes.Stack node(String address, boolean loading, boolean canGoBack, boolean canGoForward, Optional<PixelImage> icon,
                      NavigationHistory.History history, BrowserSettings settings, boolean notSecure, boolean devNull, Optional<Boolean> bookmarked,
-                     List<Grant> site) {
+                     List<MenuItem> privacy) {
         var reload = loading
             ? new Nodes.Button(RELOAD, ControlState.READY, "", "close", Nodes.ButtonKind.GHOST, STOP, "Stop")
             : new Nodes.Button(RELOAD, ControlState.READY, "", "refresh", Nodes.ButtonKind.GHOST, RELOAD, "Reload");
@@ -108,7 +107,7 @@ final class BrowserToolbar {
         Optional<String> drag = notSecure || address.isBlank() ? Optional.empty() : Optional.of(address);
         var field = new Nodes.Field(ADDRESS, ControlState.READY, Nodes.FieldKind.TEXT, value, PLACEHOLDER, "Address", ENTER, Optional.empty(),
             Nodes.FieldPresentation.EMBEDDED, "", ESCAPE, "", false, image, glyph, name, drag, true, rows, typed != null && suggesting);
-        var menu = new Nodes.MenuButton(MENU, ControlState.READY, "", "menu", Nodes.ButtonKind.GHOST, "", menu(address, bookmarked, site), "Menu");
+        var menu = new Nodes.MenuButton(MENU, ControlState.READY, "", "menu", Nodes.ButtonKind.GHOST, "", menu(address, bookmarked, privacy), "Menu");
         var children = new ArrayList<Nodes.Node>(List.of(
             historyButton(BACK, canGoBack, "back", "Back", NavigationHistory.backMenu(history)),
             historyButton(FORWARD, canGoForward, "forward", "Forward", NavigationHistory.forwardMenu(history)), reload));
@@ -169,10 +168,10 @@ final class BrowserToolbar {
 
     /**
      * The menu button's items, its groups in order: with a bookmark state, Add Bookmark (disabled for an address bookmarks
-     * never keep) or Remove Bookmark, a separator, Manage Bookmarks and History; the privacy group; then Settings. Plan 7's
-     * reader group goes first. A separator that would lead, end the menu or follow another is left out.
+     * never keep) or Remove Bookmark, a separator, Manage Bookmarks and History; the privacy group; then a separator and
+     * Settings. Plan 7's reader group goes first. A separator that would lead, end the menu or follow another is left out.
      */
-    private static List<MenuItem> menu(String address, Optional<Boolean> bookmarked, List<Grant> site) {
+    private static List<MenuItem> menu(String address, Optional<Boolean> bookmarked, List<MenuItem> privacy) {
         var items = new ArrayList<MenuItem>();
         if (bookmarked.isPresent()) {
             items.add(bookmarked.get() ? new MenuItem(BOOKMARK_REMOVE, "Remove Bookmark", "", BOOKMARK_REMOVE, true, false)
@@ -180,7 +179,8 @@ final class BrowserToolbar {
             items.addAll(List.of(new MenuItem("browser.bookmarks.separator", "", "", "", true, true),
                 new MenuItem(BOOKMARKS, "Manage Bookmarks", "", BOOKMARKS, true, false), new MenuItem(HISTORY, "History", "", HISTORY, true, false)));
         }
-        items.addAll(PrivacyMenu.items(site, false));
+        items.addAll(privacy);
+        items.add(new MenuItem("browser.settings.separator", "", "", "", true, true));
         items.add(SETTINGS_ITEM);
         return separated(items);
     }

@@ -2,8 +2,10 @@ package dev.jasper.browser.permissions;
 
 import dev.jasper.browser.store.BrowserDatabase;
 import dev.jasper.browser.store.CapturedLog;
+import dev.jasper.browser.store.DatabaseClosedException;
+import dev.jasper.browser.store.DatabaseFixtures;
 import dev.jasper.browser.store.DataFolder;
-import dev.jasper.browser.store.Reached;
+import dev.jasper.browser.store.HistoryStore;
 import dev.jasper.browser.store.Stores;
 import java.awt.EventQueue;
 import java.nio.file.Path;
@@ -11,6 +13,7 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -156,16 +159,7 @@ class PermissionStoreTest {
 
     /** Plan 6's F32: a file plan 5 made, without the table, gets it as it opens, and keeps its history. */
     @Test void aDatabasePlanFiveMadeGetsTheTableAndKeepsItsRows() throws Exception {
-        BrowserDatabase plan5 = file();
-        done(new Stores(plan5, Runnable::run).history().record("https://kept.example/", Reached.LINK, 1_000));
-        done(plan5.call(connection -> {
-            try (var statement = connection.createStatement()) {
-                statement.execute("DROP TABLE permissions");
-            }
-            return null;
-        }));
-        plan5.close();
-        plan5.closed().get(30, TimeUnit.SECONDS);
+        DatabaseFixtures.plan5(folder, "https://kept.example/");
 
         BrowserDatabase opened = file();
         assertThat(done(opened.<Set<String>>call(PermissionStoreTest::tables))).as("the table is made as it opens").contains("permissions", "history", "bookmarks");
@@ -174,8 +168,92 @@ class PermissionStoreTest {
         assertThat(store.all()).isEmpty();
         done(store.set(A, Permission.MICROPHONE, Decision.ALLOWED));
         assertThat(reread(opened).all()).extracting(Grant::permission).containsExactly(Permission.MICROPHONE);
-        assertThat(done(new Stores(opened, Runnable::run).history().visits(10))).extracting(visit -> visit.url())
-            .as("plan 5's rows stay").containsExactly("https://kept.example/");
+        assertThat(done(new Stores(opened, Runnable::run).history().list("", Optional.empty(), 10)).entries())
+            .extracting(HistoryStore.HistoryEntry::url).as("plan 5's rows stay").containsExactly("https://kept.example/");
+    }
+
+    /**
+     * Review item 2: a change and its row are one step, so another change made to the same site at that moment cannot
+     * land in the database in the other order: here the set's listener, told as it changes the cache, clears the site
+     * at once, as another thread could, while the database thread is parked; both rows queue, and the database ends as
+     * the cache does.
+     */
+    @Test void aChangeQueuesItsRowInTheOrderItChangesTheCache() throws Exception {
+        BrowserDatabase database = memory();
+        var meanwhile = new java.util.concurrent.atomic.AtomicReference<Runnable>();
+        var store = new PermissionStore(database, task -> {
+            Runnable other = meanwhile.getAndSet(null);
+            if (other != null) other.run();
+            EventQueue.invokeLater(task);
+        }, failure -> { }, clock::get);
+        store.onChanged(() -> { });
+        Runnable release = park(database);
+        meanwhile.set(() -> store.clearSite(A));
+        CompletableFuture<Void> set = store.set(A, Permission.CAMERA, Decision.ALLOWED);
+        assertThat(meanwhile).as("the clear ran as the set told its change").hasValue(null);
+        release.run();
+        done(set);
+        assertThat(store.all()).as("the clear came last").isEmpty();
+        assertThat(reread(database).all()).as("and so did its row").isEmpty();
+    }
+
+    /**
+     * Review item 3: a closed store's permissions go from its cache, its rows untouched, and it takes no change after;
+     * a load that comes later brings none back.
+     */
+    @Test void discardEmptiesTheCacheWithoutWritingAndTakesNoLaterChange() throws Exception {
+        BrowserDatabase database = memory();
+        PermissionStore store = store(database);
+        done(store.set(A, Permission.CAMERA, Decision.ALLOWED));
+        var told = new AtomicInteger();
+        store.onChanged(told::incrementAndGet);
+        store.discard();
+        assertThat(store.all()).isEmpty();
+        assertThat(store.decision(A, Permission.CAMERA)).isEmpty();
+        assertThat(store.set(B, Permission.MICROPHONE, Decision.ALLOWED)).as("no change after").failsWithin(10, TimeUnit.SECONDS);
+        assertThat(store.clearAll()).isEmpty();
+        assertThatThrownBy(() -> done(store.load())).isInstanceOf(ExecutionException.class);
+        settle();
+        assertThat(store.all()).as("a later load brings none back").isEmpty();
+        assertThat(told).as("a closing store's items are not drawn again").hasValue(0);
+        assertThat(reread(database).all()).as("nothing written: the rows are as they were").extracting(Grant::origin).containsExactly(A);
+    }
+
+    /**
+     * Review item 4: only the database's own refusal as it closes is a dropped write; an {@code IllegalStateException}
+     * that SQLite's driver throws is a failed write, logged and told.
+     */
+    @Test void anIllegalStateExceptionFromTheDriverIsAFailedWrite() throws Exception {
+        BrowserDatabase database = DatabaseFixtures.throwingFor(sql -> sql.startsWith("INSERT INTO permissions"));
+        databases.add(database);
+        PermissionStore store = store(database);
+        try (var log = new CapturedLog(PermissionStore.class.getName())) {
+            CompletableFuture<Void> written = store.set(A, Permission.CAMERA, Decision.ALLOWED);
+            assertThatThrownBy(() -> done(written)).isInstanceOf(ExecutionException.class).hasCauseInstanceOf(IllegalStateException.class);
+            settle();
+            assertThat(unsaved).singleElement().isInstanceOf(IllegalStateException.class)
+                .satisfies(cause -> assertThat(cause).hasMessageStartingWith("The driver failed"));
+            assertThat(log.records()).extracting(LogRecord::getLevel).containsExactly(Level.WARNING);
+        }
+        assertThat(store.decision(A, Permission.CAMERA)).contains(Decision.ALLOWED);
+    }
+
+    /** Parks {@code database}'s thread until the answer is run, so the work given meanwhile queues behind it. */
+    private static Runnable park(BrowserDatabase database) throws Exception {
+        var parked = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        database.call(connection -> {
+            parked.countDown();
+            try {
+                if (!release.await(30, TimeUnit.SECONDS)) throw new SQLException("never released");
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                throw new SQLException("interrupted", interrupted);
+            }
+            return null;
+        });
+        assertThat(parked.await(10, TimeUnit.SECONDS)).as("the database's thread parked").isTrue();
+        return release::countDown;
     }
 
     /**
@@ -186,24 +264,11 @@ class PermissionStoreTest {
         BrowserDatabase database = memory();
         done(store(database).set(A, Permission.CAMERA, Decision.ALLOWED));
         PermissionStore store = store(database);
-        var parked = new CountDownLatch(1);
-        var release = new CountDownLatch(1);
-        CompletableFuture<Object> held = database.call(connection -> {
-            parked.countDown();
-            try {
-                if (!release.await(30, TimeUnit.SECONDS)) throw new SQLException("never released");
-            } catch (InterruptedException interrupted) {
-                Thread.currentThread().interrupt();
-                throw new SQLException("interrupted", interrupted);
-            }
-            return null;
-        });
-        assertThat(parked.await(10, TimeUnit.SECONDS)).isTrue();
+        Runnable release = park(database);
         CompletableFuture<Void> loaded = store.load();
         assertThat(store.revoke(A, Permission.CAMERA)).as("not loaded yet, so not known").isEmpty();
         CompletableFuture<Void> set = store.set(B, Permission.MICROPHONE, Decision.BLOCKED);
-        release.countDown();
-        done(held);
+        release.run();
         done(loaded);
         done(set);
         assertThat(store.all()).extracting(Grant::origin, Grant::permission).containsExactly(tuple(B, Permission.MICROPHONE));
@@ -246,7 +311,7 @@ class PermissionStoreTest {
         logger.setLevel(Level.ALL);
         try (var log = new CapturedLog(PermissionStore.class.getName())) {
             CompletableFuture<Void> written = store.set(A, Permission.CAMERA, Decision.ALLOWED);
-            assertThatThrownBy(() -> done(written)).isInstanceOf(ExecutionException.class).hasCauseInstanceOf(IllegalStateException.class);
+            assertThatThrownBy(() -> done(written)).isInstanceOf(ExecutionException.class).hasCauseInstanceOf(DatabaseClosedException.class);
             store.revoke(B, Permission.CAMERA);
             settle();
             assertThat(store.decision(A, Permission.CAMERA)).contains(Decision.ALLOWED);

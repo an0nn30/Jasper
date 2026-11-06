@@ -178,8 +178,8 @@ suggestions and the palette see only the 10,000 sites visited most recently.
 History and [bookmarks](#bookmarks) are kept in `browser.sqlite` in the plugin's data folder ([Files](#files)), which
 Jasper opens the first time it needs it, such as when a browser page first shows, and never as it starts. When the file
 cannot be used, because Jasper cannot read or write it, it is damaged, a later Jasper wrote it, or another program holds
-it for more than 2 seconds, Jasper leaves it as it was, posts "Browser history and bookmarks are unavailable" with the
-reason, and keeps history and bookmarks in memory until it quits. When SQLite itself cannot load, there are none for
+it for more than 2 seconds, Jasper leaves it as it was, posts "Browser history, bookmarks and site permissions are
+unavailable" with the reason, and keeps history and bookmarks in memory until it quits. When SQLite itself cannot load, there are none for
 the run. Browsing works as usual either way.
 
 **The history page**, `jasper-about:history`, opens from Web › History, ☰ › History, Show Full History and the welcome

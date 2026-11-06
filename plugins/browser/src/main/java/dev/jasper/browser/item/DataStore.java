@@ -16,8 +16,9 @@ import java.util.function.Consumer;
  * user went on past in them. The persistent store is Chromium's global context and the database in the plugin's data
  * folder, which every item shares that opened in no other. A /dev/null store holds an in-memory context and an in-memory
  * database, which the items a /dev/null item opens share; it counts its open items ({@link #retain}, {@link #release})
- * and closes as the last of them closes: its stores close, its allowances go and its context is released. The
- * persistent store closes only with the plugin's {@link DataStores}. UI thread, except where a method says otherwise.
+ * and closes as the last of them closes: its stores close, its permissions and allowances go and its context is
+ * released. The persistent store closes only with the plugin's {@link DataStores}. UI thread, except where a method
+ * says otherwise.
  */
 public final class DataStore {
     private final boolean devNull;
@@ -151,13 +152,16 @@ public final class DataStore {
     }
 
     /**
-     * Closes the store, once: its stores close, as their database does (the work given before still runs), its allowances
-     * go, its context is released, and those who asked {@link #onClosed} are told.
+     * Closes the store, once: its stores close, as their database does (the work given before still runs), its site
+     * permissions and allowances go from memory, its context is released, and those who asked {@link #onClosed} are
+     * told. The permissions' rows are not written: a /dev/null store's go with its database, and the persistent store's
+     * stay in their file.
      */
     void close() {
         if (closed) return;
         closed = true;
         stores.close();
+        permissions.discard();
         allowance.clear();
         context.close();
         ended.accept(this);

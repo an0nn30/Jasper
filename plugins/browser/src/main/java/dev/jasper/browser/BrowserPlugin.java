@@ -230,12 +230,14 @@ public class BrowserPlugin implements Plugin {
     }
 
     /**
-     * History and bookmarks cannot be kept in their file: the reason goes to the plugin's log and, while the plugin runs,
-     * to one notification. They are kept in memory until Jasper quits, or not at all. UI thread.
+     * History, bookmarks and site permissions cannot be kept in their file: the reason goes to the plugin's log and, while
+     * the plugin runs, to one notification. They are kept in memory until Jasper quits, or not at all. UI thread.
      */
     void storesUnavailable(Throwable cause) {
-        context.log().log(System.Logger.Level.WARNING, "Browser history and bookmarks are unavailable: " + reason(cause), cause);
-        if (running) context.notifications().group().warning("Browser history and bookmarks are unavailable", reason(cause));
+        context.log().log(System.Logger.Level.WARNING, "Browser history, bookmarks and site permissions are unavailable: " + reason(cause),
+            cause);
+        if (running) context.notifications().group().warning("Browser history, bookmarks and site permissions are unavailable",
+            reason(cause));
     }
 
     /**

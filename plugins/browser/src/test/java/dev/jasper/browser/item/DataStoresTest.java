@@ -106,6 +106,36 @@ class DataStoresTest {
         });
     }
 
+    /**
+     * Review item 3: a /dev/null group's permissions end with its store. A query of its permissions page that found the
+     * store just before it closed, answered after, lists none, and the closed store answers no decision.
+     */
+    @Test void aQueryThatRacedADevNullStoresCloseFindsNoPermission() throws Exception {
+        Stores plugins = memory.make();
+        var stores = new AtomicReference<DataStores>();
+        DataStore devNull = onUi(() -> {
+            stores.set(stores(plugins));
+            DataStore made = stores.get().newDevNull();
+            made.retain();
+            return made;
+        });
+        done(onUi(devNull::ready));
+        done(devNull.permissions().set("https://private.test", Permission.CAMERA, Decision.ALLOWED));
+        dev.jasper.browser.permissions.PermissionStore found = devNull.permissions();
+        onUi(() -> {
+            devNull.release();
+            return null;
+        });
+        assertThat(devNull.closed()).isTrue();
+        String listed = done(dev.jasper.browser.pages.PermissionsPage.answer(found, sites -> { }, "{\"op\":\"list\"}"));
+        assertThat(listed).isEqualTo("{\"grants\":[]}");
+        assertThat(found.decision("https://private.test", Permission.CAMERA)).isEmpty();
+        onUi(() -> {
+            stores.get().close();
+            return null;
+        });
+    }
+
     /** Plan 6: a permission a store could not save is told to whoever listens, once for each write, on the UI thread. */
     @Test void aPermissionNoStoreCouldSaveIsToldOnTheUiThread() throws Exception {
         Stores plugins = memory.make();

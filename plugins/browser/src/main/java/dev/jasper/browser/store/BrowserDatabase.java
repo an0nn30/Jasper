@@ -145,13 +145,13 @@ public final class BrowserDatabase implements AutoCloseable {
      * @param work the work
      * @param <T> what it gives
      * @return what it gave; failed with what it threw, with an {@link SQLException} when no database could open, and with
-     *     an {@link IllegalStateException} once the database is closing
+     *     a {@link DatabaseClosedException} once the database is closing
      */
     public <T> CompletableFuture<T> call(Work<T> work) {
         Objects.requireNonNull(work, "work");
         var result = new CompletableFuture<T>();
         synchronized (lock) {
-            if (closing) return CompletableFuture.failedFuture(new IllegalStateException("The browser's database is closed"));
+            if (closing) return CompletableFuture.failedFuture(new DatabaseClosedException());
             if (thread == null) thread = Executors.newSingleThreadExecutor(Thread.ofPlatform().daemon().name("jasper-browser-store").factory());
             thread.execute(() -> run(work, result));
         }

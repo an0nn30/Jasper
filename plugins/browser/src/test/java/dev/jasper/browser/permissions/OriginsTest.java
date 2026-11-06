@@ -29,6 +29,23 @@ class OriginsTest {
         assertThat(Origins.of("https://a@b@h.test:8443/")).contains("https://h.test:8443");
     }
 
+    /**
+     * Review item 6: what Chromium takes for the host. A backslash ends the host in an http or https address, as a
+     * slash does, and so do a query and a fragment, whatever {@code @} follows them.
+     */
+    @Test void theHostEndsWhereChromiumEndsIt() {
+        assertThat(Origins.of("https://good.test\\@evil.test/")).contains("https://good.test");
+        assertThat(Origins.of("https://good.test?@evil.test")).contains("https://good.test");
+        assertThat(Origins.of("https://evil.test#@good.test")).contains("https://evil.test");
+    }
+
+    /** Chromium writes an international host in punycode, which is kept; a raw Unicode host is no host Chromium writes. */
+    @Test void aPunycodeHostIsKeptAndARawUnicodeHostHasNoOrigin() {
+        assertThat(Origins.of("https://xn--bcher-kva.example/")).contains("https://xn--bcher-kva.example");
+        assertThat(Origins.of("https://XN--BCHER-KVA.example:8443/")).contains("https://xn--bcher-kva.example:8443");
+        assertThat(Origins.of("https://b" + (char) 0xFC + "cher.example/")).isEmpty();
+    }
+
     @Test void everyFileAddressHasOneOrigin() {
         assertThat(Origins.of("file:///x")).contains("file://");
         assertThat(Origins.of("FILE:///Users/ada/notes.html")).contains("file://");

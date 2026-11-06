@@ -783,10 +783,57 @@ class BrowserItemTest {
         }
     }
 
+    /**
+     * Ruling V17: a Reset item revokes its permission for the site the menu offered it for, though the page has gone on
+     * to another site since. The menu offered first.test's Reset Camera; the page went on to second.test, for which the
+     * menu offers Reset Microphone; the Reset Camera row chosen as it went, its action arriving after, revokes
+     * first.test's camera and keeps second.test's microphone, and second.test's own Reset revokes that.
+     */
+    @Test void aResetRevokesItsPermissionForTheSiteTheMenuOfferedItFor() throws Exception {
+        var host = onUi(FakePluginHost::new);
+        try {
+            var items = onUi(() -> items(host, page -> { }));
+            var item = onUi(() -> items.open(URI.create("https://first.test/"), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty()));
+            var permissions = item.store().permissions();
+            permissions.set("https://first.test", Permission.CAMERA, Decision.ALLOWED).get(10, TimeUnit.SECONDS);
+            permissions.set("https://second.test", Permission.MICROPHONE, Decision.ALLOWED).get(10, TimeUnit.SECONDS);
+            onUi(() -> {
+                assertThat(resets(view(host, item))).containsExactly("Reset Camera Permission (Allowed)");
+                item.load(URI.create("https://second.test/"));
+                assertThat(resets(view(host, item))).as("the menu follows the page").containsExactly("Reset Microphone Permission (Allowed)");
+                view(host, item).emit(new UiEvent.Action("browser.permission.reset.camera"));
+                return null;
+            });
+            assertThat(permissions.decision("https://first.test", Permission.CAMERA)).as("the site the menu offered it for").isEmpty();
+            assertThat(permissions.decision("https://second.test", Permission.MICROPHONE)).contains(Decision.ALLOWED);
+            onUi(() -> {
+                view(host, item).choose(BrowserToolbar.MENU, "browser.permission.reset.microphone");
+                assertThat(host.failures()).isEmpty();
+                return null;
+            });
+            assertThat(permissions.decision("https://second.test", Permission.MICROPHONE)).isEmpty();
+        } finally {
+            onUi(() -> {
+                host.close();
+                return null;
+            });
+        }
+    }
+
     /** The Reset items of the menu button of the item whose tab is called {@code title}. UI thread. */
     private static List<String> resets(FakePluginHost host, String title) {
-        var menu = (Nodes.MenuButton) Views.node(host.contentView(ID, title).orElseThrow().spec().root(), BrowserToolbar.MENU);
+        return resets(host.contentView(ID, title).orElseThrow());
+    }
+
+    /** The Reset items of {@code view}'s menu button. UI thread. */
+    private static List<String> resets(dev.jasper.sdk.testing.FakeKitView view) {
+        var menu = (Nodes.MenuButton) Views.node(view.spec().root(), BrowserToolbar.MENU);
         return menu.items().stream().map(MenuItem::label).filter(label -> label.startsWith("Reset ")).toList();
+    }
+
+    /** The view of {@code item}'s tab, found by the title it shows now. UI thread. */
+    private static dev.jasper.sdk.testing.FakeKitView view(FakePluginHost host, BrowserItem item) {
+        return host.contentView(ID, host.contentPresentation(item.tab()).title()).orElseThrow();
     }
 
     /**

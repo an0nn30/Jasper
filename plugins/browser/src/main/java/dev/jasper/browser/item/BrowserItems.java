@@ -179,7 +179,7 @@ public final class BrowserItems implements AutoCloseable {
         Objects.requireNonNull(store, "store");
         Objects.requireNonNull(origins, "origins");
         if (origins.isEmpty()) return;
-        for (BrowserItem item : List.copyOf(open)) if (item.store() == store) item.reloadShowing(origins);
+        for (BrowserItem item : List.copyOf(open)) if (item.store() == store) item.privacy().reloadShowing(origins);
     }
 
     /** Opens Settings at the Browser's page. */

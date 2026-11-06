@@ -57,20 +57,23 @@ class BrowserPluginTest {
         } });
     }
 
-    /** Plan 5: a database that cannot be used posts one notification with the reason, while the plugin runs. */
-    @Test void historyAndBookmarksThatAreUnavailablePostANotificationWithTheReasonWhileThePluginRuns() throws Exception {
+    /**
+     * Plan 5: a database that cannot be used posts one notification with the reason, while the plugin runs; it names the
+     * site permissions too, which plan 6 keeps there (ruling V15).
+     */
+    @Test void historyBookmarksAndSitePermissionsThatAreUnavailablePostANotificationWithTheReasonWhileThePluginRuns() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost(); var log = new CapturedLog("dev.jasper.plugins." + ID)) {
             var plugin = new BrowserPlugin();
             host.start(INFO, Set.of(), Set.of(), plugin);
             plugin.storesUnavailable(new java.sql.SQLException("[SQLITE_NOTADB] file is not a database"));
             assertThat(host.notifications().lines())
-                .containsExactly("dev.jasper.browser|WARNING|Browser history and bookmarks are unavailable|[SQLITE_NOTADB] file is not a database");
+                .containsExactly("dev.jasper.browser|WARNING|Browser history, bookmarks and site permissions are unavailable|[SQLITE_NOTADB] file is not a database");
             host.stopAll();
             plugin.storesUnavailable(new java.sql.SQLException("late"));
             assertThat(host.notifications().lines()).as("a stopped plugin only logs").hasSize(1);
             assertThat(log.records()).extracting(LogRecord::getLevel, LogRecord::getMessage).containsExactly(
-                tuple(Level.WARNING, "Browser history and bookmarks are unavailable: [SQLITE_NOTADB] file is not a database"),
-                tuple(Level.WARNING, "Browser history and bookmarks are unavailable: late"));
+                tuple(Level.WARNING, "Browser history, bookmarks and site permissions are unavailable: [SQLITE_NOTADB] file is not a database"),
+                tuple(Level.WARNING, "Browser history, bookmarks and site permissions are unavailable: late"));
             assertThat(log.records()).allSatisfy(logged -> assertThat(logged.getThrown()).isInstanceOf(java.sql.SQLException.class));
             assertThat(host.failures()).isEmpty();
         } });

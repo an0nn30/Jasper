@@ -1,6 +1,7 @@
 package dev.jasper.browser.permissions;
 
 import dev.jasper.browser.store.BrowserDatabase;
+import dev.jasper.browser.store.DatabaseClosedException;
 import dev.jasper.sdk.Subscription;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -24,14 +25,15 @@ import java.util.stream.Collectors;
 /**
  * One data store's site permissions (spec section 12), in its database's {@code permissions} table: for each site and
  * permission, the decision the user stored. They are read from a cache, at once and on any thread, which
- * {@link #load()} fills with every row; each change goes into the cache at once and is written on the database's
- * thread after. A change made before the rows have loaded is made again over them as they arrive, so it stands. Making
- * the store does no I/O.
+ * {@link #load()} fills with every row; each change goes into the cache at once, and its row is queued in the same step,
+ * so the database takes the changes in the order the cache did, and writes them on its thread after. A change made
+ * before the rows have loaded is made again over them as they arrive, so it stands. As its data store closes, the store
+ * empties its cache ({@link #discard()}), writing nothing. Making the store does no I/O.
  *
  * <p>A write that fails is logged and told once, with why, to the store's {@code unsaved} listener on the UI thread,
  * which posts "Site permissions could not be saved"; the cache keeps the new value for the rest of the run. A write the
- * database refuses because it has closed, as a /dev/null group's does with its last item, is dropped and logged for
- * debugging only.
+ * database refuses because it has closed ({@link DatabaseClosedException}), as a /dev/null group's does with its last
+ * item, is dropped and logged for debugging only.
  */
 public final class PermissionStore {
     /** What the notification of a write that failed says. */
@@ -52,6 +54,8 @@ public final class PermissionStore {
     private List<Change> early = new ArrayList<>();
     // Under the lock: the rows' load, once asked for.
     private CompletableFuture<Void> loaded;
+    // Under the lock: whether the store's data store has closed, after which the store holds and takes nothing.
+    private boolean discarded;
 
     private record Key(String origin, Permission permission) { }
 
@@ -95,6 +99,10 @@ public final class PermissionStore {
         synchronized (lock) {
             if (loaded != null) return loaded;
             load = loaded = new CompletableFuture<>();
+            if (discarded) {
+                load.completeExceptionally(new DatabaseClosedException());
+                return load;
+            }
         }
         database.call(PermissionStore::rows).whenComplete((rows, failure) -> loaded(load, rows, failure));
         return load;
@@ -157,7 +165,8 @@ public final class PermissionStore {
      * @param origin the site
      * @param permission the permission
      * @param decision what the user chose
-     * @return completes once the row is written; fails, the failure already logged and told, when it is not
+     * @return completes once the row is written; fails, the failure already logged and told, when it is not, and at once
+     *     once the store's data store has closed
      */
     public CompletableFuture<Void> set(String origin, Permission permission, Decision decision) {
         Objects.requireNonNull(origin, "origin");
@@ -165,11 +174,10 @@ public final class PermissionStore {
         Objects.requireNonNull(decision, "decision");
         var key = new Key(origin, permission);
         Instant now = Instant.ofEpochMilli(clock.getAsLong());
-        change(grants -> {
+        return change(grants -> {
             grants.compute(key, (same, was) -> new Grant(origin, permission, decision, was == null ? now : was.created(), now));
             return Set.of(origin);
-        });
-        return write(connection -> {
+        }, connection -> {
             try (var insert = connection.prepareStatement(SET)) {
                 insert.setString(1, origin);
                 insert.setString(2, permission.token());
@@ -178,7 +186,7 @@ public final class PermissionStore {
                 insert.setLong(5, now.toEpochMilli());
                 insert.executeUpdate();
             }
-        });
+        }).written();
     }
 
     /**
@@ -186,37 +194,35 @@ public final class PermissionStore {
      *
      * @param origin the site
      * @param permission the permission
-     * @return the site, when a decision was stored for it; else nothing
+     * @return the site, when the cache held a decision for it; else nothing. Before the rows have first loaded the cache
+     *     knows only the changes made since, so this is empty then, while the row's deletion is still queued
      */
     public Set<String> revoke(String origin, Permission permission) {
         var key = new Key(Objects.requireNonNull(origin, "origin"), Objects.requireNonNull(permission, "permission"));
-        Set<String> affected = change(grants -> grants.remove(key) == null ? Set.of() : Set.of(origin));
-        write(connection -> {
+        return change(grants -> grants.remove(key) == null ? Set.of() : Set.of(origin), connection -> {
             try (var delete = connection.prepareStatement("DELETE FROM permissions WHERE origin = ? AND type = ?")) {
                 delete.setString(1, origin);
                 delete.setString(2, permission.token());
                 delete.executeUpdate();
             }
-        });
-        return affected;
+        }).affected();
     }
 
     /**
      * Forgets every decision stored for {@code origin}. Any thread.
      *
      * @param origin the site
-     * @return the site, when any decision was stored for it; else nothing
+     * @return the site, when the cache held any decision for it; else nothing. Before the rows have first loaded the
+     *     cache knows only the changes made since, so this is empty then, while the rows' deletion is still queued
      */
     public Set<String> clearSite(String origin) {
         Objects.requireNonNull(origin, "origin");
-        Set<String> affected = change(grants -> grants.keySet().removeIf(key -> key.origin().equals(origin)) ? Set.of(origin) : Set.of());
-        write(connection -> {
+        return change(grants -> grants.keySet().removeIf(key -> key.origin().equals(origin)) ? Set.of(origin) : Set.of(), connection -> {
             try (var delete = connection.prepareStatement("DELETE FROM permissions WHERE origin = ?")) {
                 delete.setString(1, origin);
                 delete.executeUpdate();
             }
-        });
-        return affected;
+        }).affected();
     }
 
     /**
@@ -225,17 +231,28 @@ public final class PermissionStore {
      * @return the sites a decision was stored for
      */
     public Set<String> clearAll() {
-        Set<String> affected = change(grants -> {
+        return change(grants -> {
             Set<String> origins = grants.keySet().stream().map(Key::origin).collect(Collectors.toUnmodifiableSet());
             grants.clear();
             return origins;
-        });
-        write(connection -> {
+        }, connection -> {
             try (var delete = connection.createStatement()) {
                 delete.executeUpdate("DELETE FROM permissions");
             }
-        });
-        return affected;
+        }).affected();
+    }
+
+    /**
+     * The store's data store has closed: the cache empties, writing nothing, so a query that found the store just before
+     * finds no decision, and the store takes no change after, nor rows from a load that comes later. Its listeners are
+     * not told, as the items that listen are closing too. Any thread.
+     */
+    public void discard() {
+        synchronized (lock) {
+            discarded = true;
+            early = null;
+            grants = new ConcurrentHashMap<>();
+        }
     }
 
     /**
@@ -251,21 +268,37 @@ public final class PermissionStore {
         return () -> listeners.remove(entry);
     }
 
-    /** Makes {@code change} in the cache, and again over the rows when they have not loaded yet; the sites it changed. */
-    private Set<String> change(Change change) {
-        Set<String> affected;
+    /** The sites a change affected, and its row's write. */
+    private record Changed(Set<String> affected, CompletableFuture<Void> written) { }
+
+    /**
+     * Makes {@code change} in the cache, and again over the rows when they have not loaded yet, and queues its row's
+     * {@code write} in the same step, so no other change comes between them and the database takes the changes in the
+     * cache's order: queuing only hands the write to the database's thread, which never waits for this lock. Once the
+     * store is discarded, nothing changes.
+     */
+    private Changed change(Change change, Write write) {
+        Changed changed;
         synchronized (lock) {
-            affected = change.apply(grants);
+            if (discarded) {
+                LOG.log(System.Logger.Level.DEBUG, "A site permission was not changed: its store has closed");
+                return new Changed(Set.of(), CompletableFuture.failedFuture(new DatabaseClosedException()));
+            }
+            Set<String> affected = change.apply(grants);
             if (early != null) early.add(change);
+            changed = new Changed(affected, write(write));
         }
-        if (!affected.isEmpty()) told();
-        return affected;
+        if (!changed.affected().isEmpty()) told();
+        return changed;
     }
 
     /** The rows have been read, or could not be: the cache holds them, with the changes made since over them. */
     private void loaded(CompletableFuture<Void> load, List<Grant> rows, Throwable failure) {
+        Throwable unread = failure;
         synchronized (lock) {
-            if (failure == null) {
+            // Rows that arrive once the store is discarded are not the cache's: its data store has closed.
+            if (discarded && unread == null) unread = new DatabaseClosedException();
+            if (unread == null) {
                 var read = new ConcurrentHashMap<Key, Grant>();
                 for (Grant grant : rows) read.put(new Key(grant.origin(), grant.permission()), grant);
                 for (Change change : early) change.apply(read);
@@ -273,18 +306,19 @@ public final class PermissionStore {
             }
             early = null;
         }
-        if (failure == null) {
+        if (unread == null) {
             told();
             load.complete(null);
             return;
         }
-        Throwable cause = cause(failure);
-        if (cause instanceof IllegalStateException) LOG.log(System.Logger.Level.DEBUG, "Site permissions were not read: their store has closed", cause);
+        Throwable cause = cause(unread);
+        if (cause instanceof DatabaseClosedException)
+            LOG.log(System.Logger.Level.DEBUG, "Site permissions were not read: their store has closed", cause);
         else LOG.log(System.Logger.Level.WARNING, "Site permissions could not be read", cause);
         load.completeExceptionally(cause);
     }
 
-    /** Writes a change on the database's thread; one that fails is logged and told, unless the database has closed. */
+    /** Queues a change's row for the database's thread; one that fails is logged and told, unless the database has closed. */
     private CompletableFuture<Void> write(Write write) {
         return database.<Void>call(connection -> {
             write.run(connection);
@@ -295,8 +329,8 @@ public final class PermissionStore {
     }
 
     private void unwritten(Throwable cause) {
-        // BrowserDatabase refuses every call once it is closing with an IllegalStateException, and only then (F33).
-        if (cause instanceof IllegalStateException) {
+        // The database's own refusal as it closes (F33); an IllegalStateException the driver throws is a failed write.
+        if (cause instanceof DatabaseClosedException) {
             LOG.log(System.Logger.Level.DEBUG, "A site permission was not saved: its store has closed", cause);
             return;
         }
