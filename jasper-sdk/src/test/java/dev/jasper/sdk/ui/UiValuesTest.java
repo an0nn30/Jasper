@@ -386,6 +386,21 @@ class UiValuesTest {
             .isThrownBy(() -> older(Platform.class).onDefaultBrowserChanged(jasper -> { }));
     }
 
+    /** Browser plan 5 Task 10 (SDK 0.29.0): whether Copy on select is on is a default that an older host refuses. */
+    @Test void theCopyOnSelectQueryIsADefaultThatAnOlderHostRefuses() throws Exception {
+        assertThat(Platform.class.getMethod("copyOnSelect").isDefault()).isTrue();
+        assertThatExceptionOfType(UnsupportedOperationException.class).isThrownBy(() -> older(Platform.class).copyOnSelect());
+    }
+
+    /** Browser plan 5 Task 10 (SDK 0.29.0): inserted text is any text, empty included, and whether Return follows it. */
+    @Test void insertedTextIsAnyTextAndWhetherReturnFollowsIt() {
+        assertThat(new InsertedText("ls -la", true)).isEqualTo(new InsertedText("ls -la", true))
+            .isNotEqualTo(new InsertedText("ls -la", false));
+        assertThat(new InsertedText("", true).text()).as("Return alone").isEmpty();
+        assertThat(new InsertedText("a\nb", false).submit()).isFalse();
+        assertThatNullPointerException().isThrownBy(() -> new InsertedText(null, false)).withMessage("text");
+    }
+
     /** A host that implements only the abstract members of {@code type}, as one built for an older SDK does. */
     private static <T> T older(Class<T> type) {
         return type.cast(java.lang.reflect.Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[]{type},

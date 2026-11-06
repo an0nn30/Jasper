@@ -64,7 +64,8 @@ class VisitedScopeTest {
         harness.settle();
         var rows = new AtomicReference<dev.jasper.sdk.palette.PaletteResults>();
         onUiThread(() -> rows.set(new VisitedScope(harness.stores.visitIndex(), (address, window) -> { })
-            .search("", new dev.jasper.sdk.palette.PaletteQuery(harness.handle(), java.util.Optional.empty(), 200, true))));
+            .search("", new dev.jasper.sdk.palette.PaletteQuery(harness.handle(), java.util.Optional.empty(), 200, true,
+                java.util.Optional.empty()))));
         assertThat(rows.get().rows()).hasSize(50);
         assertThat(rows.get().rows().getFirst().title()).isEqualTo("Site 60");
         assertThat(rows.get().rows().getLast().title()).isEqualTo("Site 11");

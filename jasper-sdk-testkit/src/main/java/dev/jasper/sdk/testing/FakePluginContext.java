@@ -190,6 +190,7 @@ public final class FakePluginContext implements PluginContext {
                         throw new dev.jasper.sdk.MissingCapabilityException(info.id(), dev.jasper.sdk.Capabilities.CLIPBOARD_READ);
                     return host.clipboard.text();
                 }
+                @Override public boolean copyOnSelect() { requireOpen(); return host.copyOnSelect; }
             };
         }
 

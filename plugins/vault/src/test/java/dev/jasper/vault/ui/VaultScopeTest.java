@@ -46,7 +46,7 @@ class VaultScopeTest {
     }
 
     final WindowHandle window = window();
-    final PaletteQuery query = new PaletteQuery(window, Optional.empty(), 5, true);
+    final PaletteQuery query = new PaletteQuery(window, Optional.empty(), 5, true, Optional.empty());
     final FakePluginHost host = new FakePluginHost();
     final dev.jasper.sdk.plugin.PluginContext context = host.start(new PluginInfo("dev.jasper.vault", "Vault", "0.2.0", Set.of()),
         Set.of(), Set.of(), started -> { });
@@ -114,7 +114,7 @@ class VaultScopeTest {
         assertThat(scope.search("ops", query).rows()).extracting(PaletteRow::title).containsExactly("bastion");
         assertThat(scope.search("LAP", query).rows()).isEmpty();
         assertThat(scope.search("nothing", query).rows()).isEmpty();
-        assertThat(scope.search("", new PaletteQuery(window, Optional.empty(), 1, true)).rows()).hasSize(1);
+        assertThat(scope.search("", new PaletteQuery(window, Optional.empty(), 1, true, Optional.empty())).rows()).hasSize(1);
         PaletteRow prod = row(all, "cred." + PROD), bastion = row(all, "cred." + BASTION);
         assertThat(scope.available(prod, VaultScope.COPY_PASSWORD, query)).isTrue();
         assertThat(scope.available(bastion, VaultScope.COPY_PASSWORD, query)).as("a key account has no password").isFalse();

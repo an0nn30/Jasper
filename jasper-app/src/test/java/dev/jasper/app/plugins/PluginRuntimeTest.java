@@ -164,6 +164,48 @@ class PluginRuntimeTest {
         } finally { stopAndWait(runtime); }
     }
 
+    /**
+     * Browser plan 5 Task 10: Copy on select published before the plugins start is what they read at start, and one
+     * published later is what they read from then on.
+     */
+    @Test void copyOnSelectPublishedBeforeAndAfterStartIsWhatPluginsRead() throws Exception {
+        Path dev = root.resolve("dev/dev.example.select");
+        String source = """
+            package fix.select;
+            import dev.jasper.sdk.plugin.Plugin;
+            import dev.jasper.sdk.plugin.PluginContext;
+            import dev.jasper.sdk.events.AppEvents;
+            import java.nio.file.Files;
+            public final class Main implements Plugin {
+                private void note(PluginContext context, String file) {
+                    try { Files.writeString(context.dataDirectory().resolve(file), String.valueOf(context.platform().copyOnSelect())); }
+                    catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+                }
+                public void start(PluginContext context) {
+                    note(context, "initial");
+                    context.events().subscribe(AppEvents.CONFIG_RELOADED, event -> note(context, "reloaded"));
+                }
+            }
+            """;
+        PluginJars.build(dev, "select.jar", PluginJars.descriptor("dev.example.select", "1.0.0", "fix.select.Main"),
+            Map.of("fix.select.Main", source), List.of());
+        var runtime = runtime(null, root.resolve("user"), dev, false, new ArrayList<>());
+        var data = root.resolve("user/dev.example.select/data");
+        try {
+            onEdt(() -> {
+                runtime.copyOnSelect(true);
+                runtime.start(Map.of(), true);
+            });
+            assertThat(Files.readString(data.resolve("initial"))).isEqualTo("true");
+            onEdt(() -> {
+                runtime.copyOnSelect(false);
+                runtime.configurationChanged(Map.of());
+            });
+            settle();
+            assertThat(Files.readString(data.resolve("reloaded"))).isEqualTo("false");
+        } finally { stopAndWait(runtime); }
+    }
+
     @Test void shutdownKeepsPluginClassesAvailableUntilWorkerCleanupFinishes() throws Exception {
         assertShutdownKeepsCleanupClasses(false);
     }

@@ -128,7 +128,7 @@ class HostedPaletteTest {
             assertThat(scope.id()).isEqualTo("test.a.flaky");
             assertThat(scope.inAll()).isFalse();
             assertThat(scope.verbs()).extracting(dev.jasper.app.palette.PaletteVerb::id).containsExactly("paste", "boom");
-            var target = new PaletteTarget(text -> { }, () -> { }, Optional::empty, () -> true, Optional.of(window), Optional.of(pane));
+            var target = new PaletteTarget(text -> { }, () -> { }, Optional::empty, () -> true, Optional.of(window), Optional.of(pane), Optional.empty());
             var ctx = new PaletteContext(true, target, 5);
             var results = scope.search("on", ctx);
             assertThat(results.sectionLabel()).isEqualTo("Recent");

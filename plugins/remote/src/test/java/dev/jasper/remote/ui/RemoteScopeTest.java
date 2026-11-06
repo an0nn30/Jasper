@@ -32,7 +32,7 @@ class RemoteScopeTest {
     final RemoteHost nas = RemoteHost.create("nas", "nas.local", 22, "me", Auth.AGENT, "", Optional.empty());
     Optional<String> error = Optional.empty();
     final RemoteScope scope = new RemoteScope(() -> List.of(nas, prod), () -> error, (w, h) -> events.add("connect " + h.name()), (p, h) -> events.add("split " + h.name()), (w, h) -> events.add("edit " + h.name()));
-    final PaletteQuery query = new PaletteQuery(window(), Optional.empty(), 5, true);
+    final PaletteQuery query = new PaletteQuery(window(), Optional.empty(), 5, true, Optional.empty());
 
     @Test void rowsVerbsAndErrors() {
         assertThat(scope.spec().id()).isEqualTo(RemoteScope.ID);
@@ -73,7 +73,7 @@ class RemoteScopeTest {
         withDistros.execute(rows.getFirst(), RemoteScope.CONNECT, query);
         withDistros.execute(rows.getFirst(), RemoteScope.EDIT, query);
         assertThat(events).containsExactly("open Ubuntu");
-        assertThat(withDistros.search("", new PaletteQuery(window(), Optional.empty(), 1, true)).rows())
+        assertThat(withDistros.search("", new PaletteQuery(window(), Optional.empty(), 1, true, Optional.empty())).rows())
             .as("the result limit covers distributions and hosts together").extracting(PaletteRow::id).containsExactly("wsl.Ubuntu");
     }
 

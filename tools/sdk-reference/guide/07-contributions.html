@@ -162,7 +162,10 @@ already has open selects that tab and returns its handle. Through the {@link Con
 title, detail, icon or image, unsaved marker and location ({@link ContentTab#setPresentation(ContentPresentation)}), its commands
 ({@link ContentTab#setCommands(List)}), which its context menu lists and whose shortcuts apply while it is active, and
 its status bar items ({@link ContentTab#setStatus(List)}), and shows a right-click menu over it with Jasper's pane items
-between its own ({@link ContentTab#showContextMenu(Point,List,List,Consumer)}). Commands with the ids {@code find}, {@code find-next},
+between its own ({@link ContentTab#showContextMenu(Point,List,List,Consumer)}). With {@link ContentTab#setTextInsertion(Optional)}
+the tab takes the text other plugins insert, such as a palette scope's snippet: while the tab is its window's current
+item, a palette query with no terminal pane names it as its {@link TextTarget}, and each {@link InsertedText} reaches
+the plugin's handler on the UI thread. Commands with the ids {@code find}, {@code find-next},
 {@code find-previous}, {@code copy}, {@code paste}, {@code font-bigger}, {@code font-smaller} and {@code font-reset}
 answer Jasper's own Find, Find Next, Find Previous, Copy, Paste, Increase Font Size, Decrease Font Size and Reset Font
 Size.
@@ -286,5 +289,7 @@ user asked for, offering it to the web browser role first, while {@link Platform
 browser, except while Jasper is itself the system's default browser, when it opens as
 {@link Platform#openInBrowser(URI)} does unless the calling plugin provides the browser role. Their failures are posted in the plugin's default notification group, never thrown.
 {@link Platform#isDefaultBrowser()} tells whether Jasper is the system's default web browser, as Jasper last checked,
-and {@link Platform#onDefaultBrowserChanged(Consumer)} hears each change of that answer.</p>
+and {@link Platform#onDefaultBrowserChanged(Consumer)} hears each change of that answer. {@link Platform#copyOnSelect()}
+tells, on any thread, whether the user turned on Copy on select, for a view that copies its own selections as a terminal
+does.</p>
 </section>

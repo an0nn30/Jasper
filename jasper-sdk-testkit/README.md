@@ -124,7 +124,8 @@ Jasper's is `<home>/plugins/<id>/data`.
 | Method | Returns or does |
 | --- | --- |
 | `scopes()`, `scopePresentation(scopeId)`, `scopesInAll()`, `scopesInRecents()` | Registered scopes as `id\|label\|verbIds`; a scope's `HUE\|noun\|ROLE,ROLE`; the scopes the All view searches; the scopes whose spec sets `inRecents` |
-| `searchScope`, `availableInScope`, `stepInScope`, `completeStep`, `executeInScope` | Call a scope's `search`, `available`, `step`, a step's completion and `execute` with the query the palette would build, on rows of the last `searchScope`; `completeStep` answers `done`, `error:<message>` or `reopen:<scope>:<row or ->:<query or ->` |
+| `searchScope`, `availableInScope`, `stepInScope`, `completeStep`, `executeInScope` | Call a scope's `search`, `available`, `step`, a step's completion and `execute` with the query the palette would build, on rows of the last `searchScope`; with no pane, the query's `textTarget` is the window's current item while it takes inserted text; `completeStep` answers `done`, `error:<message>` or `reopen:<scope>:<row or ->:<query or ->` |
+| `addTextTarget(windowId)`, `insertedText(tabId)`, `insertText(tab, text)` | Adds and selects a content tab that takes inserted text, as a plugin's tab with `setTextInsertion` does, and lists what plugins inserted into it; runs a plugin tab's insertion as a `TextTarget.insert` does, false when it takes none |
 | `paletteOpens()` | Every `Palette.open` as `<window> <scope> <query or -> <row or ->` |
 | `fileSources()`, `fileRoots(sourceId)`, `locateFile(sourceId, paneId)`, `connectFileSource(sourceId, rootId, windowId)` | Registered file sources and their roots; ask one where a pane is; connect to a root, running background work until it connects (at most 30 seconds) |
 | `queueFileChoice(list)`, `fileChoices()` | What the next `Windows.choose` returns; every choice asked for |
@@ -135,6 +136,7 @@ Jasper's is `<home>/plugins/<id>/data`.
 | `openLink(address, origin, placement, target, windowId)`, `browserPlugin()` | Opens a web link as Jasper's own routes do (a clicked terminal link is `LinkOrigin.CLICK`, an address given to `jasper` is `EXTERNAL`), through the browser a plugin provides, and answers what it answered; which plugin provides it |
 | `setCommandClient(path)` | What `CommandLine.client()` returns |
 | `setDefaultBrowser(jasper)` | What `Platform.isDefaultBrowser()` returns, false until set, and whether another plugin's `browse` asks the provided browser first; a change runs the `onDefaultBrowserChanged` handlers at once, on the EDT |
+| `copyOnSelect(on)` | What `Platform.copyOnSelect()` returns from the next read, false until set |
 | `declareSubcommand(pluginId, name, summary)`, `call(name, arguments, workingDirectory[, paneId])` | Declares a subcommand as `[[subcommands]]` would, before the plugin starts; calls it as `jasper <name> …` would and returns a `FakeCommandCall` |
 
 ### Settings and appearance

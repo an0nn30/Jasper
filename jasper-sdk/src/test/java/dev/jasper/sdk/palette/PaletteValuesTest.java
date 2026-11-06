@@ -101,9 +101,32 @@ class PaletteValuesTest {
     }
 
     @Test void aQueryHasABoundedResultCountAndTheCapabilityAndVersionExist() {
-        assertThatIllegalArgumentException().isThrownBy(() -> new PaletteQuery(null, Optional.empty(), 5, true));
+        assertThatIllegalArgumentException().isThrownBy(() -> new PaletteQuery(null, Optional.empty(), 5, true, Optional.empty()));
         assertThat(Capabilities.PALETTE_CONTRIBUTE).isEqualTo("palette.contribute");
         assertThat(Capabilities.ALL).contains("palette.contribute");
         assertThat(JasperSdk.VERSION).isEqualTo("0.29.0");
+    }
+
+    /** Browser plan 5 Task 10 (SDK 0.29.0): a query names a text target only when no pane is its origin. */
+    @Test void aQueryNamesATextTargetOnlyWithoutATargetPane() {
+        var window = proxy(dev.jasper.sdk.terminal.WindowHandle.class);
+        var pane = proxy(dev.jasper.sdk.terminal.PaneHandle.class);
+        var text = proxy(dev.jasper.sdk.ui.TextTarget.class);
+        assertThat(new PaletteQuery(window, Optional.empty(), 5, true, Optional.of(text)).textTarget()).containsSame(text);
+        assertThat(new PaletteQuery(window, Optional.of(pane), 5, true, Optional.empty()).textTarget()).isEmpty();
+        assertThatIllegalArgumentException().isThrownBy(() -> new PaletteQuery(window, Optional.of(pane), 5, true, Optional.of(text)))
+            .withMessage("A query with a target pane has no text target");
+        assertThatNullPointerException().isThrownBy(() -> new PaletteQuery(window, Optional.empty(), 5, true, null));
+    }
+
+    /** A stand-in whose own methods are never called; equal only to itself. */
+    private static <T> T proxy(Class<T> type) {
+        return type.cast(java.lang.reflect.Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[]{type},
+            (self, method, arguments) -> switch (method.getName()) {
+                case "equals" -> self == arguments[0];
+                case "hashCode" -> System.identityHashCode(self);
+                case "toString" -> type.getSimpleName();
+                default -> throw new AssertionError("not called: " + method.getName());
+            }));
     }
 }

@@ -16,7 +16,10 @@ public final class Capabilities {
     public static final String TERMINAL_OBSERVE = "terminal.observe";
     /** Reading the text selected in a pane. */
     public static final String TERMINAL_SELECTION = "terminal.selection";
-    /** Typing and pasting into a pane. */
+    /**
+     * Typing and pasting into a pane, and, since 0.29.0, inserting text into another plugin's content tab through a
+     * palette query's {@code TextTarget}.
+     */
     public static final String TERMINAL_INJECT = "terminal.inject";
     /**
      * Opening local tabs and splits (the shell, a shell profile or a program), and reading the shell profiles with

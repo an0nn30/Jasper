@@ -138,6 +138,8 @@ final class PluginHost {
     volatile Optional<Path> commandClient = Optional.empty();
     /** Whether Jasper is the system's default browser, as last checked ({@code Platform.isDefaultBrowser}); never blocks. */
     volatile java.util.function.BooleanSupplier defaultBrowser = () -> false;
+    /** Whether Copy on select is on ({@code terminal.copy_on_select}, {@code Platform.copyOnSelect}); read on any thread. */
+    volatile boolean copyOnSelect;
     /** The plugins' {@code Platform.onDefaultBrowserChanged} handlers, in registration order. UI thread. */
     private final List<Consumer<Boolean>> defaultBrowserHandlers = new ArrayList<>();
     final EventBus bus;

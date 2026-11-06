@@ -1969,8 +1969,10 @@ public final class FakePluginHost implements AutoCloseable {
         }
 
         private PaletteQuery query(FakePalette.Registered registered, UUID windowId, UUID paneIdOrNull) {
-            return new PaletteQuery(registered.context().terminals.windowHandle(windowId),
-                Optional.ofNullable(paneIdOrNull).map(registered.context().terminals::paneHandle), 5, true);
+            var context = registered.context();
+            return new PaletteQuery(context.terminals.windowHandle(windowId),
+                Optional.ofNullable(paneIdOrNull).map(context.terminals::paneHandle), 5, true,
+                paneIdOrNull == null ? textTarget(context, windowId) : Optional.empty());
         }
 
         private PaletteRow row(String scopeId, String rowId) {
@@ -1986,7 +1988,8 @@ public final class FakePluginHost implements AutoCloseable {
 
         /**
          * Searches a scope as the palette would, as {@code rowId|title|enabled} lines; later row lookups use this
-         * answer. Every palette call this host makes passes {@code maxResults} 5 and {@code macOs} true.
+         * answer. Every palette call this host makes passes {@code maxResults} 5 and {@code macOs} true, and with no pane
+         * the window's current item as the {@code textTarget} while it takes inserted text (since 0.29.0).
          */
         public List<String> searchScope(String scopeId, String query, UUID windowId, UUID paneIdOrNull) {
             var registered = scope(scopeId);
@@ -2635,5 +2638,100 @@ public final class FakePluginHost implements AutoCloseable {
         var entry = new Entry(pluginId, value -> handler.accept((Boolean) value), new AtomicBoolean());
         defaultBrowserHandlers.add(entry);
         return () -> { entry.closed().set(true); defaultBrowserHandlers.remove(entry); };
+    }
+
+    volatile boolean copyOnSelect;
+
+    /**
+     * Sets what {@code Platform.copyOnSelect} reports: whether the user's Copy on select ({@code terminal.copy_on_select})
+     * is on. Every plugin reads the new value from its next call, on any thread. Until then it reports false.
+     *
+     * @param on whether Copy on select is on
+     * @since 0.29.0
+     */
+    public void copyOnSelect(boolean on) { copyOnSelect = on; }
+
+    /** The application's own content tabs that take text ({@link #addTextTarget}), each with what was inserted into it. */
+    private final Map<UUID, List<dev.jasper.sdk.ui.InsertedText>> textTargets = new ConcurrentHashMap<>();
+
+    /**
+     * Adds and selects a content tab of the application's that takes inserted text, as a plugin's tab does once it calls
+     * {@code ContentTab.setTextInsertion}: the window's current item, so a palette query for that window with no pane
+     * names it as {@code PaletteQuery.textTarget()} until another item is current or it closes ({@link #closeTab}).
+     * {@link #insertedText} lists what plugins inserted into it.
+     *
+     * @param windowId an open window
+     * @return the new tab's id
+     * @since 0.29.0
+     */
+    public UUID addTextTarget(UUID windowId) {
+        UUID id = addContentTab(windowId, "Text target");
+        textTargets.put(id, new CopyOnWriteArrayList<>());
+        return id;
+    }
+
+    /**
+     * What plugins inserted, through a palette query's {@code TextTarget}, into a tab {@link #addTextTarget} added.
+     *
+     * @param tabId a tab {@link #addTextTarget} added
+     * @return the texts, in the order they were inserted
+     * @throws IllegalArgumentException for any other tab
+     * @since 0.29.0
+     */
+    public List<dev.jasper.sdk.ui.InsertedText> insertedText(UUID tabId) {
+        var inserted = textTargets.get(Objects.requireNonNull(tabId, "tabId"));
+        if (inserted == null) throw new IllegalArgumentException("Not a text target: " + tabId);
+        return List.copyOf(inserted);
+    }
+
+    /**
+     * Inserts text into a plugin's content tab, as a palette query's {@code TextTarget.insert} does: the insertion the tab
+     * set with {@code ContentTab.setTextInsertion} receives it, on the caller's thread; one that throws is recorded in
+     * {@link #failures()}.
+     *
+     * @param tab a plugin's content tab, from this host
+     * @param text what to insert
+     * @return false, running nothing, when the tab is closed or takes no text
+     * @since 0.29.0
+     */
+    public boolean insertText(dev.jasper.sdk.ui.ContentTab tab, dev.jasper.sdk.ui.InsertedText text) {
+        Objects.requireNonNull(text, "text");
+        var content = (FakeContent) Objects.requireNonNull(tab, "tab");
+        if (!content.takesText()) return false;
+        try { content.insertion.orElseThrow().accept(text); }
+        catch (RuntimeException | LinkageError failure) { recordFailure(content.ui.context.plugin().id() + " content insertion: " + failure); }
+        return true;
+    }
+
+    /**
+     * The text target a palette query for {@code windowId} with no pane names, bound to {@code context}'s plugin: the
+     * window's current item while it takes text, an {@link #addTextTarget} tab or a plugin's content tab. It stays bound
+     * to that item, which it reads again at each call.
+     */
+    Optional<dev.jasper.sdk.ui.TextTarget> textTarget(FakePluginContext context, UUID windowId) {
+        FakeWorkspace.Tab current = workspace.window(windowId).map(window -> window.selected).orElse(null);
+        if (current == null) return Optional.empty();
+        var inserted = textTargets.get(current.id);
+        if (inserted != null)
+            return current.open ? Optional.of(textTarget(context, () -> current.open, inserted::add)) : Optional.empty();
+        for (FakePluginContext owner : contexts.values())
+            for (FakeContent content : owner.ui.contents)
+                if (content.tab == current && content.takesText())
+                    return Optional.of(textTarget(context, content::takesText, text -> insertText(content, text)));
+        return Optional.empty();
+    }
+
+    /** As the application's: {@code terminal.inject} first, then an open plugin, then the item's state, read now. */
+    private static dev.jasper.sdk.ui.TextTarget textTarget(FakePluginContext context, java.util.function.BooleanSupplier taking,
+                                                          Consumer<dev.jasper.sdk.ui.InsertedText> insert) {
+        return new dev.jasper.sdk.ui.TextTarget() {
+            @Override public void insert(dev.jasper.sdk.ui.InsertedText text) {
+                Objects.requireNonNull(text, "text");
+                context.terminals.require(dev.jasper.sdk.Capabilities.TERMINAL_INJECT);
+                context.requireOpen();
+                if (taking.getAsBoolean()) insert.accept(text);
+            }
+            @Override public boolean isOpen() { context.requireOpen(); return taking.getAsBoolean(); }
+        };
     }
 }

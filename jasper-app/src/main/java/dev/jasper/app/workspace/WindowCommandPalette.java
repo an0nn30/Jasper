@@ -112,7 +112,7 @@ final class WindowCommandPalette implements AutoCloseable {
                 }
             }
             boolean modeless = view.modeless();
-            PaletteTarget target = modeless ? currentTarget() : originPane == null ? PaletteTarget.window(owner.id()) : target(originPane);
+            PaletteTarget target = modeless ? currentTarget() : originPane == null ? contentTarget() : target(originPane);
             if (controller.open(id, target, modeless ? this::attached : this::validOrigin, queryOrNull, rowIdOrNull)) {
                 // The Run window runs a row where the person last worked (plan 8b Rulings 4).
                 if (modeless && !wasOpen) controller.follow(this::currentTarget);
@@ -130,13 +130,22 @@ final class WindowCommandPalette implements AutoCloseable {
             text -> { if (pane.view() != null) pane.view().paste(text); },
             () -> { if (pane.session() != null) pane.session().write("\r"); },
             () -> pane.session() == null ? java.util.Optional.empty() : pane.session().workingDirectory(),
-            pane::running, java.util.Optional.of(owner.id()), java.util.Optional.of(pane.id()));
+            pane::running, java.util.Optional.of(owner.id()), java.util.Optional.of(pane.id()), java.util.Optional.empty());
     }
 
-    /** The window's current pane, or the window when it has none. */
+    /** The window's current pane; with none, its current content item, or the window when it has neither. */
     private PaletteTarget currentTarget() {
         TerminalPane pane = owner.currentPane();
-        return pane == null ? PaletteTarget.window(owner.id()) : target(pane);
+        return pane == null ? contentTarget() : target(pane);
+    }
+
+    /**
+     * The window's current item when it is a plugin's, whose text insertion (SDK 0.29.0) the target reads at each call,
+     * so one that takes text later or stops taking it is followed; the window when no plugin item is current.
+     */
+    private PaletteTarget contentTarget() {
+        dev.jasper.app.contributions.Tab content = owner.selectedContent();
+        return content == null ? PaletteTarget.window(owner.id()) : PaletteTarget.content(owner.id(), content::insertion);
     }
 
     /** The Run window lives as long as its window is open and attached (spec 11.6: "it goes with its window"). */
