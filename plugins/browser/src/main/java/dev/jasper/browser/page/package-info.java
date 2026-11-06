@@ -1,12 +1,15 @@
 /**
  * A page on screen. {@link dev.jasper.browser.page.Page} is what a browser item drives, in plain types: it makes the
- * page's canvas at once and its browser only once asked to start. {@link dev.jasper.browser.page.PageView} is the
- * lightweight canvas Chromium's off-screen frames are painted on and its input comes from,
- * {@link dev.jasper.browser.page.PageRenderer} receives those frames, and {@link dev.jasper.browser.page.PageBrowser}
- * is the page's browser. {@link dev.jasper.browser.page.PageEvents} holds the client's one display, load and keyboard
- * handler, which hand each page's callbacks to its {@code Page} and refuse fullscreen, and tells the {@code links}
- * package's hook each main frame's load start on Chromium's thread; the main frame then runs {@code detect-favicon.js},
- * which names the document's icon through the {@code links} package's message router, and
+ * page's canvas at once and its browser only once asked to start, in its browsing group's
+ * {@link dev.jasper.browser.page.PageContext}, Chromium's global context or a /dev/null group's own in memory, and
+ * tells its item its browser's identifier as Chromium makes it, on Chromium's thread.
+ * {@link dev.jasper.browser.page.PageView} is the lightweight canvas Chromium's off-screen frames are painted on and its
+ * input comes from, {@link dev.jasper.browser.page.PageRenderer} receives those frames, and
+ * {@link dev.jasper.browser.page.PageBrowser} is the page's browser. {@link dev.jasper.browser.page.PageEvents} holds
+ * the client's one display, load and keyboard handler, and a life span handler, which hand each page's callbacks to its
+ * {@code Page} and refuse fullscreen, and tells the {@code links} package's hook each main frame's load start on
+ * Chromium's thread; the main frame then runs {@code detect-favicon.js}, which names the document's icon through the
+ * {@code links} package's message router, and
  * {@link dev.jasper.browser.page.Favicons} fetches it for the page. {@link dev.jasper.browser.page.NavigationHistory}
  * reads a page's history through DevTools after each main-frame load end and committed navigation, and a moment after a
  * title change, for its item's Back and Forward hold menus, and goes to the entry chosen; the {@code json} package

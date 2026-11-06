@@ -10,19 +10,30 @@ import org.cef.CefClient;
 import org.cef.CefSettings;
 import org.cef.SystemBootstrap;
 import org.cef.browser.CefBrowser;
+import org.cef.browser.CefRequestContext;
 import org.cef.callback.CefSchemeRegistrar;
 import org.cef.handler.CefAppHandlerAdapter;
+import org.cef.handler.CefResourceHandler;
+import org.cef.network.CefCookieManager;
+import org.cef.network.CefRequest;
 
 /**
- * The JCEF side of {@link Chromium}: the in-process {@link CefApp}, its pages' client, its previews' client and its
- * dispose. Only Chromium's start loads this class, so a plugin start that never shows a page loads no Chromium class.
+ * The JCEF side of {@link Chromium}: the in-process {@link CefApp}, its pages' client, its previews' client, its
+ * in-memory request contexts, the hand-over to its own UI thread and its dispose. Only Chromium's start loads this class,
+ * so a plugin start that never shows a page loads no Chromium class.
  */
 final class ChromiumApp {
     private final CefApp app;
+    // Serves jasper-about: to the global context as its scheme handler factory, and to in-memory contexts' pages through
+    // their request handler (F1): the factory is registered on the global context alone.
+    private final AboutSchemeFactory about;
     private CefClient client, preview;
     private boolean disposed;
 
-    private ChromiumApp(CefApp app) { this.app = app; }
+    private ChromiumApp(CefApp app, AboutSchemeFactory about) {
+        this.app = app;
+        this.about = about;
+    }
 
     /**
      * Starts in-process Chromium as the spike does and returns its app, which then initializes on Chromium's own thread.
@@ -35,9 +46,10 @@ final class ChromiumApp {
      * @param previewBrowser whether {@code jasper-preview:} answers a browser's request for an address: a preview's, on
      *     its own origin
      * @param terminated run once Chromium has ended, on the UI thread
+     * @param contextInitialized run once Chromium's context has initialized, on Chromium's own UI thread
      */
     static ChromiumApp start(Path dataDir, AboutScheme about, Predicate<CefBrowser> pageBrowser, PreviewScheme previews,
-            BiPredicate<CefBrowser, String> previewBrowser, Runnable terminated) {
+            BiPredicate<CefBrowser, String> previewBrowser, Runnable terminated, Runnable contextInitialized) {
         JCefAppConfig config = JCefAppConfig.getInstance();
         CefApp.setIsRemoteEnabled(false);
         SystemBootstrap.setLoader(config.getLoader());
@@ -45,12 +57,50 @@ final class ChromiumApp {
         CefSettings settings = config.getCefSettings();
         ChromiumOptions.apply(settings, dataDir);
         String[] args = ChromiumOptions.arguments(List.of(config.getAppArgs())).toArray(String[]::new);
-        CefApp.addAppHandler(new Handler(args, terminated));
+        CefApp.addAppHandler(new Handler(args, terminated, contextInitialized));
         CefApp app = CefApp.getInstance(args, settings, config.getServerExe());
+        var pages = new AboutSchemeFactory(about, pageBrowser);
         // JCEF holds the factories until the app has initialized.
-        app.registerSchemeHandlerFactory(AboutScheme.NAME, "", new AboutSchemeFactory(about, pageBrowser));
+        app.registerSchemeHandlerFactory(AboutScheme.NAME, "", pages);
         app.registerSchemeHandlerFactory(PreviewScheme.NAME, "", new PreviewSchemeFactory(previews, previewBrowser));
-        return new ChromiumApp(app);
+        return new ChromiumApp(app, pages);
+    }
+
+    /**
+     * A new request context in memory: CEF's defaults, whose empty cache path keeps its cookies, cache and storage in
+     * memory. Chromium's own UI thread, where CEF initializes it at once.
+     *
+     * @return the context
+     * @throws IllegalStateException when CEF makes none
+     */
+    static CefRequestContext inMemoryContext() {
+        CefRequestContext made = CefRequestContext.createContext(null);
+        if (made == null) throw new IllegalStateException("Chromium could not make an in-memory request context");
+        return made;
+    }
+
+    /** Releases Java's hold on {@code context}, which CEF destroys once its last browser has let it go too. */
+    static void dispose(CefRequestContext context) {
+        context.dispose();
+    }
+
+    /**
+     * Hands {@code task} to Chromium's own UI thread: the global cookie manager's {@code flushStore}, which has no other
+     * effect, calls back there. Once JCEF has initialized; any thread.
+     *
+     * @return whether Chromium will call back
+     */
+    boolean onChromiumThread(Runnable task) {
+        CefCookieManager cookies = CefCookieManager.getGlobalManager();
+        return cookies != null && cookies.flushStore(task::run);
+    }
+
+    /**
+     * The handler of {@code browser}'s {@code jasper-about:} request, as the scheme handler factory answers it.
+     * Chromium's IO thread.
+     */
+    CefResourceHandler aboutResource(CefBrowser browser, CefRequest request) {
+        return about.handler(browser, request.getResourceType(), request.getURL());
     }
 
     /** Runs {@code then} once the app has initialized, on Chromium's thread. */
@@ -104,15 +154,20 @@ final class ChromiumApp {
     }
 
     /**
-     * Registers {@code jasper-about} and {@code jasper-preview} and reports Chromium's end. JCEF tells it of each state on
-     * the UI thread.
+     * Registers {@code jasper-about} and {@code jasper-preview}, reports the context's initialization, on Chromium's own UI
+     * thread, and reports Chromium's end. JCEF tells it of each state on the UI thread.
      */
     private static final class Handler extends CefAppHandlerAdapter {
-        private final Runnable terminated;
+        private final Runnable terminated, contextInitialized;
 
-        Handler(String[] args, Runnable terminated) {
+        Handler(String[] args, Runnable terminated, Runnable contextInitialized) {
             super(args);
             this.terminated = terminated;
+            this.contextInitialized = contextInitialized;
+        }
+
+        @Override public void onContextInitialized() {
+            contextInitialized.run();
         }
 
         @Override public void onRegisterCustomSchemes(CefSchemeRegistrar registrar) {

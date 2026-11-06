@@ -29,7 +29,7 @@ import java.util.function.Consumer;
  *       so it loads in place; else as a new load, for an http or https address only, as a page could load one
  *       itself.</li>
  *   <li>Continue, once and only with its token, allows the host with the certificate the item kept from Chromium, for
- *       every item until Jasper quits, and loads it again.</li>
+ *       every item of its store while that lasts, and loads it again.</li>
  *   <li>"Not secure" shows while the page last committed is at an https address of a host so allowed.</li>
  * </ul>
  * An item remembers its last {@value #MAX} error pages, as many as Chromium keeps entries in a page's history. UI
@@ -51,7 +51,7 @@ final class ErrorPages {
      * {@code certificates} allows.
      *
      * @param page the item's page
-     * @param certificates the certificates the user went on past, the plugin's
+     * @param certificates the certificates the user went on past, its store's
      * @param load loads an address in the item, as its address field would
      */
     ErrorPages(Page page, CertificateAllowance certificates, Consumer<URI> load) {

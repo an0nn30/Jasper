@@ -10,15 +10,16 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.IntFunction;
 
 /**
  * {@code jasper-about:welcome} (spec section 14), the default start page: "Welcome Back", Top Sites, the sites visited
  * most, and Quick Actions for the bookmarks, the history and Settings (the {@code jasper-about:settings} action). Its
  * template is {@code welcome.html} and its script {@code welcome.js}, which asks {@code {"op":"top-sites"}} and is
  * answered {@code {"sites":[{"url","title","host"}]}}: at most {@value #TOP_SITES} sites, most visited first as
- * {@link HistoryStore#topSites} gives them, {@code title} empty when a site has none and {@code host} the address's host
- * or, for an address with none, the address. Until the onboarding ({@link OnboardingPages}) is finished the page
- * redirects to its first page.
+ * {@link HistoryStore#topSites} gives them, from the asking browser's history, {@code title} empty when a site has none
+ * and {@code host} the address's host or, for an address with none, the address. Until the onboarding
+ * ({@link OnboardingPages}) is finished the page redirects to its first page.
  */
 public final class WelcomePage {
     /** The page's name, and the name of the action that opens Settings › Browser. */
@@ -26,24 +27,27 @@ public final class WelcomePage {
     /** How many sites the page shows at most. */
     static final int TOP_SITES = 8;
     private static final String NOT_UNDERSTOOD = "Jasper does not understand this request.";
+    private static final String NO_HISTORY = "Jasper could not answer this request.";
 
     private WelcomePage() { }
 
     /**
-     * Registers the page, its queries, answered from {@code history} with the asking browser not needed, and its
-     * redirect to {@code jasper-about:onboarding-intro} while {@code onboarding} is not finished. The queries come
-     * before the page is first rendered. The {@link #SETTINGS} action is the plugin's own to register.
+     * Registers the page, its queries, each answered from the history of the browser that asks, and its redirect to
+     * {@code jasper-about:onboarding-intro} while {@code onboarding} is not finished. The queries come before the page is
+     * first rendered. The {@link #SETTINGS} action is the plugin's own to register.
      *
      * @param about the pages' registry
      * @param pages the pages' templates
-     * @param history the history whose top sites the page shows
+     * @param history given the asking browser's identifier, the history whose top sites the page shows there, or empty
+     *     for a browser with none, which is refused; asked on the plugin's background executor
      * @param onboarding whether the onboarding is finished; asked on Chromium's IO thread, so it answers from memory
      */
-    public static void register(AboutScheme about, AboutPages pages, HistoryStore history, Onboarding onboarding) {
+    public static void register(AboutScheme about, AboutPages pages, IntFunction<Optional<HistoryStore>> history, Onboarding onboarding) {
         Objects.requireNonNull(history, "history");
         Objects.requireNonNull(onboarding, "onboarding");
         about.register(NAME, () -> pages.render(NAME, Map.of()));
-        about.registerQueries(NAME, (browser, request) -> answer(history, request));
+        about.registerQueries(NAME, (browser, request) -> history.apply(browser).map(found -> answer(found, request))
+            .orElseGet(() -> CompletableFuture.failedFuture(new IllegalStateException(NO_HISTORY))));
         about.redirect(NAME, () -> onboarding.finished() ? Optional.empty() : Optional.of(AboutScheme.NAME + ":" + OnboardingPages.INTRO_PAGE));
     }
 

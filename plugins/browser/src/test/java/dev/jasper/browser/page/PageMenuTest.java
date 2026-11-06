@@ -2,6 +2,7 @@ package dev.jasper.browser.page;
 
 import dev.jasper.browser.item.BrowserItem;
 import dev.jasper.browser.item.BrowserItems;
+import dev.jasper.browser.item.DataStores;
 import dev.jasper.browser.item.ItemTestAccess;
 import dev.jasper.browser.settings.BrowserSettings;
 import dev.jasper.browser.store.MemoryStores;
@@ -277,7 +278,7 @@ class PageMenuTest {
     @Test void inspectElementIsTheItemsAtThePointOnThePagesCanvas() throws Exception {
         onUiThread(() -> {
             var inspected = new ArrayList<Point>();
-            var page = new Page(URI.create(PAGE), () -> { }, PageTestAccess.noFavicons(), Runnable::run);
+            var page = new Page(URI.create(PAGE), () -> { }, PageTestAccess.noFavicons(), Runnable::run, PageContext.persistent());
             var place = new MenuPlace(tab((proxy, method, args) -> null), copied -> { }, () -> "Google", terms -> URI.create(PAGE),
                 () -> false, () -> { }, () -> { }, () -> { }, inspected::add);
             var pointed = new PageMenu.Pointed(new Point(40, 70), NONE, NONE, NONE, NONE, false, NONE);
@@ -345,7 +346,7 @@ class PageMenuTest {
             show(plain());
             assertThat(ended).hasValue(1);
             assertThat(host.contentMenu(tab)).isEmpty();
-            var unplaced = new Page(URI.create(PAGE), () -> { }, PageTestAccess.noFavicons(), Runnable::run);
+            var unplaced = new Page(URI.create(PAGE), () -> { }, PageTestAccess.noFavicons(), Runnable::run, PageContext.persistent());
             PageMenu.show(unplaced, plain(), ended::incrementAndGet);
             assertThat(ended).hasValue(2);
             unplaced.close();
@@ -426,7 +427,7 @@ class PageMenuTest {
         host = new FakePluginHost();
         var started = new AtomicReference<BrowserItems>();
         host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(),
-            plugin -> started.set(new BrowserItems(plugin, BrowserSettings.declare(plugin.settings())::read, memory.make(), any -> { })));
+            plugin -> started.set(new BrowserItems(plugin, BrowserSettings.declare(plugin.settings())::read, new DataStores(memory.make()), any -> { })));
         items = started.get();
         host.activateTerminalWindow(host.addTerminalWindow());
         item = items.open(URI.create(PAGE), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
@@ -458,7 +459,7 @@ class PageMenuTest {
 
     /** A page without an item whose menu shows over {@code tab}, copying into {@code copies}. UI thread. */
     private static Page placed(ContentTab tab, List<String> copies) {
-        var page = new Page(URI.create(PAGE), () -> { }, PageTestAccess.noFavicons(), Runnable::run);
+        var page = new Page(URI.create(PAGE), () -> { }, PageTestAccess.noFavicons(), Runnable::run, PageContext.persistent());
         page.setMenuPlace(new MenuPlace(tab, copies::add, () -> "Google", terms -> URI.create("https://google.com/search?q=" + terms),
             page::canGoBack, page::back, page::reload, () -> { }, at -> { }));
         return page;

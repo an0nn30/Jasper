@@ -287,7 +287,7 @@ class SelectionCopyTest {
                 context.set(plugin);
                 settings.set(BrowserSettings.declare(plugin.settings()));
             });
-            var items = new BrowserItems(context.get(), settings.get()::read, memory.make(), started -> { },
+            var items = new BrowserItems(context.get(), settings.get()::read, new DataStores(memory.make()), started -> { },
                 (Duration delay, Runnable task) -> () -> { }, request -> new CompletableFuture<>());
             BrowserItem item = items.open(URI.create("https://example.com/"), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
             page = item.page();

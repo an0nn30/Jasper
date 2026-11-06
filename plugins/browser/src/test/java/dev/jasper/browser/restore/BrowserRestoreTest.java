@@ -3,6 +3,7 @@ package dev.jasper.browser.restore;
 import dev.jasper.browser.item.AddressInput;
 import dev.jasper.browser.item.BrowserItem;
 import dev.jasper.browser.item.BrowserItems;
+import dev.jasper.browser.item.DataStores;
 import dev.jasper.browser.item.ItemTestAccess;
 import dev.jasper.browser.item.Zoom;
 import dev.jasper.browser.page.Page;
@@ -572,9 +573,10 @@ class BrowserRestoreTest {
         var items = new AtomicReference<BrowserItems>();
         host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(), started -> {
             context.set(started);
-            items.set(new BrowserItems(started, BrowserSettings.declare(started.settings())::read, memory.make(), start));
+            var stores = new DataStores(memory.make());
+            items.set(new BrowserItems(started, BrowserSettings.declare(started.settings())::read, stores, start));
             started.windows().restorer(BrowserRestore.KIND, request -> {
-                items.get().restore(request.state(), START, request.window(), wait);
+                items.get().restore(request.state(), START, request.window(), wait, stores.persistent());
                 return Optional.empty();
             });
         });

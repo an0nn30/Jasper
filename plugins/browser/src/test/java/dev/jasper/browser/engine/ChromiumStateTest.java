@@ -418,6 +418,117 @@ class ChromiumStateTest {
         assertThat(Chromium.onItsOrigin(null, preview, "jasper-preview://" + token + "/")).as("before the previews name any").isFalse();
     }
 
+    /**
+     * Plan 6: work for Chromium's own UI thread, such as making an in-memory context, given before Chromium has started
+     * waits for its thread and starts nothing; once Chromium is closed, it fails, and so does any given after.
+     */
+    @Test void aTaskForChromiumsThreadGivenBeforeAnyStartWaitsStartsNothingAndFailsOnceClosed() throws Exception {
+        Chromium chromium = chromium(recording, LIMIT);
+        var ran = new AtomicInteger();
+        var waiting = chromium.onChromiumThread(ran::incrementAndGet);
+        var context = chromium.inMemoryContext();
+        flushUi();
+        assertThat(waiting).isNotDone();
+        assertThat(context).isNotDone();
+        assertThat(chromium.state()).isEqualTo(Chromium.State.NOT_STARTED);
+        assertThat(starts).as("it starts nothing").isEmpty();
+        EventQueue.invokeAndWait(chromium::close);
+        assertThat(failure(waiting)).isInstanceOf(IllegalStateException.class).hasMessage(Chromium.ONCE);
+        assertThat(failure(context)).isInstanceOf(IllegalStateException.class).hasMessage(Chromium.ONCE);
+        assertThat(failure(chromium.onChromiumThread(ran::incrementAndGet))).as("given after the close").hasMessage(Chromium.ONCE);
+        assertThat(failure(chromium.inMemoryContext())).hasMessage(Chromium.ONCE);
+        assertThat(ran).hasValue(0);
+        assertThat(starts).isEmpty();
+        flushUi();
+        assertThat(tellings).as("nothing to tell").hasValue(0);
+    }
+
+    /**
+     * Work given before Chromium's context initialized runs inside its initialization, on Chromium's thread, in the order
+     * given; a task that throws fails its own future only.
+     */
+    @Test void tasksGivenBeforeTheContextInitializedRunInsideItInTheOrderGiven() throws Exception {
+        Chromium chromium = chromium(recording, LIMIT);
+        chromium.client();
+        assertThat(chromium.enter()).isTrue();
+        var ran = new CopyOnWriteArrayList<String>();
+        var on = new java.util.concurrent.atomic.AtomicReference<Thread>();
+        var first = chromium.onChromiumThread(() -> {
+            on.set(Thread.currentThread());
+            ran.add("first");
+        });
+        var broken = chromium.onChromiumThread(() -> { throw new IllegalStateException("broken"); });
+        var second = chromium.onChromiumThread(() -> ran.add("second"));
+        assertThat(ran).isEmpty();
+        Thread initializing = Thread.ofPlatform().name("chromium-ui").start(chromium::contextInitialized);
+        initializing.join(TimeUnit.SECONDS.toMillis(10));
+        assertThat(ran).containsExactly("first", "second");
+        assertThat(on.get()).as("on Chromium's thread, inside its initialization").isSameAs(initializing);
+        assertThat(first).isCompleted();
+        assertThat(first.isCompletedExceptionally()).isFalse();
+        assertThat(failure(broken)).isInstanceOf(IllegalStateException.class).hasMessage("broken");
+        assertThat(second.isCompletedExceptionally()).isFalse();
+        end(chromium);
+    }
+
+    /**
+     * Once both Chromium's context and JCEF have initialized, in either order, work is handed to Chromium's thread; work
+     * the thread refuses fails, and work handed over that runs only after Chromium can no longer serve pages fails
+     * instead of running.
+     */
+    @Test void workAfterBothInitializationsIsHandedToChromiumsThread() {
+        var unavailable = new java.util.concurrent.atomic.AtomicReference<java.util.Optional<Throwable>>(java.util.Optional.empty());
+        var thread = new ChromiumThread(unavailable::get);
+        var handed = new java.util.ArrayList<Runnable>();
+        var ran = new CopyOnWriteArrayList<String>();
+        var first = thread.run(() -> ran.add("first"));
+        thread.contextInitialized();
+        assertThat(ran).as("inside the context's initialization").containsExactly("first");
+        assertThat(first.isCompletedExceptionally()).isFalse();
+        var between = thread.run(() -> ran.add("between"));
+        assertThat(ran).as("JCEF has not initialized: it waits").containsExactly("first");
+        thread.handOverWith(task -> handed.add(task));
+        assertThat(handed).as("handed over as JCEF initializes").hasSize(1);
+        var later = thread.run(() -> ran.add("later"));
+        assertThat(handed).hasSize(2);
+        handed.get(0).run();
+        assertThat(between).isCompleted();
+        assertThat(ran).containsExactly("first", "between");
+        var stopped = new IllegalStateException(Chromium.ONCE);
+        unavailable.set(java.util.Optional.of(stopped));
+        thread.fail(stopped);
+        assertThat(failure(later)).isSameAs(stopped);
+        handed.get(1).run();
+        assertThat(ran).as("handed over, never run").containsExactly("first", "between");
+        assertThat(failure(thread.run(() -> ran.add("after")))).isSameAs(stopped);
+
+        var jcefFirst = new ChromiumThread(java.util.Optional::empty);
+        jcefFirst.handOverWith(task -> { throw new AssertionError("handed over before the context initialized"); });
+        var waiting = jcefFirst.run(() -> ran.add("waiting"));
+        jcefFirst.contextInitialized();
+        assertThat(waiting.isCompletedExceptionally()).isFalse();
+        assertThat(ran).endsWith("waiting");
+
+        var refusing = new ChromiumThread(java.util.Optional::empty);
+        refusing.contextInitialized();
+        refusing.handOverWith(task -> false);
+        assertThat(failure(refusing.run(() -> ran.add("refused")))).isInstanceOf(IllegalStateException.class)
+            .hasMessage("Chromium's thread did not take the work");
+        assertThat(ran).doesNotContain("refused");
+    }
+
+    /** A start that fails fails the work waiting for Chromium's thread, with its reason, and any given after it. */
+    @Test void aFailedStartFailsTheWorkWaitingForChromiumsThread() throws Exception {
+        Chromium chromium = chromium(recording, Duration.ofMillis(50));
+        var waiting = chromium.onChromiumThread(() -> { });
+        chromium.client();
+        Throwable cause = told();
+        assertThat(failure(waiting)).isSameAs(cause);
+        assertThat(failure(chromium.onChromiumThread(() -> { }))).isSameAs(cause);
+        assertThat(failure(chromium.inMemoryContext())).isSameAs(cause);
+        chromium.close();
+    }
+
     /** A browser that is only itself. */
     private static CefBrowser browser() {
         return (CefBrowser) Proxy.newProxyInstance(CefBrowser.class.getClassLoader(), new Class<?>[] {CefBrowser.class},

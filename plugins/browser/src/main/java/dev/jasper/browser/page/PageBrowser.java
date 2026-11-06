@@ -49,6 +49,9 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
     private final PageView view;
     // The DevTools this browser draws, when it is Chromium's DevTools browser; null for a page's.
     private final DevTools devTools;
+    // Whether it was made with a request context of its own, in memory, as a /dev/null page's is; read on Chromium's IO
+    // thread.
+    private final boolean inMemory;
     // UI thread: the DevTools Chromium makes while openDevTools runs.
     private DevTools opening;
     // Set before the native browser is made, so before Chromium calls back for this browser.
@@ -71,6 +74,7 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
         super(client, url, context, renderer, view, settings());
         this.view = view;
         devTools = null;
+        inMemory = context != null;
     }
 
     /** Chromium's DevTools browser for {@code tools}, inspecting {@code inspected}'s page at {@code at}. */
@@ -79,6 +83,7 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
         super(client, url, context, renderer, view, inspected, at, settings());
         this.view = view;
         devTools = tools;
+        inMemory = context != null;
     }
 
     /** Chromium's own default is 30 frames a second. */
@@ -151,6 +156,16 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
      */
     public Page owner() {
         return owner;
+    }
+
+    /**
+     * Whether the browser was made with a request context of its own, in memory, as a /dev/null page's is, which
+     * Chromium's {@code jasper-about:} scheme handler factory does not serve. Any thread.
+     *
+     * @return true for a browser of an in-memory context
+     */
+    public boolean inMemory() {
+        return inMemory;
     }
 
     /**

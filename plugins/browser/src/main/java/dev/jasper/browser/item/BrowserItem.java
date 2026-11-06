@@ -92,7 +92,11 @@ import javax.swing.JComponent;
  * ({@link Page#insertText}), then Return when asked; a focus that takes no text gets neither; the clipboard is never
  * touched. While Copy on select is on
  * ({@code Platform.copyOnSelect()}, spec section 15), each selection the user finishes in the page is copied
- * ({@link Page#onSelectionGesture}, {@link Page#selectedText}), except one in a frame of another origin. UI thread.
+ * ({@link Page#onSelectionGesture}, {@link Page#selectedText}), except one in a frame of another origin. An item opens
+ * in a {@link DataStore} (spec section 12), which it holds while it is open: its page is made in the store's request
+ * context, once the store is {@link DataStore#ready ready}; its history, bookmarks, address suggestions and Edit Bookmark
+ * panel are the store's, and so are the certificates it goes on past; and the links and popups its page opens in items
+ * of their own open in the same store, so a /dev/null item's stay in its group. UI thread.
  */
 public final class BrowserItem implements AutoCloseable {
     static final String ROOT = "browser", PAGE = "browser.page", CONTENT = "browser.page.content";
@@ -107,7 +111,9 @@ public final class BrowserItem implements AutoCloseable {
     // The longest address the tab's location and status show; a data: address can run to megabytes.
     private static final int SHOWN_ADDRESS = 2_000;
     private final BrowserItems items;
-    // The history and bookmarks the item records into and suggests from, read once, as it opens.
+    // The data store the item opens in, which it holds while it is open; and that store's history and bookmarks, which
+    // the item records into and suggests from.
+    private final DataStore store;
     private final Stores stores;
     private final Optional<String> target;
     private final Page page;
@@ -142,15 +148,20 @@ public final class BrowserItem implements AutoCloseable {
     private Runnable typingPause = NOTHING;
     private CompletableFuture<List<String>> suggestion;
 
-    private BrowserItem(BrowserItems items, URI url, Optional<String> target, OptionalInt zoom, boolean waiting) {
+    private BrowserItem(BrowserItems items, URI url, Optional<String> target, OptionalInt zoom, boolean waiting, DataStore store) {
         this.items = items;
-        stores = items.stores();
+        this.store = store;
+        stores = store.stores();
         this.target = target;
         this.url = url;
         saved = url;
         ownZoom = zoom;
         this.waiting = waiting;
-        page = new Page(url, this::changed, items.favicons(), items.context().background());
+        page = new Page(url, this::changed, items.favicons(), items.context().background(), store.context());
+        // The page's browser is found in the item's store from the moment Chromium names it, on Chromium's thread, so
+        // its documents' first queries are answered from that store.
+        DataStores all = items.dataStores();
+        page.onBrowser(browser -> all.browserMade(browser, store), browser -> all.browserClosed(browser, store));
         showZoom(zoom.orElseGet(() -> items.settings().pageZoom()));
         page.onNavigationButton(this::navigationButton);
         page.onMagnify(this::magnify);
@@ -160,7 +171,7 @@ public final class BrowserItem implements AutoCloseable {
         page.onAddressChange(this::committed);
         page.onLoadStart(address -> loadStarts++);
         page.onSelectionGesture(this::selectionFinished);
-        errors = new ErrorPages(page, items.certificates(), this::load);
+        errors = new ErrorPages(page, store.allowance(), this::load);
         page.onLoadFailure(failure -> { if (!closed) errors.failed(failure); });
         sources = new SourcePages(page, this::load);
         history = new HistoryRecorder(page, stores, items::later);
@@ -177,45 +188,50 @@ public final class BrowserItem implements AutoCloseable {
     }
 
     /**
-     * Opens a browser item at {@code url}. Its page loads the first time the item shows.
+     * Opens a browser item at {@code url}, in {@code store}. Its page loads the first time the item shows.
      *
      * @param items the plugin's items, which keep it while it is open
      * @param url what it loads
      * @param placement where it opens
      * @param target the OSC 8 target it is for, or empty
      * @param window the window it opens from, or empty for the most recently active one
+     * @param store the data store it opens in, which it holds until it closes
      * @return the item, at Page zoom
      */
     public static BrowserItem open(BrowserItems items, URI url, TabPlacement placement, Optional<String> target,
-                                   Optional<WindowOwner> window) {
-        return open(items, url, placement, target, window, OptionalInt.empty(), false);
+                                   Optional<WindowOwner> window, DataStore store) {
+        return open(items, url, placement, target, window, OptionalInt.empty(), false, store);
     }
 
     /**
-     * As {@link #open(BrowserItems, URI, TabPlacement, Optional, Optional)}, at {@code zoom}, a zoom of its own from
-     * {@link Zoom#MIN} to {@link Zoom#MAX}, or empty for Page zoom; with {@code waiting}, the item waits.
+     * As {@link #open(BrowserItems, URI, TabPlacement, Optional, Optional, DataStore)}, at {@code zoom}, a zoom of its own
+     * from {@link Zoom#MIN} to {@link Zoom#MAX}, or empty for Page zoom; with {@code waiting}, the item waits.
      */
     static BrowserItem open(BrowserItems items, URI url, TabPlacement placement, Optional<String> target,
-                            Optional<WindowOwner> window, OptionalInt zoom, boolean waiting) {
+                            Optional<WindowOwner> window, OptionalInt zoom, boolean waiting, DataStore store) {
         Objects.requireNonNull(items, "items");
         Objects.requireNonNull(url, "url");
         Objects.requireNonNull(placement, "placement");
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(window, "window");
         Objects.requireNonNull(zoom, "zoom");
-        var item = new BrowserItem(items, url, target, zoom, waiting);
+        Objects.requireNonNull(store, "store");
+        var item = new BrowserItem(items, url, target, zoom, waiting, store);
         item.attach(placement, window);
         return item;
     }
 
+    /** The item opens its tab, holding its store from now on; a tab that cannot open gives the store back. */
     private void attach(TabPlacement placement, Optional<WindowOwner> window) {
         var spec = new ContentSpec(KEY + UUID.randomUUID(), title);
         try {
+            store.retain();
             tab = items.context().windows().openTab(restore(url).map(spec::withRestore).orElse(spec), window.orElse(null), view, placement);
         } catch (RuntimeException | Error failure) {
             bookmarksChanged.close();
             visitsChanged.close();
             view.close();
+            store.release();
             throw failure;
         }
         tab.setFocusTarget(this::focusContent);
@@ -256,6 +272,15 @@ public final class BrowserItem implements AutoCloseable {
      */
     public Optional<String> target() {
         return target;
+    }
+
+    /**
+     * The data store the item opened in, which it holds while it is open.
+     *
+     * @return the store
+     */
+    public DataStore store() {
+        return store;
     }
 
     /**
@@ -539,6 +564,8 @@ public final class BrowserItem implements AutoCloseable {
         if (asked || closed || waiting) return;
         asked = true;
         loadIndexes();
+        // Chromium is asked for at once; only the page's browser waits for the store.
+        page.makeAfter(store.ready());
         items.start(page);
     }
 
@@ -590,6 +617,10 @@ public final class BrowserItem implements AutoCloseable {
         view.selectAll(id);
     }
 
+    /**
+     * The item's tab closed: its page's last title goes to history first, then the item lets go of everything, its page
+     * and its store last, which a /dev/null group's last item closes.
+     */
     private void closed() {
         closed = true;
         history.flush();
@@ -601,6 +632,7 @@ public final class BrowserItem implements AutoCloseable {
         items.closed(this);
         view.close();
         page.close();
+        store.release();
     }
 
     /** The mouse's back or forward button was released over the page. */
@@ -610,10 +642,10 @@ public final class BrowserItem implements AutoCloseable {
     }
 
     /**
-     * A link or popup of the page opens an item of its own beside this one, for no OSC 8 target: in a new tab right
-     * after this item's tab, or split from this item's pane. A split opens beside the focused pane of the window's shown
-     * tab, so this item is selected first when it is not that. An address that is no URI opens nothing. Answers the new
-     * item's page, which the opener bridge links to this one.
+     * A link or popup of the page opens an item of its own beside this one, for no OSC 8 target, in this item's store: in
+     * a new tab right after this item's tab, or split from this item's pane. A split opens beside the focused pane of the
+     * window's shown tab, so this item is selected first when it is not that. An address that is no URI opens nothing.
+     * Answers the new item's page, which the opener bridge links to this one.
      */
     private Optional<Page> openItem(String address, TabPlacement placement) {
         if (closed || tab == null) return Optional.empty();
@@ -621,7 +653,7 @@ public final class BrowserItem implements AutoCloseable {
         if (link.isEmpty()) return Optional.empty();
         if (placement != TabPlacement.NEXT_TAB && !tab.isActive()) tab.select();
         try {
-            return Optional.of(items.open(link.get(), placement, Optional.empty(), Optional.of(tab)).page);
+            return Optional.of(items.open(link.get(), placement, Optional.empty(), Optional.of(tab), store).page);
         } catch (IllegalStateException closing) { // the windows close, or Jasper quits
             items.context().log().log(System.Logger.Level.WARNING, "A link could not open: " + closing.getMessage(), closing);
             return Optional.empty();

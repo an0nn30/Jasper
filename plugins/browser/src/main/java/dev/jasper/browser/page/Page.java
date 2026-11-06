@@ -13,6 +13,7 @@ import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
@@ -28,26 +29,36 @@ import javax.swing.JComponent;
 import javax.swing.Timer;
 import org.cef.CefClient;
 import org.cef.browser.CefFrame;
+import org.cef.browser.CefRequestContext;
 
 /**
  * One page as its item drives it, in plain types: the canvas it is drawn on, where it is, its title and favicon,
  * whether it loads, where it can go and its history, its find in page, its zoom, its failed loads and the certificates
  * it may go on past, the HTML it shows, what the user selects in it, its {@link DevTools}, and what it is asked to do. Its
  * Chromium browser is made only once {@link #start} asks for it, the first time its item shows; until then the page
- * holds the address it will load and the zoom it will show at, and asks nothing of Chromium. Every method runs on the
- * UI thread, and so does every callback it makes. This is the one class that makes a {@link PageView}: the page's, and
- * each of its DevTools'.
+ * holds the address it will load and the zoom it will show at, and asks nothing of Chromium. Its browser is made in its
+ * browsing group's {@link PageContext}: Chromium's global context, or a /dev/null group's own in memory. Every method
+ * runs on the UI thread, and so does every callback it makes, except where a method says otherwise. This is the one
+ * class that makes a {@link PageView}: the page's, and each of its DevTools'.
  */
 public final class Page implements AutoCloseable {
     /** The longest {@link #source} waits for Chromium's HTML. */
     static final long SOURCE_WAIT_SECONDS = 10;
     /** How long after a title change the page reads its history, once for the title changes meanwhile. */
     static final int TITLE_READ_MILLIS = 250;
+    private static final System.Logger LOG = System.getLogger(Page.class.getName());
     private final PageView view = new PageView();
     private final Runnable changed;
     private final Favicons favicons;
     // Where the answers of the page's DevTools runs are read: the plugin's background executor.
     private final Executor background;
+    // The request context the browser is made with, and what else must be ready first, as its item gives it.
+    private final PageContext context;
+    private CompletableFuture<?> before = CompletableFuture.completedFuture(null);
+    // Told on Chromium's thread as Chromium makes and closes the page's browser, with its identifier; and that identifier
+    // while the browser lives.
+    private volatile IntConsumer browserMade = browser -> { }, browserClosed = browser -> { };
+    private volatile OptionalInt browserId = OptionalInt.empty();
     private final Function<Page, CompletableFuture<NavigationHistory.History>> historyReader;
     private ObjIntConsumer<Page> historyJumper;
     // Given the page, reads the HTML its main frame shows: Chromium's, or a test's.
@@ -131,10 +142,11 @@ public final class Page implements AutoCloseable {
      * @param changed told whenever its address, title, favicon, loading state, where it can go or its history changes
      * @param favicons fetches the favicons its documents name
      * @param background the plugin's background executor, where the answers of its DevTools runs are read
+     * @param context the request context its browser is made with: its browsing group's
      */
-    public Page(URI url, Runnable changed, Favicons favicons, Executor background) {
+    public Page(URI url, Runnable changed, Favicons favicons, Executor background, PageContext context) {
         // Functions of the page, not of its browser's type: making a page loads no Chromium class.
-        this(url, changed, favicons, background, page -> NavigationHistory.read(page.readyBrowser()),
+        this(url, changed, favicons, background, context, page -> NavigationHistory.read(page.readyBrowser()),
             (page, id) -> NavigationHistory.goTo(page.readyBrowser(), id));
     }
 
@@ -145,16 +157,18 @@ public final class Page implements AutoCloseable {
      * @param changed told whenever its address, title, favicon, loading state, where it can go or its history changes
      * @param favicons fetches the favicons its documents name
      * @param background where the answers of its DevTools runs are read
+     * @param context the request context its browser is made with
      * @param historyReader given the page, reads its history, as {@link NavigationHistory#read} reads its browser's
      * @param historyJumper given the page and an entry's id, goes there, as {@link NavigationHistory#goTo} does
      */
-    Page(URI url, Runnable changed, Favicons favicons, Executor background,
+    Page(URI url, Runnable changed, Favicons favicons, Executor background, PageContext context,
          Function<Page, CompletableFuture<NavigationHistory.History>> historyReader, ObjIntConsumer<Page> historyJumper) {
         requested = Objects.requireNonNull(url, "url");
         address = url.toString();
         this.changed = Objects.requireNonNull(changed, "changed");
         this.favicons = Objects.requireNonNull(favicons, "favicons");
         this.background = Objects.requireNonNull(background, "background");
+        this.context = Objects.requireNonNull(context, "context");
         this.historyReader = Objects.requireNonNull(historyReader, "historyReader");
         this.historyJumper = Objects.requireNonNull(historyJumper, "historyJumper");
         titleRead.setRepeats(false);
@@ -176,10 +190,11 @@ public final class Page implements AutoCloseable {
     }
 
     /**
-     * Makes the page's browser: asks {@code chromium} for its client, starting Chromium when no page has yet, and makes
-     * the browser once the client is ready, which then loads what the page was last asked to. The client's display, load,
-     * keyboard and context-menu handlers are installed before any page is made on it. Once; nothing after
-     * {@link #close()}.
+     * Makes the page's browser: asks {@code chromium} for its client, starting Chromium when no page has yet, and for its
+     * group's request context, and makes the browser in that context once the client, the context and what
+     * {@link #makeAfter} gave are all ready, which then loads what the page was last asked to. Only the browser waits for
+     * them: Chromium's start waits for none. The client's display, load, keyboard and context-menu handlers are installed
+     * before any page is made on it. Once; nothing after {@link #close()}.
      *
      * @param chromium the plugin's Chromium
      */
@@ -189,10 +204,65 @@ public final class Page implements AutoCloseable {
         started = true;
         PageEvents.prepare(chromium);
         PageMenu.prepare(chromium);
-        // A ready client completes on the UI thread; a failure can complete anywhere, and the plugin tells it once.
-        chromium.client().whenComplete((client, failure) -> {
-            if (failure == null) EventQueue.invokeLater(() -> make(client));
+        CompletableFuture<CefClient> client = chromium.client();
+        CompletableFuture<CefRequestContext> inContext = context.context(chromium);
+        // What the item waits for counts once done, however it ended.
+        CompletableFuture<?> ready = before.handle((done, failure) -> null);
+        CompletableFuture.allOf(client, inContext, ready).whenComplete((all, failure) -> {
+            if (failure == null) {
+                EventQueue.invokeLater(() -> make(client.join(), inContext.join()));
+            } else if (!client.isCompletedExceptionally() && chromium.state() != Chromium.State.STOPPED) {
+                // A client that fails, the plugin tells once; a context that fails while Chromium runs, the log.
+                LOG.log(System.Logger.Level.WARNING, "A page's request context could not be made", failure);
+            }
         });
+    }
+
+    /**
+     * Has the page make its browser only once {@code ready} has completed too, however it completes, besides its client
+     * and its context: what its first document must already find, such as its store's site permissions. Asking for
+     * Chromium waits for nothing. Give it before {@link #start}; the last one given counts.
+     *
+     * @param ready what the browser waits for
+     */
+    public void makeAfter(CompletableFuture<?> ready) {
+        before = Objects.requireNonNull(ready, "ready");
+    }
+
+    /**
+     * The identifier Chromium gave the page's browser, which Jasper's pages' queries carry. Any thread.
+     *
+     * @return the identifier, from the moment Chromium has made the browser until it has closed it; empty otherwise
+     */
+    public OptionalInt browserId() {
+        return browserId;
+    }
+
+    /**
+     * Has {@code made} told the identifier Chromium gives the page's browser, as Chromium makes it and before any
+     * document of it can ask Jasper anything, and {@code closed} the same identifier once Chromium has closed it: both on
+     * Chromium's thread, where they must return at once and must not throw. The page's item gives them before
+     * {@link #start}; they replace the ones before, and the page's close keeps them, as its browser closes after it.
+     *
+     * @param made told the identifier of the browser Chromium made
+     * @param closed told the identifier of the browser Chromium closed
+     */
+    public void onBrowser(IntConsumer made, IntConsumer closed) {
+        browserMade = Objects.requireNonNull(made, "made");
+        browserClosed = Objects.requireNonNull(closed, "closed");
+    }
+
+    /** Chromium made the page's browser, whose identifier is {@code id}. Chromium's thread. */
+    void browserMade(int id) {
+        browserId = OptionalInt.of(id);
+        browserMade.accept(id);
+    }
+
+    /** Chromium closed the page's browser. Chromium's thread. */
+    void browserClosed() {
+        OptionalInt id = browserId;
+        browserId = OptionalInt.empty();
+        if (id.isPresent()) browserClosed.accept(id.getAsInt());
     }
 
     /**
@@ -1031,11 +1101,14 @@ public final class Page implements AutoCloseable {
         if (ready && !closed) browser.setZoomLevel(zoomLevel);
     }
 
-    /** The client is ready: makes the browser, which loads what the page was last asked to. */
-    private void make(CefClient client) {
+    /**
+     * The client and the request context are ready: makes the browser in that context, null for Chromium's global one,
+     * which loads what the page was last asked to.
+     */
+    private void make(CefClient client, CefRequestContext requestContext) {
         if (closed) return;
         made = requested.toString();
-        PageBrowser page = new PageBrowser(client, made, null, new PageRenderer(view), view);
+        PageBrowser page = new PageBrowser(client, made, requestContext, new PageRenderer(view), view);
         page.owner(this);
         browser = page;
         page.attach();

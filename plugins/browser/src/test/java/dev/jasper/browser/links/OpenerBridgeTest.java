@@ -8,6 +8,7 @@ import dev.jasper.browser.links.OpenerBridge.Party;
 import dev.jasper.browser.page.Activation;
 import dev.jasper.browser.page.Favicons;
 import dev.jasper.browser.page.Page;
+import dev.jasper.browser.page.PageContext;
 import dev.jasper.browser.page.PageFind;
 import dev.jasper.browser.page.PageTestAccess;
 import java.io.InputStream;
@@ -863,7 +864,7 @@ class OpenerBridgeTest {
 
         Document(String address) {
             this.address = address;
-            page = new Page(URI.create(address), () -> { }, NO_FAVICONS, Runnable::run);
+            page = new Page(URI.create(address), () -> { }, NO_FAVICONS, Runnable::run, PageContext.persistent());
             page.onOpenItem((url, placement) -> {
                 opened.add(placement + " " + url);
                 var popup = new Document(url);

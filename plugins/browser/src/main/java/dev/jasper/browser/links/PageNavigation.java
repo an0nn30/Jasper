@@ -1,5 +1,6 @@
 package dev.jasper.browser.links;
 
+import dev.jasper.browser.engine.AboutScheme;
 import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.links.LinkGesture.Where;
 import dev.jasper.browser.page.Page;
@@ -8,7 +9,10 @@ import dev.jasper.browser.page.PageView;
 import dev.jasper.browser.page.ServerCertificate;
 import dev.jasper.sdk.ui.TabPlacement;
 import java.awt.EventQueue;
+import java.util.Collections;
 import java.util.Optional;
+import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.function.Consumer;
 import org.cef.CefClient;
 import org.cef.browser.CefBrowser;
@@ -17,9 +21,12 @@ import org.cef.callback.CefCallback;
 import org.cef.handler.CefLifeSpanHandlerAdapter;
 import org.cef.handler.CefLoadHandler;
 import org.cef.handler.CefRequestHandlerAdapter;
+import org.cef.handler.CefResourceHandler;
 import org.cef.handler.CefResourceRequestHandler;
+import org.cef.handler.CefResourceRequestHandlerAdapter;
 import org.cef.misc.BoolRef;
 import org.cef.network.CefRequest;
+import org.cef.network.CefResponse;
 import org.cef.security.CefSSLInfo;
 
 /**
@@ -39,6 +46,12 @@ import org.cef.security.CefSSLInfo;
  * certificate, and otherwise the page is told the certificate, which its item's error page shows with the failure that
  * follows (spec section 14). Chromium checks certificates against the system's trust store.
  *
+ * <p>The request handler also serves {@code jasper-about:} to the pages of an in-memory context, a /dev/null group's:
+ * Chromium's scheme handler factory serves the global context alone, so every {@code jasper-about:} request of such a
+ * page is answered through {@link Chromium#aboutResource}, as the factory would answer it. A request's handler is one
+ * composite ({@code PageRequests}) of what each part asks of it: the opener bridge's for a main frame's navigation, and
+ * this.
+ *
  * <p>JCEF keeps a client's first request handler, so this is the only one: what else a request handler is asked goes to
  * its defaults. Life span handlers are a list, which JetBrains' runtime adds its own to, so this adds one and removes
  * none. The same installer wires the {@link OpenerBridge}, which a script's {@code window.open} goes through instead of
@@ -46,7 +59,8 @@ import org.cef.security.CefSSLInfo;
  */
 public final class PageNavigation {
     private static final boolean MAC_OS = System.getProperty("os.name", "").startsWith("Mac");
-    private static final Consumer<CefClient> INSTALL = PageNavigation::install;
+    // The Chromiums given the handlers, held weakly: each client gets them once, however often a page asks.
+    private static final Set<Chromium> PREPARED = Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
 
     private PageNavigation() { }
 
@@ -58,12 +72,21 @@ public final class PageNavigation {
      * @param chromium the plugin's Chromium
      */
     public static void prepare(Chromium chromium) {
-        chromium.onClient(INSTALL);
+        if (PREPARED.add(chromium)) chromium.onClient(client -> install(client, chromium));
     }
 
-    private static void install(CefClient client) {
-        client.addRequestHandler(new Links(OpenerBridge.install(client)));
+    private static void install(CefClient client, Chromium chromium) {
+        client.addRequestHandler(new Links(OpenerBridge.install(client), chromium));
         client.addLifeSpanHandler(new Popups());
+    }
+
+    /**
+     * Whether the request handler serves {@code browser}'s request for {@code url} itself, as {@code jasper-about:} (F1):
+     * a page's browser made with a context of its own, in memory, which Chromium's scheme handler factory does not serve.
+     * Chromium's IO thread.
+     */
+    static boolean servesAbout(CefBrowser browser, String url) {
+        return browser instanceof PageBrowser page && page.inMemory() && AboutScheme.page(url).isPresent();
     }
 
     /**
@@ -72,16 +95,22 @@ public final class PageNavigation {
      */
     private static final class Links extends CefRequestHandlerAdapter {
         private final OpenerBridge bridge;
+        private final Chromium chromium;
 
-        Links(OpenerBridge bridge) {
+        Links(OpenerBridge bridge, Chromium chromium) {
             this.bridge = bridge;
+            this.chromium = chromium;
         }
 
+        /** A main frame's navigation gets the opener bridge's, and an in-memory page's jasper-about: request its page. */
         @Override public CefResourceRequestHandler getResourceRequestHandler(CefBrowser browser, CefFrame frame, CefRequest request,
                                                                              boolean isNavigation, boolean isDownload, String initiator,
                                                                              BoolRef disableDefaultHandling) {
-            return isNavigation && browser instanceof PageBrowser && request.getResourceType() == CefRequest.ResourceType.RT_MAIN_FRAME
-                ? bridge.responses() : null;
+            boolean navigation = isNavigation && browser instanceof PageBrowser
+                && request.getResourceType() == CefRequest.ResourceType.RT_MAIN_FRAME;
+            boolean about = servesAbout(browser, request.getURL());
+            if (!navigation && !about) return null;
+            return new PageRequests(navigation ? bridge.responses() : null, about ? chromium : null);
         }
 
         @Override public boolean onCertificateError(CefBrowser browser, CefLoadHandler.ErrorCode error, String url, CefSSLInfo info,
@@ -114,6 +143,29 @@ public final class PageNavigation {
         if (url != null && !url.isEmpty()) return url;
         Page page = browser.owner();
         return page == null ? "" : page.committedAddress();
+    }
+
+    /**
+     * One request's handler, the composite of its parts: the opener bridge's reader of a main frame's response, and the
+     * page for a {@code jasper-about:} request of an in-memory context; each null when the request has none. Chromium's IO
+     * thread.
+     */
+    private static final class PageRequests extends CefResourceRequestHandlerAdapter {
+        private final CefResourceRequestHandler responses;
+        private final Chromium about;
+
+        PageRequests(CefResourceRequestHandler responses, Chromium about) {
+            this.responses = responses;
+            this.about = about;
+        }
+
+        @Override public CefResourceHandler getResourceHandler(CefBrowser browser, CefFrame frame, CefRequest request) {
+            return about == null ? null : about.aboutResource(browser, request);
+        }
+
+        @Override public boolean onResourceResponse(CefBrowser browser, CefFrame frame, CefRequest request, CefResponse response) {
+            return responses != null && responses.onResourceResponse(browser, frame, request, response);
+        }
     }
 
     /** Popups: Jasper opens the ones the user asked for as items, and Chromium makes none. */

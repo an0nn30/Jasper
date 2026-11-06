@@ -9,8 +9,12 @@
  * from Chromium and the bookmarks and visited sites of the {@code store} package's indexes ({@code StoreSuggestions}),
  * and {@link dev.jasper.browser.item.FaviconDecoder} turns a page's favicon into the image its tab and
  * address field show. A failed load shows {@link dev.jasper.browser.item.ErrorPage} in place of the page, as the
- * item's {@code ErrorPages} decide, whose Continue past a certificate error the plugin run's
- * {@code CertificateAllowance} remembers for every item. View Source shows
+ * item's {@code ErrorPages} decide, whose Continue past a certificate error its store's {@code CertificateAllowance}
+ * remembers for every item in that store. Each item opens in a {@link dev.jasper.browser.item.DataStore}, which
+ * {@link dev.jasper.browser.item.DataStores} makes (spec section 12): the persistent one, or a /dev/null group's, with
+ * its own request context and history and bookmarks in memory, which closes with the last item of the group; the links
+ * and popups an item's page opens open in its store, and Jasper's pages answer from the store of the browser that asks.
+ * View Source shows
  * {@link dev.jasper.browser.item.SourcePage}, a page's source fetched again through the {@code http} package or as the
  * item's {@code SourcePages} captured it; both take the theme's colours and their tokens from the {@code pages}
  * package's {@link dev.jasper.browser.pages.PageHtml}. Inspect Element shows a page's DevTools in its item's

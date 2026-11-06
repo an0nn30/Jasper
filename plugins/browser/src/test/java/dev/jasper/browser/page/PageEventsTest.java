@@ -111,7 +111,7 @@ class PageEventsTest {
     }
 
     private static Page page() {
-        return new Page(URI.create("https://example.com/"), () -> { }, PageTestAccess.noFavicons(), Runnable::run);
+        return new Page(URI.create("https://example.com/"), () -> { }, PageTestAccess.noFavicons(), Runnable::run, PageContext.persistent());
     }
 
     /** A frame that answers only whether it is the main one. */

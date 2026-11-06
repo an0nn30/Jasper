@@ -157,7 +157,7 @@ class FaviconsTest {
     @Test void aFaviconForThePageStillThereBecomesItsFavicon() throws Exception {
         favicons = new Favicons(FaviconDecoder::toPng, STARTS, TIMEOUT);
         var changes = new AtomicInteger();
-        Page page = onUi(() -> new Page(at("/page"), changes::incrementAndGet, favicons, Runnable::run));
+        Page page = onUi(() -> new Page(at("/page"), changes::incrementAndGet, favicons, Runnable::run, PageContext.persistent()));
         onUi(() -> {
             page.faviconDeclared(at("/silent.ico"), at("/page").toString());
             assertThat(page.declaredFavicon()).contains(at("/silent.ico"));
@@ -183,7 +183,7 @@ class FaviconsTest {
     @Test void aFaviconThatArrivesAfterAPushStateStillBecomesTheDocumentsFavicon() throws Exception {
         favicons = new Favicons(FaviconDecoder::toPng, STARTS, TIMEOUT);
         var changes = new AtomicInteger();
-        Page page = onUi(() -> new Page(at("/page"), changes::incrementAndGet, favicons, Runnable::run));
+        Page page = onUi(() -> new Page(at("/page"), changes::incrementAndGet, favicons, Runnable::run, PageContext.persistent()));
         onUi(() -> {
             page.faviconDeclared(at("/silent.ico"), at("/page").toString());
             return null;
@@ -208,7 +208,7 @@ class FaviconsTest {
     @Test void aFaviconForADocumentThePageNoLongerShowsIsDropped() throws Exception {
         favicons = new Favicons(FaviconDecoder::toPng, STARTS, TIMEOUT);
         var changes = new AtomicInteger();
-        Page page = onUi(() -> new Page(at("/page"), changes::incrementAndGet, favicons, Runnable::run));
+        Page page = onUi(() -> new Page(at("/page"), changes::incrementAndGet, favicons, Runnable::run, PageContext.persistent()));
         onUi(() -> {
             long declaredIn = PageTestAccess.document(page);
             page.loadStarted(at("/next").toString(), Reached.LINK);
@@ -230,7 +230,7 @@ class FaviconsTest {
     @Test void aLoadStartClearsTheFaviconAndEachDocumentAsksOnce() throws Exception {
         favicons = new Favicons(FaviconDecoder::toPng, STARTS, TIMEOUT);
         var changes = new AtomicInteger();
-        Page page = onUi(() -> new Page(at("/page"), changes::incrementAndGet, favicons, Runnable::run));
+        Page page = onUi(() -> new Page(at("/page"), changes::incrementAndGet, favicons, Runnable::run, PageContext.persistent()));
         onUi(() -> {
             page.faviconDeclared(at("/favicon.ico"), at("/page").toString());
             return null;

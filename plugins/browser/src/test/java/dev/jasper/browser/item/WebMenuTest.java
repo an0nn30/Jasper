@@ -181,7 +181,7 @@ class WebMenuTest {
     private BrowserItems items(FakePluginHost host) {
         var items = new AtomicReference<BrowserItems>();
         host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(),
-            plugin -> items.set(new BrowserItems(plugin, BrowserSettings.declare(plugin.settings())::read, memory.make(), (Page page) -> { })));
+            plugin -> items.set(new BrowserItems(plugin, BrowserSettings.declare(plugin.settings())::read, new DataStores(memory.make()), (Page page) -> { })));
         return items.get();
     }
 

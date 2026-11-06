@@ -24,13 +24,17 @@ import org.cef.browser.CefFrame;
 import org.cef.handler.CefDisplayHandlerAdapter;
 import org.cef.handler.CefKeyboardHandler;
 import org.cef.handler.CefKeyboardHandlerAdapter;
+import org.cef.handler.CefLifeSpanHandlerAdapter;
 import org.cef.handler.CefLoadHandler;
 import org.cef.handler.CefLoadHandlerAdapter;
 import org.cef.network.CefRequest;
 
 /**
- * The client's one display, load and keyboard handler. JCEF keeps the first handler of each kind a client is given,
- * so these serve every page: each callback goes to the {@link Page} of the browser it is about. Chromium calls them
+ * The client's one display, load and keyboard handler, and a life span handler. JCEF keeps the first handler of each
+ * kind a client is given, but every life span handler, so these serve every page: each callback goes to the
+ * {@link Page} of the browser it is about. A page's browser is named to its page as Chromium makes it and as it closes,
+ * there and then on Chromium's thread ({@link Page#onBrowser}), so its documents' queries find its item's store from the
+ * first. Chromium calls them
  * on its own UI thread (on macOS, AppKit's main thread), never Swing's, so what a page shows changes on the UI thread.
  * The hover address goes straight to the canvas, which takes it from any thread. A main frame's load start also goes,
  * at once and on Chromium's thread, to the hooks the {@code links} package gave the client
@@ -110,6 +114,7 @@ public final class PageEvents {
         client.addDisplayHandler(new Display());
         client.addLoadHandler(new Load());
         client.addKeyboardHandler(new Keyboard());
+        client.addLifeSpanHandler(new Lives());
     }
 
     /** The page script {@code name}, one of this package's resources. */
@@ -198,6 +203,22 @@ public final class PageEvents {
         /** Jasper refuses fullscreen: a page that enters it leaves it at once. */
         @Override public void onFullscreenModeChange(CefBrowser browser, boolean fullscreen) {
             if (fullscreen && page(browser) != null) browser.executeJavaScript(EXIT_FULLSCREEN, EXIT_FULLSCREEN_URL, 0);
+        }
+    }
+
+    /**
+     * A page's browser is made, or closed: its page hears its identifier at once, on Chromium's thread. It decides no
+     * popup and no close, which the {@code links} package's life span handler and the browser decide.
+     */
+    private static final class Lives extends CefLifeSpanHandlerAdapter {
+        @Override public void onAfterCreated(CefBrowser browser) {
+            Page page = page(browser);
+            if (page != null) page.browserMade(browser.getIdentifier());
+        }
+
+        @Override public void onBeforeClose(CefBrowser browser) {
+            Page page = page(browser);
+            if (page != null) page.browserClosed();
         }
     }
 

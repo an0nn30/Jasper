@@ -9,6 +9,7 @@ import dev.jasper.browser.engine.PreviewScheme;
 import dev.jasper.browser.engine.RunMarker;
 import dev.jasper.browser.item.BookmarkPanel;
 import dev.jasper.browser.item.BrowserItems;
+import dev.jasper.browser.item.DataStores;
 import dev.jasper.browser.item.ErrorPage;
 import dev.jasper.browser.item.SourcePage;
 import dev.jasper.browser.item.WebMenu;
@@ -60,7 +61,9 @@ import java.util.concurrent.RejectedExecutionException;
  * Chromium class. After a run that ended while Chromium ran, the items it restores wait to be loaded. It makes the
  * items' history and bookmarks too, in {@code browser.sqlite} in its data folder, which opens only once an item first
  * shows or its address field is edited, so the start opens no database and loads no sqlite-jdbc class (spec section
- * 19); that folder, which holds Chromium's cookies too, is made its owner's alone before either writes there.
+ * 19); that folder, which holds Chromium's cookies too, is made its owner's alone before either writes there. They are
+ * the persistent store of its {@link DataStores}, beside which each group of /dev/null items has a store of its own,
+ * in memory (spec section 12); Jasper's pages answer from the store of the browser that asks.
  */
 public class BrowserPlugin implements Plugin {
     static final String NEW_TAB = "dev.jasper.browser.new_tab", NEW_WINDOW = "dev.jasper.browser.new_window";
@@ -72,6 +75,7 @@ public class BrowserPlugin implements Plugin {
     private PreviewService previews;
     private BrowserItems items;
     private Stores stores;
+    private DataStores dataStores;
     private SourcePage sources;
     private boolean running;
 
@@ -102,6 +106,10 @@ public class BrowserPlugin implements Plugin {
         // open is told on its own thread.
         var database = BrowserDatabase.file(folder, cause -> EventQueue.invokeLater(() -> storesUnavailable(cause)));
         stores = new Stores(database, EventQueue::invokeLater);
+        // The persistent store holds them; a /dev/null group's store, made as its first item opens, holds its own in
+        // memory. Making them opens nothing.
+        var dataStores = new DataStores(stores);
+        this.dataStores = dataStores;
         // Spec section 15: "Bookmark Removed" and "Bookmark Deleted" post in a group of their own, which Settings lists.
         context.notifications().group(BookmarkPanel.GROUP);
         // A page is made when its item first shows: the client's handlers are installed then, before any page is made on
@@ -110,7 +118,7 @@ public class BrowserPlugin implements Plugin {
         Chromium engine = chromium;
         // Spec section 1: whether the onboarding is finished, read from its marker on the background executor.
         var onboarding = new Onboarding(data.resolve("onboarding-finished"), context.background());
-        var items = new BrowserItems(context, settings::read, stores, page -> {
+        var items = new BrowserItems(context, settings::read, dataStores, page -> {
             PageNavigation.prepare(engine);
             PageDialogs.prepare(engine);
             AboutQueries.prepare(engine, about, context.background());
@@ -121,18 +129,19 @@ public class BrowserPlugin implements Plugin {
         this.items = items;
         about.registerAction(WelcomePage.SETTINGS, () -> { if (running) items.showSettings(); });
         // Jasper's pages built from their templates, in the workspace theme. Spec section 10: the history and bookmarks
-        // pages, whose queries are answered from the history and the bookmarks; the asking browser is not needed yet.
+        // pages, whose queries are answered from the history and the bookmarks of the asking browser's store, so a
+        // /dev/null item's pages show its group's own; a browser with no store is refused.
         var pages = new AboutPages(context.appearance(), about);
-        var history = stores.history();
         // The welcome page, which sends the user to the onboarding until it is finished, and the onboarding's pages. No
         // setting is offered on the setup page yet.
-        WelcomePage.register(about, pages, history, onboarding);
+        WelcomePage.register(about, pages, browser -> dataStores.forBrowser(browser).map(store -> store.stores().history()), onboarding);
         new OnboardingPages(pages, about, onboarding, System.getProperty("os.name", "").startsWith("Mac"), List.of(), EventQueue::invokeLater).register();
         about.register(HistoryPage.NAME, () -> pages.render(HistoryPage.NAME, Map.of()));
-        about.registerQueries(HistoryPage.NAME, (browser, request) -> HistoryPage.answer(history, request));
-        var bookmarks = stores.bookmarks();
+        about.registerQueries(HistoryPage.NAME, (browser, request) ->
+            dataStores.answer(browser, store -> HistoryPage.answer(store.stores().history(), request)));
         about.register(BookmarksPage.NAME, () -> pages.render(BookmarksPage.NAME, Map.of()));
-        about.registerQueries(BookmarksPage.NAME, (browser, request) -> BookmarksPage.answer(bookmarks, request));
+        about.registerQueries(BookmarksPage.NAME, (browser, request) ->
+            dataStores.answer(browser, store -> BookmarksPage.answer(store.stores().bookmarks(), request)));
         // Spec section 14: a failed load's page, and what its Try Again and Continue ask of the item whose page it is.
         var errors = new ErrorPage(context.appearance());
         about.register(ErrorPage.NAME, errors::html);
@@ -156,8 +165,8 @@ public class BrowserPlugin implements Plugin {
         file.add(NEW_TAB);
         file.add(NEW_WINDOW);
         WebMenu.register(context, items);
-        // Spec section 11: bookmarks and visited sites in the command palette. They read the indexes, which load when the
-        // palette first asks, so the start reads nothing.
+        // Spec section 11: bookmarks and visited sites in the command palette. They read the persistent store's indexes,
+        // which load when the palette first asks, so the start reads nothing.
         var opener = new PaletteOpener(items, engine::unavailable, this::tell);
         context.palette().register(new BookmarksScope(stores.bookmarkIndex(), opener::open));
         context.palette().register(new VisitedScope(stores.visitIndex(), opener::open));
@@ -165,10 +174,10 @@ public class BrowserPlugin implements Plugin {
         var role = new BrowserRole(context, items, settings, engine::state);
         context.platform().browser(role);
         WebAddressItems.register(context, role, settings);
-        // Spec section 16: a saved item comes back at once, and its page loads the first time it shows, or, after a run
-        // that ended while Chromium ran, once the user loads it.
+        // Spec section 16: a saved item comes back at once, in the persistent store, and its page loads the first time it
+        // shows, or, after a run that ended while Chromium ran, once the user loads it.
         context.windows().restorer(BrowserRestore.KIND, request -> {
-            items.restore(request.state(), settings.read().startAddress(), request.window(), endedWhileRunning);
+            items.restore(request.state(), settings.read().startAddress(), request.window(), endedWhileRunning, dataStores.persistent());
             return Optional.empty();
         });
         running = true;
@@ -176,8 +185,9 @@ public class BrowserPlugin implements Plugin {
 
     /**
      * Jasper quits, or the plugin is turned off. The items close their open Edit Bookmark panels, whose bookmarks keep the
-     * tags they show, and give history their pages' last titles, then the history and bookmarks close: their database
-     * takes no more work and closes once the work given before has run. The items' favicon fetches and View Source's
+     * tags they show, and give history their pages' last titles, then the data stores close: the persistent history and
+     * bookmarks' database takes no more work and closes once the work given before has run, and each /dev/null store
+     * ends with its in-memory database and context, before Chromium closes. The items' favicon fetches and View Source's
      * fetches end. On the UI thread {@link Chromium#close()} only starts Chromium's dispose, and every Markdown preview
      * still open is then unavailable. The database's end and Chromium's are waited for on the plugin's background
      * executor: Jasper's quit waits for that work within its own shutdown grace, so quitting holds briefly for them and
@@ -186,7 +196,7 @@ public class BrowserPlugin implements Plugin {
     @Override public void stop() {
         running = false;
         if (items != null) items.close();
-        if (stores != null) stores.close();
+        if (dataStores != null) dataStores.close();
         if (sources != null) sources.close();
         chromium.close();
         // Once closed, Chromium is unavailable for the rest of the run.

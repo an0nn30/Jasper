@@ -338,7 +338,7 @@ class PageTextTest {
     @Test void aMainFrameLoadStartBeginsANewDocument() throws Exception {
         var runs = new ArrayList<CompletableFuture<Page.Insertion>>();
         javax.swing.SwingUtilities.invokeAndWait(() -> {
-            var page = new Page(java.net.URI.create("https://example.com/"), () -> { }, PageTestAccess.noFavicons(), Runnable::run);
+            var page = new Page(java.net.URI.create("https://example.com/"), () -> { }, PageTestAccess.noFavicons(), Runnable::run, PageContext.persistent());
             page.usePageText(text);
             runs.add(text.insertIntoField("one"));
             page.loadStarted("https://example.com/next", dev.jasper.browser.store.Reached.LINK);

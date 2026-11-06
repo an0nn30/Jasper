@@ -1,6 +1,7 @@
 package dev.jasper.browser.palette;
 
 import dev.jasper.browser.item.BrowserItems;
+import dev.jasper.browser.item.DataStores;
 import dev.jasper.browser.settings.BrowserSettings;
 import dev.jasper.browser.store.MemoryStores;
 import dev.jasper.browser.store.Stores;
@@ -46,7 +47,7 @@ final class PaletteHarness {
             plugin.palette().register(new BookmarksScope(stores.bookmarkIndex(), this::open));
             plugin.palette().register(new VisitedScope(stores.visitIndex(), this::open));
         });
-        items = new BrowserItems(context.get(), settings.get()::read, stores, page -> { });
+        items = new BrowserItems(context.get(), settings.get()::read, new DataStores(stores), page -> { });
         opener = real ? new PaletteOpener(items, unavailable::get, told::add) : null;
     }
 

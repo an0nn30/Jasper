@@ -23,6 +23,9 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import org.cef.CefClient;
 import org.cef.browser.CefBrowser;
+import org.cef.browser.CefRequestContext;
+import org.cef.handler.CefResourceHandler;
+import org.cef.network.CefRequest;
 
 /**
  * Chromium's one life in a plugin run: in process and off screen, started when a page first asks for it and disposed
@@ -38,6 +41,12 @@ import org.cef.browser.CefBrowser;
  * <p>Its {@link RunMarker} marks it in the data directory from the moment its start enters JCEF, before Chromium
  * initializes, until Jasper closes it or it has ended, so a fatal Chromium error that ends Jasper meanwhile leaves the
  * mark.
+ *
+ * <p>Work for Chromium's own UI thread, which is not Swing's ({@link #onChromiumThread}), waits for Chromium's context to
+ * initialize, and the in-memory request contexts of /dev/null pages are made there ({@link #inMemoryContext}); Chromium
+ * keeps track of each until it is released or Chromium closes. Their pages' {@code jasper-about:} requests are served
+ * through the pages' request handler ({@link #aboutResource}), as Chromium's scheme handler factory serves only its
+ * global context.
  */
 public final class Chromium implements AutoCloseable {
     /** Where Chromium's life stands. */
@@ -74,6 +83,11 @@ public final class Chromium implements AutoCloseable {
     // Set by the worker before Chromium can initialize, so before any dispose or client is decided.
     private volatile ChromiumApp app;
     private final Installers pageInstallers = new Installers(), previewInstallers = new Installers();
+    // Work for Chromium's own UI thread, which fails once Chromium cannot serve pages.
+    private final ChromiumThread chromiumThread = new ChromiumThread(this::unavailable);
+    // Guarded by itself: the in-memory contexts made and not yet released, until Chromium's dispose takes them.
+    private final Set<CefRequestContext> contexts = Collections.newSetFromMap(new IdentityHashMap<>());
+    private boolean contextsDisposed;
     // Guarded by previewing: the preview client's future, made on the first ask.
     private final Object previewing = new Object();
     private CompletableFuture<CefClient> preview;
@@ -235,6 +249,92 @@ public final class Chromium implements AutoCloseable {
     }
 
     /**
+     * Runs {@code task} on Chromium's own UI thread, which is not Swing's (on macOS it is AppKit's main thread), where CEF
+     * makes request contexts and sets their preferences. Before Chromium's context has initialized, the task waits and
+     * runs inside that initialization, in the order given; afterwards, it runs in the callback of the global cookie
+     * manager's {@code flushStore}, which has no other effect. Asking starts nothing: before any page asks for Chromium,
+     * the task waits for the start a page makes. Any thread.
+     *
+     * @param task what runs there; it must return quickly
+     * @return completes once the task has run, or fails with what it threw; fails, and the task never runs, once Chromium
+     *     has failed or stopped (with the reason {@link #unavailable()} gives), and when Chromium refuses to call back
+     */
+    public CompletableFuture<Void> onChromiumThread(Runnable task) {
+        return chromiumThread.run(task);
+    }
+
+    /**
+     * A new request context in memory for a /dev/null group's pages: {@code CefRequestContext.createContext(null)}, made
+     * on Chromium's thread ({@link #onChromiumThread}), so CEF initializes it at once, with CEF's defaults and an empty
+     * cache path, which keeps its cookies, cache and storage in memory. Chromium keeps track of it until
+     * {@link #release} or its close. Any thread.
+     *
+     * @return the context, on Chromium's thread; fails as {@link #onChromiumThread} fails, and when CEF makes none
+     */
+    public CompletableFuture<CefRequestContext> inMemoryContext() {
+        var made = new CompletableFuture<CefRequestContext>();
+        onChromiumThread(() -> made.complete(keep(ChromiumApp.inMemoryContext()))).whenComplete((done, failure) -> {
+            if (failure != null) made.completeExceptionally(failure);
+        });
+        return made;
+    }
+
+    /**
+     * Keeps track of {@code context}, just made, until it is released or Chromium's dispose takes it; one made as that
+     * dispose ran is disposed at once. Chromium's thread.
+     */
+    private CefRequestContext keep(CefRequestContext context) {
+        synchronized (contexts) {
+            if (!contextsDisposed) {
+                contexts.add(context);
+                return context;
+            }
+        }
+        ChromiumApp.dispose(context);
+        throw new IllegalStateException(ONCE);
+    }
+
+    /**
+     * Releases {@code context}, an in-memory context {@link #inMemoryContext} made: it is disposed, once, however often
+     * released, on Swing's thread, where Chromium's own dispose runs, unless Chromium has stopped by then: from then on
+     * no native object is touched, and Chromium's dispose has taken every context still kept with it. Any thread; on
+     * Swing's, at once.
+     *
+     * @param context the context, or null for none
+     */
+    public void release(CefRequestContext context) {
+        if (context == null) return;
+        onUiThread(() -> {
+            if (state() == State.STOPPED) return;
+            boolean kept;
+            synchronized (contexts) {
+                kept = contexts.remove(context);
+            }
+            if (kept) ChromiumApp.dispose(context);
+        });
+    }
+
+    /**
+     * The handler of a {@code jasper-about:} request of {@code browser} that Chromium's scheme handler factory does not
+     * reach, as it serves only the global context: one of a page made with an in-memory context. It answers as that
+     * factory does, from the same registry, under the same rule (plan 4b's P47): only a page's main-frame request is
+     * answered, and any other 404. Chromium's IO thread, where it returns at once.
+     *
+     * @param browser the browser whose request it is
+     * @param request the request
+     * @return the handler; null before Chromium has started
+     */
+    public CefResourceHandler aboutResource(CefBrowser browser, CefRequest request) {
+        ChromiumApp started = app;
+        return started == null ? null : started.aboutResource(browser, request);
+    }
+
+    /** Chromium's context has initialized: the work waiting for its thread runs now. Chromium's thread. */
+    void contextInitialized() {
+        chromiumThread.contextInitialized();
+    }
+
+    /**
      * Where Chromium's life stands.
      *
      * @return the state
@@ -309,13 +409,18 @@ public final class Chromium implements AutoCloseable {
         if (!enter()) return;
         ChromiumApp started;
         try {
-            started = ChromiumApp.start(dataDir, about, this::answersAbout, previews, this::answersPreview, this::terminated);
+            started = ChromiumApp.start(dataDir, about, this::answersAbout, previews, this::answersPreview, this::terminated,
+                this::contextInitialized);
         } catch (Throwable failure) { // JCEF reports a runtime without Chromium's libraries as an Error.
             threw(failure);
             return;
         }
         app = started;
-        started.onInitialized(() -> run(life.initialized()));
+        started.onInitialized(() -> {
+            // From now on JCEF's cookie manager can hand work to Chromium's thread.
+            chromiumThread.handOverWith(started::onChromiumThread);
+            run(life.initialized());
+        });
     }
 
     /**
@@ -336,8 +441,12 @@ public final class Chromium implements AutoCloseable {
     /** Chromium has ended, or its dispose failed. Any thread. */
     void terminated() { run(life.terminated()); }
 
-    /** Carries out the life's steps, in order, outside its lock. */
+    /**
+     * Carries out the life's steps, in order, outside its lock. Once Chromium cannot serve pages, the work waiting for its
+     * thread fails first, with the reason.
+     */
     private void run(List<Step<CefClient>> steps) {
+        unavailable().ifPresent(chromiumThread::fail);
         for (Step<CefClient> step : steps) {
             switch (step) {
                 case Step.Start<CefClient> start -> handOver();
@@ -385,8 +494,24 @@ public final class Chromium implements AutoCloseable {
             .execute(() -> run(life.timedOut(new TimeoutException(SLOW))));
     }
 
-    /** Disposes the app, on the UI thread, when the life says so: once. */
+    /**
+     * Disposes the in-memory contexts still kept, then the app, on the UI thread, when the life says so: once. Their
+     * pages' browsers keep what they need of a context until the app's dispose closes them.
+     */
     private void dispose() {
+        List<CefRequestContext> left;
+        synchronized (contexts) {
+            contextsDisposed = true;
+            left = List.copyOf(contexts);
+            contexts.clear();
+        }
+        for (CefRequestContext context : left) {
+            try {
+                ChromiumApp.dispose(context);
+            } catch (RuntimeException failure) {
+                LOG.log(System.Logger.Level.WARNING, "Chromium could not release an in-memory context", failure);
+            }
+        }
         try {
             app.dispose();
         } catch (RuntimeException failure) {

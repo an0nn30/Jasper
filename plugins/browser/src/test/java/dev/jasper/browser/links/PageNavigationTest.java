@@ -3,6 +3,7 @@ package dev.jasper.browser.links;
 import dev.jasper.browser.page.LoadFailure;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageBrowser;
+import dev.jasper.browser.page.PageContext;
 import dev.jasper.browser.page.PageTestAccess;
 import dev.jasper.browser.page.ServerCertificate;
 import java.awt.Point;
@@ -149,6 +150,23 @@ class PageNavigationTest {
         });
     }
 
+    /**
+     * F1: Chromium's scheme handler factory serves its global context alone, so the client's request handler serves
+     * {@code jasper-about:} itself to the browsers of an in-memory context, every such request of theirs, and to no other
+     * browser, whose requests stay the factory's and Chromium's.
+     */
+    @Test void jasperAboutIsServedThroughTheRequestHandlerInAnInMemoryContextAlone() throws Exception {
+        onUiThread(() -> {
+            PageBrowser persistent = PageTestAccess.pageBrowser(page()), inMemory = PageTestAccess.pageBrowser(page(), true);
+            assertThat(PageNavigation.servesAbout(inMemory, "jasper-about:welcome")).isTrue();
+            assertThat(PageNavigation.servesAbout(inMemory, "JASPER-ABOUT://history/?q=1")).isTrue();
+            assertThat(PageNavigation.servesAbout(inMemory, "https://example.com/")).isFalse();
+            assertThat(PageNavigation.servesAbout(inMemory, null)).isFalse();
+            assertThat(PageNavigation.servesAbout(persistent, "jasper-about:welcome")).as("the global context's factory serves it").isFalse();
+            assertThat(PageNavigation.servesAbout(null, "jasper-about:welcome")).isFalse();
+        });
+    }
+
     /** A frame that answers only its address. */
     private static CefFrame frame(String url) {
         return (CefFrame) Proxy.newProxyInstance(CefFrame.class.getClassLoader(), new Class<?>[] {CefFrame.class}, (proxy, method, args) -> {
@@ -158,7 +176,7 @@ class PageNavigationTest {
     }
 
     private static Page page() {
-        return new Page(URI.create("https://example.com/"), () -> { }, PageTestAccess.noFavicons(), Runnable::run);
+        return new Page(URI.create("https://example.com/"), () -> { }, PageTestAccess.noFavicons(), Runnable::run, PageContext.persistent());
     }
 
     private static void onUiThread(Runnable test) throws Exception {

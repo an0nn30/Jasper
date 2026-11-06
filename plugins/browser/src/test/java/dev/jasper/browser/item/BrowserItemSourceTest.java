@@ -154,7 +154,7 @@ class BrowserItemSourceTest {
             context.set(plugin);
             settings.set(BrowserSettings.declare(plugin.settings()));
         });
-        items = new BrowserItems(context.get(), settings.get()::read, memory.make(), started -> { });
+        items = new BrowserItems(context.get(), settings.get()::read, new DataStores(memory.make()), started -> { });
         item = items.open(url, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
         page = item.page();
         PageTestAccess.useSourceReader(page, read -> {

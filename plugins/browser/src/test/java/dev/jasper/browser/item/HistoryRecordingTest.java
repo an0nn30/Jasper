@@ -400,7 +400,7 @@ class HistoryRecordingTest {
                 context.set(plugin);
                 settings.set(BrowserSettings.declare(plugin.settings()));
             });
-            return new BrowserItems(context.get(), settings.get()::read, stores, page -> { }, later, request -> new CompletableFuture<>());
+            return new BrowserItems(context.get(), settings.get()::read, new DataStores(stores), page -> { }, later, request -> new CompletableFuture<>());
         });
     }
 

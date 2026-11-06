@@ -5,8 +5,14 @@ import dev.jasper.browser.page.NavigationHistory.Entry;
 import dev.jasper.browser.page.NavigationHistory.History;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageTestAccess;
+import dev.jasper.browser.pages.HistoryPage;
 import dev.jasper.browser.settings.BrowserSettings;
+import dev.jasper.browser.store.BrowserDatabase;
+import dev.jasper.browser.store.DataFolder;
+import dev.jasper.browser.store.HistoryStore;
 import dev.jasper.browser.store.MemoryStores;
+import dev.jasper.browser.store.Reached;
+import dev.jasper.browser.store.Stores;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.testing.FakeKit;
@@ -22,6 +28,8 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -44,7 +52,9 @@ import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Browser items on the testkit's fake host. Their pages are made by a recording stand-in, because a page cannot be made
@@ -463,6 +473,204 @@ class BrowserItemTest {
             opener.close();
             assertThat(opener.page().openItem("https://example.com/next", TabPlacement.NEXT_TAB)).isEmpty();
             assertThat(host.contentTabs()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /**
+     * Spec section 12: an item holds its data store, the persistent one unless it opened in another, and a link or popup
+     * its page opens in an item of its own opens in the opener's store: in /dev/null, the opener's group.
+     */
+    @Test void aLinkOrPopupOpensInItsOpenersStore() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var items = items(host, page -> { });
+            DataStore devNull = items.dataStores().newDevNull();
+            var opener = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), devNull);
+            assertThat(opener.store()).isSameAs(devNull);
+            Optional<Page> opened = ItemTestAccess.page(opener).openItem("https://example.com/popup", TabPlacement.NEXT_TAB);
+            var popup = items.items().getLast();
+            assertThat(opened).containsSame(popup.page());
+            assertThat(popup.store()).as("the opener's group").isSameAs(devNull);
+            ItemTestAccess.page(opener).openItem("https://example.com/split", TabPlacement.SPLIT_RIGHT);
+            assertThat(items.items().getLast().store()).isSameAs(devNull);
+            var persistent = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            assertThat(persistent.store()).isSameAs(items.dataStores().persistent());
+            ItemTestAccess.page(persistent).openItem("https://example.org/", TabPlacement.NEXT_TAB);
+            assertThat(items.items().getLast().store()).isSameAs(items.dataStores().persistent());
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    @Test void twoItemsOpenedApartInDevNullHaveTwoStores() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var items = items(host, page -> { });
+            var one = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), items.dataStores().newDevNull());
+            var two = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), items.dataStores().newDevNull());
+            assertThat(one.store().devNull()).isTrue();
+            assertThat(two.store().devNull()).isTrue();
+            assertThat(one.store()).isNotSameAs(two.store());
+            assertThat(one.store().stores()).isNotSameAs(two.store().stores());
+            assertThat(one.store().context()).isNotSameAs(two.store().context());
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /** Spec section 12: a /dev/null group's store ends with the last of its items, its opener first or not. */
+    @Test void closingTheOpenerKeepsThePopupsStoreOpenUntilThePopupCloses() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var items = items(host, page -> { });
+            DataStore devNull = items.dataStores().newDevNull();
+            var opener = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), devNull);
+            opener.page().openItem("https://example.com/popup", TabPlacement.NEXT_TAB);
+            var popup = items.items().getLast();
+            opener.close();
+            assertThat(devNull.closed()).as("the popup still holds it").isFalse();
+            assertThat(items.dataStores().live()).contains(devNull);
+            popup.close();
+            assertThat(devNull.closed()).isTrue();
+            assertThat(items.dataStores().live()).doesNotContain(devNull);
+            var persistent = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            persistent.close();
+            assertThat(items.dataStores().persistent().closed()).as("the persistent store outlives its items").isFalse();
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /** An item whose tab cannot open gives its store back: a /dev/null store no item holds then ends. */
+    @Test void anItemWhoseTabCannotOpenReleasesItsStore() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var items = items(host, page -> { });
+            var gone = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            gone.close();
+            DataStore devNull = items.dataStores().newDevNull();
+            assertThatThrownBy(() -> items.open(EXAMPLE, TabPlacement.NEXT_TAB, Optional.empty(), Optional.of(gone.tab()), devNull))
+                .as("a closed tab opens nothing beside it").isInstanceOf(IllegalArgumentException.class);
+            assertThat(devNull.closed()).isTrue();
+            assertThat(items.items()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /**
+     * Plan 5's routing (F13): a page's browser is found in its item's store from the moment Chromium names it, on
+     * Chromium's thread, so its document's first query is answered from that store; and no longer once it has closed.
+     */
+    @Test void aPagesBrowserIsFoundInItsStoreFromTheMomentChromiumNamesIt() throws Exception {
+        var host = onUi(FakePluginHost::new);
+        try {
+            var items = onUi(() -> items(host, page -> { }));
+            var item = onUi(() -> items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), items.dataStores().newDevNull()));
+            assertThat(item.page().browserId()).isEmpty();
+            CompletableFuture.runAsync(() -> {
+                PageTestAccess.browserMade(item.page(), 31);
+                assertThat(items.dataStores().forBrowser(31)).as("at once, on Chromium's thread").containsSame(item.store());
+            }).get(10, TimeUnit.SECONDS);
+            assertThat(item.page().browserId()).hasValue(31);
+            CompletableFuture.runAsync(() -> PageTestAccess.browserClosed(item.page())).get(10, TimeUnit.SECONDS);
+            assertThat(items.dataStores().forBrowser(31)).isEmpty();
+            assertThat(item.page().browserId()).isEmpty();
+        } finally {
+            onUi(() -> {
+                host.close();
+                return null;
+            });
+        }
+    }
+
+    /**
+     * Spec section 12: a visit in a /dev/null item is recorded in its group's in-memory stores alone, and nothing reaches
+     * the persistent database, whose file is never even made.
+     */
+    @Test void aDevNullItemsVisitIsRecordedInItsOwnStoresAlone(@TempDir Path data) throws Exception {
+        var persistentStores = new Stores(BrowserDatabase.file(new DataFolder(data), cause -> { }), java.awt.EventQueue::invokeLater);
+        var host = onUi(FakePluginHost::new);
+        try {
+            var items = onUi(() -> items(host, page -> { }, persistentStores));
+            var item = onUi(() -> items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), items.dataStores().newDevNull()));
+            onUi(() -> {
+                PageTestAccess.loadStarted(item.page(), "https://private.example/", Reached.LINK);
+                PageTestAccess.titleChanged(item.page(), "Private");
+                return null;
+            });
+            memory.settle();
+            assertThat(item.store().stores().history().visits(10).get(10, TimeUnit.SECONDS))
+                .extracting(HistoryStore.Visit::url).containsExactly("https://private.example/");
+            try (var files = Files.list(data)) {
+                assertThat(files.map(file -> file.getFileName().toString()).filter(name -> name.startsWith("browser.sqlite")).toList())
+                    .as("the persistent database is never made").isEmpty();
+            }
+            assertThat(MemoryStores.started(persistentStores)).isFalse();
+            onUi(() -> {
+                item.close();
+                return null;
+            });
+            assertThat(persistentStores.history().visits(10).get(10, TimeUnit.SECONDS)).as("no row in the persistent database").isEmpty();
+        } finally {
+            onUi(() -> {
+                host.close();
+                return null;
+            });
+            persistentStores.close();
+            persistentStores.closed().get(30, TimeUnit.SECONDS);
+        }
+    }
+
+    /**
+     * Plan 5's channel answers from the asking browser's store: the history page's list from a /dev/null item's browser
+     * lists that item's visits, and from a persistent item's browser none of them; a browser with no store is refused.
+     */
+    @Test void theHistoryPageListsTheVisitsOfTheAskingBrowsersStoreOnly() throws Exception {
+        var host = onUi(FakePluginHost::new);
+        try {
+            var items = onUi(() -> items(host, page -> { }));
+            var devNull = onUi(() -> items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), items.dataStores().newDevNull()));
+            var persistent = onUi(() -> items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty()));
+            CompletableFuture.runAsync(() -> {
+                PageTestAccess.browserMade(devNull.page(), 41);
+                PageTestAccess.browserMade(persistent.page(), 42);
+            }).get(10, TimeUnit.SECONDS);
+            onUi(() -> {
+                PageTestAccess.loadStarted(devNull.page(), "https://private.example/", Reached.LINK);
+                PageTestAccess.loadStarted(persistent.page(), "https://public.example/", Reached.LINK);
+                return null;
+            });
+            memory.settle();
+            String list = "{\"op\":\"list\",\"query\":\"\"}";
+            String fromDevNull = items.dataStores().answer(41, store -> HistoryPage.answer(store.stores().history(), list)).get(10, TimeUnit.SECONDS);
+            String fromPersistent = items.dataStores().answer(42, store -> HistoryPage.answer(store.stores().history(), list)).get(10, TimeUnit.SECONDS);
+            assertThat(fromDevNull).contains("https://private.example/").doesNotContain("https://public.example/");
+            assertThat(fromPersistent).contains("https://public.example/").doesNotContain("https://private.example/");
+            assertThat(items.dataStores().answer(43, store -> HistoryPage.answer(store.stores().history(), list)))
+                .as("a browser with no store").failsWithin(10, TimeUnit.SECONDS);
+        } finally {
+            onUi(() -> {
+                host.close();
+                return null;
+            });
+        }
+    }
+
+    /**
+     * Spec section 14: a certificate the user went on past in a /dev/null item is allowed in its group alone, and the
+     * allowance ends with the group's store.
+     */
+    @Test void aCertificateAllowedInADevNullItemIsItsGroupsAloneAndEndsWithIt() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var items = items(host, page -> { });
+            DataStore devNull = items.dataStores().newDevNull();
+            var opener = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), devNull);
+            opener.page().openItem("https://example.com/popup", TabPlacement.NEXT_TAB);
+            var popup = items.items().getLast();
+            var persistent = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            var certificate = new dev.jasper.browser.page.ServerCertificate("self-signed.badssl.com",
+                "d53a1b43dbe103e328aa1f2e50c9ee35d35d116b19c8912f86aeff71eda21e61", List.of("CN=*.badssl.com"), true);
+            devNull.allowance().allow(certificate.host(), certificate.sha256());
+            assertThat(opener.page().allowsCertificate(certificate)).isTrue();
+            assertThat(popup.page().allowsCertificate(certificate)).as("its group's").isTrue();
+            assertThat(persistent.page().allowsCertificate(certificate)).as("not the persistent items'").isFalse();
+            opener.close();
+            popup.close();
+            assertThat(devNull.allowance().allows(certificate.host(), certificate.sha256())).as("gone with its store").isFalse();
             assertThat(host.failures()).isEmpty();
         } });
     }
@@ -945,7 +1153,8 @@ class BrowserItemTest {
 
     /** A waiting item at {@code url}, as a restore after a run that ended while Chromium ran opens it. UI thread. */
     private static BrowserItem waiting(BrowserItems items, URI url) {
-        var item = BrowserItem.open(items, url, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), java.util.OptionalInt.empty(), true);
+        var item = BrowserItem.open(items, url, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), java.util.OptionalInt.empty(), true,
+            items.dataStores().persistent());
         assertThat(item.waiting()).isTrue();
         return item;
     }
@@ -963,18 +1172,32 @@ class BrowserItemTest {
      * fields' suggestion delays wait for {@code later} and their engine suggestions come from {@code fetches}. UI thread.
      */
     private BrowserItems items(FakePluginHost host, Consumer<Page> start, Later later, Fetches fetches) {
+        return items(host, start, later, fetches, memory.make());
+    }
+
+    /**
+     * As {@link #items(FakePluginHost, Consumer, Later, Fetches)}, with {@code persistent} as the persistent store's
+     * history and bookmarks. Each /dev/null store's are in memory, and its context a recording stand-in. UI thread.
+     */
+    private BrowserItems items(FakePluginHost host, Consumer<Page> start, Later later, Fetches fetches, Stores persistent) {
         var context = new AtomicReference<PluginContext>();
         var settings = new AtomicReference<BrowserSettings.Declared>();
         host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(), plugin -> {
             context.set(plugin);
             settings.set(BrowserSettings.declare(plugin.settings()));
         });
-        return new BrowserItems(context.get(), settings.get()::read, memory.make(), start, later, fetches);
+        var stores = new DataStores(persistent, memory::make, () -> PageTestAccess.recordingContext(new AtomicInteger()));
+        return new BrowserItems(context.get(), settings.get()::read, stores, start, later, fetches);
     }
 
     /** As {@link #items(FakePluginHost, Consumer, Later, Fetches)}, with delays that never end and fetches nobody answers. */
     private BrowserItems items(FakePluginHost host, Consumer<Page> start) {
         return items(host, start, new Later(), new Fetches());
+    }
+
+    /** As {@link #items(FakePluginHost, Consumer)}, with {@code persistent} as the persistent store's history and bookmarks. */
+    private BrowserItems items(FakePluginHost host, Consumer<Page> start, Stores persistent) {
+        return items(host, start, new Later(), new Fetches(), persistent);
     }
 
     /** The UI thread's delays, which wait until the test runs them. UI thread. */
