@@ -156,6 +156,10 @@ class FakePaletteTest {
             note.setTextInsertion(Optional.of(text -> { throw new IllegalStateException("broken"); }));
             assertThat(host.insertText(note, new InsertedText("ls", false))).isTrue();
             assertThat(host.failures()).containsExactly("test.a content insertion: java.lang.IllegalStateException: broken");
+            ContentTab foreign = (ContentTab) java.lang.reflect.Proxy.newProxyInstance(ContentTab.class.getClassLoader(),
+                new Class<?>[] {ContentTab.class}, (proxy, method, args) -> { throw new UnsupportedOperationException(method.getName()); });
+            assertThatThrownBy(() -> host.insertText(foreign, new InsertedText("ls", false))).as("a tab no fake host made")
+                .isInstanceOf(IllegalArgumentException.class);
         }
     }
 }

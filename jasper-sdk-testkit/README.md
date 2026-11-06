@@ -136,7 +136,7 @@ Jasper's is `<home>/plugins/<id>/data`.
 | `openLink(address, origin, placement, target, windowId)`, `browserPlugin()` | Opens a web link as Jasper's own routes do (a clicked terminal link is `LinkOrigin.CLICK`, an address given to `jasper` is `EXTERNAL`), through the browser a plugin provides, and answers what it answered; which plugin provides it |
 | `setCommandClient(path)` | What `CommandLine.client()` returns |
 | `setDefaultBrowser(jasper)` | What `Platform.isDefaultBrowser()` returns, false until set, and whether another plugin's `browse` asks the provided browser first; a change runs the `onDefaultBrowserChanged` handlers at once, on the EDT |
-| `copyOnSelect(on)` | What `Platform.copyOnSelect()` returns from the next read, false until set |
+| `setCopyOnSelect(on)` | What `Platform.copyOnSelect()` returns from the next read, false until set |
 | `declareSubcommand(pluginId, name, summary)`, `call(name, arguments, workingDirectory[, paneId])` | Declares a subcommand as `[[subcommands]]` would, before the plugin starts; calls it as `jasper <name> …` would and returns a `FakeCommandCall` |
 
 ### Settings and appearance

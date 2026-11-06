@@ -25,9 +25,9 @@ final class TextFields {
     }
     /**
      * Whether the kit's fields release Ctrl+H on this platform ({@link #releasesCtrlH}); tests set it to take the other
-     * platforms' path. Read as each field is made.
+     * platforms' path. Read as each field is made, on the UI thread, while a test may set it from its own.
      */
-    static boolean ctrlHReleased = releasesCtrlH(System.getProperty("os.name", ""));
+    static volatile boolean ctrlHReleased = releasesCtrlH(System.getProperty("os.name", ""));
     /**
      * While {@link #ctrlHReleased} holds, binds Ctrl+H in {@code input}'s focused map to {@code "none"}, which hides the
      * look and feel's Delete Backward and names no action, so the key passes on to the window's keymap.

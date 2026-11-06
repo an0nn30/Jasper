@@ -2649,7 +2649,7 @@ public final class FakePluginHost implements AutoCloseable {
      * @param on whether Copy on select is on
      * @since 0.29.0
      */
-    public void copyOnSelect(boolean on) { copyOnSelect = on; }
+    public void setCopyOnSelect(boolean on) { copyOnSelect = on; }
 
     /** The application's own content tabs that take text ({@link #addTextTarget}), each with what was inserted into it. */
     private final Map<UUID, List<dev.jasper.sdk.ui.InsertedText>> textTargets = new ConcurrentHashMap<>();
@@ -2692,11 +2692,13 @@ public final class FakePluginHost implements AutoCloseable {
      * @param tab a plugin's content tab, from this host
      * @param text what to insert
      * @return false, running nothing, when the tab is closed or takes no text
+     * @throws IllegalArgumentException for a tab no fake host made
      * @since 0.29.0
      */
     public boolean insertText(dev.jasper.sdk.ui.ContentTab tab, dev.jasper.sdk.ui.InsertedText text) {
         Objects.requireNonNull(text, "text");
-        var content = (FakeContent) Objects.requireNonNull(tab, "tab");
+        if (!(Objects.requireNonNull(tab, "tab") instanceof FakeContent content))
+            throw new IllegalArgumentException("Not a content tab of a fake host: " + tab.getClass().getName());
         if (!content.takesText()) return false;
         try { content.insertion.orElseThrow().accept(text); }
         catch (RuntimeException | LinkageError failure) { recordFailure(content.ui.context.plugin().id() + " content insertion: " + failure); }

@@ -172,7 +172,7 @@ class FakeContractTest extends PluginContractTest {
             }
             @Override public void commandClient(java.nio.file.Path client) { host.setCommandClient(client); }
             @Override public void defaultBrowser(boolean jasper) { host.setDefaultBrowser(jasper); }
-            @Override public void copyOnSelect(boolean on) { host.copyOnSelect(on); }
+            @Override public void copyOnSelect(boolean on) { host.setCopyOnSelect(on); }
             @Override public void close() { host.close(); }
         };
     }

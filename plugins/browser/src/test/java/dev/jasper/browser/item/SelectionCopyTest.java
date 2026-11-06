@@ -92,12 +92,12 @@ class SelectionCopyTest {
     @Test void turningCopyOnSelectOffBetweenTwoGesturesStopsTheSecondCopy() throws Exception {
         open(true);
         gesture();
-        host.copyOnSelect(false);
+        host.setCopyOnSelect(false);
         selection = CompletableFuture.completedFuture(new Page.Selection.Text("def"));
         gesture();
         assertThat(log).containsExactly("read");
         assertThat(copies()).containsExactly("copy|" + ID + "|abc");
-        host.copyOnSelect(true);
+        host.setCopyOnSelect(true);
         gesture();
         assertThat(copies()).containsExactly("copy|" + ID + "|abc", "copy|" + ID + "|def");
     }
@@ -255,10 +255,10 @@ class SelectionCopyTest {
         BrowserItem item = open(true);
         selection = new CompletableFuture<>();
         gesture();
-        host.copyOnSelect(false);
+        host.setCopyOnSelect(false);
         onUi(() -> selection.complete(new Page.Selection.Text("late")));
         settle();
-        host.copyOnSelect(true);
+        host.setCopyOnSelect(true);
         selection = new CompletableFuture<>();
         gesture();
         onUi(item::close);
@@ -280,7 +280,7 @@ class SelectionCopyTest {
     private BrowserItem open(boolean on, boolean answering) throws Exception {
         return onUi(() -> {
             host = new FakePluginHost();
-            host.copyOnSelect(on);
+            host.setCopyOnSelect(on);
             var context = new AtomicReference<PluginContext>();
             var settings = new AtomicReference<BrowserSettings.Declared>();
             host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(), plugin -> {
