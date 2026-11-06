@@ -109,7 +109,8 @@ class PageViewMouseTest {
         SwingUtilities.invokeAndWait(() -> {
             for (String os : List.of(NavigationButtonTest.WINDOWS, NavigationButtonTest.LINUX)) {
                 var devTools = new PageView(event -> false, shown -> { }, rate -> { }, key -> { },
-                    button -> NavigationButton.of(button, NavigationButtonTest.WINDOWS, NavigationButtonTest.W_TOOLKIT));
+                    button -> NavigationButton.of(button, NavigationButtonTest.WINDOWS, NavigationButtonTest.W_TOOLKIT),
+                    (delay, task) -> () -> { });
                 devTools.useOsName(os);
                 assertThat(turn(devTools, -1).isConsumed()).as(os).isFalse();
             }
@@ -159,7 +160,8 @@ class PageViewMouseTest {
     /** A view whose buttons are Windows' and whose wheel follows {@code os}'s rule. */
     private PageView view(String os) {
         var view = new PageView(event -> false, shown -> { }, rate -> { }, key -> { },
-            button -> NavigationButton.of(button, NavigationButtonTest.WINDOWS, NavigationButtonTest.W_TOOLKIT));
+            button -> NavigationButton.of(button, NavigationButtonTest.WINDOWS, NavigationButtonTest.W_TOOLKIT),
+            (delay, task) -> () -> { });
         view.useOsName(os);
         view.onNavigationButton(told::add);
         view.onMagnify(magnified::add);

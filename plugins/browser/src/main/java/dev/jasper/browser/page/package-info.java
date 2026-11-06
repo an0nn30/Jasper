@@ -17,7 +17,10 @@
  * clipboard: {@code insert-text.js} runs in an isolated world of the main frame, else {@code Input.insertText} types the
  * text where the focus is, and Return is pressed through DevTools too
  * ({@link dev.jasper.browser.page.Page#insertIntoField}, {@link dev.jasper.browser.page.Page#insertText},
- * {@link dev.jasper.browser.page.Page#pressReturn}).
+ * {@link dev.jasper.browser.page.Page#pressReturn}). For copy on select, the canvas tells the page once the user has
+ * finished a selection with the mouse or the keyboard ({@link dev.jasper.browser.page.Page#onSelectionGesture}), and
+ * {@code PageText} reads it with {@code selection.js} in the same isolated world
+ * ({@link dev.jasper.browser.page.Page#selectedText}).
  * {@link dev.jasper.browser.page.DialogPlace} is where the {@code dialogs} package shows a page's dialogs, as its item
  * gives it. {@code PageMenu} is the client's one context-menu handler: Jasper shows the page's right-click menu,
  * {@code PageMenuItems} for what is under the pointer, at the {@link dev.jasper.browser.page.MenuPlace} the item gives,

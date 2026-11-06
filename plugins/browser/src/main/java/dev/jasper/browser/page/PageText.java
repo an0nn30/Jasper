@@ -19,28 +19,31 @@ import org.cef.browser.CefDevToolsClient;
 
 /**
  * Text put where the user is typing in a page, and Return pressed there, for the text another plugin inserts into its
- * item (spec section 15, Snippets in page fields; H30), through the page's DevTools client. Chromium's Java API inserts
- * no text and presses no key, so DevTools does. None of it touches the clipboard.
+ * item (spec section 15, Snippets in page fields; H30), and the page's selection read for copy on select (spec section
+ * 15), through the page's DevTools client. Chromium's Java API inserts no text, presses no key and reads no selection
+ * without the page's scripts, so DevTools does. None of it touches the clipboard.
  *
- * <p>{@link #insertIntoField} asks, in order:
+ * <p>{@link #insertIntoField} and {@link #selectedText} each run a script in a world of Jasper's own, and ask, in order:
  * <ol>
  *   <li>{@code Page.getFrameTree}, for the main frame's id;</li>
- *   <li>{@code Page.createIsolatedWorld}, for a world of Jasper's own in it, {@value #WORLD};</li>
+ *   <li>{@code Page.createIsolatedWorld}, for Jasper's world in it, {@value #WORLD}, the same for both scripts;</li>
  *   <li>{@code Runtime.enable}, which reports every context, that world's unique id among them; then
  *       {@code Runtime.disable};</li>
- *   <li>{@code Runtime.evaluate}, which runs {@code insert-text.js} with the text, a JSON string literal, in that unique
- *       context only.</li>
+ *   <li>{@code Runtime.evaluate}, which runs the script in that unique context only: {@code insert-text.js} with the
+ *       text, a JSON string literal, or {@code selection.js} with the longest selection read, {@value #MAX_SELECTION}
+ *       characters.</li>
  * </ol>
  * The script runs with no user activation, which would let the page open popups. A navigation between the calls cannot
  * run the script in the new document's world, because a context id may repeat in another renderer process and a unique
- * id never does. Its answer comes back by value. The world is asked for at each insertion, not kept, as each new document
- * drops its worlds' contexts. Runtime is enabled for one insertion at a time, so an insertion waits for the one before.
- * While it is enabled, which takes a moment, the page could notice that DevTools is attached.
+ * id never does. Its answer comes back by value. The world is asked for at each run, not kept, as each new document
+ * drops its worlds' contexts. Runtime is enabled for one run at a time, so a run waits for the one before, an insertion
+ * or a read. While it is enabled, which takes a moment, the page could notice that DevTools is attached.
  *
- * <p>Only the script's own true or false is an answer. Every call times out after five seconds, and a late call, an
- * error answer, a refused call and an answer that cannot be read each fail the insertion, as the text may still go in or
- * nothing can tell. DevTools' answers are read as untrusted input, within bounds, as the page's own scripts can shape
- * the frame tree.
+ * <p>Only the script's own answer is an answer: true or false for an insertion, and for a read the selected text, a
+ * frame of another origin, or nothing. Every call times out after five seconds, and a late call, an error answer, a
+ * refused call and an answer that cannot be read each fail the run, as the text may still go in or nothing can tell.
+ * DevTools' answers are read as untrusted input, within bounds, as the page's own scripts can shape the frame tree and
+ * the selection.
  *
  * <p>{@link #insertText} types text with {@code Input.insertText} into whatever has the focus, cross-origin frames
  * included. {@link #pressReturn} sends {@code Input.dispatchKeyEvent}'s key down, with Return's text, which a form submits
@@ -51,15 +54,21 @@ import org.cef.browser.CefDevToolsClient;
  */
 final class PageText {
     /** The name of Jasper's isolated world in the main frame. */
-    static final String WORLD = "Jasper text insertion";
+    static final String WORLD = "Jasper";
     /** The longest main frame id and unique context id kept, in characters: Chromium's are shorter. */
     static final int MAX_ID = 256;
     /** The longest frame tree read, in characters, and how deep it nests at most. */
     static final int MAX_TREE = 1 << 20, MAX_TREE_DEPTH = 64;
     /** The longest other answer or event read, in characters, and how deep it nests at most. */
     static final int MAX_ANSWER = 1 << 16, MAX_ANSWER_DEPTH = 16;
-    /** The page script: a function of the text. */
-    static final String SOURCE = source();
+    /** The insertion's script: a function of the text. */
+    static final String INSERT_TEXT = source("insert-text.js");
+    /** The selection's script: a function of the longest text it gives. */
+    static final String SELECTION = source("selection.js");
+    /** The longest selection read, in characters: a longer one reads as none. */
+    static final int MAX_SELECTION = 1 << 20;
+    /** The longest answer to a read, in characters: the longest selection, every character escaped, and room to spare. */
+    static final int MAX_SELECTION_ANSWER = 6 * MAX_SELECTION + MAX_ANSWER;
     /** Return's key down, with the text a key press carries, and its key up. */
     static final String RETURN_DOWN = "{\"type\":\"keyDown\",\"key\":\"Enter\",\"code\":\"Enter\",\"windowsVirtualKeyCode\":13,"
         + "\"text\":\"\\r\",\"unmodifiedText\":\"\\r\"}",
@@ -72,16 +81,16 @@ final class PageText {
     private final BiFunction<String, String, CompletableFuture<String>> devTools;
     private final Executor ui;
     private final Duration timeout;
-    // The insertion under way, or the last: the next waits for it. UI thread.
+    // The run under way, or the last, an insertion or a read: the next waits for it. UI thread.
     private CompletableFuture<?> last = CompletableFuture.completedFuture(null);
-    // The world whose report the insertion under way waits for, while Runtime is enabled for it; else null.
+    // The world whose report the run under way waits for, while Runtime is enabled for it; else null.
     private volatile Awaited awaited;
 
     private record Awaited(String frame, int context, CompletableFuture<String> uniqueId) { }
 
     /**
-     * Text insertion through {@code devTools}: Chromium's, or a test's. It must hear every event DevTools reports
-     * ({@link #event}).
+     * Text insertion and selection reads through {@code devTools}: Chromium's, or a test's. It must hear every event
+     * DevTools reports ({@link #event}).
      *
      * @param devTools calls a DevTools method with its parameters, a JSON object or null for none, and answers what DevTools
      *     answered; an error answer fails the future
@@ -95,10 +104,11 @@ final class PageText {
     }
 
     /**
-     * Text insertion through {@code browser}'s DevTools client, which tells it its events from now on.
+     * Text insertion and selection reads through {@code browser}'s DevTools client, which tells them its events from now
+     * on.
      *
      * @param browser a page's ready browser
-     * @return the insertion; empty when the browser has no DevTools client
+     * @return them; empty when the browser has no DevTools client
      */
     static Optional<PageText> of(PageBrowser browser) {
         try {
@@ -117,8 +127,8 @@ final class PageText {
     }
 
     /**
-     * Puts {@code text} into the field that has the page's focus, as {@code insert-text.js} finds it, once the insertion
-     * before has ended.
+     * Puts {@code text} into the field that has the page's focus, as {@code insert-text.js} finds it, once the run before
+     * has ended.
      *
      * @param text the text
      * @return true when the field took the text; false when the script found no field it reaches focused. It fails when
@@ -126,9 +136,19 @@ final class PageText {
      */
     CompletableFuture<Boolean> insertIntoField(String text) {
         Objects.requireNonNull(text, "text");
-        CompletableFuture<Boolean> inserted = last.handle((done, failure) -> null).thenComposeAsync(ignored -> insertNow(text), ui);
-        last = inserted;
-        return inserted;
+        return inWorld(INSERT_TEXT + "\n(" + StrictJson.quote(text) + ");")
+            .thenApply(answer -> answered(answer).orElseThrow(() -> unreadable("Runtime.evaluate")));
+    }
+
+    /**
+     * What the user has selected in the page, as {@code selection.js} reads it, once the run before has ended.
+     *
+     * @return the selection; it fails when any call is late, refused or answered with an error, or its answer cannot be
+     *     read
+     */
+    CompletableFuture<Page.Selection> selectedText() {
+        return inWorld(SELECTION + "\n(" + MAX_SELECTION + ");")
+            .thenApply(answer -> selection(answer).orElseThrow(() -> unreadable("Runtime.evaluate")));
     }
 
     /**
@@ -157,7 +177,7 @@ final class PageText {
     }
 
     /**
-     * An event DevTools reports: the world the insertion under way waits for is reported with its unique id. Any thread.
+     * An event DevTools reports: the world the run under way waits for is reported with its unique id. Any thread.
      *
      * @param method the event's method
      * @param parameters its parameters, a JSON object
@@ -168,14 +188,20 @@ final class PageText {
         uniqueId(parameters, waiting.frame(), waiting.context()).ifPresent(waiting.uniqueId()::complete);
     }
 
-    private CompletableFuture<Boolean> insertNow(String text) {
+    /** Runs {@code expression} in Jasper's world once the run before has ended: DevTools' answer to its evaluation. */
+    private CompletableFuture<String> inWorld(String expression) {
+        CompletableFuture<String> answer = last.handle((done, failure) -> null).thenComposeAsync(ignored -> evaluate(expression), ui);
+        last = answer;
+        return answer;
+    }
+
+    private CompletableFuture<String> evaluate(String expression) {
         CompletableFuture<String> frame = call("Page.getFrameTree", null)
             .thenApply(tree -> mainFrame(tree).orElseThrow(() -> unreadable("Page.getFrameTree")));
         return frame.thenComposeAsync(id -> call("Page.createIsolatedWorld", isolatedWorld(id)), ui)
             .thenApply(world -> context(world).orElseThrow(() -> unreadable("Page.createIsolatedWorld")))
             .thenComposeAsync(context -> uniqueContext(frame.join(), context), ui)
-            .thenComposeAsync(unique -> call("Runtime.evaluate", evaluation(unique, text)), ui)
-            .thenApply(answer -> answered(answer).orElseThrow(() -> unreadable("Runtime.evaluate")));
+            .thenComposeAsync(unique -> call("Runtime.evaluate", evaluation(unique, expression)), ui);
     }
 
     /**
@@ -269,16 +295,15 @@ final class PageText {
     }
 
     /**
-     * What {@code Runtime.evaluate} is asked: {@link #SOURCE} called with {@code text}, a JSON string literal, in the
+     * What {@code Runtime.evaluate} is asked: {@code expression}, one of Jasper's scripts called with its argument, in the
      * context {@code unique} names, its answer by value, without user activation, awaiting nothing, its exceptions
      * unreported.
      *
      * @param unique the isolated world's unique context id
-     * @param text the text
+     * @param expression the script and its call
      * @return the parameters, a JSON object
      */
-    static String evaluation(String unique, String text) {
-        String expression = SOURCE + "\n(" + StrictJson.quote(text) + ");";
+    static String evaluation(String unique, String expression) {
         return "{\"expression\":" + StrictJson.quote(expression) + ",\"uniqueContextId\":" + StrictJson.quote(unique)
             + ",\"returnByValue\":true,\"userGesture\":false,\"awaitPromise\":false,\"silent\":true}";
     }
@@ -298,6 +323,30 @@ final class PageText {
     }
 
     /**
+     * What {@code selection.js} answered in DevTools' answer to {@code Runtime.evaluate}: its {@code result}, an object by
+     * value, when nothing threw. Its {@code kind} is {@code text}, with the selected {@code text} of at most
+     * {@link #MAX_SELECTION} characters; {@code frame}, for the focus in a frame of another origin; or {@code none}.
+     *
+     * @param answer what DevTools answered
+     * @return the selection; empty for anything else, for an answer over {@link #MAX_SELECTION_ANSWER} characters, and
+     *     never an exception
+     */
+    static Optional<Page.Selection> selection(String answer) {
+        if (answer == null || answer.length() > MAX_SELECTION_ANSWER) return Optional.empty();
+        Map<String, Object> root = StrictJson.object(answer, MAX_ANSWER_DEPTH).orElse(null);
+        if (root == null || root.containsKey("exceptionDetails") || !(root.get("result") instanceof Map<?, ?> result)
+            || !"object".equals(result.get("type")) || !(result.get("value") instanceof Map<?, ?> value)
+            || !(value.get("kind") instanceof String kind)) return Optional.empty();
+        return switch (kind) {
+            case "text" -> value.get("text") instanceof String text && text.length() <= MAX_SELECTION
+                ? Optional.of(new Page.Selection.Text(text)) : Optional.empty();
+            case "frame" -> Optional.of(new Page.Selection.InFrame());
+            case "none" -> Optional.of(new Page.Selection.None());
+            default -> Optional.empty();
+        };
+    }
+
+    /**
      * What {@code Input.insertText} is asked: {@code text}, a JSON string.
      *
      * @param text the text
@@ -312,9 +361,9 @@ final class PageText {
         return text == null || text.length() > MAX_ANSWER ? Optional.empty() : StrictJson.object(text, MAX_ANSWER_DEPTH);
     }
 
-    private static String source() {
-        try (InputStream in = PageText.class.getResourceAsStream("insert-text.js")) {
-            if (in == null) throw new IllegalStateException("The Browser plugin has no insert-text.js");
+    private static String source(String name) {
+        try (InputStream in = PageText.class.getResourceAsStream(name)) {
+            if (in == null) throw new IllegalStateException("The Browser plugin has no " + name);
             return new String(in.readAllBytes(), StandardCharsets.UTF_8).strip();
         } catch (IOException unreadable) {
             throw new UncheckedIOException(unreadable);

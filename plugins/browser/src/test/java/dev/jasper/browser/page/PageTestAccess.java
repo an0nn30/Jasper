@@ -171,6 +171,39 @@ public final class PageTestAccess {
     }
 
     /**
+     * Has {@code page} read its selection with {@code reader} from now on, which is told the page each time and answers
+     * what is selected, as the page's script would: a test's, as a page without Chromium has nothing selected.
+     *
+     * @param page a page
+     * @param reader answers each read
+     */
+    public static void useSelectionReader(Page page, java.util.function.Function<Page,
+            java.util.concurrent.CompletableFuture<Page.Selection>> reader) {
+        page.useSelectionReader(reader);
+    }
+
+    /**
+     * Has {@code page} run Chromium's copy in its focused frame with {@code copier} from now on, which is told the page
+     * each time: a test's recording one, as a page without Chromium copies nothing.
+     *
+     * @param page a page
+     * @param copier told each copy
+     */
+    public static void useCopier(Page page, java.util.function.Consumer<Page> copier) {
+        page.useCopier(copier);
+    }
+
+    /**
+     * The user finished a selection in the page, as its canvas tells 100 ms after the last selection gesture: those who
+     * asked {@link Page#onSelectionGesture} are told. UI thread.
+     *
+     * @param page a page
+     */
+    public static void selectionGesture(Page page) {
+        page.selectionGestured();
+    }
+
+    /**
      * Has {@code page} read the HTML its main frame shows with {@code reader} from now on, which is told the page: a
      * test's, as a page without Chromium has none to read.
      *

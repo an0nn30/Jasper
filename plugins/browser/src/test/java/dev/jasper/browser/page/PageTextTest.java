@@ -27,8 +27,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *
  * <p>Only the script's answered true or false is an answer. A late call, an error answer, a refused call and an answer
  * that cannot be read each fail the insertion, so its item does nothing more. {@code Input.insertText} types the text
- * without the clipboard, and Return is a key down then a key up. A recording DevTools stands in for Chromium's, and calls
- * time out after {@value #TIMEOUT_MILLIS} ms. The script itself is checked by hand (Task 14).
+ * without the clipboard, and Return is a key down then a key up. Copy on select's read runs {@code selection.js} the same
+ * way, one run at a time with the insertions. A recording DevTools stands in for Chromium's, and calls time out after
+ * {@value #TIMEOUT_MILLIS} ms. The scripts themselves are checked by hand (Task 14).
  */
 class PageTextTest {
     private static final long TIMEOUT_MILLIS = 100;
@@ -59,7 +60,7 @@ class PageTextTest {
         assertThat(evaluated).containsEntry("uniqueContextId", UNIQUE).doesNotContainKey("contextId")
             .containsEntry("returnByValue", true).containsEntry("userGesture", false).containsEntry("awaitPromise", false)
             .containsEntry("silent", true).hasSize(6);
-        assertThat((String) evaluated.get("expression")).isEqualTo(PageText.SOURCE + "\n(" + StrictJson.quote("ls -la") + ");");
+        assertThat((String) evaluated.get("expression")).isEqualTo(PageText.INSERT_TEXT + "\n(" + StrictJson.quote("ls -la") + ");");
     }
 
     @Test void anAnsweredFalseIsFalse() throws Exception {
@@ -227,8 +228,88 @@ class PageTextTest {
     }
 
     @Test void theScriptIsAFunctionOfTheText() {
-        assertThat(PageText.SOURCE).startsWith("/*").contains("(function (text) {", "execCommand('insertText'", "setRangeText")
+        assertThat(PageText.INSERT_TEXT).startsWith("/*").contains("(function (text) {", "execCommand('insertText'", "setRangeText")
             .endsWith("})");
+    }
+
+    /**
+     * Copy on select (spec section 15; F12): the selection is read as the insertion is, in Jasper's isolated world's unique
+     * context, by {@code selection.js} called with the longest text Jasper copies, and its answer comes back by value.
+     */
+    @Test void theSelectionIsReadInTheWorldsUniqueContextAsTheInsertionIs() throws Exception {
+        devTools.answer("Runtime.evaluate", selected("{\"kind\":\"text\",\"text\":\"abc\"}"));
+        assertThat(text.selectedText().get(5, TimeUnit.SECONDS)).isEqualTo(new Page.Selection.Text("abc"));
+        assertThat(devTools.methods()).isEqualTo(ORDER);
+        Map<String, Object> evaluated = devTools.parameters("Runtime.evaluate");
+        assertThat(evaluated).containsEntry("uniqueContextId", UNIQUE).doesNotContainKey("contextId")
+            .containsEntry("returnByValue", true).containsEntry("userGesture", false).containsEntry("awaitPromise", false)
+            .containsEntry("silent", true).hasSize(6);
+        assertThat((String) evaluated.get("expression")).isEqualTo(PageText.SELECTION + "\n(" + PageText.MAX_SELECTION + ");");
+    }
+
+    @Test void theSelectionsAnswerIsTextAFrameOfAnotherOriginOrNone() {
+        assertThat(PageText.selection(selected("{\"kind\":\"text\",\"text\":\"\"}"))).contains(new Page.Selection.Text(""));
+        assertThat(PageText.selection(selected("{\"kind\":\"text\",\"text\":\"a\\u2028b\"}"))).contains(new Page.Selection.Text("a b"));
+        assertThat(PageText.selection(selected("{\"kind\":\"frame\"}"))).contains(new Page.Selection.InFrame());
+        assertThat(PageText.selection(selected("{\"kind\":\"none\"}"))).contains(new Page.Selection.None());
+        String longest = "x".repeat(PageText.MAX_SELECTION);
+        assertThat(PageText.selection(selected("{\"kind\":\"text\",\"text\":" + StrictJson.quote(longest) + "}")))
+            .contains(new Page.Selection.Text(longest));
+        String escaped = "\u0001".repeat(PageText.MAX_SELECTION);
+        assertThat(PageText.selection(selected("{\"kind\":\"text\",\"text\":" + StrictJson.quote(escaped) + "}")))
+            .as("the longest text, every character escaped").contains(new Page.Selection.Text(escaped));
+        for (String answer : new String[] {null, "", "{}", TRUE, selected("{}"), selected("{\"kind\":\"text\"}"),
+            selected("{\"kind\":\"text\",\"text\":7}"), selected("{\"kind\":\"other\"}"), selected("\"abc\""),
+            selected("{\"kind\":\"text\",\"text\":\"" + "x".repeat(PageText.MAX_SELECTION + 1) + "\"}"),
+            "{\"result\":{\"type\":\"object\",\"value\":{\"kind\":\"none\"}},\"exceptionDetails\":{}}",
+            selected("{\"kind\":\"none\"}") + " x"})
+            assertThat(PageText.selection(answer)).as(answer == null ? "null" : answer.substring(0, Math.min(answer.length(), 80)))
+                .isEmpty();
+    }
+
+    @Test void aSelectionReadThatCannotBeReadOrIsLateFails() {
+        devTools.answer("Runtime.evaluate", TRUE);
+        assertFails(text.selectedText(), IllegalStateException.class);
+        var late = new DevTools();
+        late.never("Runtime.evaluate");
+        assertFails(made(late, Duration.ofMillis(TIMEOUT_MILLIS)).selectedText(), TimeoutException.class);
+        assertThat(late.methods()).contains("Runtime.disable");
+    }
+
+    /** Runtime is enabled once at a time: a selection read waits for an insertion under way, and the reverse. */
+    @Test void selectionReadsAndInsertionsRunOneAtATime() throws Exception {
+        var patient = new DevTools();
+        PageText waiting = made(patient, Duration.ofSeconds(5));
+        var pending = new CompletableFuture<String>();
+        patient.answers.put("Runtime.evaluate", parameters -> pending);
+        CompletableFuture<Boolean> inserted = waiting.insertIntoField("one");
+        CompletableFuture<Page.Selection> read = waiting.selectedText();
+        assertThat(patient.methods()).as("the read waits").isEqualTo(ORDER);
+        patient.answer("Runtime.evaluate", selected("{\"kind\":\"none\"}"));
+        pending.complete(TRUE);
+        assertThat(inserted.get(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(read.get(5, TimeUnit.SECONDS)).isEqualTo(new Page.Selection.None());
+        assertThat(patient.methods()).hasSize(10);
+    }
+
+    /**
+     * The script never reads a password field (spec section 15): its check of the focused field's type comes before any
+     * read of a field's value or the document's selection. The script itself runs by hand (Task 14).
+     */
+    @Test void theSelectionScriptRefusesAPasswordFieldBeforeItReadsAnything() {
+        String script = PageText.SELECTION;
+        assertThat(script).startsWith("/*").contains("(function (maxLength) {", "element.type === 'password'", "contentDocument",
+            "kind: 'frame'", "getSelection()").endsWith("})");
+        int refusal = script.indexOf("element.type === 'password'");
+        int code = script.indexOf("(function (maxLength) {");
+        assertThat(refusal).as("the refusal is code, not the header").isGreaterThan(code);
+        assertThat(script.indexOf(".value", code)).as("a field's value is read after the refusal").isGreaterThan(refusal);
+        assertThat(script.indexOf("getSelection()", code)).as("the document's selection is read after it").isGreaterThan(refusal);
+    }
+
+    /** {@code value}, a JSON object, as {@code Runtime.evaluate} answers a script's object by value. */
+    private static String selected(String value) {
+        return "{\"result\":{\"type\":\"object\",\"value\":" + value + "}}";
     }
 
     /** {@code event} as {@code Runtime.executionContextCreated} reports a context. */

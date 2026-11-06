@@ -31,7 +31,7 @@ import org.cef.browser.CefFrame;
 /**
  * One page as its item drives it, in plain types: the canvas it is drawn on, where it is, its title and favicon,
  * whether it loads, where it can go and its history, its find in page, its zoom, its failed loads and the certificates
- * it may go on past, the HTML it shows, its {@link DevTools}, and what it is asked to do. Its
+ * it may go on past, the HTML it shows, what the user selects in it, its {@link DevTools}, and what it is asked to do. Its
  * Chromium browser is made only once {@link #start} asks for it, the first time its item shows; until then the page
  * holds the address it will load and the zoom it will show at, and asks nothing of Chromium. Every method runs on the
  * UI thread, and so does every callback it makes. This is the one class that makes a {@link PageView}: the page's, and
@@ -56,10 +56,16 @@ public final class Page implements AutoCloseable {
     private BiFunction<Page, String, CompletableFuture<Void>> textInserter =
         (page, typed) -> page.pageText().map(text -> text.insertText(typed)).orElseGet(Page::noBrowser);
     private Consumer<Page> returnPresser = page -> page.pageText().ifPresent(PageText::pressReturn);
-    // The page's text insertion through its browser's DevTools, made the first time it is asked for once the browser is
-    // ready; null before.
+    // Given the page, reads what is selected in it, through its browser's DevTools; or a test's.
+    private Function<Page, CompletableFuture<Selection>> selectionReader =
+        page -> page.pageText().map(PageText::selectedText).orElseGet(() -> CompletableFuture.completedFuture(new Selection.None()));
+    // Given the page, runs Chromium's copy in its focused frame; or a test's.
+    private Consumer<Page> copier = page -> page.onFocusedFrame(CefFrame::copy);
+    // The page's text insertion and selection reads through its browser's DevTools, made the first time either is asked
+    // for once the browser is ready; null before.
     private PageText pageText;
     private final List<Consumer<String>> loadStarts = new CopyOnWriteArrayList<>();
+    private final List<Runnable> selectionGestures = new CopyOnWriteArrayList<>();
     private final List<BiConsumer<String, Reached>> visits = new CopyOnWriteArrayList<>();
     private final List<Consumer<NavigationButton>> navigationButtons = new CopyOnWriteArrayList<>();
     private final List<IntConsumer> magnifies = new CopyOnWriteArrayList<>();
@@ -284,9 +290,12 @@ public final class Page implements AutoCloseable {
         onFocusedFrame(CefFrame::cut);
     }
 
-    /** Copies the selection of the page's focused frame, as its Edit menu's Copy would. */
+    /**
+     * Copies the selection of the page's focused frame, as its Edit menu's Copy would: Chromium's copy, which runs that
+     * frame's {@code copy} handlers, so its scripts may put what they like on the clipboard, as in Chrome.
+     */
     public void copy() {
-        onFocusedFrame(CefFrame::copy);
+        if (!closed) copier.accept(this);
     }
 
     /** Pastes the clipboard into the page's focused frame, as its Edit menu's Paste would. */
@@ -336,6 +345,47 @@ public final class Page implements AutoCloseable {
      */
     public void pressReturn() {
         if (!closed) returnPresser.accept(this);
+    }
+
+    /** What is selected in a page, as {@link #selectedText} reads it. */
+    public sealed interface Selection permits Selection.Text, Selection.InFrame, Selection.None {
+        /**
+         * Text the user selected in the page, or in its focused field.
+         *
+         * @param text the text; empty when nothing is selected
+         */
+        record Text(String text) implements Selection {
+            /** Checks that the text is given. */
+            public Text {
+                Objects.requireNonNull(text, "text");
+            }
+        }
+
+        /** The focus is in a frame of another origin, whose selection Jasper does not read. */
+        record InFrame() implements Selection { }
+
+        /**
+         * Nothing that can be copied: no browser yet, the page closed, a password field focused, a field whose type has no
+         * selection, or a selection of more than 1,048,576 characters, which {@code PageText} reads at most.
+         */
+        record None() implements Selection { }
+    }
+
+    /**
+     * What the user has selected in the page, as copy on select reads it (spec section 15): {@code selection.js}, which
+     * {@link PageText} runs in Jasper's isolated world of the main frame, follows the focus through same-origin frames and open
+     * shadow roots. A focused {@code <input>} or {@code <textarea>} gives the selected part of its value, but a password
+     * field never does, and anything else gives the selection of the deepest same-origin document; the focus in a
+     * cross-origin frame gives {@link Selection.InFrame}. No page script can steer what the script reads, but a page can
+     * change its own selection, during a drag too. It completes on any thread.
+     *
+     * @return what is selected; {@link Selection.None} before the page has its browser and after {@link #close()}. It
+     *     fails when a DevTools call is late, refused or answered with an error, or its answer cannot be read
+     */
+    public CompletableFuture<Selection> selectedText() {
+        if (closed) return CompletableFuture.completedFuture(new Selection.None());
+        CompletableFuture<Selection> read = selectionReader.apply(this);
+        return read == null ? CompletableFuture.completedFuture(new Selection.None()) : read;
     }
 
     /** Selects all of the page's focused frame, as its Edit menu's Select All would. */
@@ -555,6 +605,25 @@ public final class Page implements AutoCloseable {
         Objects.requireNonNull(listener, "listener");
         magnifies.add(listener);
         return () -> magnifies.remove(listener);
+    }
+
+    /**
+     * Tells {@code listener} each time the user has finished a selection in the page, as copy on select copies after it:
+     * 100 ms after the last of the selection gestures {@link PageView} counts, the mouse's and the keyboard's. A change
+     * the page's scripts make to the selection is none. The canvas times gestures only while something listens.
+     *
+     * @param listener told on the UI thread
+     * @return the registration; the page's close ends it
+     */
+    public Subscription onSelectionGesture(Runnable listener) {
+        Objects.requireNonNull(listener, "listener");
+        if (closed) return () -> { };
+        selectionGestures.add(listener);
+        view.onSelectionGesture(this::selectionGestured);
+        return () -> {
+            selectionGestures.remove(listener);
+            if (selectionGestures.isEmpty()) view.endSelectionGestures();
+        };
     }
 
     /**
@@ -855,6 +924,8 @@ public final class Page implements AutoCloseable {
         if (closed) return;
         closed = true;
         loadStarts.clear();
+        selectionGestures.clear();
+        view.endSelectionGestures();
         visits.clear();
         navigationButtons.clear();
         magnifies.clear();
@@ -911,6 +982,12 @@ public final class Page implements AutoCloseable {
     private void magnified(int direction) {
         if (closed) return;
         for (IntConsumer listener : magnifies) listener.accept(direction);
+    }
+
+    /** The user finished a selection in the page, as its canvas tells. */
+    void selectionGestured() {
+        if (closed) return;
+        for (Runnable listener : selectionGestures) listener.run();
     }
 
     /** The browser, once it hears what it is asked, shows the page at its zoom. */
@@ -1059,9 +1136,19 @@ public final class Page implements AutoCloseable {
         returnPresser = Objects.requireNonNull(replacement, "replacement");
     }
 
+    /** Has the page read what is selected in it with {@code replacement} from now on, as a test's answering one. */
+    void useSelectionReader(Function<Page, CompletableFuture<Selection>> replacement) {
+        selectionReader = Objects.requireNonNull(replacement, "replacement");
+    }
+
+    /** Has the page run Chromium's copy with {@code replacement} from now on, as a test's recording one. */
+    void useCopier(Consumer<Page> replacement) {
+        copier = Objects.requireNonNull(replacement, "replacement");
+    }
+
     /**
-     * The page's text insertion through its browser's DevTools, made the first time it is asked for: none before the
-     * browser is ready, after {@link #close()}, or for a browser without a DevTools client.
+     * The page's text insertion and selection reads through its browser's DevTools, made the first time either is asked
+     * for: none before the browser is ready, after {@link #close()}, or for a browser without a DevTools client.
      */
     private Optional<PageText> pageText() {
         PageBrowser ready = readyBrowser();

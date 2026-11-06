@@ -89,7 +89,9 @@ import javax.swing.JComponent;
  * which closes with it. Text another plugin inserts into the item, such as a snippet from the command palette (spec
  * section 15), goes into the page's focused field ({@link Page#insertIntoField}), then Return when asked. When the
  * page's script finds no field it reaches focused, as with the focus in a cross-origin frame, the text is typed where the
- * focus is ({@link Page#insertText}), then Return when asked; the clipboard is never touched. UI thread.
+ * focus is ({@link Page#insertText}), then Return when asked; the clipboard is never touched. While Copy on select is on
+ * ({@code Platform.copyOnSelect()}, spec section 15), each selection the user finishes in the page is copied
+ * ({@link Page#onSelectionGesture}, {@link Page#selectedText}), except one in a frame of another origin. UI thread.
  */
 public final class BrowserItem implements AutoCloseable {
     static final String ROOT = "browser", PAGE = "browser.page", CONTENT = "browser.page.content";
@@ -150,6 +152,7 @@ public final class BrowserItem implements AutoCloseable {
         page.onShowItem(this::show);
         page.onAddressChange(this::committed);
         page.onLoadStart(address -> loadStarts++);
+        page.onSelectionGesture(this::selectionFinished);
         errors = new ErrorPages(page, items.certificates(), this::load);
         page.onLoadFailure(failure -> { if (!closed) errors.failed(failure); });
         sources = new SourcePages(page, this::load);
@@ -327,6 +330,25 @@ public final class BrowserItem implements AutoCloseable {
                     if (notTyped != null) items.context().log().log(System.Logger.Level.DEBUG, "Text could not be typed into a page", notTyped);
                     else if (inserted.submit()) page.pressReturn();
                 }));
+            }
+        }));
+    }
+
+    /**
+     * The user finished a selection in the page. While Copy on select is on, the page's selection is read, and its text,
+     * if any, is copied on the UI thread, if Copy on select is still on and the item still open by then. A selection in a
+     * frame of another origin is not copied (F2): Chromium's copy there would run that frame's scripts, which could put
+     * anything on the clipboard; Copy copies it. A read that fails copies nothing.
+     */
+    private void selectionFinished() {
+        if (closed || items.closed() || !items.context().platform().copyOnSelect()) return;
+        page.selectedText().whenComplete((selection, failure) -> EventQueue.invokeLater(() -> {
+            if (closed || items.closed()) return;
+            if (failure != null) {
+                items.context().log().log(System.Logger.Level.DEBUG, "A page's selection could not be read", failure);
+            } else if (selection instanceof Page.Selection.Text selected && !selected.text().isEmpty()
+                && items.context().platform().copyOnSelect()) {
+                items.context().platform().copy(selected.text());
             }
         }));
     }

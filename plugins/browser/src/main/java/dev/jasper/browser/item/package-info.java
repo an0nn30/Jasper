@@ -20,7 +20,8 @@
  * {@code store} package's bookmarks and opens {@link dev.jasper.browser.item.BookmarkPanel}, where its tags are
  * edited, and its Manage Bookmarks and History load the {@code pages} package's bookmarks and history pages. Text another
  * plugin inserts into an item, such as a snippet, goes into its page's focused field, or is typed where the page's focus
- * is, through DevTools and never the clipboard. Each item
+ * is, through DevTools and never the clipboard. While Copy on select is on, each item copies the selections the user
+ * finishes in its page, but none in a frame of another origin. Each item
  * saves its restore state through the {@code restore} package, and {@code BrowserItems} opens saved ones again.
  */
 package dev.jasper.browser.item;

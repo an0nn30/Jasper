@@ -54,7 +54,7 @@ class OnboardingPagesTest {
     @Test void everyFeatureRowShowsWithCmdOnMacOsAndCtrlElsewhere() throws Exception {
         assertThat(OnboardingPages.FEATURES).extracting(OnboardingPages.Feature::title).containsExactly("Pages beside your terminals",
             "Links from the terminal", "An address field that searches", "Find in page", "Bookmarks and history",
-            "Snippets in page fields");
+            "Snippets in page fields", "Copy on select");
         for (boolean macOs : new boolean[] {true, false}) {
             try (var other = new PagesFixture()) {
                 var pages = new OnboardingPages(other.pages, other.about, onboarding, macOs, List.of(), Runnable::run);
@@ -71,6 +71,8 @@ class OnboardingPagesTest {
                     + "Jasper asks first or sends links to your default browser.");
                 assertThat(rows.get(5)).isEqualTo(Map.of("title", "Snippets in page fields",
                     "text", "Insert a snippet into the page field you are typing in."));
+                assertThat(rows.get(6)).isEqualTo(Map.of("title", "Copy on select",
+                    "text", "With Copy on select on, selecting text in a page copies it."));
             }
         }
     }

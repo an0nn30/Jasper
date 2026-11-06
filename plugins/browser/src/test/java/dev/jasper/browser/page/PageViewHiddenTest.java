@@ -76,6 +76,7 @@ class PageViewHiddenTest {
     }
 
     private PageView view() {
-        return new PageView(event -> false, visibility::add, frameRates::add, event -> { }, NavigationButton::of);
+        return new PageView(event -> false, visibility::add, frameRates::add, event -> { }, NavigationButton::of,
+            (delay, task) -> () -> { });
     }
 }
