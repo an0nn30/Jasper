@@ -19,6 +19,9 @@ public record Notification(UUID id, NotificationRequest request, Instant posted,
 
     Notification withRead(boolean value) { return new Notification(id, request, posted, count, value, expired); }
 
+    /** The same entry carrying {@code value}, a request of the same text. */
+    Notification withRequest(NotificationRequest value) { return new Notification(id, value, posted, count, read, expired); }
+
     Notification withExpired() { return new Notification(id, request.released(), posted, count, read, true); }
 
     /** The same text posted again: counted, re-stamped and unread again. */

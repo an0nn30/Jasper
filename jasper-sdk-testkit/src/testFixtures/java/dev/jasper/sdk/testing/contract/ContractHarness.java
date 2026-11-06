@@ -350,7 +350,7 @@ public interface ContractHarness extends AutoCloseable {
          * Every notification plugins posted, oldest first, as {@code group|SEVERITY|title|content|labels|cause|window|state}:
          * the plugin's action labels joined with {@code ;}, or {@code -}; {@code cause} when it carried one (the application
          * then offers Show more…), or {@code -}; the target window's id, or {@code -}; and {@code live} or {@code expired}.
-         * A post with the same text as one less than a minute before counts on that one, which moves last; a removed
+         * A post with the same text as one at most a minute before counts on that one, which moves last; a removed
          * notification is left out.
          */
         List<String> notifications();

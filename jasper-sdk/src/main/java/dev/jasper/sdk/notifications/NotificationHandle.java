@@ -9,9 +9,10 @@ public interface NotificationHandle {
      * Removes the notification: its card closes, its links stop working and it leaves history. A removed notification
      * also reads as expired. Idempotent; safe from any thread.
      *
-     * <p>Jasper counts a post with the same text as one made less than a minute before on that earlier notification, so
-     * one notification can have several handles: it leaves history once each of them has been removed, and each removed
-     * handle reads as expired from then on.
+     * <p>Jasper counts a post with the same text as one made at most a minute before on that earlier notification, which
+     * takes the newer post's links, so one notification can have several handles: it leaves history once each of them
+     * has been removed, and until then it has the links of the newest post whose handle is left. Each removed handle
+     * reads as expired from then on.
      *
      * @since 0.30.0
      */

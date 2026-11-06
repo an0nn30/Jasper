@@ -725,8 +725,9 @@ sync.error("Could not sync", "prod: connection refused", failure);
 - The returned [`NotificationHandle`](sdk-reference.html#dev.jasper.sdk.notifications.NotificationHandle) expires the
   notification with `expire()`: its card closes and its links stop working, and it stays in history. It also expires
   when the user removes it, when its group drops it, and when the plugin stops. `remove()` (SDK 0.30.0) also takes it
-  out of history. A post with the same text as one less than a minute before counts on that notification
-  ([notifications](notifications.md)), which then leaves history once each of its handles has been removed.
+  out of history. A post with the same text as one at most a minute before counts on that notification
+  ([notifications](notifications.md)), which then leaves history once each of its handles has been removed; until
+  then it has the links of the newest post whose handle is left.
 - A group id starts with the plugin id and a dot, at most 160 characters; its name is one line of at most 80.
   `<plugin id>.activities` is Jasper's. A group's display mode (`CARD`, `STICKY`, `HISTORY`, `OFF`) is a default: the
   user's choice in Settings › Notifications or `[notifications.groups]` wins ([notifications](notifications.md)).

@@ -2381,7 +2381,8 @@ public abstract class PluginContractTest {
             assertThat(h.savedTitle(id)).isEqualTo("Account 1234 - Bank");
             assertThatNullPointerException().isThrownBy(() -> tab.setSavedTitle(null));
             tab.close();
-            tab.setSavedTitle(Optional.of("Ignored once closed"));
+            assertThatCode(() -> tab.setSavedTitle(Optional.of("Ignored once closed"))).as("a closed tab ignores it")
+                .doesNotThrowAnyException();
         });
     }
 
@@ -3879,7 +3880,7 @@ public abstract class PluginContractTest {
     }
 
     /**
-     * SDK 0.30.0: a post with the same text less than a minute after another counts on that notification, which then has
+     * SDK 0.30.0: a post with the same text at most a minute after another counts on that notification, which then has
      * two handles; expiring either expires it, and it leaves history once both have been removed, each removed handle
      * reading as expired.
      */
@@ -3917,6 +3918,32 @@ public abstract class PluginContractTest {
         twice.getLast().remove();
         h.flush();
         assertThat(h.notifications()).containsExactly("test.a|INFO|Other||-|-|-|live");
+    }
+
+    /**
+     * Ruling V8: a repeat gives the notification its links; once its handle is removed, the remaining handle's links,
+     * body included, are the notification's again, and the removed post's never run.
+     */
+    @Test void aRemovedRepeatsLinksStopWorking() {
+        PluginContext a = started("test.a", Set.of());
+        var ran = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        var again = new AtomicReference<NotificationHandle>();
+        h.ui(() -> {
+            a.notifications().group().post(NotificationSpec.of(Severity.INFO, "Same").withContent("text")
+                .withAction(new NotificationAction("Open", () -> ran.add("first open"), false)).withActivate(() -> ran.add("first body")));
+            again.set(a.notifications().group().post(NotificationSpec.of(Severity.INFO, "Same").withContent("text")
+                .withAction(new NotificationAction("Show", () -> ran.add("again show"), false)).withActivate(() -> ran.add("again body"))));
+        });
+        h.flush();
+        assertThat(h.notifications()).as("the repeat's links").containsExactly("test.a|INFO|Same|text|Show|-|-|live");
+        again.get().remove();
+        h.flush();
+        assertThat(h.notifications()).as("the remaining post's links").containsExactly("test.a|INFO|Same|text|Open|-|-|live");
+        assertThat(h.runNotificationAction("Same", "Show")).as("the removed post's link is gone").isFalse();
+        assertThat(h.runNotificationAction("Same", "Open")).isTrue();
+        assertThat(h.clickNotification("Same")).isTrue();
+        h.flush();
+        assertThat(ran).containsExactly("first open", "first body");
     }
 
     @Test void aPostFromAnyThreadArrivesAndItsCauseIsMarked() throws Exception {

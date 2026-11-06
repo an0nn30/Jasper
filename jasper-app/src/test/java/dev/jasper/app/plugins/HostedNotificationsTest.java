@@ -17,10 +17,18 @@ import static org.assertj.core.api.Assertions.*;
 class HostedNotificationsTest {
     private final NotificationsFixture fixture = new NotificationsFixture();
     private final List<Runnable> queued = new ArrayList<>();
+    /** The handles every plugin of the host holds on the center's entries, as a host shares them. */
+    private final HostedNotifications.Holds holds = new HostedNotifications.Holds(fixture.center);
 
     /** EDT: a plugin's notifications whose work for the UI thread waits in {@code queued}, so a test can order it. */
-    private HostedNotifications hosted() {
-        return new HostedNotifications("dev.example.tool", "Tool", fixture.host, new Containment(() -> true), queued::add, () -> false, name -> new javax.swing.ImageIcon(), name -> {});
+    private HostedNotifications hosted() { return hosted("dev.example.tool", "Tool"); }
+
+    private HostedNotifications hosted(String id, String name) {
+        return new HostedNotifications(id, name, fixture.host, holds, new Containment(() -> true), queued::add, () -> false, icon -> new javax.swing.ImageIcon(), icon -> {});
+    }
+
+    private static List<String> labels(dev.jasper.app.notifications.Notification entry) {
+        return entry.request().actions().stream().map(dev.jasper.app.notifications.NotificationAction::label).toList();
     }
 
     private void runQueued() { while (!queued.isEmpty()) queued.removeFirst().run(); }
@@ -57,7 +65,7 @@ class HostedNotificationsTest {
     @Test void aRemoveBeforeThePostLandsRemovesItWhenItLands() {
         var hosted = new HostedNotifications("dev.example.tool", "Tool", new PluginRuntime.NotificationHost(fixture.center,
             caused -> queued.add(() -> caused.posted().accept(fixture.center.post(caused.request()))), (title, details) -> { }),
-            new Containment(() -> true), queued::add, () -> false, name -> new javax.swing.ImageIcon(), name -> {});
+            holds, new Containment(() -> true), queued::add, () -> false, name -> new javax.swing.ImageIcon(), name -> {});
         var kept = hosted.group().info("Same", "");
         runQueued();
         var plain = hosted.group().info("Saved", "");
@@ -74,6 +82,53 @@ class HostedNotificationsTest {
             assertThat(entry.expired()).isFalse();
         });
         assertThat(kept.expired()).isFalse();
+    }
+
+    /**
+     * Ruling V9: plugin {@code dev.example} may declare the group {@code dev.example.tool}, the default group of plugin
+     * {@code dev.example.tool}, so the two plugins' same-text posts count on one entry. Removing one plugin's handle, or
+     * stopping that plugin, leaves the entry to the other plugin's handle, with its links; it leaves history once every
+     * handle on it has been removed.
+     */
+    @Test void anEntryTwoPluginsHoldStaysForTheOtherWithItsLinks() {
+        var tool = hosted("dev.example.tool", "Tool");
+        var outer = hosted("dev.example", "Example");
+        var shared = outer.group(new GroupSpec("dev.example.tool", "Tool", DisplayMode.CARD));
+        runQueued();
+        var ran = new ArrayList<String>();
+        var inner = tool.group().post(NotificationSpec.of(Severity.INFO, "Same")
+            .withAction(new NotificationAction("Tool", () -> ran.add("tool"), false)));
+        var mine = shared.post(NotificationSpec.of(Severity.INFO, "Same")
+            .withAction(new NotificationAction("Example", () -> ran.add("example"), false)));
+        runQueued();
+        assertThat(fixture.center.history()).as("one entry, with the newer post's links").singleElement()
+            .satisfies(entry -> assertThat(labels(entry)).containsExactly("Example"));
+        mine.remove();
+        runQueued();
+        assertThat(mine.expired()).isTrue();
+        assertThat(inner.expired()).isFalse();
+        assertThat(fixture.center.history()).as("the other plugin's handle keeps it, with its links").singleElement().satisfies(entry -> {
+            assertThat(entry.expired()).isFalse();
+            assertThat(labels(entry)).containsExactly("Tool");
+            fixture.center.runAction(entry.id(), 0);
+        });
+        assertThat(ran).containsExactly("tool");
+        var again = shared.post(NotificationSpec.of(Severity.INFO, "Same")
+            .withAction(new NotificationAction("Example", () -> ran.add("example"), false)));
+        runQueued();
+        outer.close();
+        assertThat(again.expired()).isTrue();
+        assertThat(fixture.center.history()).as("stopping leaves it to the other plugin too").singleElement().satisfies(entry -> {
+            assertThat(entry.expired()).isFalse();
+            assertThat(labels(entry)).containsExactly("Tool");
+        });
+        inner.remove();
+        runQueued();
+        assertThat(fixture.center.history()).as("held by a stopped plugin's handle alone, it expires").singleElement()
+            .satisfies(entry -> assertThat(entry.expired()).isTrue());
+        again.remove();
+        runQueued();
+        assertThat(fixture.center.history()).as("and leaves once that handle is removed too").isEmpty();
     }
 
     @Test void aPostThatLandsAfterThePluginStoppedExpiresAtOnce() {

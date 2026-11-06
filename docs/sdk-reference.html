@@ -4248,9 +4248,10 @@ message, and the host offers Show more…, which opens the stack trace. A <a cla
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.notifications.NotificationHandle.remove()" aria-label="Link to this member">#</a><code><span class="kw">void</span> <b>remove</b>()</code></pre>
 <p class="badges"><span class="since">since 0.30.0</span></p>
 <div class="doc"><p>Removes the notification: its card closes, its links stop working and it leaves history. A removed notification
-also reads as expired. Idempotent; safe from any thread.</p><p>Jasper counts a post with the same text as one made less than a minute before on that earlier notification, so
-one notification can have several handles: it leaves history once each of them has been removed, and each removed
-handle reads as expired from then on.</div>
+also reads as expired. Idempotent; safe from any thread.</p><p>Jasper counts a post with the same text as one made at most a minute before on that earlier notification, which
+takes the newer post's links, so one notification can have several handles: it leaves history once each of them
+has been removed, and until then it has the links of the newest post whose handle is left. Each removed handle
+reads as expired from then on.</div>
 </div>
 <div class="member" id="dev.jasper.sdk.notifications.NotificationHandle.expired()">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.notifications.NotificationHandle.expired()" aria-label="Link to this member">#</a><code><span class="kw">boolean</span> <b>expired</b>()</code></pre>
@@ -12026,8 +12027,12 @@ focus staying in the field; typing, a focus move, or a change that removes the t
 <div class="doc"><p>What fake plugins posted and the groups declared for them, as the application's notification center holds them.
 The host's is <a href="#dev.jasper.sdk.testing.FakePluginHost.notifications()"><code>FakePluginHost.notifications()</code></a>; a component under test that takes a <a href="#dev.jasper.sdk.notifications.NotificationGroup"><code>NotificationGroup</code></a>
 gets a recording one from a new instance's <a href="#dev.jasper.sdk.testing.FakeNotifications.group(String)"><code>group(String)</code></a>. Safe from any thread.</p><p>As Jasper counts a repeat on its earlier notification, a post with the same <a href="#dev.jasper.sdk.testing.FakeNotifications.Post.line()"><code>Post.line()</code></a> as a post that is
-neither expired nor removed, less than 60 seconds after it (<a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/System.html#nanoTime()"><code>System.nanoTime()</code></a>), counts on that post: the post
-moves last, takes the newer spec and counts one more (<a href="#dev.jasper.sdk.testing.FakeNotifications.Post.count()"><code>Post.count()</code></a>), and the new handle shares it.</div>
+neither expired nor removed, at most 60 seconds after that post's last post (<a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/System.html#nanoTime()"><code>System.nanoTime()</code></a>), counts on it:
+the post moves last, takes the newer spec and counts one more (<a href="#dev.jasper.sdk.testing.FakeNotifications.Post.count()"><code>Post.count()</code></a>), and the new handle shares it.
+It leaves history once each of its handles has been removed. While it stays, it has a handle's spec, of a plugin that
+is running: when the handle whose spec it has is removed, or that handle's plugin stops, the newest handle left of a
+running plugin gives it its spec, and with none left it expires. A post with a cause counts on one whose line names a
+cause of the same simple class name, where Jasper counts it on the notification of the same incident.</div>
 <h5>Constructors</h5>
 <div class="member" id="dev.jasper.sdk.testing.FakeNotifications.FakeNotifications()">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.testing.FakeNotifications.FakeNotifications()" aria-label="Link to this member">#</a><code><b>FakeNotifications</b>()</code></pre>
@@ -12088,7 +12093,8 @@ recorded among <a href="#dev.jasper.sdk.testing.FakePluginHost.failures()"><code
 </div>
 <div class="member" id="dev.jasper.sdk.testing.FakeNotifications.Post.spec()">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.testing.FakeNotifications.Post.spec()" aria-label="Link to this member">#</a><code><a class="tl" href="#dev.jasper.sdk.notifications.NotificationSpec">NotificationSpec</a> <b>spec</b>()</code></pre>
-<div class="doc"><p>What was posted: the newest repeat's spec, as Jasper's notification takes the newest post's links.</p></div>
+<div class="doc"><p>What was posted: the newest repeat's spec, as Jasper's notification takes the newest post's links, or once that
+repeat's handle was removed, the newest spec whose handle is left.</p></div>
 <dl class="tags"><dt>Returns</dt><dd>the spec</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.testing.FakeNotifications.Post.count()">

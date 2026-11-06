@@ -32,7 +32,7 @@ class FakeNotificationsTest {
     }
 
     /**
-     * SDK 0.30.0: as in Jasper, a post with the same text less than a minute after another counts on that post, which
+     * SDK 0.30.0: as in Jasper, a post with the same text at most a minute after another counts on that post, which
      * moves last and takes the newest spec; it leaves history once each of its handles has been removed, and stays listed
      * as removed.
      */
@@ -61,6 +61,22 @@ class FakeNotificationsTest {
         group.info("Same", "text");
         assertThat(notifications.posts()).as("a repeat of a removed post is a new post").hasSize(3);
         assertThat(notifications.posts().getLast().removed()).isFalse();
+    }
+
+    /** As in Jasper, a post counts on the last one with its line until exactly 60 seconds after it, and not later. */
+    @Test void aRepeatCountsUntilSixtySecondsAfterTheLastPost() {
+        var notifications = new FakeNotifications();
+        long[] now = {0};
+        notifications.nanos = () -> now[0];
+        var group = notifications.group("dev.example.tool");
+        group.info("Same", "");
+        now[0] = java.util.concurrent.TimeUnit.SECONDS.toNanos(60);
+        group.info("Same", "");
+        assertThat(notifications.posts()).as("at 60 seconds").singleElement().satisfies(post -> assertThat(post.count()).isEqualTo(2));
+        now[0] = java.util.concurrent.TimeUnit.SECONDS.toNanos(120) + 1;
+        group.info("Same", "");
+        assertThat(notifications.posts()).as("past 60 seconds after the last post, a new post").hasSize(2);
+        assertThat(notifications.posts().getLast().count()).isEqualTo(1);
     }
 
     @Test void aStandaloneGroupLetsAThrowingActionReachTheTest() {

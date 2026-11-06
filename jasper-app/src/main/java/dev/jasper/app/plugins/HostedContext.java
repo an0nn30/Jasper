@@ -105,7 +105,7 @@ final class HostedContext implements PluginContext {
         };
         this.palette = new HostedPalette(id, gate, host.environment.contributions(), host.containment, ui, terminals, hosted.iconHue());
         this.fileSources = new HostedFileSources(id, gate, host.environment.contributions(), host.containment, ui, terminals);
-        this.notifications = new HostedNotifications(id, hosted.info().name(), host.environment.notifications(), host.containment,
+        this.notifications = new HostedNotifications(id, hosted.info().name(), host.environment.notifications(), host.notificationHolds, host.containment,
             host.environment.ui(), host.environment.onUi(), ui::icon, ui::validateIcon);
         this.commandLine = new HostedCommandLine(id, host.commands, ui, terminals, () -> host.commandClient);
     }
