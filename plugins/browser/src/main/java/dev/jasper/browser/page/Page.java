@@ -210,7 +210,10 @@ public final class Page implements AutoCloseable {
         CompletableFuture<?> ready = before.handle((done, failure) -> null);
         CompletableFuture.allOf(client, inContext, ready).whenComplete((all, failure) -> {
             if (failure == null) {
-                EventQueue.invokeLater(() -> make(client.join(), inContext.join()));
+                // Nothing native is touched once Chromium has stopped: no browser is made then.
+                EventQueue.invokeLater(() -> {
+                    if (chromium.state() != Chromium.State.STOPPED) make(client.join(), inContext.join());
+                });
             } else if (!client.isCompletedExceptionally() && chromium.state() != Chromium.State.STOPPED) {
                 // A client that fails, the plugin tells once; a context that fails while Chromium runs, the log.
                 LOG.log(System.Logger.Level.WARNING, "A page's request context could not be made", failure);
@@ -250,6 +253,14 @@ public final class Page implements AutoCloseable {
     public void onBrowser(IntConsumer made, IntConsumer closed) {
         browserMade = Objects.requireNonNull(made, "made");
         browserClosed = Objects.requireNonNull(closed, "closed");
+    }
+
+    /**
+     * Whether the page's browsing group keeps its data in memory, as a /dev/null group's does: what its store says. Any
+     * thread.
+     */
+    boolean inMemory() {
+        return context.inMemory();
     }
 
     /** Chromium made the page's browser, whose identifier is {@code id}. Chromium's thread. */

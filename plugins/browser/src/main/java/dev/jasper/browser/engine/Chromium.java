@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import org.cef.CefClient;
 import org.cef.browser.CefBrowser;
 import org.cef.browser.CefRequestContext;
@@ -88,6 +89,8 @@ public final class Chromium implements AutoCloseable {
     // Guarded by itself: the in-memory contexts made and not yet released, until Chromium's dispose takes them.
     private final Set<CefRequestContext> contexts = Collections.newSetFromMap(new IdentityHashMap<>());
     private boolean contextsDisposed;
+    // A test's maker of in-memory contexts; null for CEF's.
+    private volatile Supplier<CefRequestContext> contextMaker;
     // Guarded by previewing: the preview client's future, made on the first ask.
     private final Object previewing = new Object();
     private CompletableFuture<CefClient> preview;
@@ -255,9 +258,11 @@ public final class Chromium implements AutoCloseable {
      * manager's {@code flushStore}, which has no other effect. Asking starts nothing: before any page asks for Chromium,
      * the task waits for the start a page makes. Any thread.
      *
-     * @param task what runs there; it must return quickly
+     * @param task what runs there; it must return quickly and must not wait for Swing's thread, as Chromium's close waits
+     *     for it to end
      * @return completes once the task has run, or fails with what it threw; fails, and the task never runs, once Chromium
-     *     has failed or stopped (with the reason {@link #unavailable()} gives), and when Chromium refuses to call back
+     *     has failed or begun to close (with the reason {@link #unavailable()} gives), and when Chromium refuses to call
+     *     back
      */
     public CompletableFuture<Void> onChromiumThread(Runnable task) {
         return chromiumThread.run(task);
@@ -272,11 +277,32 @@ public final class Chromium implements AutoCloseable {
      * @return the context, on Chromium's thread; fails as {@link #onChromiumThread} fails, and when CEF makes none
      */
     public CompletableFuture<CefRequestContext> inMemoryContext() {
+        var kept = new java.util.concurrent.atomic.AtomicReference<CefRequestContext>();
         var made = new CompletableFuture<CefRequestContext>();
-        onChromiumThread(() -> made.complete(keep(ChromiumApp.inMemoryContext()))).whenComplete((done, failure) -> {
-            if (failure != null) made.completeExceptionally(failure);
+        // Completed once the work is over, not inside it: what follows the context runs outside the thread's work.
+        onChromiumThread(() -> {
+            Supplier<CefRequestContext> maker = contextMaker;
+            kept.set(keep(maker == null ? ChromiumApp.inMemoryContext() : maker.get()));
+        }).whenComplete((done, failure) -> {
+            if (failure == null) made.complete(kept.get());
+            else made.completeExceptionally(failure);
         });
         return made;
+    }
+
+    /**
+     * Each browser's own context object over {@code kept}, an in-memory context {@link #inMemoryContext} made (plan 6's
+     * V10): JCEF disposes a browser's context object as the browser closes, so a browser is never handed the kept one.
+     * The object carries the kept context's native handle and does what is asked of it on the kept context, and its
+     * dispose leaves the kept context alone, which only {@link #release} and Chromium's dispose release. Any thread; it
+     * touches nothing native.
+     *
+     * @param kept the group's kept context, or null for Chromium's global one
+     * @return a new object over it, or null for the global context
+     */
+    public CefRequestContext browserContext(CefRequestContext kept) {
+        // Through a method typed as a context, so Chromium's own verification loads no Chromium class at the plugin's start.
+        return kept == null ? null : BrowserContext.over(kept);
     }
 
     /**
@@ -329,6 +355,11 @@ public final class Chromium implements AutoCloseable {
         return started == null ? null : started.aboutResource(browser, request);
     }
 
+    /** Has {@link #inMemoryContext} make its contexts with {@code made} instead of CEF: a test's stand-ins. */
+    void makeContextsWith(Supplier<CefRequestContext> made) {
+        contextMaker = Objects.requireNonNull(made, "made");
+    }
+
     /** Chromium's context has initialized: the work waiting for its thread runs now. Chromium's thread. */
     void contextInitialized() {
         chromiumThread.contextInitialized();
@@ -356,7 +387,8 @@ public final class Chromium implements AutoCloseable {
      * marker goes at once, before Chromium has ended.
      */
     @Override public void close() {
-        List<Step<CefClient>> steps = life.close();
+        // Under the lock that hands work to Chromium's thread: none is handed over or runs once the close has begun.
+        List<Step<CefClient>> steps = chromiumThread.closing(life::close);
         // Jasper closes Chromium: the marker goes now, as a quit's dispose can outlast Jasper's exit.
         marker.stopped();
         run(steps);
@@ -499,6 +531,20 @@ public final class Chromium implements AutoCloseable {
      * pages' browsers keep what they need of a context until the app's dispose closes them.
      */
     private void dispose() {
+        disposeContexts();
+        try {
+            app.dispose();
+        } catch (RuntimeException failure) {
+            LOG.log(System.Logger.Level.WARNING, "Chromium could not stop", failure);
+            terminated();
+        }
+    }
+
+    /**
+     * The dispose's sweep: every in-memory context still kept is disposed, and one made from now on is disposed as it
+     * is made. Swing's thread, once Chromium has stopped.
+     */
+    void disposeContexts() {
         List<CefRequestContext> left;
         synchronized (contexts) {
             contextsDisposed = true;
@@ -511,12 +557,6 @@ public final class Chromium implements AutoCloseable {
             } catch (RuntimeException failure) {
                 LOG.log(System.Logger.Level.WARNING, "Chromium could not release an in-memory context", failure);
             }
-        }
-        try {
-            app.dispose();
-        } catch (RuntimeException failure) {
-            LOG.log(System.Logger.Level.WARNING, "Chromium could not stop", failure);
-            terminated();
         }
     }
 

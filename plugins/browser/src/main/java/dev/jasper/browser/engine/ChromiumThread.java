@@ -14,14 +14,16 @@ import java.util.function.Supplier;
  * inside that initialization, on that thread, in the order given. Work given later is handed to the thread through the
  * hand-over Chromium gives once JCEF has initialized too; until then it waits as well. Every piece of work fails, rather
  * than runs, once Chromium cannot serve pages: work waiting or handed over then fails with the reason, and so does work
- * given after. Plain Java: {@link Chromium} makes the JCEF calls. Any thread.
+ * given after. Handing work over and running it happen under the one lock that Chromium's close takes as it begins
+ * ({@link #closing}), so neither happens, from any thread, once the close has begun. Plain Java: {@link Chromium} makes
+ * the JCEF calls. Any thread.
  */
 final class ChromiumThread {
     private final Supplier<Optional<Throwable>> unavailable;
     // Guarded by this: the work waiting for the context, or for JCEF, to initialize, and the work handed to the thread
     // that has not run yet, each in the order given.
     private final List<Work> waiting = new ArrayList<>(), handed = new ArrayList<>();
-    private boolean contextInitialized;
+    private boolean contextInitialized, closed;
     // Set once JCEF has initialized: hands a task to Chromium's thread, answering whether the thread took it.
     private Predicate<Runnable> hand;
 
@@ -37,26 +39,26 @@ final class ChromiumThread {
     /**
      * Runs {@code task} on Chromium's thread, as the class says. Any thread.
      *
-     * @param task the work
+     * @param task the work; it must return quickly and must not wait for Swing's thread
      * @return completes once it has run, or fails with what it threw; fails, and it never runs, once Chromium cannot
-     *     serve pages, and when the thread refuses it
+     *     serve pages or has begun to close, and when the thread refuses it
      */
     CompletableFuture<Void> run(Runnable task) {
         Objects.requireNonNull(task, "task");
         var work = new Work(task);
-        Predicate<Runnable> now;
+        Throwable refused;
         synchronized (this) {
-            // Asked under the lock that fail() takes after Chromium's state has changed, so no work waits past it.
-            Optional<Throwable> refused = unavailable.get();
-            if (refused.isPresent()) return CompletableFuture.failedFuture(refused.get());
-            if (!contextInitialized || hand == null) {
-                waiting.add(work);
-                return work.done;
+            // Asked under the lock that fail() and closing() take, so no work waits past them or is handed over after.
+            refused = refusal();
+            if (refused == null) {
+                if (!contextInitialized || hand == null) {
+                    waiting.add(work);
+                    return work.done;
+                }
+                refused = handOver(hand, work);
             }
-            handed.add(work);
-            now = hand;
         }
-        handOver(now, work);
+        if (refused != null) work.done.completeExceptionally(refused);
         return work.done;
     }
 
@@ -80,16 +82,37 @@ final class ChromiumThread {
      */
     void handOverWith(Predicate<Runnable> hand) {
         Objects.requireNonNull(hand, "hand");
-        List<Work> now;
+        var refused = new ArrayList<Work>();
+        var reasons = new ArrayList<Throwable>();
         synchronized (this) {
             if (this.hand != null) return;
             this.hand = hand;
-            if (!contextInitialized) return; // the context's initialization runs what waits
-            now = List.copyOf(waiting);
+            if (!contextInitialized || refusal() != null) return; // the context's initialization, or fail(), takes what waits
+            List<Work> now = List.copyOf(waiting);
             waiting.clear();
-            handed.addAll(now);
+            for (Work work : now) {
+                Throwable reason = handOver(hand, work);
+                if (reason != null) {
+                    refused.add(work);
+                    reasons.add(reason);
+                }
+            }
         }
-        for (Work work : now) handOver(hand, work);
+        for (int each = 0; each < refused.size(); each++) refused.get(each).done.completeExceptionally(reasons.get(each));
+    }
+
+    /**
+     * Chromium begins to close: {@code closing} runs under the lock that hands work over and runs it, so none is handed
+     * over or runs from now on, and work already under way has ended first. The work left fails as {@link #fail} is then
+     * told.
+     *
+     * @param closing the close's own first step, which must not wait for Chromium's thread
+     * @param <T> what it gives
+     * @return what it gave
+     */
+    synchronized <T> T closing(Supplier<T> closing) {
+        closed = true;
+        return closing.get();
     }
 
     /**
@@ -108,42 +131,49 @@ final class ChromiumThread {
         for (Work work : failing) work.done.completeExceptionally(cause);
     }
 
-    /** Hands {@code work} to Chromium's thread; work the thread refuses fails. */
-    private void handOver(Predicate<Runnable> hand, Work work) {
+    /**
+     * Hands {@code work} to Chromium's thread, under this lock: why the thread refused it, or null once it took it, and
+     * the work then counts as handed over.
+     */
+    private Throwable handOver(Predicate<Runnable> hand, Work work) {
         boolean taken;
         try {
             taken = hand.test(() -> execute(work));
         } catch (RuntimeException failure) {
-            forget(work);
-            work.done.completeExceptionally(failure);
-            return;
+            return failure;
         }
-        if (!taken) {
-            forget(work);
-            work.done.completeExceptionally(new IllegalStateException("Chromium's thread did not take the work"));
-        }
+        if (!taken) return new IllegalStateException("Chromium's thread did not take the work");
+        handed.add(work);
+        return null;
     }
 
-    /** Runs {@code work}, on Chromium's thread, unless it has failed already or Chromium can no longer serve pages. */
+    /**
+     * Runs {@code work}, on Chromium's thread, under this lock, unless it has failed already or Chromium can no longer
+     * serve pages or has begun to close; its future completes after, outside the lock.
+     */
     private void execute(Work work) {
-        forget(work);
-        if (work.done.isDone()) return;
-        Optional<Throwable> refused = unavailable.get();
-        if (refused.isPresent()) {
-            work.done.completeExceptionally(refused.get());
-            return;
+        Throwable failed;
+        synchronized (this) {
+            handed.remove(work);
+            if (work.done.isDone()) return;
+            failed = refusal();
+            if (failed == null) {
+                try {
+                    work.task.run();
+                } catch (Throwable thrown) { // an Error too fails the work, or nobody hears of it
+                    failed = thrown;
+                }
+            }
         }
-        try {
-            work.task.run();
-        } catch (Throwable failure) { // an Error too fails the work, or nobody hears of it
-            work.done.completeExceptionally(failure);
-            return;
-        }
-        work.done.complete(null);
+        if (failed == null) work.done.complete(null);
+        else work.done.completeExceptionally(failed);
     }
 
-    private synchronized void forget(Work work) {
-        handed.remove(work);
+    /** Why no work may be handed over or run now; null while it may. Under this lock. */
+    private Throwable refusal() {
+        Optional<Throwable> refused = unavailable.get();
+        if (refused.isPresent()) return refused.get();
+        return closed ? new IllegalStateException(Chromium.ONCE) : null;
     }
 
     /** One piece of work and its future. */

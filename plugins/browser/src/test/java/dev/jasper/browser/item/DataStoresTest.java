@@ -48,13 +48,12 @@ class DataStoresTest {
             assertThat(one.context().inMemory()).isTrue();
             assertThat(one.stores()).isNotSameAs(two.stores()).isNotSameAs(plugins);
             assertThat(one.allowance()).isNotSameAs(two.allowance());
-            assertThat(stores.live()).as("the persistent store is not asked for yet").containsExactly(one, two);
+            assertThat(stores.live()).as("the persistent store is not open yet").containsExactly(one, two);
             DataStore persistent = stores.persistent();
             assertThat(persistent.devNull()).isFalse();
             assertThat(persistent.context().inMemory()).isFalse();
             assertThat(persistent.stores()).isSameAs(plugins);
             assertThat(stores.persistent()).isSameAs(persistent);
-            assertThat(stores.live()).containsExactly(persistent, one, two);
             assertThat(one.ready()).isCompleted();
             assertThat(persistent.ready()).isCompleted();
             stores.close();
@@ -105,7 +104,6 @@ class DataStoresTest {
             persistent.release();
             assertThat(persistent.closed()).isFalse();
             assertThat(plugins.closed()).isNotDone();
-            assertThat(stores.live()).containsExactly(persistent);
             persistent.retain();
             assertThat(persistent.closed()).isFalse();
             stores.close();
@@ -203,6 +201,51 @@ class DataStoresTest {
         assertThat(stores.get().forBrowser(7)).as("a closed store is no browser's").isEmpty();
         onUi(() -> {
             stores.get().close();
+            return null;
+        });
+    }
+
+    /**
+     * The persistent store is live once its database has opened, not because a restore or an item asked for the store:
+     * listing the live stores opens nothing.
+     */
+    @Test void thePersistentStoreIsLiveOnlyOnceItsDatabaseHasOpened() throws Exception {
+        Stores plugins = memory.make();
+        var stores = new AtomicReference<DataStores>();
+        var persistent = new AtomicReference<DataStore>();
+        onUi(() -> {
+            stores.set(stores(plugins));
+            persistent.set(stores.get().persistent());
+            persistent.get().retain();
+            assertThat(stores.get().live()).as("asked for, as the restorer asks, not opened").isEmpty();
+            return null;
+        });
+        assertThat(MemoryStores.started(plugins)).as("listing opened nothing").isFalse();
+        plugins.history().visits(1).get(10, TimeUnit.SECONDS);
+        onUi(() -> {
+            assertThat(stores.get().live()).containsExactly(persistent.get());
+            stores.get().close();
+            assertThat(stores.get().live()).isEmpty();
+            return null;
+        });
+    }
+
+    /** No browser is found in any store once the stores have closed, at the plugin's stop, or named to them after. */
+    @Test void theStoresForgetEveryBrowserAsTheyCloseAndHearNoneAfter() throws Exception {
+        Stores plugins = memory.make();
+        onUi(() -> {
+            DataStores stores = stores(plugins);
+            DataStore persistent = stores.persistent(), devNull = stores.newDevNull();
+            devNull.retain();
+            stores.browserMade(3, persistent);
+            stores.browserMade(4, devNull);
+            assertThat(stores.browsersKnown()).isEqualTo(2);
+            stores.close();
+            assertThat(stores.browsersKnown()).as("forgotten at the close, whether Chromium closes them after or not").isZero();
+            stores.browserMade(5, persistent);
+            assertThat(stores.browsersKnown()).as("one Chromium names after the close").isZero();
+            assertThat(stores.forBrowser(3)).isEmpty();
+            assertThat(stores.forBrowser(5)).isEmpty();
             return null;
         });
     }

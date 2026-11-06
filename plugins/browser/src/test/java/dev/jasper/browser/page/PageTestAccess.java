@@ -1,5 +1,6 @@
 package dev.jasper.browser.page;
 
+import dev.jasper.browser.engine.RecordingContext;
 import dev.jasper.browser.store.Reached;
 import org.cef.browser.CefRequestContext;
 
@@ -288,19 +289,6 @@ public final class PageTestAccess {
     }
 
     /**
-     * As {@link #pageBrowser(Page)}, a browser of an in-memory context when {@code inMemory}, as a /dev/null page's is.
-     *
-     * @param owner the page
-     * @param inMemory whether the browser was made with a context of its own
-     * @return the browser
-     */
-    public static PageBrowser pageBrowser(Page owner, boolean inMemory) {
-        PageBrowser made = pageBrowser(owner);
-        set(made, "inMemory", inMemory);
-        return made;
-    }
-
-    /**
      * Chromium has made the page's browser, as its life span handler tells on Chromium's thread: the browser's identifier
      * is the page's from now on. Any thread, as Chromium's.
      *
@@ -321,49 +309,29 @@ public final class PageTestAccess {
     }
 
     /**
-     * An in-memory context whose Chromium context is a stand-in, made at once, and whose each release counts in
-     * {@code released} instead of reaching Chromium: for the tests of the stores that hold contexts, as no context can be
-     * made without Chromium.
+     * An in-memory context whose kept Chromium context is a stand-in ({@link RecordingContext}), made at once, and whose
+     * each release counts in {@code released} instead of reaching Chromium: for the tests of the stores that hold
+     * contexts, as no context can be made without Chromium.
      *
      * @param released counts the releases
      * @return the context
      */
     public static PageContext recordingContext(java.util.concurrent.atomic.AtomicInteger released) {
-        CefRequestContext standIn = standInContext();
-        return new PageContext(true, chromium -> java.util.concurrent.CompletableFuture.completedFuture(standIn),
+        CefRequestContext kept = new RecordingContext(1);
+        return new PageContext(true, chromium -> java.util.concurrent.CompletableFuture.completedFuture(kept),
             (chromium, context) -> released.incrementAndGet());
     }
 
     /**
-     * Has {@code context} asked for as a page made with it asks, as it starts: its Chromium context, asked of
-     * {@code chromium} the first time.
+     * Has {@code context} asked for as a page made with it asks, as it starts: a context object of the page's own, over
+     * the group's kept context, which is asked of {@code chromium} the first time.
      *
      * @param context a page context
      * @param chromium the plugin's Chromium
-     * @return the Chromium context's future
+     * @return the page's context object's future
      */
     public static java.util.concurrent.CompletableFuture<?> askContext(PageContext context, dev.jasper.browser.engine.Chromium chromium) {
         return context.context(chromium);
-    }
-
-    /**
-     * A request context that is only itself, which no Chromium made: every call on it but {@code dispose} fails.
-     *
-     * @return the context
-     */
-    static CefRequestContext standInContext() {
-        return new CefRequestContext() {
-            @Override public void dispose() { }
-            @Override public boolean isGlobal() { return false; }
-            @Override public org.cef.handler.CefRequestContextHandler getHandler() { return null; }
-            @Override public boolean hasPreference(String name) { throw new UnsupportedOperationException(name); }
-            @Override public Object getPreference(String name) { throw new UnsupportedOperationException(name); }
-            @Override public java.util.Map<String, Object> getAllPreferences(boolean defaults) { throw new UnsupportedOperationException(); }
-            @Override public boolean canSetPreference(String name) { throw new UnsupportedOperationException(name); }
-            @Override public String setPreference(String name, Object value) { throw new UnsupportedOperationException(name); }
-            @Override public void ClearCertificateExceptions(org.cef.callback.CefCompletionCallback callback) { throw new UnsupportedOperationException(); }
-            @Override public void CloseAllConnections(org.cef.callback.CefCompletionCallback callback) { throw new UnsupportedOperationException(); }
-        };
     }
 
     /**

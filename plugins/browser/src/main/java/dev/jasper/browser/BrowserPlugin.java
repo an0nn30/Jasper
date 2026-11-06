@@ -76,6 +76,7 @@ public class BrowserPlugin implements Plugin {
     private BrowserItems items;
     private Stores stores;
     private DataStores dataStores;
+    private AboutScheme about;
     private SourcePage sources;
     private boolean running;
 
@@ -92,6 +93,7 @@ public class BrowserPlugin implements Plugin {
         // it must not hold one of the SDK's virtual threads. The executor makes no thread until a page asks for Chromium.
         worker = Executors.newSingleThreadExecutor(Thread.ofPlatform().daemon().name("jasper-browser-chromium").factory());
         var about = new AboutScheme();
+        this.about = about;
         // The Markdown previews' origins, which read nothing and make no random source until a preview is first made.
         var origins = new PreviewScheme();
         // H37: the data folder holds the history and Chromium's cookies, so it is made its owner's alone, with no I/O
@@ -251,6 +253,21 @@ public class BrowserPlugin implements Plugin {
     /** The plugin's Chromium. */
     Chromium chromium() {
         return chromium;
+    }
+
+    /** Jasper's pages, as Chromium serves them and their queries. */
+    AboutScheme about() {
+        return about;
+    }
+
+    /** The plugin's data stores. */
+    DataStores dataStores() {
+        return dataStores;
+    }
+
+    /** The plugin's browser items. */
+    BrowserItems items() {
+        return items;
     }
 
     /**

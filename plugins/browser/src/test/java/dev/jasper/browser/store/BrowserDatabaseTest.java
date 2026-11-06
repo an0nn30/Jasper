@@ -310,6 +310,16 @@ class BrowserDatabaseTest {
         assertThat(data.resolve("browser.sqlite")).doesNotExist();
     }
 
+    /**
+     * V11: a database in memory, a /dev/null group's, keeps its temporary tables and sort spills in memory too: the
+     * bundled SQLite would otherwise spill them to temporary files on disk.
+     */
+    @Test void aDatabaseInMemoryKeepsItsTemporaryStoreInMemory() throws Exception {
+        BrowserDatabase database = BrowserDatabase.memory();
+        opened.add(database);
+        assertThat(done(database.<String>call(connection -> text(connection, "PRAGMA temp_store")))).as("MEMORY").isEqualTo("2");
+    }
+
     @Test void aFailedCallFailsItsFutureAndTheNextCallRuns() throws Exception {
         BrowserDatabase database = BrowserDatabase.memory();
         opened.add(database);
@@ -333,6 +343,7 @@ class BrowserDatabaseTest {
         long entry = done(history.record("https://a.example/", Reached.LINK, 1)).orElseThrow().entry();
         assertThat(done(history.list("", Optional.empty(), 10)).entries()).extracting(HistoryStore.HistoryEntry::id).containsExactly(entry);
         assertThat(done(database.<String>call(connection -> text(connection, "PRAGMA journal_mode")))).as("in memory").isEqualTo("memory");
+        assertThat(done(database.<String>call(connection -> text(connection, "PRAGMA temp_store")))).as("V11").isEqualTo("2");
         assertThat(done(database.<String>call(connection -> text(connection, "PRAGMA foreign_keys")))).isEqualTo("1");
         assertThat(kept).hasBinaryContent(before);
         assertThat(sidecars(file)).isEmpty();

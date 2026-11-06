@@ -551,6 +551,20 @@ class BrowserItemTest {
         } });
     }
 
+    /** An item that fails before its tab opens gives its store back too: a /dev/null store no item holds ends. */
+    @Test void anItemThatFailsBeforeItsTabOpensReleasesItsStore() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var host = new FakePluginHost();
+            var items = items(host, page -> { });
+            DataStore devNull = items.dataStores().newDevNull();
+            host.close();
+            assertThatThrownBy(() -> items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), devNull))
+                .as("a stopped plugin makes no item").isInstanceOf(IllegalStateException.class);
+            assertThat(devNull.closed()).isTrue();
+            assertThat(items.dataStores().live()).doesNotContain(devNull);
+        });
+    }
+
     /**
      * Plan 5's routing (F13): a page's browser is found in its item's store from the moment Chromium names it, on
      * Chromium's thread, so its document's first query is answered from that store; and no longer once it has closed.

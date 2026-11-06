@@ -4,9 +4,12 @@ import dev.jasper.browser.api.MarkdownPreviews;
 import dev.jasper.browser.api.PreviewEvent;
 import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.item.BrowserItems;
+import dev.jasper.browser.item.ItemTestAccess;
+import dev.jasper.browser.page.PageTestAccess;
 import dev.jasper.browser.restore.BrowserRestore;
 import dev.jasper.browser.store.CapturedLog;
 import dev.jasper.browser.store.MemoryStores;
+import dev.jasper.browser.store.Reached;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.testing.FakePluginHost;
 import dev.jasper.sdk.ui.Nodes;
@@ -324,6 +327,55 @@ class BrowserPluginTest {
             assertThat(waits(host, "example.org")).as("still waiting").isTrue();
             assertThat(host.failures()).isEmpty();
         } });
+    }
+
+    /**
+     * Plan 6: Jasper's history, bookmarks and welcome pages answer each query, through the plugin's own registrations,
+     * from the asking browser's store: a /dev/null item's browser gets its group's history and bookmarks, a persistent
+     * item's browser none of them, and a browser no page has is refused.
+     */
+    @Test void jaspersPagesAnswerEachQueryFromTheAskingBrowsersStore(@TempDir Path root) throws Exception {
+        var plugin = new BrowserPlugin();
+        var host = new AtomicReference<FakePluginHost>();
+        SwingUtilities.invokeAndWait(() -> {
+            host.set(new FakePluginHost(root));
+            host.get().start(INFO, Set.of(), Set.of(), plugin);
+        });
+        try {
+            var devNull = new AtomicReference<dev.jasper.browser.item.DataStore>();
+            SwingUtilities.invokeAndWait(() -> {
+                devNull.set(plugin.dataStores().newDevNull());
+                var inDevNull = plugin.items().open(URI.create("https://private.example/"), dev.jasper.sdk.ui.TabPlacement.NEW_TAB,
+                    Optional.empty(), Optional.empty(), devNull.get());
+                var persistent = plugin.items().open(URI.create("https://public.example/"), dev.jasper.sdk.ui.TabPlacement.NEW_TAB,
+                    Optional.empty(), Optional.empty());
+                PageTestAccess.browserMade(ItemTestAccess.page(inDevNull), 61);
+                PageTestAccess.browserMade(ItemTestAccess.page(persistent), 62);
+            });
+            devNull.get().stores().history().record("https://private.example/", Reached.LINK, 1_000).get(10, TimeUnit.SECONDS);
+            devNull.get().stores().bookmarks().add("https://private.example/", "Private", 1_000).get(10, TimeUnit.SECONDS);
+            String list = "{\"op\":\"list\",\"query\":\"\"}", top = "{\"op\":\"top-sites\"}";
+            assertThat(ask(plugin, "history", 61, list)).contains("https://private.example/");
+            assertThat(ask(plugin, "bookmarks", 61, list)).contains("https://private.example/");
+            assertThat(ask(plugin, "welcome", 61, top)).contains("https://private.example/");
+            assertThat(ask(plugin, "history", 62, list)).doesNotContain("private.example");
+            assertThat(ask(plugin, "bookmarks", 62, list)).doesNotContain("private.example");
+            assertThat(ask(plugin, "welcome", 62, top)).doesNotContain("private.example");
+            for (String page : List.of("history", "bookmarks", "welcome")) {
+                var refused = plugin.about().query("jasper-about:" + page, true, 63, plugin.about().secret(page).orElseThrow() + list);
+                assertThat(refused).as(page).isPresent();
+                assertThat(refused.get()).as(page + " from a browser no page has").failsWithin(10, TimeUnit.SECONDS)
+                    .withThrowableThat().withMessageContaining("Jasper could not answer this request.");
+            }
+        } finally {
+            SwingUtilities.invokeAndWait(() -> host.get().close());
+        }
+    }
+
+    /** What {@code page}'s script is answered for {@code request} from browser {@code browser}, as its own document asks. */
+    private static String ask(BrowserPlugin plugin, String page, int browser, String request) throws Exception {
+        String secret = plugin.about().secret(page).orElseThrow();
+        return plugin.about().query("jasper-about:" + page, true, browser, secret + request).orElseThrow().get(10, TimeUnit.SECONDS);
     }
 
     /** Whether the browser item whose tab is called {@code title} shows the placeholder of an item that waits. UI thread. */

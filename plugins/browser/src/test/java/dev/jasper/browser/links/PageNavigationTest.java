@@ -15,6 +15,8 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.SwingUtilities;
 import org.cef.browser.CefFrame;
+import org.cef.network.CefRequest;
+import org.cef.network.CefRequest.ResourceType;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -152,18 +154,62 @@ class PageNavigationTest {
 
     /**
      * F1: Chromium's scheme handler factory serves its global context alone, so the client's request handler serves
-     * {@code jasper-about:} itself to the browsers of an in-memory context, every such request of theirs, and to no other
-     * browser, whose requests stay the factory's and Chromium's.
+     * {@code jasper-about:} itself to an in-memory page's main frame; the opener bridge reads each page's main-frame
+     * navigation's response; and every other request gets no handler. The request's address is read only for an
+     * in-memory page's main frame: reading it copies it across JNI, and a {@code data:} address can run to megabytes.
      */
-    @Test void jasperAboutIsServedThroughTheRequestHandlerInAnInMemoryContextAlone() throws Exception {
+    @Test void eachRequestGetsTheCompositeOfItsPartsAndOnlyAnInMemoryMainFrameHasItsAddressRead() throws Exception {
         onUiThread(() -> {
-            PageBrowser persistent = PageTestAccess.pageBrowser(page()), inMemory = PageTestAccess.pageBrowser(page(), true);
-            assertThat(PageNavigation.servesAbout(inMemory, "jasper-about:welcome")).isTrue();
-            assertThat(PageNavigation.servesAbout(inMemory, "JASPER-ABOUT://history/?q=1")).isTrue();
-            assertThat(PageNavigation.servesAbout(inMemory, "https://example.com/")).isFalse();
-            assertThat(PageNavigation.servesAbout(inMemory, null)).isFalse();
-            assertThat(PageNavigation.servesAbout(persistent, "jasper-about:welcome")).as("the global context's factory serves it").isFalse();
-            assertThat(PageNavigation.servesAbout(null, "jasper-about:welcome")).isFalse();
+            PageBrowser persistent = PageTestAccess.pageBrowser(page()), inMemory = PageTestAccess.pageBrowser(page(PageContext.memory()));
+            var responses = new org.cef.handler.CefResourceRequestHandlerAdapter() { };
+
+            var welcome = new Request("jasper-about:welcome", ResourceType.RT_MAIN_FRAME);
+            var both = PageNavigation.requests(inMemory, welcome, true, () -> responses, null);
+            assertThat(both).isNotNull();
+            assertThat(both.responses).as("the opener bridge's").isSameAs(responses);
+            assertThat(both.about).as("jasper-about: through the request handler").isTrue();
+            assertThat(welcome.urlReads).isEqualTo(1);
+
+            var web = new Request("https://example.com/", ResourceType.RT_MAIN_FRAME);
+            var bridged = PageNavigation.requests(inMemory, web, true, () -> responses, null);
+            assertThat(bridged.responses).isSameAs(responses);
+            assertThat(bridged.about).isFalse();
+
+            var typed = new Request("JASPER-ABOUT://history/?q=1", ResourceType.RT_MAIN_FRAME);
+            var aboutOnly = PageNavigation.requests(inMemory, typed, false, () -> responses, null);
+            assertThat(aboutOnly.responses).as("no navigation, no response to read").isNull();
+            assertThat(aboutOnly.about).isTrue();
+
+            var persistentWelcome = new Request("jasper-about:welcome", ResourceType.RT_MAIN_FRAME);
+            var global = PageNavigation.requests(persistent, persistentWelcome, true, () -> responses, null);
+            assertThat(global.responses).isSameAs(responses);
+            assertThat(global.about).as("the global context's factory serves it").isFalse();
+            assertThat(persistentWelcome.urlReads).as("a persistent page's address is not read").isZero();
+
+            for (PageBrowser browser : List.of(persistent, inMemory)) {
+                var image = new Request("jasper-about:welcome", ResourceType.RT_IMAGE);
+                var frame = new Request("jasper-about:welcome", ResourceType.RT_SUB_FRAME);
+                assertThat(PageNavigation.requests(browser, image, false, () -> responses, null)).isNull();
+                assertThat(PageNavigation.requests(browser, frame, true, () -> responses, null)).isNull();
+                assertThat(image.urlReads + frame.urlReads).as("no address read for what is no main frame").isZero();
+            }
+            var none = new Request("jasper-about:welcome", ResourceType.RT_MAIN_FRAME);
+            assertThat(PageNavigation.requests(null, none, true, () -> responses, null)).isNull();
+            assertThat(none.urlReads).isZero();
+        });
+    }
+
+    /**
+     * A browser is an in-memory one as its page's store says, not as JCEF's context object says: a persistent page's
+     * DevTools browser, which JCEF gives the global context's object, is not; a /dev/null page's DevTools browser is.
+     */
+    @Test void aBrowserIsInMemoryAsItsPagesStoreSaysDevToolsToo() throws Exception {
+        onUiThread(() -> {
+            Page persistent = page(), devNull = page(PageContext.memory());
+            assertThat(PageTestAccess.pageBrowser(persistent).inMemory()).isFalse();
+            assertThat(PageTestAccess.pageBrowser(devNull).inMemory()).isTrue();
+            assertThat(PageTestAccess.devToolsBrowser(PageTestAccess.devTools(persistent, new Point(1, 1))).inMemory()).isFalse();
+            assertThat(PageTestAccess.devToolsBrowser(PageTestAccess.devTools(devNull, new Point(1, 1))).inMemory()).isTrue();
         });
     }
 
@@ -176,7 +222,53 @@ class PageNavigationTest {
     }
 
     private static Page page() {
-        return new Page(URI.create("https://example.com/"), () -> { }, PageTestAccess.noFavicons(), Runnable::run, PageContext.persistent());
+        return page(PageContext.persistent());
+    }
+
+    private static Page page(PageContext context) {
+        return new Page(URI.create("https://example.com/"), () -> { }, PageTestAccess.noFavicons(), Runnable::run, context);
+    }
+
+    /** A request that answers only its address, counting each read, and its resource type, as Chromium's IO thread asks. */
+    private static final class Request extends CefRequest {
+        private final String url;
+        private final ResourceType type;
+        int urlReads;
+
+        Request(String url, ResourceType type) {
+            this.url = url;
+            this.type = type;
+        }
+
+        @Override public String getURL() {
+            urlReads++;
+            return url;
+        }
+
+        @Override public ResourceType getResourceType() { return type; }
+        @Override public void dispose() { }
+        @Override public long getIdentifier() { throw new UnsupportedOperationException(); }
+        @Override public boolean isReadOnly() { return true; }
+        @Override public void setURL(String value) { throw new UnsupportedOperationException(); }
+        @Override public String getMethod() { return "GET"; }
+        @Override public void setMethod(String value) { throw new UnsupportedOperationException(); }
+        @Override public void setReferrer(String value, ReferrerPolicy policy) { throw new UnsupportedOperationException(); }
+        @Override public String getReferrerURL() { throw new UnsupportedOperationException(); }
+        @Override public ReferrerPolicy getReferrerPolicy() { throw new UnsupportedOperationException(); }
+        @Override public org.cef.network.CefPostData getPostData() { throw new UnsupportedOperationException(); }
+        @Override public void setPostData(org.cef.network.CefPostData data) { throw new UnsupportedOperationException(); }
+        @Override public String getHeaderByName(String name) { throw new UnsupportedOperationException(); }
+        @Override public void setHeaderByName(String name, String value, boolean overwrite) { throw new UnsupportedOperationException(); }
+        @Override public void getHeaderMap(java.util.Map<String, String> headers) { throw new UnsupportedOperationException(); }
+        @Override public void setHeaderMap(java.util.Map<String, String> headers) { throw new UnsupportedOperationException(); }
+        @Override public void set(String value, String method, org.cef.network.CefPostData data, java.util.Map<String, String> headers) {
+            throw new UnsupportedOperationException();
+        }
+        @Override public int getFlags() { throw new UnsupportedOperationException(); }
+        @Override public void setFlags(int flags) { throw new UnsupportedOperationException(); }
+        @Override public String getFirstPartyForCookies() { throw new UnsupportedOperationException(); }
+        @Override public void setFirstPartyForCookies(String value) { throw new UnsupportedOperationException(); }
+        @Override public TransitionType getTransitionType() { throw new UnsupportedOperationException(); }
     }
 
     private static void onUiThread(Runnable test) throws Exception {

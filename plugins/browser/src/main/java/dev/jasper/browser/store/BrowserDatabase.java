@@ -119,7 +119,7 @@ public final class BrowserDatabase implements AutoCloseable {
     }
 
     /**
-     * A database in memory, gone when it closes.
+     * A database in memory, gone when it closes; its temporary tables and sorts stay in memory too.
      *
      * @return the database, not yet opened
      */
@@ -268,6 +268,10 @@ public final class BrowserDatabase implements AutoCloseable {
             if (file) {
                 String journal = text(connection, "PRAGMA journal_mode = WAL");
                 if (!"wal".equalsIgnoreCase(journal)) throw new SQLException("SQLite cannot keep a write-ahead log for the database (" + journal + ")");
+            } else {
+                // V11: a database in memory writes nothing to disk, its temporary tables and sort spills neither, which
+                // the bundled SQLite (TEMP_STORE=1) would otherwise put in temporary files.
+                Sql.execute(connection, "PRAGMA temp_store = MEMORY");
             }
             Sql.execute(connection, "PRAGMA synchronous = NORMAL");
             Sql.execute(connection, "PRAGMA foreign_keys = ON");

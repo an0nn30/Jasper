@@ -13,7 +13,8 @@
  * of the same app; each client's handlers are installed through {@link dev.jasper.browser.engine.Chromium#onClient} or
  * {@link dev.jasper.browser.engine.Chromium#onPreviewClient}, once each, before any page or preview is made on it.
  * Chromium makes a /dev/null group's in-memory request context on its own UI thread and releases it once, never after
- * it has stopped, and serves {@code jasper-about:} to such a context's pages through their request handler, as its
- * scheme handler factory serves the global context alone.
+ * it has stopped; each browser of the group is handed a {@code BrowserContext} of its own over it, as JCEF disposes a
+ * browser's context object as the browser closes. It serves {@code jasper-about:} to such a context's pages through
+ * their request handler, as its scheme handler factory serves the global context alone.
  */
 package dev.jasper.browser.engine;

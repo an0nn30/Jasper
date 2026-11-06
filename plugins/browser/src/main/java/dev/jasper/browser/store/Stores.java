@@ -80,6 +80,15 @@ public final class Stores implements AutoCloseable {
         return database.closed();
     }
 
+    /**
+     * Whether the database has opened: its first call opens it. Asking opens nothing.
+     *
+     * @return whether it has had a call
+     */
+    public boolean opened() {
+        return database.started();
+    }
+
     /** Whether the database has started its thread, which only its first call does. */
     boolean started() {
         return database.started();

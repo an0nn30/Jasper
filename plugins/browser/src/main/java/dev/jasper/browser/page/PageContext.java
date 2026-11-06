@@ -10,10 +10,12 @@ import org.cef.browser.CefRequestContext;
 /**
  * The Chromium request context a browsing group's pages are made with: where their cookies, cache and storage live. The
  * persistent one is Chromium's global context, in the plugin's data folder, which 4a's pages are made with. An in-memory
- * one is a /dev/null group's own ({@link Chromium#inMemoryContext}): asked of Chromium once, by the group's first page as
- * it starts, and released once, as its group's store closes, unless Chromium has stopped by then. Its public methods
- * name no Chromium type, and making one loads no Chromium class: nothing here names one until a page asks for its
- * context. UI thread.
+ * one is a /dev/null group's own ({@link Chromium#inMemoryContext}), kept for the group: asked of Chromium once, by the
+ * group's first page as it starts, and released once, as its group's store closes, unless Chromium has stopped by then.
+ * Each page is handed a context object of its own over the kept one ({@link Chromium#browserContext}), never the kept
+ * one, as JCEF disposes a browser's context object as the browser closes (plan 6's V10). Its public methods name no
+ * Chromium type, and making one loads no Chromium class: nothing here names one until a page asks for its context. UI
+ * thread.
  */
 public final class PageContext {
     private static final String CLOSED = "This browsing group's data store has closed";
@@ -70,10 +72,11 @@ public final class PageContext {
 
     /**
      * The context a page of the group is made with: for the persistent group null at once, Chromium's global context, as
-     * 4a passes it; for a /dev/null group the context {@link Chromium#inMemoryContext} makes, asked the first time only.
+     * 4a passes it; for a /dev/null group a new object of the page's own over the context kept for the group, which
+     * {@link Chromium#inMemoryContext} makes the first time only. Ask once for each browser made.
      *
      * @param chromium the plugin's Chromium
-     * @return the context; for a /dev/null group failed once it has closed, or as Chromium fails to make it
+     * @return the page's context object; for a /dev/null group failed once it has closed, or as Chromium fails to make it
      */
     CompletableFuture<CefRequestContext> context(Chromium chromium) {
         Objects.requireNonNull(chromium, "chromium");
@@ -83,7 +86,7 @@ public final class PageContext {
             from = chromium;
             made = make == null ? chromium.inMemoryContext() : make.apply(chromium);
         }
-        return made;
+        return made.thenApply(chromium::browserContext);
     }
 
     /**

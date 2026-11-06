@@ -115,6 +115,8 @@ public final class BrowserItem implements AutoCloseable {
     // the item records into and suggests from.
     private final DataStore store;
     private final Stores stores;
+    // Whether the item still holds its store, which it gives back once.
+    private boolean holdsStore = true;
     private final Optional<String> target;
     private final Page page;
     private final ErrorPages errors;
@@ -216,22 +218,29 @@ public final class BrowserItem implements AutoCloseable {
         Objects.requireNonNull(window, "window");
         Objects.requireNonNull(zoom, "zoom");
         Objects.requireNonNull(store, "store");
-        var item = new BrowserItem(items, url, target, zoom, waiting, store);
-        item.attach(placement, window);
+        // The item holds its store from the start: one that fails before its tab opens, or as it opens, gives it back.
+        store.retain();
+        BrowserItem item = null;
+        try {
+            item = new BrowserItem(items, url, target, zoom, waiting, store);
+            item.attach(placement, window);
+        } catch (RuntimeException | Error failure) {
+            if (item == null) store.release();
+            else item.releaseStore();
+            throw failure;
+        }
         return item;
     }
 
-    /** The item opens its tab, holding its store from now on; a tab that cannot open gives the store back. */
+    /** The item opens its tab; one that cannot open lets go of what the item made for it. */
     private void attach(TabPlacement placement, Optional<WindowOwner> window) {
         var spec = new ContentSpec(KEY + UUID.randomUUID(), title);
         try {
-            store.retain();
             tab = items.context().windows().openTab(restore(url).map(spec::withRestore).orElse(spec), window.orElse(null), view, placement);
         } catch (RuntimeException | Error failure) {
             bookmarksChanged.close();
             visitsChanged.close();
             view.close();
-            store.release();
             throw failure;
         }
         tab.setFocusTarget(this::focusContent);
@@ -632,6 +641,13 @@ public final class BrowserItem implements AutoCloseable {
         items.closed(this);
         view.close();
         page.close();
+        releaseStore();
+    }
+
+    /** The item gives its store back, once: a /dev/null group's last item closes the group's store. */
+    private void releaseStore() {
+        if (!holdsStore) return;
+        holdsStore = false;
         store.release();
     }
 

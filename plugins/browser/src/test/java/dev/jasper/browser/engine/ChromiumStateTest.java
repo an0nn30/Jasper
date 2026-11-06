@@ -517,6 +517,120 @@ class ChromiumStateTest {
         assertThat(ran).doesNotContain("refused");
     }
 
+    /**
+     * V10: JCEF disposes a browser's context object as the browser closes, so each browser is handed one of its own: it
+     * carries the kept context's native handle, does what is asked of it on the kept context, and its dispose leaves the
+     * kept context alone.
+     */
+    @Test void aBrowsersContextObjectIsItsOwnOverTheKeptContextAndDisposesNothing() {
+        Chromium chromium = chromium(recording, LIMIT);
+        var kept = new RecordingContext(42);
+        kept.setPreference("first", 1);
+        org.cef.browser.CefRequestContext one = chromium.browserContext(kept), two = chromium.browserContext(kept);
+        assertThat(one).isNotSameAs(kept).isNotSameAs(two);
+        assertThat(one.getNativeRef("CefRequestContext")).isEqualTo(42);
+        assertThat(two.getNativeRef("CefRequestContext")).isEqualTo(42);
+        assertThat(one.getPreference("first")).isEqualTo(1);
+        assertThat(one.setPreference("second", 2)).isNull();
+        assertThat(kept.getPreference("second")).as("set on the kept context").isEqualTo(2);
+        assertThat(one.hasPreference("second")).isTrue();
+        assertThat(one.getAllPreferences(false)).containsEntry("first", 1);
+        assertThat(one.isGlobal()).isFalse();
+        one.dispose();
+        one.dispose();
+        assertThat(kept.disposals()).isZero();
+        assertThat(two.getPreference("first")).as("the kept context is still there").isEqualTo(1);
+        assertThat(chromium.browserContext(null)).as("Chromium's global context, which JCEF makes for a null").isNull();
+        assertThat(starts).isEmpty();
+    }
+
+    /**
+     * Plan 6: an in-memory context Chromium made is released once, however often asked, on Swing's thread; the dispose's
+     * sweep takes those still kept, a context made after the sweep is disposed at once and its ask fails, and after the
+     * close a release touches nothing. The contexts are stand-ins, as none can be made without Chromium.
+     */
+    @Test void aKeptContextIsReleasedOnceTheSweepTakesTheRestAndNothingIsTouchedAfterTheClose() throws Exception {
+        Chromium chromium = chromium(recording, LIMIT);
+        var made = new java.util.ArrayDeque<RecordingContext>(List.of(new RecordingContext(1), new RecordingContext(2),
+            new RecordingContext(3)));
+        chromium.makeContextsWith(made::poll);
+        chromium.client();
+        assertThat(chromium.enter()).isTrue();
+        var first = chromium.inMemoryContext();
+        var second = chromium.inMemoryContext();
+        var third = chromium.inMemoryContext();
+        Thread.ofPlatform().start(chromium::contextInitialized).join(TimeUnit.SECONDS.toMillis(10));
+        var one = (RecordingContext) first.get(10, TimeUnit.SECONDS);
+        var two = (RecordingContext) second.get(10, TimeUnit.SECONDS);
+        var three = (RecordingContext) third.get(10, TimeUnit.SECONDS);
+        EventQueue.invokeAndWait(() -> {
+            chromium.release(one);
+            chromium.release(one);
+        });
+        assertThat(one.disposals()).as("released once").isEqualTo(1);
+        EventQueue.invokeAndWait(chromium::close);
+        EventQueue.invokeAndWait(() -> chromium.release(two));
+        assertThat(two.disposals()).as("released after the close: nothing touched").isZero();
+        EventQueue.invokeAndWait(chromium::disposeContexts);
+        assertThat(two.disposals()).as("the dispose's sweep").isEqualTo(1);
+        assertThat(three.disposals()).isEqualTo(1);
+        assertThat(one.disposals()).as("released already").isEqualTo(1);
+        chromium.terminated();
+
+        // Another process's Chromium, as one Chromium starts once in each.
+        Chromium late = new Chromium(data, () -> { }, recording, new AboutScheme(), new PreviewScheme(), cause -> { }, new StartOnce(), LIMIT);
+        var after = new RecordingContext(4);
+        late.makeContextsWith(() -> after);
+        late.client();
+        assertThat(late.enter()).isTrue();
+        var asked = late.inMemoryContext();
+        EventQueue.invokeAndWait(late::disposeContexts);
+        Thread.ofPlatform().start(late::contextInitialized).join(TimeUnit.SECONDS.toMillis(10));
+        assertThat(failure(asked)).as("made as the dispose ran").isInstanceOf(IllegalStateException.class).hasMessage(Chromium.ONCE);
+        assertThat(after.disposals()).as("disposed at once").isEqualTo(1);
+        end(late);
+    }
+
+    /**
+     * Plan 6: no work is handed to Chromium's thread once the close has begun: a hand-over under way when the close comes
+     * ends before the close begins, and none starts after it.
+     */
+    @Test void noWorkIsHandedToChromiumsThreadOnceTheCloseHasBegun() throws Exception {
+        var closing = new AtomicBoolean();
+        var thread = new ChromiumThread(() -> closing.get() ? java.util.Optional.of(new IllegalStateException(Chromium.ONCE))
+            : java.util.Optional.empty());
+        var inHand = new java.util.concurrent.CountDownLatch(1);
+        var leave = new java.util.concurrent.CountDownLatch(1);
+        var sawClosing = new AtomicBoolean();
+        var hands = new AtomicInteger();
+        thread.contextInitialized();
+        thread.handOverWith(task -> {
+            hands.incrementAndGet();
+            inHand.countDown();
+            try {
+                leave.await(10, TimeUnit.SECONDS);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+            sawClosing.set(closing.get());
+            return true;
+        });
+        Thread giver = Thread.ofPlatform().start(() -> thread.run(() -> { }));
+        assertThat(inHand.await(10, TimeUnit.SECONDS)).isTrue();
+        Thread closer = Thread.ofPlatform().start(() -> thread.closing(() -> {
+            closing.set(true);
+            return null;
+        }));
+        closer.join(300);
+        assertThat(closer.isAlive()).as("the close waits for the hand-over under way").isTrue();
+        leave.countDown();
+        giver.join(TimeUnit.SECONDS.toMillis(10));
+        closer.join(TimeUnit.SECONDS.toMillis(10));
+        assertThat(sawClosing).as("the hand-over ended before the close began").isFalse();
+        assertThat(failure(thread.run(() -> { }))).hasMessage(Chromium.ONCE);
+        assertThat(hands).as("nothing handed over after it").hasValue(1);
+    }
+
     /** A start that fails fails the work waiting for Chromium's thread, with its reason, and any given after it. */
     @Test void aFailedStartFailsTheWorkWaitingForChromiumsThread() throws Exception {
         Chromium chromium = chromium(recording, Duration.ofMillis(50));

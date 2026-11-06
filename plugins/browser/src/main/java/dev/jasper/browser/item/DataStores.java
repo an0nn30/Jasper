@@ -33,7 +33,8 @@ public final class DataStores implements AutoCloseable {
     private final List<DataStore> devNull = new ArrayList<>();
     // Made the first time it is asked for.
     private DataStore persistent;
-    private boolean closed;
+    // Read by Chromium's thread as it names a browser.
+    private volatile boolean closed;
 
     /**
      * The stores whose persistent one holds {@code persistent}, and whose /dev/null ones each hold a new database in
@@ -84,14 +85,14 @@ public final class DataStores implements AutoCloseable {
     }
 
     /**
-     * The stores open now: the persistent one, once it has been asked for, then every /dev/null one still open, in the
-     * order they were made.
+     * The stores open now: the persistent one, once its database has opened, not merely because a restore or an item
+     * asked for the store, then every /dev/null one still open, in the order they were made. Asking opens nothing.
      *
      * @return the stores
      */
     public List<DataStore> live() {
         var live = new ArrayList<DataStore>(devNull.size() + 1);
-        if (persistent != null && !persistent.closed()) live.add(persistent);
+        if (!closed && plugins.opened()) live.add(persistent());
         live.addAll(devNull);
         return List.copyOf(live);
     }
@@ -121,9 +122,14 @@ public final class DataStores implements AutoCloseable {
         return forBrowser(browser).map(answer).orElseGet(() -> CompletableFuture.failedFuture(new IllegalStateException(NO_STORE)));
     }
 
-    /** Chromium made {@code browser} for a page in {@code store}. Any thread: Chromium's, before any of its documents asks. */
+    /**
+     * Chromium made {@code browser} for a page in {@code store}; once these have closed, at the plugin's stop, it is
+     * forgotten at once. Any thread: Chromium's, before any of its documents asks.
+     */
     void browserMade(int browser, DataStore store) {
-        browsers.put(browser, Objects.requireNonNull(store, "store"));
+        Objects.requireNonNull(store, "store");
+        browsers.put(browser, store);
+        if (closed) browsers.remove(browser, store); // named as these closed: close() clears after setting closed
     }
 
     /** Chromium closed {@code browser}, a page's in {@code store}. Any thread. */
@@ -142,6 +148,11 @@ public final class DataStores implements AutoCloseable {
         else plugins.close();
         for (DataStore store : List.copyOf(devNull)) store.close();
         browsers.clear();
+    }
+
+    /** How many browsers' stores these know: for tests. Any thread. */
+    int browsersKnown() {
+        return browsers.size();
     }
 
     /** A /dev/null store closed: it is no longer live, and no browser is in it. */
