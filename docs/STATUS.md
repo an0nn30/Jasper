@@ -115,7 +115,9 @@ gesture and the read (H-F12); a long search matches on its start only (H16); `Ä
 a modifier-click on a `file:` row opens nothing (H3); the palette and the suggestions see the 10,000 sites visited most
 recently (H-F29); no JavaScript runs in a test. Task 14 (the user's check on macOS, with their OK): pending, the
 GUI-only risks first (H-F1's transition flags, CEF's `Runtime.executionContextCreated` through JBR's out-of-process
-bridge, H-F19's load start for a failed navigation). Windows and Linux are not run; benchmarks are deferred (H4).
+bridge, H-F19's load start for a failed navigation), then the plan's ten lines and the task reviews'
+([checklist](browser-verification.md#plan-5-history-bookmarks-and-jasper-integrations)). Windows and Linux are not run;
+benchmarks are deferred (H4).
 
 **Browser plan 9: the Chromium Markdown preview — 2026-11-05** (`claude/browser-markdown-preview`, worktree
 `.claude/worktrees/browser-4b-4c-e6deab`, from local `main` `420bfd63a`, which has plans 4a, 4b and 4c merged; the plan

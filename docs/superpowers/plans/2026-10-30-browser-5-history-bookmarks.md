@@ -158,9 +158,11 @@ task reviews recorded these deviations from the plan's text, each with its rulin
   U+2029. No GUI was launched.
 
 Not run:
-- **Task 14**, the user's GUI check on macOS, with their OK: pending, the GUI-only risks first: H-F1's transition flags,
-  CEF's delivery of `Runtime.executionContextCreated` through JBR's out-of-process bridge, and whether CEF reports a
-  load start for a failed navigation (H-F19).
+- **Task 14**, the user's GUI check on macOS, with their OK: pending
+  ([checklist](../../browser-verification.md#plan-5-history-bookmarks-and-jasper-integrations)), the GUI-only risks
+  first: H-F1's transition flags, CEF's delivery of `Runtime.executionContextCreated` through JBR's out-of-process
+  bridge, and whether CEF reports a load start for a failed navigation (H-F19); then the plan's ten lines, line 7 on
+  H30's path and line 8 with H32's gestures, H-F2's frame and H35's no-copy, and the task reviews' lines.
 - **The final review** and its fix wave, with the minors marked for it below (H36 among them).
 - **Windows and Linux** (no hosts): every GUI line, Ctrl+H's History in kit fields included; benchmarks and the memory
   run: deferred. H4: the second sqlite-jdbc's first open, about 0.1 s in tests (3.1 s once, probably macOS scanning
