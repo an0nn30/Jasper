@@ -270,6 +270,19 @@ class BrowserDatabaseTest {
         assertThat(unavailable).isEmpty();
     }
 
+    /**
+     * H41: a fresh file is made its owner's alone before SQLite opens it, so the write-ahead log and shared memory SQLite
+     * makes beside it, which take the file's permissions, are too.
+     */
+    @Test @DisabledOnOs(OS.WINDOWS) void aFreshFileAndTheLogAndSharedMemoryBesideItAreTheirOwnersAlone() throws Exception {
+        Path file = data.resolve("data").resolve("browser.sqlite");
+        BrowserDatabase database = file(file);
+        assertThat(done(database.<String>call(connection -> text(connection, "PRAGMA journal_mode")))).isEqualTo("wal");
+        for (String suffix : List.of("", "-wal", "-shm"))
+            assertThat(permissions(file.resolveSibling(file.getFileName() + suffix))).as("browser.sqlite" + suffix).isEqualTo("rw-------");
+        assertThat(unavailable).isEmpty();
+    }
+
     /** H37: a folder whose permissions cannot be set is logged once, as a warning, and the database opens all the same. */
     @Test void aDataFolderWhosePermissionsCannotBeSetIsLoggedOnceAndStillOpens() throws Exception {
         var folder = new DataFolder(data, path -> { throw new IOException("Operation not permitted"); });

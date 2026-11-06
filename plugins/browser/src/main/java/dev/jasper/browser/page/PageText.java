@@ -13,6 +13,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -60,7 +61,8 @@ import org.cef.browser.CefDevToolsClient;
  *
  * <p>The evaluation's answer, up to {@value #MAX_SELECTION_ANSWER} characters for a read, is read on the parsing
  * executor, the plugin's background executor, off the UI thread; that bound, checked before the parse, bounds the parse
- * too. The other answers are read where they arrive. Each later call is made on the UI thread, as the
+ * too, and a parse that executor refuses, once the plugin has stopped, fails its run. The other answers are read where
+ * they arrive. Each later call is made on the UI thread, as the
  * page's other DevTools calls are. The methods run on the UI thread; their futures complete on any thread.
  */
 final class PageText {
@@ -232,10 +234,23 @@ final class PageText {
     private <T> CompletableFuture<T> evaluate(String expression, Function<String, Optional<T>> reader) {
         CompletableFuture<String> unique = world != null ? CompletableFuture.completedFuture(world) : askWorld(generation);
         return unique.thenComposeAsync(id -> call("Runtime.evaluate", evaluation(id, expression)), ui)
-            .thenApplyAsync(answer -> reader.apply(answer).orElseThrow(() -> unreadable("Runtime.evaluate")), parsing)
+            .thenCompose(answer -> parsed(answer, reader))
             .whenCompleteAsync((value, failure) -> {
                 if (failure != null) world = null;
             }, ui);
+    }
+
+    /**
+     * What {@code reader} reads in {@code answer}, on the parsing executor. When that executor refuses the work, as the
+     * plugin's background executor does once the plugin has stopped, the read fails at once, so the run still ends and the
+     * runs after it go on (H41).
+     */
+    private <T> CompletableFuture<T> parsed(String answer, Function<String, Optional<T>> reader) {
+        try {
+            return CompletableFuture.supplyAsync(() -> reader.apply(answer).orElseThrow(() -> unreadable("Runtime.evaluate")), parsing);
+        } catch (RejectedExecutionException refused) {
+            return CompletableFuture.failedFuture(refused);
+        }
     }
 
     /**

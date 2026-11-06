@@ -421,6 +421,28 @@ class PageTextTest {
     }
 
     /**
+     * H41: once the plugin has stopped, its background executor refuses the parse: the run fails instead of never
+     * ending, and the run after it goes on.
+     */
+    @Test void aParseTheExecutorRefusesFailsTheRunAndTheNextRunGoesOn() throws Exception {
+        var refusing = new java.util.concurrent.atomic.AtomicBoolean(true);
+        var devTools = new DevTools();
+        var text = new PageText(devTools, Runnable::run, task -> {
+            if (refusing.getAndSet(false)) throw new java.util.concurrent.RejectedExecutionException("the plugin stopped");
+            task.run();
+        }, Duration.ofSeconds(5));
+        devTools.owner = text;
+        var answered = new CompletableFuture<String>();
+        devTools.answers.put("Runtime.evaluate", parameters -> answered);
+        CompletableFuture<Page.Insertion> refused = text.insertIntoField("one");
+        answered.complete(INSERTED);
+        assertThatThrownBy(() -> refused.get(2, TimeUnit.SECONDS)).isInstanceOf(ExecutionException.class)
+            .hasCauseInstanceOf(java.util.concurrent.RejectedExecutionException.class);
+        devTools.answer("Runtime.evaluate", INSERTED);
+        assertThat(text.insertIntoField("two").get(2, TimeUnit.SECONDS)).isEqualTo(Page.Insertion.INSERTED);
+    }
+
+    /**
      * H35: the script answers text only when a selectionchange reached the document, or the focused field, since its last
      * read there; its listener and flags live in Jasper's world, which the page cannot see. The first read of each has
      * nothing to compare against. The script itself runs in the node harness and by hand (Task 14).

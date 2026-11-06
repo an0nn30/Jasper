@@ -1,10 +1,12 @@
 package dev.jasper.browser.store;
 
 import java.io.IOException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
@@ -16,9 +18,11 @@ import java.util.Set;
  * other user of the computer can read them. The first {@link #restrict()} takes every permission of the group and of
  * others from the folder, keeping the owner's, which leaves {@code rwx------} for the folder the host made; then from
  * {@code browser.sqlite} and its write-ahead log and shared memory, those that exist, as SQLite gives the files it makes
- * beside the database the database's permissions. It runs on whichever thread needs the folder first: the database's,
- * before the file opens, or Chromium's worker, before Chromium writes there. Permissions that cannot be set are logged
- * once, as a warning, and the folder is used all the same. On Windows it does nothing. Making one does no I/O.
+ * beside the database the database's permissions, and the database makes a new {@code browser.sqlite} its owner's
+ * alone before SQLite opens it ({@code createOwnerOnly}). It runs on whichever thread needs the folder first: the
+ * database's, before the file opens, or Chromium's worker, before Chromium writes there. Permissions that cannot be set
+ * are logged once, as a warning, and the folder is used all the same. On Windows it does nothing. Making one does no
+ * I/O.
  */
 public final class DataFolder {
     /** The history's and bookmarks' file in the folder. */
@@ -81,6 +85,28 @@ public final class DataFolder {
                 if (Files.exists(made)) restriction.apply(made);
         } catch (IOException | RuntimeException failure) {
             LOG.log(System.Logger.Level.WARNING, "The browser's data folder could not be made its owner's alone: " + folder, failure);
+        }
+    }
+
+    /**
+     * Makes {@code file}, empty and its owner's alone ({@code rw-------}), when it is missing and its folder's file system
+     * has POSIX permissions (H41): SQLite gives the write-ahead log and shared memory it makes beside a database the
+     * database's permissions, so they are the owner's alone too.
+     *
+     * @param file the database's file, in a folder that exists
+     * @return whether it made the file; false when the file was there, or another program made it meanwhile, and on
+     *     a file system without POSIX permissions
+     * @throws IOException if the file cannot be made
+     */
+    static boolean createOwnerOnly(Path file) throws IOException {
+        Path folder = file.toAbsolutePath().getParent();
+        if (Files.exists(file) || Files.getFileAttributeView(folder, PosixFileAttributeView.class) == null) return false;
+        try {
+            Files.createFile(file, PosixFilePermissions.asFileAttribute(EnumSet.of(PosixFilePermission.OWNER_READ,
+                PosixFilePermission.OWNER_WRITE)));
+            return true;
+        } catch (FileAlreadyExistsException meanwhile) {
+            return false;
         }
     }
 

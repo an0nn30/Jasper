@@ -23,7 +23,8 @@ import java.util.function.Consumer;
  * one the plugin cannot read or write, that fails SQLite's quick check, that a later Jasper wrote ({@code user_version}
  * above 1), or that another program holds past the 2-second busy timeout. The file's checks come before anything is
  * written to it, so a file that fails one is never changed but for its permissions: before the file opens, its folder and
- * it are made their owner's alone ({@link DataFolder#restrict}). When SQLite's native library does not load there is no
+ * it are made their owner's alone ({@link DataFolder#restrict}), and a missing file is made so, then deleted again if
+ * this open cannot use it. When SQLite's native library does not load there is no
  * database at all, in a file or in memory, and every call fails. Either way the file's database is told why once.
  */
 public final class BrowserDatabase implements AutoCloseable {
@@ -234,7 +235,21 @@ public final class BrowserDatabase implements AutoCloseable {
         // that cannot be written is refused here, before SQLite makes anything beside it.
         if (!Files.isWritable(folder)) throw new AccessDeniedException(folder.toString(), null, "The folder cannot be written");
         if (Files.exists(absolute) && !Files.isWritable(absolute)) throw new AccessDeniedException(absolute.toString(), null, "The file cannot be written");
-        return prepared(opener.open("jdbc:sqlite:" + absolute), true);
+        // H41: a new file is its owner's alone before SQLite opens it, and so the log and shared memory SQLite makes
+        // beside it; one this open made and then could not use is deleted again, so the folder is left as it was.
+        boolean made = DataFolder.createOwnerOnly(absolute);
+        try {
+            return prepared(opener.open("jdbc:sqlite:" + absolute), true);
+        } catch (Throwable unusable) {
+            if (made) {
+                try {
+                    Files.deleteIfExists(absolute);
+                } catch (IOException notDeleted) {
+                    unusable.addSuppressed(notDeleted);
+                }
+            }
+            throw unusable;
+        }
     }
 
     /**
