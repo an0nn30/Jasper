@@ -129,26 +129,29 @@ public final class ProfileWipe {
     /**
      * Deletes the database's {@code files} when {@code dataDir}'s marker asks for them, as the data folder's first use
      * does, before the database opens (ruling V25), and takes the database's mark back; the profile's stays for
-     * Chromium. A file that cannot be deleted keeps the mark for the next start, logged. Any thread but the UI thread.
+     * Chromium. A file that cannot be deleted keeps the mark for the next start, logged, and the database may not use
+     * the files meanwhile (ruling V27). Any thread but the UI thread.
      *
-     * @param dataDir the plugin's data directory, its owner's alone
+     * @param dataDir the plugin's data directory
      * @param files the database's file, its write-ahead log and its shared memory
+     * @return whether the database may use the files: false when they are marked and could not all be deleted
      */
-    public static void wipeMarkedDatabase(Path dataDir, List<Path> files) {
+    public static boolean wipeMarkedDatabase(Path dataDir, List<Path> files) {
         Content now = read(dataDir);
-        if (!now.database()) return;
+        if (!now.database()) return true;
         try {
             for (Path file : files) Files.deleteIfExists(file);
         } catch (IOException | RuntimeException kept) {
             LOG.log(System.Logger.Level.WARNING, "The browser's database could not be deleted as Clear Website Data asked; the next start tries "
                 + "again", kept);
-            return;
+            return false;
         }
         try {
             write(dataDir, new Content(now.profile(), false));
         } catch (IOException | RuntimeException kept) {
             LOG.log(System.Logger.Level.WARNING, "The browser's clearing marker could not be written: " + dataDir.resolve(MARKER), kept);
         }
+        return true;
     }
 
     /**

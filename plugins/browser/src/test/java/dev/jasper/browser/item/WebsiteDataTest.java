@@ -88,9 +88,10 @@ class WebsiteDataTest {
 
     /**
      * The sites are gathered before anything is erased, from the history and the persistent store's open items, as web
-     * origins; Chromium is cleared first, and only once it has the database is emptied.
+     * origins; the re-review's item 3 (ruling V27) then erases the database before Chromium's part, so a quit during
+     * that part leaves no row.
      */
-    @Test void theSitesAreGatheredFirstAndChromiumIsClearedBeforeTheDatabase() throws Exception {
+    @Test void theSitesAreGatheredFirstAndTheDatabaseIsErasedBeforeChromium() throws Exception {
         DataStore persistent = persistent(memory.make());
         Stores kept = persistent.stores();
         done(kept.history().record("https://visited.example/page", Reached.LINK, 1_000));
@@ -108,10 +109,10 @@ class WebsiteDataTest {
             .as("F20's live set: the history's origins and the open items', web origins only")
             .containsExactlyInAnyOrder("https://visited.example", "http://visited.example:8080", "https://open.example");
         memory.settle();
-        assertThat(done(kept.history().visits(10))).as("Chromium has not cleared yet: nothing is erased").hasSize(4);
-        assertThat(done(kept.bookmarks().all())).hasSize(1);
-        assertThat(persistent.permissions().all()).hasSize(1);
-        assertThat(cleared).isNotDone();
+        assertThat(done(kept.history().visits(10))).as("erased before Chromium is asked").isEmpty();
+        assertThat(done(kept.bookmarks().all())).isEmpty();
+        assertThat(persistent.permissions().all()).isEmpty();
+        assertThat(cleared).as("Chromium has not cleared yet").isNotDone();
 
         chromium.complete(null);
         done(cleared);
@@ -176,8 +177,6 @@ class WebsiteDataTest {
         chromium = new CompletableFuture<>();
         CompletableFuture<Void> cleared = onUi(() -> data(persistent).clearAll());
         await(() -> !chromiumAsked.isEmpty());
-        memory.settle();
-        assertThat(done(persistent.stores().history().visits(10))).as("Chromium's clearing has not ended").hasSize(1);
         chromium.completeExceptionally(new java.util.concurrent.TimeoutException("Chromium did not clear its data within 60 seconds"));
         assertThat(failure(cleared)).hasMessage("Chromium did not clear its data within 60 seconds");
         flushUi();
@@ -189,6 +188,38 @@ class WebsiteDataTest {
         assertThat(done(persistent.stores().history().visits(10))).as("erased all the same").isEmpty();
         assertThat(done(persistent.stores().bookmarks().all())).isEmpty();
         assertThat(persistent.permissions().all()).isEmpty();
+    }
+
+    /**
+     * The re-review's item 3 (ruling V27): a stop or quit while Chromium clears, which closes the database, leaves no row
+     * of the cleared ones in the file or its log, and the next start's database has none.
+     */
+    @Test void aStopWhileChromiumClearsLeavesNoRowInTheFile() throws Exception {
+        Path data = Files.createDirectories(folder.resolve("data"));
+        plugins = new Stores(BrowserDatabase.file(new DataFolder(data), cause -> told.add("unavailable: " + cause)), EventQueue::invokeLater);
+        DataStore persistent = persistent(plugins);
+        for (int each = 0; each < 20; each++)
+            done(plugins.history().record("https://" + MARKER + ".example/page" + each, Reached.LINK, 1_000 + each));
+        assertThat(holds(data)).isTrue();
+        chromium = new CompletableFuture<>();
+        CompletableFuture<Void> cleared = onUi(() -> data(persistent).clearAll());
+        await(() -> !chromiumAsked.isEmpty());
+        onUi(() -> {
+            stores.close(); // the plugin's stop, as Chromium's part runs
+            return null;
+        });
+        plugins.closed().get(10, TimeUnit.SECONDS);
+        chromium.completeExceptionally(new IllegalStateException("Chromium can start once each time Jasper runs."));
+        assertThat(cleared).failsWithin(10, TimeUnit.SECONDS);
+        assertThat(holds(data)).as("no cleared row in the file or its log").isFalse();
+        var next = BrowserDatabase.file(new DataFolder(data), cause -> told.add("unavailable: " + cause));
+        try {
+            assertThat(done(new HistoryStore(next).list("", java.util.Optional.empty(), 10)).entries()).as("the next start").isEmpty();
+        } finally {
+            next.close();
+            next.closed().get(10, TimeUnit.SECONDS);
+        }
+        plugins = null;
     }
 
     /** Review round 1's item 1: the pages showing a site whose permission went load again, as the permissions page has them. */
@@ -252,6 +283,7 @@ class WebsiteDataTest {
             flushUi();
             assertThat(told).singleElement().asString().startsWith("Website data could not be cleared|");
             assertThat(permissionsLog.records()).as("the store's own warning").hasSize(1);
+            assertThat(databaseMarked).as("V27: an erase that did not complete marks the file for the next start").containsExactly(true);
         }
     }
 

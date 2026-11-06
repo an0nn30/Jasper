@@ -26,13 +26,14 @@ import java.util.function.Supplier;
  * /dev/null groups' stores are untouched, as each goes with its group. Clear Website Data first gathers the sites to
  * clear live, through {@link Origins#of}: the newest 1,000 sites of the history and the sites of the persistent store's
  * open items (plan 6's F20), web origins only, as Chromium adds its cookies' own and the next start's wipe covers the
- * rest, as it does a history that cannot be read. Then Chromium clears ({@link Chromium#clearWebsiteData}). Once it has
- * ended, failed or not (ruling V26), the persistent store's history, bookmarks and site permissions are emptied, the
- * pages of a site whose permission went load again, as the permissions page has them, and the database is compacted, an
- * erase that failed included, and its write-ahead log checkpointed and truncated, so no page of a deleted row stays in
- * its file or its log (F17).
- * A database that runs in memory, as its file could not be used, cannot erase its file (ruling V25): Chromium marks the
- * file for deletion at the next start, before the database opens, and the clearing fails. A failure is told once, with
+ * rest, as it does a history that cannot be read. Then, so a stop or quit while Chromium clears leaves no row (ruling
+ * V27), the persistent store's history, bookmarks and site permissions are emptied, the pages of a site whose permission
+ * went load again, as the permissions page has them, and the database is compacted, an erase that failed included, and
+ * its write-ahead log checkpointed and truncated, so no page of a deleted row stays in its file or its log (F17). Then
+ * Chromium clears ({@link Chromium#clearWebsiteData}), whether the database's part failed or not (V26). A database that
+ * runs in memory, as its file could not be used, cannot erase its file (ruling V25), and one whose erase did not
+ * complete has not: Chromium marks the file for deletion at the next start, before the database opens, and the clearing
+ * fails. A failure is told once, with
  * its cause: "Website data could not be cleared", or for Clear Cookies "Cookies could not be cleared". Names no Chromium
  * type. UI thread, where the open items are read; the clearing goes on other threads.
  */
@@ -95,8 +96,8 @@ public final class WebsiteData {
     /**
      * Clear Website Data, as the class says.
      *
-     * @return completes once everything is cleared; fails, the failure told, when Chromium's part, the erase or the
-     *     compaction fails, or the database runs in memory
+     * @return completes once everything is cleared; fails, the failure told, when the erase, the compaction or Chromium's
+     *     part fails, or the database runs in memory
      */
     public CompletableFuture<Void> clearAll() {
         Set<String> sites = new LinkedHashSet<>();
@@ -115,16 +116,17 @@ public final class WebsiteData {
             Set<String> live = new LinkedHashSet<>();
             for (String origin : visited) web(origin).ifPresent(live::add);
             live.addAll(sites);
-            // V26: Chromium's part, failed or not, is followed by the database's; the compaction follows a failed erase too,
-            // as what was deleted must not stay in the file.
-            start(() -> clearChromium.apply(Set.copyOf(live), unused)).whenComplete((chromium, chromiumFailure) ->
-                erase(stores).handle((erased, eraseFailure) -> eraseFailure)
-                    .thenCompose(eraseFailure -> compact(database).handle((compacted, compactFailure) -> first(cause(eraseFailure), cause(compactFailure))))
-                    .thenAccept(databaseFailure -> {
-                        Throwable failure = first(cause(chromiumFailure), databaseFailure, unused ? new IOException(IN_MEMORY) : null);
-                        if (failure == null) cleared.complete(null);
-                        else cleared.completeExceptionally(failure);
-                    }));
+            // V27: the database first, so a stop or quit while Chromium clears leaves no row; the compaction follows a failed
+            // erase too, as what was deleted must not stay in the file. Chromium's part follows either way (V26), and a
+            // database whose erase did not complete, or that runs in memory, is marked for deletion at the next start.
+            erase(stores).handle((erased, eraseFailure) -> eraseFailure)
+                .thenCompose(eraseFailure -> compact(database).handle((compacted, compactFailure) -> first(cause(eraseFailure), cause(compactFailure))))
+                .thenCompose(databaseFailure -> start(() -> clearChromium.apply(Set.copyOf(live), unused || databaseFailure != null))
+                    .handle((chromium, chromiumFailure) -> first(databaseFailure, cause(chromiumFailure), unused ? new IOException(IN_MEMORY) : null)))
+                .thenAccept(failure -> {
+                    if (failure == null) cleared.complete(null);
+                    else cleared.completeExceptionally(failure);
+                });
         }).exceptionally(broken -> {
             cleared.completeExceptionally(cause(broken));
             return null;

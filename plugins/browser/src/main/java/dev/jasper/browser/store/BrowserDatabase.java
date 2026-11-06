@@ -248,6 +248,9 @@ public final class BrowserDatabase implements AutoCloseable {
         Files.createDirectories(folder);
         // H37: no other user may read the history, and SQLite gives its log and shared memory the file's permissions.
         place.folder().restrict();
+        // V27: a file a Clear Website Data marked and that could not be deleted holds rows it cleared, which are never read.
+        if (!place.folder().databaseUsable())
+            throw new IOException("The browser's database is to be deleted, as Clear Website Data asked, and could not be: " + absolute);
         // SQLite opens a file it cannot write for reading only and fails only at the first write, so a folder or file
         // that cannot be written is refused here, before SQLite makes anything beside it.
         if (!Files.isWritable(folder)) throw new AccessDeniedException(folder.toString(), null, "The folder cannot be written");

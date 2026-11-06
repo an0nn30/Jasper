@@ -99,6 +99,20 @@ class ProfileWipeTest {
         }
     }
 
+    /**
+     * Ruling V27: a marked database whose files cannot be deleted keeps its mark, and the database may not use them, so
+     * the rows cleared are never read again; the next start tries again.
+     */
+    @Test void aMarkedDatabaseThatCannotBeDeletedKeepsItsMarkAndMayNotBeUsed() throws Exception {
+        List<Path> files = List.of(data.resolve("browser.sqlite"), data.resolve("browser.sqlite-wal"), data.resolve("browser.sqlite-shm"));
+        Files.writeString(files.get(0), "rows");
+        Files.writeString(Files.createDirectories(files.get(1)).resolve("held"), "a directory no delete removes");
+        ProfileWipe.mark(data, Mark.ALL, true);
+        assertThat(ProfileWipe.wipeMarkedDatabase(data, files)).as("the database may not use them").isFalse();
+        assertThat(ProfileWipe.databaseMarked(data)).as("the mark stays").isTrue();
+        assertThat(warnings).singleElement().asString().startsWith("The browser's database could not be deleted as Clear Website Data asked");
+    }
+
     /** A marker this Jasper cannot read the meaning of is taken for a wipe of the profile, never of the database. */
     @Test void aMarkerOfUnknownContentIsAll() throws Exception {
         Files.writeString(marker(), "everything, please");
@@ -181,7 +195,7 @@ class ProfileWipeTest {
         Path cookies = profile();
         List<Path> files = List.of(data.resolve("browser.sqlite"), data.resolve("browser.sqlite-wal"), data.resolve("browser.sqlite-shm"));
         for (Path file : files.subList(1, 3)) Files.writeString(file, "pages");
-        ProfileWipe.wipeMarkedDatabase(data, files);
+        assertThat(ProfileWipe.wipeMarkedDatabase(data, files)).as("no mark: the files may be used").isTrue();
         assertThat(files).as("no mark: nothing").allSatisfy(file -> assertThat(file).isRegularFile());
 
         ProfileWipe.mark(data, Mark.ALL, true);
@@ -197,7 +211,7 @@ class ProfileWipeTest {
         ProfileWipe.mark(data, Mark.COOKIES);
         assertThat(Files.readString(marker())).isEqualTo("cookies database");
 
-        ProfileWipe.wipeMarkedDatabase(data, files);
+        assertThat(ProfileWipe.wipeMarkedDatabase(data, files)).as("deleted: a new file may be made").isTrue();
         assertThat(files).allSatisfy(file -> assertThat(file).doesNotExist());
         assertThat(Files.readString(marker())).as("the cookies still wait for Chromium").isEqualTo("cookies");
         assertThat(ProfileWipe.databaseMarked(data)).isFalse();

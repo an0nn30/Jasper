@@ -286,7 +286,7 @@ class BrowserDatabaseTest {
 
     /** H37: a folder whose permissions cannot be set is logged once, as a warning, and the database opens all the same. */
     @Test void aDataFolderWhosePermissionsCannotBeSetIsLoggedOnceAndStillOpens() throws Exception {
-        var folder = new DataFolder(data, path -> { throw new IOException("Operation not permitted"); }, files -> { });
+        var folder = new DataFolder(data, path -> { throw new IOException("Operation not permitted"); }, files -> true);
         try (var log = new CapturedLog(DataFolder.class)) {
             BrowserDatabase database = BrowserDatabase.file(folder, this::unavailable);
             opened.add(database);
@@ -349,13 +349,7 @@ class BrowserDatabaseTest {
         var asked = new CopyOnWriteArrayList<List<Path>>();
         var dataFolder = new DataFolder(folder, files -> {
             asked.add(files);
-            for (Path file : files) {
-                try {
-                    Files.deleteIfExists(file);
-                } catch (IOException failure) {
-                    throw new java.io.UncheckedIOException(failure);
-                }
-            }
+            return deleted(files);
         });
         BrowserDatabase database = BrowserDatabase.file(dataFolder, this::unavailable);
         opened.add(database);
@@ -364,7 +358,54 @@ class BrowserDatabaseTest {
         assertThat(asked).containsExactly(List.of(file, file.resolveSibling("browser.sqlite-wal"), file.resolveSibling("browser.sqlite-shm")));
         dataFolder.restrict();
         assertThat(asked).as("once, at the first use").hasSize(1);
+        assertThat(database.fileUnused()).isFalse();
         assertThat(unavailable).isEmpty();
+
+        // Re-review's item 1: a folder whose permissions cannot be set, as on a network-mounted home, still deletes them.
+        Path refusing = Files.createDirectories(data.resolve("refusing"));
+        DatabaseFixtures.plan5(refusing, "https://cleared.example/");
+        var refused = new DataFolder(refusing, path -> { throw new IOException("Operation not permitted"); }, files -> {
+            asked.add(files);
+            return deleted(files);
+        });
+        try (var log = new CapturedLog(DataFolder.class)) {
+            BrowserDatabase again = BrowserDatabase.file(refused, this::unavailable);
+            opened.add(again);
+            assertThat(done(new HistoryStore(again).list("", Optional.empty(), 10)).entries()).as("a new file all the same").isEmpty();
+            assertThat(log.records()).as("the refused permissions, logged once").hasSize(1);
+        }
+        assertThat(asked).hasSize(2);
+        assertThat(unavailable).isEmpty();
+    }
+
+    /**
+     * Ruling V27: a marked database whose files cannot be deleted, as Windows refuses while another program holds them, is
+     * not opened: the database runs in memory for the run, says so, and its file, with the mark, waits for the next start.
+     */
+    @Test void aMarkedDatabaseThatCannotBeDeletedIsNotOpenedAndRunsInMemory() throws Exception {
+        Path folder = Files.createDirectories(data.resolve("held"));
+        DatabaseFixtures.plan5(folder, "https://cleared.example/");
+        Path file = folder.resolve("browser.sqlite");
+        byte[] before = Files.readAllBytes(file);
+        BrowserDatabase database = BrowserDatabase.file(new DataFolder(folder, files -> false), this::unavailable);
+        opened.add(database);
+        assertThat(done(new HistoryStore(database).list("", Optional.empty(), 10)).entries()).as("the cleared rows are not read").isEmpty();
+        assertThat(database.fileUnused()).isTrue();
+        assertThat(unavailable).singleElement().satisfies(cause -> assertThat(cause)
+            .hasMessage("The browser's database is to be deleted, as Clear Website Data asked, and could not be: " + file.toAbsolutePath()));
+        assertThat(Files.readAllBytes(file)).as("left as it was").isEqualTo(before);
+    }
+
+    /** Deletes {@code files}, as the plugin's hook does for a marked database: whether the database may use them now. */
+    private static boolean deleted(List<Path> files) {
+        for (Path each : files) {
+            try {
+                Files.deleteIfExists(each);
+            } catch (IOException failure) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
