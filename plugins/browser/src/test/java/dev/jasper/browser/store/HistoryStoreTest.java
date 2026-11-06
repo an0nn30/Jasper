@@ -211,6 +211,31 @@ class HistoryStoreTest {
         assertThat(ids("delta")).isEmpty();
     }
 
+    /**
+     * Plan 5's H16: a search counts only its first 256 characters, then only their first 8 words, so that a pasted text
+     * of tens of thousands of words neither fails the search nor holds the database.
+     */
+    @Test void aSearchOfTensOfThousandsOfWordsAnswers() throws Exception {
+        long a = titled("https://a.example/", "A", 1);
+        String pasted = "a ".repeat(32_768);
+        assertThat(pasted).as("as long as a page's request may be").hasSize(65_536);
+        assertThat(ids(pasted)).containsExactly(a);
+    }
+
+    @Test void aSearchsNinthWordIsIgnored() throws Exception {
+        var eight = new java.util.ArrayList<Long>();
+        for (int word = 1; word <= 8; word++) eight.addFirst(titled("https://w" + word + ".example/", "", word));
+        long ninth = titled("https://w9.example/", "", 9);
+        assertThat(ids("w1 w2 w3 w4 w5 w6 w7 w8")).containsExactlyElementsOf(eight);
+        assertThat(ids(" w1  w2 w3 w4 w5 w6 w7 w8 w9")).as("the ninth").containsExactlyElementsOf(eight).doesNotContain(ninth);
+    }
+
+    @Test void aSearchCutAt256CharactersStillMatchesOnItsStart() throws Exception {
+        long cut = titled("https://a.example/", "y".repeat(256), 1);
+        titled("https://b.example/", "y".repeat(255), 2);
+        assertThat(ids("y".repeat(300))).containsExactly(cut);
+    }
+
     /** iTerm2's rule: a search's {@code %}, {@code _} and {@code \} match only themselves. */
     @Test void percentUnderscoreAndBackslashMatchOnlyThemselves() throws Exception {
         long percent = titled("https://p.example/1", "100% sure", 1);

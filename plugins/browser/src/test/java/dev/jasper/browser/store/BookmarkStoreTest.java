@@ -151,6 +151,22 @@ class BookmarkStoreTest {
         assertThat(list("cook", Sort.DATE_ADDED, Set.of("news"))).as("and the tags chosen").isEmpty();
     }
 
+    /**
+     * Plan 5's H16: a search counts only its first 256 characters, then only their first 8 words, as typed, so that a
+     * pasted text neither fails the search nor holds the database.
+     */
+    @Test void aSearchIsBoundedTo256CharactersAndThenEightWords() throws Exception {
+        Bookmark eight = add("https://a.example/", "w1 w2  w3 w4 w5 w6 w7 w8 and more", 1);
+        Bookmark cut = add("https://b.example/", "y".repeat(256), 2);
+        Bookmark pasted = add("https://c.example/", "a a a a a a a a", 3);
+        add("https://d.example/", "y".repeat(255), 4);
+        assertThat(list("w1 w2  w3 w4 w5 w6 w7 w8 w9", Sort.DATE_ADDED, Set.of())).as("a ninth word is ignored").containsExactly(eight);
+        assertThat(list("y".repeat(300), Sort.DATE_ADDED, Set.of())).as("cut at 256 characters").containsExactly(cut);
+        String huge = "a ".repeat(32_768);
+        assertThat(huge).hasSize(65_536);
+        assertThat(list(huge, Sort.DATE_ADDED, Set.of())).as("tens of thousands of words").containsExactly(pasted);
+    }
+
     @Test void pagesRunByOffsetAndSayWhetherMoreFollow() throws Exception {
         for (int i = 0; i < 5; i++) add("https://a.example/" + i, "Page " + i, i);
         BookmarkPage first = done(bookmarks.list("", Sort.DATE_ADDED, Set.of(), 0, 2));

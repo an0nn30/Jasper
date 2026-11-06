@@ -206,8 +206,9 @@ public final class BookmarkStore {
 
     /**
      * A page of bookmarks. The trimmed query matches anywhere in a bookmark's title, address or one of its tags, ignoring
-     * the case of ASCII letters, and its {@code %}, {@code _} and {@code \} match only themselves. A bookmark must have
-     * every tag chosen.
+     * the case of ASCII letters, and its {@code %}, {@code _} and {@code \} match only themselves. Only the query's first
+     * 256 characters count, and of those its first 8 words, as typed ({@code Sql.searched}). A bookmark must have every
+     * tag chosen.
      *
      * @param query what is searched for; blank for every bookmark
      * @param sort their order
@@ -220,7 +221,7 @@ public final class BookmarkStore {
         Objects.requireNonNull(sort, "sort");
         List<String> chosen = List.copyOf(tags);
         if (offset < 0 || limit < 1) return CompletableFuture.failedFuture(new IllegalArgumentException("A page starts at 0 or later and holds at least one bookmark"));
-        String searched = query.strip();
+        String searched = Sql.searched(query);
         var sql = new StringBuilder(BOOKMARK).append(" WHERE 1");
         if (!searched.isEmpty())
             sql.append(" AND (b.title LIKE ?1 ESCAPE '\\' OR b.url LIKE ?1 ESCAPE '\\'")

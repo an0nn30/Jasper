@@ -181,7 +181,7 @@ public final class HistoryStore {
      * A page of entries, newest first. A page runs from a cursor, so entries recorded between two pages never shift the
      * second. The query's words, split at white space, each match anywhere in an entry's address or title, ignoring the
      * case of ASCII letters; an entry matches any of them, and their {@code %}, {@code _} and {@code \} match only
-     * themselves.
+     * themselves. Only the query's first 256 characters count, and of those its first 8 words ({@code Sql.searched}).
      *
      * @param query the words searched for; blank for every entry
      * @param before the cursor the page starts after; empty for the newest entries
@@ -191,7 +191,7 @@ public final class HistoryStore {
     public CompletableFuture<HistoryPage> list(String query, Optional<Cursor> before, int limit) {
         Objects.requireNonNull(before, "before");
         if (limit < 1) return CompletableFuture.failedFuture(new IllegalArgumentException("A page holds at least one entry"));
-        List<String> words = Stream.of(query.strip().split("\\s+")).filter(word -> !word.isEmpty()).map(Sql::containing).toList();
+        List<String> words = Stream.of(Sql.searched(query).split("\\s+")).filter(word -> !word.isEmpty()).map(Sql::containing).toList();
         var sql = new StringBuilder("SELECT id, url, title, visited_at, reached FROM history WHERE 1");
         if (!words.isEmpty())
             sql.append(" AND (").append(String.join(" OR ", Collections.nCopies(words.size(), "url LIKE ? ESCAPE '\\' OR title LIKE ? ESCAPE '\\'"))).append(')');

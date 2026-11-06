@@ -6,10 +6,19 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /** The stores' statements: transactions, search patterns and reading results. */
 final class Sql {
+    /** The most characters of a search that count. */
+    static final int SEARCH_LENGTH = 256;
+    /** The most words of a search that count, of those characters. */
+    static final int SEARCH_WORDS = 8;
+    // A word of a search: what white space separates, as the stores split a search into its words.
+    private static final Pattern WORD = Pattern.compile("\\S+");
+
     private Sql() { }
 
     /**
@@ -54,6 +63,24 @@ final class Sql {
      */
     static String containing(String text) {
         return "%" + text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+    }
+
+    /**
+     * What a search of history or bookmarks counts of {@code query} (plan 5's H16), so that a pasted text neither fails
+     * the search nor holds the database: its first {@value #SEARCH_LENGTH} characters, or one fewer where a
+     * character's two halves would part, then the first {@value #SEARCH_WORDS} words of those, as typed, with the white
+     * space between them and none at either end. Words past the eighth are ignored.
+     *
+     * @param query a search as typed
+     * @return what of it counts; empty for one without words
+     */
+    static String searched(String query) {
+        String cut = query.length() <= SEARCH_LENGTH ? query
+            : query.substring(0, Character.isHighSurrogate(query.charAt(SEARCH_LENGTH - 1)) ? SEARCH_LENGTH - 1 : SEARCH_LENGTH);
+        Matcher word = WORD.matcher(cut);
+        int end = 0;
+        for (int words = 0; words < SEARCH_WORDS && word.find(); words++) end = word.end();
+        return cut.substring(0, end).strip();
     }
 
     /** Runs a statement that gives no rows. */
