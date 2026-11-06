@@ -51,6 +51,78 @@ class PageViewSelectionTest {
         });
     }
 
+    /** H32: Shift+click extends the selection to the click, a gesture with no drag; Shift with another button is none. */
+    @Test void aShiftLeftClickFiresOnce100MsLaterAndAShiftRightClickNever() throws Exception {
+        onUi(() -> {
+            var view = listening(view(event -> false));
+            long when = System.currentTimeMillis();
+            int shiftLeft = InputEvent.SHIFT_DOWN_MASK | InputEvent.BUTTON1_DOWN_MASK;
+            view.processMouseEvent(mouse(view, MouseEvent.MOUSE_PRESSED, when, shiftLeft, 10, 1, MouseEvent.BUTTON1));
+            view.processMouseEvent(mouse(view, MouseEvent.MOUSE_RELEASED, when + 1, InputEvent.SHIFT_DOWN_MASK, 10, 1, MouseEvent.BUTTON1));
+            assertThat(clock.pending()).containsExactly(Duration.ofMillis(100));
+            clock.advance(100);
+            assertThat(told).isEqualTo(1);
+            int shiftRight = InputEvent.SHIFT_DOWN_MASK | InputEvent.BUTTON3_DOWN_MASK;
+            view.processMouseEvent(mouse(view, MouseEvent.MOUSE_PRESSED, when + 2, shiftRight, 10, 1, MouseEvent.BUTTON3));
+            view.processMouseEvent(mouse(view, MouseEvent.MOUSE_RELEASED, when + 3, InputEvent.SHIFT_DOWN_MASK, 10, 1, MouseEvent.BUTTON3));
+            clock.advance(1_000);
+            assertThat(told).as("Shift+right click").isEqualTo(1);
+        });
+    }
+
+    /** A Shift+click whose press the window took never reached the page: its release is no gesture. */
+    @Test void aShiftClickWhosePressTheWindowTookIsNoGesture() throws Exception {
+        onUi(() -> {
+            var view = listening(view(event -> false));
+            long when = System.currentTimeMillis();
+            MouseEvent taken = mouse(view, MouseEvent.MOUSE_PRESSED, when, InputEvent.SHIFT_DOWN_MASK | InputEvent.BUTTON1_DOWN_MASK,
+                10, 1, MouseEvent.BUTTON1);
+            taken.consume();
+            view.processMouseEvent(taken);
+            view.processMouseEvent(mouse(view, MouseEvent.MOUSE_RELEASED, when + 1, InputEvent.SHIFT_DOWN_MASK, 10, 1, MouseEvent.BUTTON1));
+            clock.advance(1_000);
+            assertThat(told).isZero();
+        });
+    }
+
+    /**
+     * Item 9: a press the window takes, as the pane drag's, ends the press the page had: a drag and release after it are
+     * no gesture, though the page's own press before it was never released.
+     */
+    @Test void aConsumedPressIsNoGesture() throws Exception {
+        onUi(() -> {
+            var view = listening(view(event -> false));
+            long when = System.currentTimeMillis();
+            view.processMouseEvent(mouse(view, MouseEvent.MOUSE_PRESSED, when, InputEvent.BUTTON1_DOWN_MASK, 10, 1, MouseEvent.BUTTON1));
+            MouseEvent taken = mouse(view, MouseEvent.MOUSE_PRESSED, when + 1, InputEvent.BUTTON1_DOWN_MASK, 10, 1, MouseEvent.BUTTON1);
+            taken.consume();
+            view.processMouseEvent(taken);
+            view.processMouseMotionEvent(mouse(view, MouseEvent.MOUSE_DRAGGED, when + 2, InputEvent.BUTTON1_DOWN_MASK, 50, 1,
+                MouseEvent.NOBUTTON));
+            view.processMouseEvent(mouse(view, MouseEvent.MOUSE_RELEASED, when + 3, 0, 50, 1, MouseEvent.BUTTON1));
+            clock.advance(1_000);
+            assertThat(told).isZero();
+        });
+    }
+
+    /** H32: the page menu's Select All tells the view a gesture, which arms the one timer only while something listens. */
+    @Test void aGestureToldTheViewArmsTheOneTimerOnlyWhileSomethingListens() throws Exception {
+        onUi(() -> {
+            var view = view(event -> false);
+            view.selectionGesture();
+            assertThat(clock.asked).as("nothing listens").isZero();
+            listening(view);
+            view.selectionGesture();
+            clock.advance(50);
+            view.selectionGesture();
+            assertThat(clock.pending()).as("restarted, one timer").hasSize(1);
+            clock.advance(99);
+            assertThat(told).isZero();
+            clock.advance(1);
+            assertThat(told).isEqualTo(1);
+        });
+    }
+
     @Test void aDoubleAndATripleClickAreGestures() throws Exception {
         onUi(() -> {
             var view = listening(view(event -> false));

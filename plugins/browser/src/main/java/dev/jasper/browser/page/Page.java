@@ -365,8 +365,9 @@ public final class Page implements AutoCloseable {
         record InFrame() implements Selection { }
 
         /**
-         * Nothing that can be copied: no browser yet, the page closed, a password field focused, a field whose type has no
-         * selection, or a selection of more than 1,048,576 characters, which {@code PageText} reads at most.
+         * Nothing that can be copied: no browser yet, the page closed, a selection unchanged since the last read, a
+         * password field focused or one CSS masks, a field whose type has no selection, or a selection of more than
+         * 1,048,576 characters, which {@code PageText} reads at most.
          */
         record None() implements Selection { }
     }
@@ -375,9 +376,12 @@ public final class Page implements AutoCloseable {
      * What the user has selected in the page, as copy on select reads it (spec section 15): {@code selection.js}, which
      * {@link PageText} runs in Jasper's isolated world of the main frame, follows the focus through same-origin frames and open
      * shadow roots. A focused {@code <input>} or {@code <textarea>} gives the selected part of its value, but a password
-     * field never does, and anything else gives the selection of the deepest same-origin document; the focus in a
-     * cross-origin frame gives {@link Selection.InFrame}. No page script can steer what the script reads, but a page can
-     * change its own selection, during a drag too. It completes on any thread.
+     * field or one CSS masks never does, and anything else gives the selection of the deepest same-origin document, its
+     * non-breaking spaces as spaces; the focus in a cross-origin frame gives {@link Selection.InFrame}. A selection gives
+     * its text only when it changed since the last read there, as a {@code selectionchange} told Jasper's world (H35),
+     * and {@link Selection.None} otherwise; the first read in a document or field gives it. No page script can steer what
+     * the script reads, but a page can change its own selection, during a drag or before the read, and that is what is
+     * read. It completes on any thread.
      *
      * @return what is selected; {@link Selection.None} before the page has its browser and after {@link #close()}. It
      *     fails when a DevTools call is late, refused or answered with an error, or its answer cannot be read
@@ -388,9 +392,13 @@ public final class Page implements AutoCloseable {
         return read == null ? CompletableFuture.completedFuture(new Selection.None()) : read;
     }
 
-    /** Selects all of the page's focused frame, as its Edit menu's Select All would. */
+    /**
+     * Selects all of the page's focused frame, as its Edit menu's Select All would, as the page menu's Select All asks: a
+     * selection gesture, which those who asked {@link #onSelectionGesture} hear as they hear the canvas's.
+     */
     public void selectAll() {
         onFocusedFrame(CefFrame::selectAll);
+        if (!closed) view.selectionGesture();
     }
 
     /** Opens Chromium's print dialog for the page. */
@@ -1141,6 +1149,11 @@ public final class Page implements AutoCloseable {
         selectionReader = Objects.requireNonNull(replacement, "replacement");
     }
 
+    /** Has the page run text insertions and selection reads with {@code replacement} from now on, as a test's. */
+    void usePageText(PageText replacement) {
+        pageText = Objects.requireNonNull(replacement, "replacement");
+    }
+
     /** Has the page run Chromium's copy with {@code replacement} from now on, as a test's recording one. */
     void useCopier(Consumer<Page> replacement) {
         copier = Objects.requireNonNull(replacement, "replacement");
@@ -1199,6 +1212,7 @@ public final class Page implements AutoCloseable {
         if (closed) return;
         if (find != null) find.dropped();
         document++;
+        if (pageText != null) pageText.newDocument(); // the world it ran in went with the document
         documentLoaded = false;
         dropFaviconFetch();
         declaredIcon = null;

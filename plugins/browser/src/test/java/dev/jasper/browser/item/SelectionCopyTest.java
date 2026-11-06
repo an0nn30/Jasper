@@ -27,8 +27,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Spec section 15's Copy on select in a browser item: each selection gesture its page tells, while
  * {@code Platform.copyOnSelect()} is on, reads the page's selection and copies its text, if any, with the plugin's
  * clipboard on the UI thread. A selection in a frame of another origin copies nothing, not even through Chromium's own
- * copy, which would let that frame's scripts write the clipboard (F2). The page is a stand-in, as a page cannot be made
- * without Chromium: the test fires its gestures, answers its selection reads and records any copy Chromium would run.
+ * copy, which would let that frame's scripts write the clipboard (F2). One read runs at a time, and only the latest is
+ * copied (H34). The page is a stand-in, as a page cannot be made without Chromium: the test fires its gestures, answers
+ * its selection reads and records any copy Chromium would run.
  */
 class SelectionCopyTest {
     private static final String ID = "dev.jasper.browser";
@@ -121,6 +122,46 @@ class SelectionCopyTest {
         assertThat(onUi(() -> page.selectedText().getNow(null))).isEqualTo(new Page.Selection.None());
         assertThat(log).isEmpty();
         assertThat(copies()).isEmpty();
+    }
+
+    /**
+     * H34: one read at a time. Gestures during a read the page has not answered start none; once it answers, the
+     * selection is read once more, and only that latest read's answer is copied, so a stalled page queues no late copies.
+     */
+    @Test void gesturesDuringAReadReadOnceMoreAndOnlyTheLatestCopies() throws Exception {
+        open(true);
+        var stalled = new CompletableFuture<Page.Selection>();
+        selection = stalled;
+        gesture();
+        var latest = new CompletableFuture<Page.Selection>();
+        selection = latest;
+        gesture();
+        gesture();
+        assertThat(log).as("no second read while one is under way").containsExactly("read");
+        onUi(() -> stalled.complete(new Page.Selection.Text("stale")));
+        settle();
+        assertThat(log).as("one more read for the gestures meanwhile").containsExactly("read", "read");
+        assertThat(copies()).as("the stale answer is not copied").isEmpty();
+        onUi(() -> latest.complete(new Page.Selection.Text("latest")));
+        settle();
+        assertThat(copies()).containsExactly("copy|" + ID + "|latest");
+        selection = CompletableFuture.completedFuture(new Page.Selection.Text("next"));
+        gesture();
+        assertThat(log).as("reads start again once none is under way").containsExactly("read", "read", "read");
+        assertThat(copies()).containsExactly("copy|" + ID + "|latest", "copy|" + ID + "|next");
+    }
+
+    /** H32: the page menu's Select All is a selection gesture: once the canvas's 100 ms pass, the selection is read once. */
+    @Test void theMenusSelectAllReadsTheSelectionOnce() throws Exception {
+        open(true);
+        onUi(() -> page.selectAll());
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10);
+        while (log.isEmpty() && System.nanoTime() < deadline) Thread.sleep(10);
+        assertThat(log).as("read within 10 s").containsExactly("read");
+        Thread.sleep(300);
+        settle();
+        assertThat(log).as("once").containsExactly("read");
+        assertThat(copies()).containsExactly("copy|" + ID + "|abc");
     }
 
     @Test void aReadThatFailsCopiesNothing() throws Exception {

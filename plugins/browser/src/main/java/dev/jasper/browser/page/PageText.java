@@ -13,8 +13,10 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 import org.cef.browser.CefDevToolsClient;
 
 /**
@@ -23,21 +25,27 @@ import org.cef.browser.CefDevToolsClient;
  * 15), through the page's DevTools client. Chromium's Java API inserts no text, presses no key and reads no selection
  * without the page's scripts, so DevTools does. None of it touches the clipboard.
  *
- * <p>{@link #insertIntoField} and {@link #selectedText} each run a script in a world of Jasper's own, and ask, in order:
+ * <p>{@link #insertIntoField} and {@link #selectedText} each run a script in a world of Jasper's own. The first run in a
+ * document asks, in order:
  * <ol>
  *   <li>{@code Page.getFrameTree}, for the main frame's id;</li>
  *   <li>{@code Page.createIsolatedWorld}, for Jasper's world in it, {@value #WORLD}, the same for both scripts;</li>
  *   <li>{@code Runtime.enable}, which reports every context, that world's unique id among them; then
- *       {@code Runtime.disable};</li>
+ *       {@code Runtime.disable}, and {@code Runtime.releaseObjectGroup} for the {@code console} group, the objects of the
+ *       page's console messages that the enable reported;</li>
  *   <li>{@code Runtime.evaluate}, which runs the script in that unique context only: {@code insert-text.js} with the
  *       text, a JSON string literal, or {@code selection.js} with the longest selection read, {@value #MAX_SELECTION}
  *       characters.</li>
  * </ol>
- * The script runs with no user activation, which would let the page open popups. A navigation between the calls cannot
- * run the script in the new document's world, because a context id may repeat in another renderer process and a unique
- * id never does. Its answer comes back by value. The world is asked for at each run, not kept, as each new document
- * drops its worlds' contexts. Runtime is enabled for one run at a time, so a run waits for the one before, an insertion
- * or a read. While it is enabled, which takes a moment, the page could notice that DevTools is attached.
+ * The world's unique id is kept for the document (H33), so a later run in it asks only {@code Runtime.evaluate}. The
+ * page's next main-frame load start drops it ({@link #newDocument}), and so does any evaluation that fails, late,
+ * answered with an error, as for a context gone with its document, or unreadable: that run does nothing, and the next
+ * asks for the world again. An id that arrives after a new document began is used for its run and not kept. A stale id
+ * can only fail: a context id may repeat in another renderer process, a unique id never does, so no script runs in
+ * another document's world. The script runs with no user activation, which would let the page open popups, and its
+ * answer comes back by value. Runs go one at a time, an insertion or a read, so Runtime is enabled for one at a time,
+ * and only for the first run in a document. While it is enabled, which takes a moment, the page could notice that
+ * DevTools is attached.
  *
  * <p>Only the script's own answer is an answer: true or false for an insertion, and for a read the selected text, a
  * frame of another origin, or nothing. Every call times out after five seconds, and a late call, an error answer, a
@@ -49,8 +57,9 @@ import org.cef.browser.CefDevToolsClient;
  * included. {@link #pressReturn} sends {@code Input.dispatchKeyEvent}'s key down, with Return's text, which a form submits
  * on, then its key up. Both are trusted input, so they give the page user activation, as the user's own typing does.
  *
- * <p>Each answer is read where it arrives, and each later call is made on the UI thread, as the page's other DevTools
- * calls are. The methods run on the UI thread; their futures complete on any thread.
+ * <p>The evaluation's answer, up to {@value #MAX_SELECTION_ANSWER} characters for a read, is read on the parsing
+ * executor, off the UI thread; the other answers where they arrive. Each later call is made on the UI thread, as the
+ * page's other DevTools calls are. The methods run on the UI thread; their futures complete on any thread.
  */
 final class PageText {
     /** The name of Jasper's isolated world in the main frame. */
@@ -76,11 +85,17 @@ final class PageText {
     /** How long each DevTools call may take before it fails. */
     static final Duration TIMEOUT = Duration.ofSeconds(5);
     private static final String CONTEXT_CREATED = "Runtime.executionContextCreated";
+    // What releases the objects of the console messages Runtime.enable reported.
+    private static final String CONSOLE_GROUP = "{\"objectGroup\":\"console\"}";
     private static final System.Logger LOG = System.getLogger(PageText.class.getName());
 
     private final BiFunction<String, String, CompletableFuture<String>> devTools;
-    private final Executor ui;
+    private final Executor ui, parsing;
     private final Duration timeout;
+    // UI thread: the world's unique id, kept for the document it was asked for in, or null; and which document runs are in,
+    // counted by newDocument.
+    private String world;
+    private long generation;
     // The run under way, or the last, an insertion or a read: the next waits for it. UI thread.
     private CompletableFuture<?> last = CompletableFuture.completedFuture(null);
     // The world whose report the run under way waits for, while Runtime is enabled for it; else null.
@@ -95,11 +110,13 @@ final class PageText {
      * @param devTools calls a DevTools method with its parameters, a JSON object or null for none, and answers what DevTools
      *     answered; an error answer fails the future
      * @param ui runs a task on the UI thread
+     * @param parsing reads the evaluations' answers, off the UI thread
      * @param timeout how long each call may take before it fails
      */
-    PageText(BiFunction<String, String, CompletableFuture<String>> devTools, Executor ui, Duration timeout) {
+    PageText(BiFunction<String, String, CompletableFuture<String>> devTools, Executor ui, Executor parsing, Duration timeout) {
         this.devTools = Objects.requireNonNull(devTools, "devTools");
         this.ui = Objects.requireNonNull(ui, "ui");
+        this.parsing = Objects.requireNonNull(parsing, "parsing");
         this.timeout = Objects.requireNonNull(timeout, "timeout");
     }
 
@@ -115,7 +132,7 @@ final class PageText {
             CefDevToolsClient client = browser.getDevToolsClient();
             if (client == null) return Optional.empty();
             var text = new PageText((method, parameters) -> parameters == null ? client.executeDevToolsMethod(method)
-                : client.executeDevToolsMethod(method, parameters), EventQueue::invokeLater, TIMEOUT);
+                : client.executeDevToolsMethod(method, parameters), EventQueue::invokeLater, ForkJoinPool.commonPool(), TIMEOUT);
             // Added once, before Runtime is first enabled: JCEF walks its listeners unsynchronized as each event arrives,
             // and no domain reports events on this client until then.
             client.addEventListener(text::event);
@@ -136,8 +153,7 @@ final class PageText {
      */
     CompletableFuture<Boolean> insertIntoField(String text) {
         Objects.requireNonNull(text, "text");
-        return inWorld(INSERT_TEXT + "\n(" + StrictJson.quote(text) + ");")
-            .thenApply(answer -> answered(answer).orElseThrow(() -> unreadable("Runtime.evaluate")));
+        return inWorld(INSERT_TEXT + "\n(" + StrictJson.quote(text) + ");", PageText::answered);
     }
 
     /**
@@ -147,8 +163,7 @@ final class PageText {
      *     read
      */
     CompletableFuture<Page.Selection> selectedText() {
-        return inWorld(SELECTION + "\n(" + MAX_SELECTION + ");")
-            .thenApply(answer -> selection(answer).orElseThrow(() -> unreadable("Runtime.evaluate")));
+        return inWorld(SELECTION + "\n(" + MAX_SELECTION + ");", PageText::selection);
     }
 
     /**
@@ -161,6 +176,15 @@ final class PageText {
     CompletableFuture<Void> insertText(String text) {
         Objects.requireNonNull(text, "text");
         return call("Input.insertText", typing(text)).thenApply(answer -> null);
+    }
+
+    /**
+     * The page's main frame starts loading a new document, whose worlds are new: the kept world's id is dropped, and one
+     * that arrives for a run under way is not kept. UI thread.
+     */
+    void newDocument() {
+        generation++;
+        world = null;
     }
 
     /** Presses Return where the page's focus is: its key down, then its key up, whatever the down's answer. */
@@ -188,25 +212,49 @@ final class PageText {
         uniqueId(parameters, waiting.frame(), waiting.context()).ifPresent(waiting.uniqueId()::complete);
     }
 
-    /** Runs {@code expression} in Jasper's world once the run before has ended: DevTools' answer to its evaluation. */
-    private CompletableFuture<String> inWorld(String expression) {
-        CompletableFuture<String> answer = last.handle((done, failure) -> null).thenComposeAsync(ignored -> evaluate(expression), ui);
-        last = answer;
-        return answer;
+    /**
+     * Runs {@code expression} in Jasper's world once the run before has ended: what {@code reader} reads in DevTools' answer
+     * to its evaluation, on the parsing executor.
+     */
+    private <T> CompletableFuture<T> inWorld(String expression, Function<String, Optional<T>> reader) {
+        CompletableFuture<T> run = last.handle((done, failure) -> null).thenComposeAsync(ignored -> evaluate(expression, reader), ui);
+        last = run;
+        return run;
     }
 
-    private CompletableFuture<String> evaluate(String expression) {
+    /**
+     * Evaluates {@code expression} in the world kept for the document, or one asked for now: any failure from the
+     * evaluation on drops the kept world, before the run ends, so the next run asks for it again. UI thread.
+     */
+    private <T> CompletableFuture<T> evaluate(String expression, Function<String, Optional<T>> reader) {
+        CompletableFuture<String> unique = world != null ? CompletableFuture.completedFuture(world) : askWorld(generation);
+        return unique.thenComposeAsync(id -> call("Runtime.evaluate", evaluation(id, expression)), ui)
+            .thenApplyAsync(answer -> reader.apply(answer).orElseThrow(() -> unreadable("Runtime.evaluate")), parsing)
+            .whenCompleteAsync((value, failure) -> {
+                if (failure != null) world = null;
+            }, ui);
+    }
+
+    /**
+     * The unique id of Jasper's world in the main frame, kept if the document is still the {@code asked}th when it
+     * arrives. UI thread.
+     */
+    private CompletableFuture<String> askWorld(long asked) {
         CompletableFuture<String> frame = call("Page.getFrameTree", null)
             .thenApply(tree -> mainFrame(tree).orElseThrow(() -> unreadable("Page.getFrameTree")));
         return frame.thenComposeAsync(id -> call("Page.createIsolatedWorld", isolatedWorld(id)), ui)
-            .thenApply(world -> context(world).orElseThrow(() -> unreadable("Page.createIsolatedWorld")))
+            .thenApply(created -> context(created).orElseThrow(() -> unreadable("Page.createIsolatedWorld")))
             .thenComposeAsync(context -> uniqueContext(frame.join(), context), ui)
-            .thenComposeAsync(unique -> call("Runtime.evaluate", evaluation(unique, expression)), ui);
+            .thenApplyAsync(unique -> {
+                if (generation == asked) world = unique;
+                return unique;
+            }, ui);
     }
 
     /**
      * The unique id of the world {@code context} in {@code frame}, as {@code Runtime.enable} reports it: Runtime is
-     * disabled again however that ends, before the answer goes on.
+     * disabled again however that ends, and the console messages' objects it reported released, before the answer goes
+     * on.
      */
     private CompletableFuture<String> uniqueContext(String frame, int context) {
         var reported = new CompletableFuture<String>();
@@ -217,6 +265,9 @@ final class PageText {
                 awaited = null;
                 call("Runtime.disable", null).whenComplete((disabled, notDisabled) -> {
                     if (notDisabled != null) LOG.log(System.Logger.Level.DEBUG, "Runtime could not be disabled in a page", notDisabled);
+                });
+                call("Runtime.releaseObjectGroup", CONSOLE_GROUP).whenComplete((released, notReleased) -> {
+                    if (notReleased != null) LOG.log(System.Logger.Level.DEBUG, "A page's console objects could not be released", notReleased);
                 });
             }, ui);
     }

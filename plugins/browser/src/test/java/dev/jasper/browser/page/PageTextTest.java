@@ -28,7 +28,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * <p>Only the script's answered true or false is an answer. A late call, an error answer, a refused call and an answer
  * that cannot be read each fail the insertion, so its item does nothing more. {@code Input.insertText} types the text
  * without the clipboard, and Return is a key down then a key up. Copy on select's read runs {@code selection.js} the same
- * way, one run at a time with the insertions. A recording DevTools stands in for Chromium's, and calls time out after
+ * way, one run at a time with the insertions. The world's unique id is kept for the document, so only the first run in a
+ * document enables Runtime, whose console objects are released after it (H33). A recording DevTools stands in for Chromium's, and calls time out after
  * {@value #TIMEOUT_MILLIS} ms. The scripts themselves are checked by hand (Task 14).
  */
 class PageTextTest {
@@ -45,9 +46,9 @@ class PageTextTest {
     private static final String TRUE = "{\"result\":{\"type\":\"boolean\",\"value\":true}}";
     private static final String FALSE = "{\"result\":{\"type\":\"boolean\",\"value\":false}}";
 
-    // The order an insertion asks in.
+    // The order the first run in a document asks in; a later run in it asks only Runtime.evaluate (H33).
     private static final List<String> ORDER = List.of("Page.getFrameTree", "Page.createIsolatedWorld", "Runtime.enable",
-        "Runtime.disable", "Runtime.evaluate");
+        "Runtime.disable", "Runtime.releaseObjectGroup", "Runtime.evaluate");
     private final DevTools devTools = new DevTools();
     private final PageText text = made(devTools, Duration.ofMillis(TIMEOUT_MILLIS));
 
@@ -89,7 +90,10 @@ class PageTextTest {
     @Test void aWorldThatIsNotReportedFailsAndRuntimeIsDisabled() {
         devTools.events.clear();
         assertFails(text.insertIntoField("ls"), TimeoutException.class);
-        assertThat(devTools.methods()).containsExactly("Page.getFrameTree", "Page.createIsolatedWorld", "Runtime.enable", "Runtime.disable");
+        assertThat(devTools.methods()).containsExactly("Page.getFrameTree", "Page.createIsolatedWorld", "Runtime.enable", "Runtime.disable",
+            "Runtime.releaseObjectGroup");
+        assertThat(devTools.parameters("Runtime.releaseObjectGroup")).as("the console's objects, after the late path too")
+            .containsExactly(Map.entry("objectGroup", "console"));
     }
 
     /**
@@ -148,7 +152,7 @@ class PageTextTest {
         pending.complete(TRUE);
         assertThat(first.get(5, TimeUnit.SECONDS)).isTrue();
         assertThat(second.get(5, TimeUnit.SECONDS)).isFalse();
-        assertThat(patient.methods()).hasSize(10).endsWith(ORDER.toArray(String[]::new));
+        assertThat(patient.methods()).as("the second run in the same document asks only the evaluation").isEqualTo(withEvaluation(ORDER));
     }
 
     /** H30: the text is typed where the focus is, cross-origin frames included, without the clipboard. */
@@ -249,7 +253,7 @@ class PageTextTest {
 
     @Test void theSelectionsAnswerIsTextAFrameOfAnotherOriginOrNone() {
         assertThat(PageText.selection(selected("{\"kind\":\"text\",\"text\":\"\"}"))).contains(new Page.Selection.Text(""));
-        assertThat(PageText.selection(selected("{\"kind\":\"text\",\"text\":\"a\\u2028b\"}"))).contains(new Page.Selection.Text("a b"));
+        assertThat(PageText.selection(selected("{\"kind\":\"text\",\"text\":\"a\\u2028b\"}"))).contains(new Page.Selection.Text("a\u2028b"));
         assertThat(PageText.selection(selected("{\"kind\":\"frame\"}"))).contains(new Page.Selection.InFrame());
         assertThat(PageText.selection(selected("{\"kind\":\"none\"}"))).contains(new Page.Selection.None());
         String longest = "x".repeat(PageText.MAX_SELECTION);
@@ -289,7 +293,7 @@ class PageTextTest {
         pending.complete(TRUE);
         assertThat(inserted.get(5, TimeUnit.SECONDS)).isTrue();
         assertThat(read.get(5, TimeUnit.SECONDS)).isEqualTo(new Page.Selection.None());
-        assertThat(patient.methods()).hasSize(10);
+        assertThat(patient.methods()).isEqualTo(withEvaluation(ORDER));
     }
 
     /**
@@ -303,8 +307,129 @@ class PageTextTest {
         int refusal = script.indexOf("element.type === 'password'");
         int code = script.indexOf("(function (maxLength) {");
         assertThat(refusal).as("the refusal is code, not the header").isGreaterThan(code);
+        int masked = script.indexOf(".webkitTextSecurity !== 'none'", code);
+        assertThat(masked).as("a field CSS masks is refused too (item 5)").isGreaterThan(code);
+        assertThat(script.indexOf(".value", code)).as("a field's value is read after that refusal").isGreaterThan(masked);
         assertThat(script.indexOf(".value", code)).as("a field's value is read after the refusal").isGreaterThan(refusal);
         assertThat(script.indexOf("getSelection()", code)).as("the document's selection is read after it").isGreaterThan(refusal);
+    }
+
+    /** H33: the world's unique id is kept for the document, so a second run asks only the evaluation, in that context. */
+    @Test void aSecondRunInTheSameDocumentAsksOnlyTheEvaluation() throws Exception {
+        assertThat(text.insertIntoField("one").get(5, TimeUnit.SECONDS)).isTrue();
+        devTools.answer("Runtime.evaluate", selected("{\"kind\":\"none\"}"));
+        assertThat(text.selectedText().get(5, TimeUnit.SECONDS)).isEqualTo(new Page.Selection.None());
+        assertThat(devTools.methods()).isEqualTo(withEvaluation(ORDER));
+        assertThat(devTools.parameters("Runtime.evaluate", 1)).containsEntry("uniqueContextId", UNIQUE);
+    }
+
+    /** H33: each main-frame load start of the page begins a new document for its text runs. */
+    @Test void aMainFrameLoadStartBeginsANewDocument() throws Exception {
+        var runs = new ArrayList<CompletableFuture<Boolean>>();
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            var page = new Page(java.net.URI.create("https://example.com/"), () -> { }, PageTestAccess.noFavicons());
+            page.usePageText(text);
+            runs.add(text.insertIntoField("one"));
+            page.loadStarted("https://example.com/next", dev.jasper.browser.store.Reached.LINK);
+            runs.add(text.insertIntoField("two"));
+            page.close();
+        });
+        for (var run : runs) assertThat(run.get(5, TimeUnit.SECONDS)).isTrue();
+        var twice = new ArrayList<>(ORDER);
+        twice.addAll(ORDER);
+        assertThat(devTools.methods()).isEqualTo(twice);
+    }
+
+    /** H33: a new document drops the world's id, so the next run asks for the world again. */
+    @Test void aNewDocumentAsksForTheWorldAgain() throws Exception {
+        text.insertIntoField("one").get(5, TimeUnit.SECONDS);
+        text.newDocument();
+        text.insertIntoField("two").get(5, TimeUnit.SECONDS);
+        var twice = new ArrayList<>(ORDER);
+        twice.addAll(ORDER);
+        assertThat(devTools.methods()).isEqualTo(twice);
+    }
+
+    /**
+     * H33: an evaluation that fails, as Runtime.evaluate's "uniqueContextId not found" for a context gone with its
+     * document, late or unreadable, drops the kept id: that run fails and does nothing, and the next asks for the world.
+     */
+    @Test void aFailedEvaluationDropsTheWorldAndTheNextRunAsksAgain() throws Exception {
+        for (String failure : List.of("error", "late", "unreadable")) {
+            var devTools = new DevTools();
+            PageText text = made(devTools, Duration.ofMillis(TIMEOUT_MILLIS));
+            assertThat(text.insertIntoField("one").get(5, TimeUnit.SECONDS)).isTrue();
+            switch (failure) {
+                case "error" -> devTools.fail("Runtime.evaluate");
+                case "late" -> devTools.never("Runtime.evaluate");
+                default -> devTools.answer("Runtime.evaluate", "{}");
+            }
+            assertThatThrownBy(() -> text.insertIntoField("two").get(5, TimeUnit.SECONDS)).as(failure).isInstanceOf(ExecutionException.class);
+            devTools.answer("Runtime.evaluate", TRUE);
+            assertThat(text.insertIntoField("three").get(5, TimeUnit.SECONDS)).isTrue();
+            var expected = withEvaluation(ORDER);
+            expected.addAll(ORDER);
+            assertThat(devTools.methods()).as(failure).isEqualTo(expected);
+        }
+    }
+
+    /** H33: an id that arrives after a new document began, during the run that asked for it, is used once and not kept. */
+    @Test void anIdReportedAfterANewDocumentBeganIsNotKept() throws Exception {
+        var enabled = new CompletableFuture<String>();
+        devTools.answers.put("Runtime.enable", parameters -> {
+            for (String event : devTools.events) text.event("Runtime.executionContextCreated", event);
+            return enabled;
+        });
+        CompletableFuture<Boolean> first = text.insertIntoField("one");
+        text.newDocument();
+        enabled.complete("{}");
+        assertThat(first.get(5, TimeUnit.SECONDS)).isTrue();
+        devTools.answers.put("Runtime.enable", parameters -> {
+            for (String event : devTools.events) text.event("Runtime.executionContextCreated", event);
+            return CompletableFuture.completedFuture("{}");
+        });
+        assertThat(text.insertIntoField("two").get(5, TimeUnit.SECONDS)).isTrue();
+        var twice = new ArrayList<>(ORDER);
+        twice.addAll(ORDER);
+        assertThat(devTools.methods()).isEqualTo(twice);
+    }
+
+    /** Item 8: the evaluation's answer, up to about 6 MiB for a selection, is read on the parsing executor, not where it arrives. */
+    @Test void theEvaluationsAnswerIsReadOnTheParsingExecutor() throws Exception {
+        var parses = new ArrayList<Runnable>();
+        var devTools = new DevTools();
+        var text = new PageText(devTools, Runnable::run, parses::add, Duration.ofSeconds(5));
+        devTools.owner = text;
+        devTools.answer("Runtime.evaluate", selected("{\"kind\":\"text\",\"text\":\"abc\"}"));
+        CompletableFuture<Page.Selection> read = text.selectedText();
+        assertThat(devTools.methods()).isEqualTo(ORDER);
+        assertThat(read).as("not read where DevTools answered").isNotDone();
+        assertThat(parses).hasSize(1);
+        parses.getFirst().run();
+        assertThat(read.get(5, TimeUnit.SECONDS)).isEqualTo(new Page.Selection.Text("abc"));
+    }
+
+    /**
+     * H35: the script answers text only when a selectionchange reached the document, or the focused field, since its last
+     * read there; its listener and flags live in Jasper's world, which the page cannot see. The first read of each has
+     * nothing to compare against. The script itself runs in the node harness and by hand (Task 14).
+     */
+    @Test void theSelectionScriptAnswersOnlyAChangedSelection() {
+        String script = PageText.SELECTION;
+        int code = script.indexOf("(function (maxLength) {");
+        assertThat(script.indexOf("addEventListener('selectionchange'", code)).isGreaterThan(code);
+        int unchanged = script.indexOf("if (!changed(doc)) return NONE;", code);
+        assertThat(unchanged).as("a document read checks for a change").isGreaterThan(code);
+        assertThat(script.indexOf("getSelection()", code)).as("before it reads the selection").isGreaterThan(unchanged);
+        int field = script.indexOf("const fieldChanged = changed(element), documentChanged = changed(doc);", code);
+        assertThat(field).as("a field read checks both").isGreaterThan(code);
+        assertThat(script.indexOf(".value", code)).as("before it reads the field").isGreaterThan(field);
+    }
+
+    /** Items 6 and 7: non-breaking spaces copy as spaces, and any element with a document of its own is a frame. */
+    @Test void theSelectionScriptCopiesSpacesAndFollowsAnyFrameElement() {
+        String script = PageText.SELECTION;
+        assertThat(script).contains(".replace(/\\u00a0/g, ' ')", "'contentDocument' in element").doesNotContain("localName === 'iframe'");
     }
 
     /** {@code value}, a JSON object, as {@code Runtime.evaluate} answers a script's object by value. */
@@ -321,15 +446,25 @@ class PageTextTest {
 
     /** A text insertion over {@code devTools}, which tells it its events, its calls timing out after {@code timeout}. */
     private static PageText made(DevTools devTools, Duration timeout) {
-        var made = new PageText(devTools, Runnable::run, timeout);
+        var made = new PageText(devTools, Runnable::run, Runnable::run, timeout);
         devTools.owner = made;
         return made;
     }
 
-    /** The calls an insertion makes up to {@code method}, which ends it: Runtime.disable follows Runtime.enable whatever. */
+    /**
+     * The calls a first run makes up to {@code method}, which ends it: Runtime.disable and the console's release follow
+     * Runtime.enable whatever.
+     */
     private static List<String> upTo(String method) {
-        int end = ORDER.indexOf(method) + (method.equals("Runtime.enable") ? 2 : 1);
+        int end = ORDER.indexOf(method) + (method.equals("Runtime.enable") ? 3 : 1);
         return ORDER.subList(0, end);
+    }
+
+    /** {@code calls}, then one more Runtime.evaluate. */
+    private static List<String> withEvaluation(List<String> calls) {
+        var all = new ArrayList<>(calls);
+        all.add("Runtime.evaluate");
+        return all;
     }
 
     private static void assertFails(CompletableFuture<?> future, Class<? extends Throwable> cause) {
@@ -391,8 +526,15 @@ class PageTextTest {
         }
 
         Map<String, Object> parameters(String method) {
-            int at = methods.indexOf(method);
-            return at < 0 ? Map.of() : StrictJson.object(raw.get(at), 2).orElseThrow();
+            return parameters(method, 0);
+        }
+
+        /** The parameters of the {@code nth} call of {@code method}, from 0. */
+        Map<String, Object> parameters(String method, int nth) {
+            for (int at = 0, seen = 0; at < methods.size(); at++) {
+                if (methods.get(at).equals(method) && seen++ == nth) return StrictJson.object(raw.get(at), 2).orElseThrow();
+            }
+            return Map.of();
         }
     }
 
