@@ -12,9 +12,9 @@ import org.cef.handler.CefRequestContextHandler;
  * and V12). JCEF disposes a browser's context object as the browser closes ({@code CefBrowser_N.onBeforeClose}), and
  * the module offers no context that shares another's storage, so each browser is handed one of these instead of the
  * kept one. It carries the kept context's native handle, which JCEF's native side reads as the browser's queued
- * creation runs, and takes no reference of its own on it; it does what is asked of it on the kept context. Its dispose,
- * once, takes its handle away and counts it off its {@link KeptContext}, which disposes the kept context only once its
- * group has closed and no object over it is left.
+ * creation runs, and takes no reference of its own on it; it does what is asked of it on the kept context. Its dispose
+ * by JCEF, or its hand-back by Jasper ({@link #handBack}), once, takes its handle away and counts it off its
+ * {@link KeptContext}, which disposes the kept context only once its group has closed and no object over it is left.
  */
 final class BrowserContext extends CefRequestContext {
     // JCEF's name for a request context's native handle.
@@ -44,11 +44,27 @@ final class BrowserContext extends CefRequestContext {
         return context instanceof BrowserContext own ? own.kept.handOut() : context;
     }
 
+    /**
+     * Jasper hands back {@code context}, a browser's object no browser was made with, or one whose browser is never made:
+     * it carries no handle any more, and its kept context hears, which after Chromium's sweep makes no native call.
+     * Nothing for any other context, such as Chromium's global one, which is JCEF's.
+     *
+     * @param context the object, or null
+     */
+    static void handBack(CefRequestContext context) {
+        if (context instanceof BrowserContext own) own.back(false);
+    }
+
     /** JCEF is done with the object, as its browser closed: it carries no handle any more, and its kept context hears. */
     @Override public void dispose() {
+        back(true);
+    }
+
+    /** The object comes back, once: by its browser's close, or by Jasper. */
+    private void back(boolean byBrowserClose) {
         if (!disposed.compareAndSet(false, true)) return;
         setNativeRef(NATIVE, 0);
-        kept.handedBack();
+        kept.handedBack(byBrowserClose);
     }
 
     @Override public boolean isGlobal() {

@@ -1115,7 +1115,8 @@ public final class Page implements AutoCloseable {
     /**
      * The client and the request context are ready: makes the browser in that context, null for Chromium's global one,
      * which loads what the page was last asked to. A page closed meanwhile, or a Chromium that has stopped, makes none,
-     * as nothing native is touched then, and the context object handed out for it goes back at once (V12).
+     * and the context object handed out for it goes back at once ({@link Chromium#handBack}), which after Chromium's
+     * sweep makes no native call.
      */
     void make(Chromium chromium, CefClient client, CefRequestContext requestContext) {
         if (closed || chromium.state() == Chromium.State.STOPPED) {
@@ -1139,7 +1140,7 @@ public final class Page implements AutoCloseable {
      * the browser closes, never has it. Null, Chromium's global context, needs nothing.
      */
     private static void unused(CefRequestContext context) {
-        if (context != null) context.dispose();
+        Chromium.handBack(context);
     }
 
     /** The browser's native browser exists: from now on it hears what it is asked, and loads what it missed. */

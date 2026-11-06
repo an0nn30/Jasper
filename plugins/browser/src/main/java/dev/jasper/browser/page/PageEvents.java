@@ -207,13 +207,17 @@ public final class PageEvents {
     }
 
     /**
-     * A page's browser is made, or closed: its page hears its identifier at once, on Chromium's thread. It decides no
-     * popup and no close, which the {@code links} package's life span handler and the browser decide.
+     * A page's browser is made, or closed: its page hears its identifier at once, on Chromium's thread, and a page's or
+     * DevTools' browser Java asked to close before Chromium made it closes now (V13). It decides no popup, which the
+     * {@code links} package's life span handler decides, and holds back no close, which the browser decides.
      */
     private static final class Lives extends CefLifeSpanHandlerAdapter {
         @Override public void onAfterCreated(CefBrowser browser) {
-            Page page = page(browser);
+            if (!(browser instanceof PageBrowser made)) return;
+            Page page = made.owner();
             if (page != null) page.browserMade(browser.getIdentifier());
+            // A page's or its DevTools' browser Java asked to close before it existed closes now (V13).
+            made.created();
         }
 
         @Override public void onBeforeClose(CefBrowser browser) {

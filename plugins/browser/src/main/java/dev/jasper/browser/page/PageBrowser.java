@@ -58,6 +58,10 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
     private volatile PreviewPage previewOwner;
     // Set once Java asks the browser to close: Jasper's close of its page, or JCEF's close of its client's browsers.
     private volatile boolean closeAsked;
+    // When Java's close can go to Chromium (V13); and the context object the browser was made with, handed back when
+    // the browser is never made.
+    private final BrowserClosing closing = new BrowserClosing();
+    private final CefRequestContext ownContext;
 
     /**
      * A page that loads {@code url} once its native browser is made, which its view asks for once it is in a window.
@@ -72,6 +76,7 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
         super(client, url, context, renderer, view, settings());
         this.view = view;
         devTools = null;
+        ownContext = context;
     }
 
     /** Chromium's DevTools browser for {@code tools}, inspecting {@code inspected}'s page at {@code at}. */
@@ -80,6 +85,8 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
         super(client, url, context, renderer, view, inspected, at, settings());
         this.view = view;
         devTools = tools;
+        ownContext = context;
+        closing.mayCreate(); // JCEF's openDevTools makes it as soon as it is made
     }
 
     /** Chromium's own default is 30 frames a second. */
@@ -106,7 +113,16 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
      * made it, Chromium would only show the DevTools, and JCEF would match the next browser Chromium makes to this one.
      */
     void create() {
-        if (devTools == null && !CefClient.isNativeBrowserCreationStarted(this)) createImmediately();
+        if (devTools == null && !CefClient.isNativeBrowserCreationStarted(this) && closing.mayCreate()) createImmediately();
+    }
+
+    /**
+     * Chromium has made the native browser, as the page client's life span handler tells on Chromium's thread: one Java
+     * asked to close before it existed closes now (V13). JCEF's own close after creation does nothing then, as the
+     * browser counts as closing already.
+     */
+    void created() {
+        if (closing.created()) super.close(true);
     }
 
     /**
@@ -141,7 +157,7 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
         try {
             made = new PageBrowser(client, url, own, new PageRenderer(canvas), canvas, this, inspectAt, tools);
         } catch (RuntimeException | Error failure) {
-            if (own != context) own.dispose(); // made for a browser that never was
+            if (own != context) Chromium.handBack(own); // made for a browser that never was
             throw failure;
         }
         made.attach();
@@ -253,13 +269,25 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
 
     /**
      * Closes the browser, as Jasper's close of its page and JCEF's close of its client's browsers ask: Chromium's
-     * {@link #doClose()} then lets the close go ahead.
+     * {@link #doClose()} then lets the close go ahead. A page's or a DevTools' browser whose native part is not made yet
+     * (V13): one whose creation is under way closes as Chromium makes it ({@link #created}), as JCEF's own close after
+     * creation would do nothing; one whose creation was never asked for is never made, refusing it from then on, and its
+     * context object goes back. It is left out of JCEF's close then, which would keep a handler holding the browser
+     * on the client for the rest of the run. A Markdown preview's browser closes as JCEF closes it.
      *
      * @param force whether the page's {@code beforeunload} is skipped
      */
     @Override public void close(boolean force) {
         closeAsked = true;
-        super.close(force);
+        if (owner == null && devTools == null) {
+            super.close(force);
+            return;
+        }
+        switch (closing.close()) {
+            case NOW -> super.close(force);
+            case ON_CREATION -> { }
+            case NEVER_MADE -> Chromium.handBack(ownContext);
+        }
     }
 
     /**

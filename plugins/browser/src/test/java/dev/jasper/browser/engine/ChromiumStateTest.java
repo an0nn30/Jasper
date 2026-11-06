@@ -26,6 +26,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Chromium's life without Chromium. The worker here records the start instead of running it, because running it would
@@ -665,6 +666,57 @@ class ChromiumStateTest {
         browser.dispose();
         assertThat(held.disposals()).as("Chromium has ended: nothing native is touched").isZero();
         assertThat(browser.getNativeRef(NATIVE)).isZero();
+    }
+
+    /**
+     * Round 3's A: once the sweep has run, CEF may shut down as soon as JCEF's browsers have closed, so only a browser's
+     * close, JCEF's dispose of its object, may dispose a kept context natively; an object Jasper hands back itself, or a
+     * group that closes after the sweep, lets go of it without a native call. Before the sweep, Jasper's own hand-back
+     * disposes as any does.
+     */
+    @Test void afterTheSweepOnlyABrowsersCloseDisposesAKeptContext() throws Exception {
+        Chromium chromium = chromium(recording, LIMIT);
+        List<RecordingContext> kept = kept(chromium, new RecordingContext(1), new RecordingContext(2), new RecordingContext(3),
+            new RecordingContext(4));
+        RecordingContext both = kept.get(0), unusedOnly = kept.get(1), closesAfter = kept.get(2), running = kept.get(3);
+
+        org.cef.browser.CefRequestContext early = chromium.browserContext(running);
+        chromium.release(running);
+        Chromium.handBack(early);
+        assertThat(running.disposals()).as("before the sweep, Jasper's own hand-back disposes it").isEqualTo(1);
+
+        org.cef.browser.CefRequestContext browser = chromium.browserContext(both), never = chromium.browserContext(both);
+        org.cef.browser.CefRequestContext alone = chromium.browserContext(unusedOnly);
+        org.cef.browser.CefRequestContext held = chromium.browserContext(closesAfter);
+        EventQueue.invokeAndWait(chromium::close);
+        EventQueue.invokeAndWait(chromium::disposeContexts);
+        Chromium.handBack(never);
+        assertThat(both.disposals()).as("a browser still holds it").isZero();
+        browser.dispose();
+        assertThat(both.disposals()).as("its last browser closed: JCEF's dispose").isEqualTo(1);
+        Chromium.handBack(alone);
+        assertThat(unusedOnly.disposals()).as("after the sweep, Jasper's own hand-back makes no native call").isZero();
+        assertThat(alone.getNativeRef(NATIVE)).isZero();
+        chromium.release(closesAfter);
+        held.dispose();
+        assertThat(closesAfter.disposals()).as("the browser's close disposes it, the group's late close never").isEqualTo(1);
+        end(chromium);
+    }
+
+    /**
+     * Round 3's B: a kept context that has been disposed is refused, never handed out again: an object over it would
+     * carry handle 0, which JCEF resolves to Chromium's global context, the persistent one.
+     */
+    @Test void aDisposedKeptContextIsRefusedNeverHandedOutAgain() throws Exception {
+        Chromium chromium = chromium(recording, LIMIT);
+        RecordingContext group = kept(chromium, new RecordingContext(12)).getFirst();
+        org.cef.browser.CefRequestContext page = chromium.browserContext(group);
+        chromium.release(group);
+        page.dispose();
+        assertThat(group.disposals()).isEqualTo(1);
+        assertThatThrownBy(() -> chromium.browserContext(group)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> Chromium.anotherContext(page)).as("a page's DevTools too").isInstanceOf(IllegalStateException.class);
+        end(chromium);
     }
 
     /**

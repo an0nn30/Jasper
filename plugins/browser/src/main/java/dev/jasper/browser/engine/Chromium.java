@@ -48,7 +48,8 @@ import org.cef.network.CefRequest;
  * <p>Work for Chromium's own UI thread, which is not Swing's ({@link #onChromiumThread}), waits for Chromium's context to
  * initialize, and the in-memory request contexts of /dev/null pages are made there ({@link #inMemoryContext}); Chromium
  * keeps each for its group, hands each browser an object of its own over it ({@link #browserContext}), and disposes it
- * once its group has closed, or Chromium's close has swept it, and JCEF has disposed every browser's object over it. Their pages' {@code jasper-about:} requests are served
+ * once its group has closed, or Chromium's close has swept it, and JCEF has disposed every browser's object over it.
+ * Their pages' {@code jasper-about:} requests are served
  * through the pages' request handler ({@link #aboutResource}), as Chromium's scheme handler factory serves only its
  * global context.
  */
@@ -89,8 +90,8 @@ public final class Chromium implements AutoCloseable {
     private final Installers pageInstallers = new Installers(), previewInstallers = new Installers();
     // Work for Chromium's own UI thread, which fails once Chromium cannot serve pages.
     private final ChromiumThread chromiumThread = new ChromiumThread(this::unavailable);
-    // Guarded by itself: each in-memory context made and not yet disposed, with the count of its browsers' objects; and
-    // whether Chromium's dispose has swept them.
+    // Guarded by itself: each in-memory context made, with the count of its browsers' objects, kept once disposed too, so
+    // a disposed one is refused; and whether Chromium's dispose has swept them.
     private final Map<CefRequestContext, KeptContext> contexts = new IdentityHashMap<>();
     private boolean contextsDisposed;
     // A test's maker of in-memory contexts; null for CEF's.
@@ -299,12 +300,14 @@ public final class Chromium implements AutoCloseable {
      * 6's V10 and V12). JCEF disposes a browser's context object as the browser closes, so a browser is never handed the
      * kept one. The object carries the kept context's native handle, which JCEF reads as the browser's queued creation
      * runs, and does what is asked of it on the kept context; it counts against the kept context until JCEF disposes it,
-     * and the kept context outlives it. Give one to each browser made, and dispose one no browser was made with. A
-     * context Chromium does not keep, such as a test's, is never disposed. Any thread; it touches nothing native.
+     * and the kept context outlives it. Give one to each browser made, and hand back ({@link #handBack}) one no browser
+     * is made with. A context Chromium does not keep, a test's stand-in, is never disposed. Any thread; it touches
+     * nothing native.
      *
      * @param kept the group's kept context, or null for Chromium's global one
      * @return a new object over it, or null for the global context
-     * @throws IllegalStateException once the kept context has been disposed
+     * @throws IllegalStateException once the kept context has been disposed, as an object over it would carry no handle
+     *     and so stand for Chromium's global context
      */
     public CefRequestContext browserContext(CefRequestContext kept) {
         if (kept == null) return null;
@@ -336,7 +339,7 @@ public final class Chromium implements AutoCloseable {
     private CefRequestContext keep(CefRequestContext context) {
         synchronized (contexts) {
             if (!contextsDisposed) {
-                contexts.put(context, new KeptContext(context, Chromium::disposeKept, () -> ended.getCount() == 0, () -> forget(context)));
+                contexts.put(context, new KeptContext(context, Chromium::disposeKept, () -> ended.getCount() == 0));
                 return context;
             }
         }
@@ -353,18 +356,11 @@ public final class Chromium implements AutoCloseable {
         }
     }
 
-    /** A kept context was disposed: Chromium forgets it. */
-    private void forget(CefRequestContext context) {
-        synchronized (contexts) {
-            contexts.remove(context);
-        }
-    }
-
     /**
      * Releases {@code context}, an in-memory context {@link #inMemoryContext} made, as its group closes (V12): it is
-     * disposed, once, however often released, as soon as JCEF has disposed every browser's object over it, at once when
-     * none is left; whichever comes last disposes it, on its thread. Once Chromium has ended, nothing native is touched.
-     * Any thread.
+     * disposed, once, however often released, as soon as every browser's object over it is back, at once when none is
+     * out; whichever comes last disposes it, on its thread. After Chromium's close has swept the kept contexts, only a
+     * browser's close disposes one natively; once Chromium has ended, nothing native is touched. Any thread.
      *
      * @param context the context, or null for none
      */
@@ -390,6 +386,18 @@ public final class Chromium implements AutoCloseable {
     public CefResourceHandler aboutResource(CefBrowser browser, CefRequest request) {
         ChromiumApp started = app;
         return started == null ? null : started.aboutResource(browser, request);
+    }
+
+    /**
+     * Hands back {@code context}, an object {@link #browserContext} or {@link #anotherContext} gave for a browser that is
+     * not made, or whose creation was never asked for: it counts off its kept context, as JCEF's dispose of a closed
+     * browser's would, but once Chromium's close has swept the kept contexts it makes no native call, as CEF may be
+     * shutting down. Nothing for Chromium's global context. Any thread.
+     *
+     * @param context the object, or null
+     */
+    public static void handBack(CefRequestContext context) {
+        BrowserContext.handBack(context);
     }
 
     /** Has {@link #inMemoryContext} make its contexts with {@code made} instead of CEF: a test's stand-ins. */

@@ -11,14 +11,16 @@ import org.cef.browser.CefRequestContext;
  * handle only when it runs, and JCEF disposes that object as the browser closes ({@code CefBrowser_N.onBeforeClose}),
  * which always comes after the creation has run. So each object handed out counts against the kept context, and the
  * kept context is disposed, once, when both its group has closed (or Chromium's close has swept it) and every object
- * over it has been disposed: whichever comes last disposes it. Nothing is disposed once Chromium has ended. Any thread:
- * Swing's for the group's close, Chromium's for JCEF's disposals.
+ * over it is back: whichever comes last disposes it. Once the sweep has run, CEF may shut down as soon as JCEF's
+ * browsers have closed, so from then on only a browser's close disposes it natively; any other last hand-back, and a
+ * group's close, let it go without a native call. Nothing is disposed once Chromium has ended. A kept context disposed,
+ * or let go, is refused from then on: an object over it would carry handle 0, which JCEF resolves to Chromium's global
+ * context. Any thread: Swing's for the group's close, Chromium's for JCEF's disposals.
  */
 final class KeptContext {
     private final CefRequestContext context;
     private final Consumer<CefRequestContext> dispose;
     private final BooleanSupplier ended;
-    private final Runnable forget;
     // Guarded by this.
     private int handedOut;
     private boolean released, swept, disposed;
@@ -29,18 +31,16 @@ final class KeptContext {
      * @param context the kept context
      * @param dispose disposes it, once
      * @param ended whether Chromium has ended, after which nothing native is touched
-     * @param forget told once it has been disposed, so Chromium forgets it
      */
-    KeptContext(CefRequestContext context, Consumer<CefRequestContext> dispose, BooleanSupplier ended, Runnable forget) {
+    KeptContext(CefRequestContext context, Consumer<CefRequestContext> dispose, BooleanSupplier ended) {
         this.context = Objects.requireNonNull(context, "context");
         this.dispose = Objects.requireNonNull(dispose, "dispose");
         this.ended = Objects.requireNonNull(ended, "ended");
-        this.forget = Objects.requireNonNull(forget, "forget");
     }
 
-    /** A context Chromium does not keep, such as a test's: its objects are counted, and nothing ever disposes it. */
+    /** A context Chromium does not keep, a test's stand-in: its objects are counted, and nothing ever disposes it. */
     static KeptContext untracked(CefRequestContext context) {
-        return new KeptContext(context, unused -> { }, () -> true, () -> { });
+        return new KeptContext(context, unused -> { }, () -> true);
     }
 
     /** The kept context. */
@@ -49,10 +49,10 @@ final class KeptContext {
     }
 
     /**
-     * A new object over the kept context, for one browser, counted until JCEF disposes it.
+     * A new object over the kept context, for one browser, counted until it comes back.
      *
      * @return the object
-     * @throws IllegalStateException once the kept context has been disposed
+     * @throws IllegalStateException once the kept context has been disposed or let go
      */
     CefRequestContext handOut() {
         synchronized (this) {
@@ -62,48 +62,62 @@ final class KeptContext {
         return new BrowserContext(this);
     }
 
-    /** An object over the kept context was disposed, as its browser closed or went unused. Once for each object. */
-    void handedBack() {
-        boolean now;
+    /**
+     * An object over the kept context came back: once for each object.
+     *
+     * @param byBrowserClose whether JCEF disposed it as its browser closed, rather than Jasper handing back one no
+     *     browser was made with
+     */
+    void handedBack(boolean byBrowserClose) {
+        Due due;
         synchronized (this) {
             handedOut--;
-            now = due();
+            due = due(!swept || byBrowserClose);
         }
-        if (now) disposeNow();
+        act(due);
     }
 
-    /** The group has closed: the kept context goes once no browser's object holds it. */
+    /** The group has closed: the kept context goes once every object over it is back. */
     void release() {
-        boolean now;
+        Due due;
         synchronized (this) {
             released = true;
-            now = due();
+            due = due(!swept);
         }
-        if (now) disposeNow();
+        act(due);
     }
 
-    /** Chromium's close sweeps it: it goes as soon as no browser's object holds it, its group closed or not. */
+    /**
+     * Chromium's close sweeps it, while CEF still runs: it goes now when no object over it is out, its group closed or
+     * not, and otherwise as the last browser over it closes.
+     */
     void sweep() {
-        boolean now;
+        Due due;
         synchronized (this) {
             swept = true;
-            now = due();
+            due = due(true);
         }
-        if (now) disposeNow();
+        act(due);
     }
 
-    /** Whether it is to be disposed now, which it then counts as. Under this lock. */
-    private boolean due() {
-        if (disposed || handedOut > 0 || !(released || swept) || ended.getAsBoolean()) return false;
+    /** What is due now, which then counts as done. Under this lock. */
+    private Due due(boolean nativeAllowed) {
+        if (disposed || handedOut > 0 || !(released || swept)) return Due.NOTHING;
         disposed = true;
-        return true;
+        return nativeAllowed && !ended.getAsBoolean() ? Due.DISPOSE : Due.LET_GO;
     }
 
-    private void disposeNow() {
-        try {
-            dispose.accept(context);
-        } finally {
-            forget.run();
-        }
+    private void act(Due due) {
+        if (due == Due.DISPOSE) dispose.accept(context);
+    }
+
+    /** What a change makes of the kept context. */
+    private enum Due {
+        /** It stays. */
+        NOTHING,
+        /** It is disposed now. */
+        DISPOSE,
+        /** It goes without a native call: CEF may be shutting down, or has. */
+        LET_GO
     }
 }
