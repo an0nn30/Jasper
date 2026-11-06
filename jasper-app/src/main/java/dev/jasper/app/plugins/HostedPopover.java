@@ -29,7 +29,7 @@ final class HostedPopover implements PluginPopover {
     HostedPopover(HostedKit kit,HostedAnchor anchor){
         this.kit=kit;this.anchor=anchor;
         popup.setLayout(new BorderLayout());popup.setBorder(new javax.swing.border.EmptyBorder(0,0,0,0));popup.setOpaque(false);
-        popup.addPopupMenuListener(new PopupMenuListener(){public void popupMenuWillBecomeVisible(PopupMenuEvent e){}public void popupMenuWillBecomeInvisible(PopupMenuEvent e){close();}public void popupMenuCanceled(PopupMenuEvent e){close();}});
+        popup.addPopupMenuListener(new PopupMenuListener(){public void popupMenuWillBecomeVisible(PopupMenuEvent e){}public void popupMenuWillBecomeInvisible(PopupMenuEvent e){dismissed(EventQueue.getCurrentEvent());}public void popupMenuCanceled(PopupMenuEvent e){dismissed(EventQueue.getCurrentEvent());}});
         lifetime=anchor.onClosed(this::close);
         anchor.target.addHierarchyBoundsListener(moved);UIManager.getDefaults().addPropertyChangeListener(fonts);
     }
@@ -61,6 +61,17 @@ final class HostedPopover implements PluginPopover {
             content.component().setAvailableHeight(Math.max(1,com.formdev.flatlaf.util.UIScale.unscale(screen().height)));
             var bounds=placement();popup.setPopupSize(bounds.getSize());if(popup.isVisible())popup.setLocation(bounds.x,bounds.y);
         }finally{fitting=false;}
+    }
+    /**
+     * The popup went away while {@code current} was being dispatched, or none was. Swing closes a popup on the press that
+     * lands outside it, and that press would then reach the control under it: when it lands on the popover's own anchor it
+     * is consumed, so the anchor's action does not run and the click that closed the popover does not open it again (as
+     * Swing's PopupMenu.consumeEventOnClose, but for the anchor only). A press elsewhere, and Escape, are left alone.
+     */
+    void dismissed(AWTEvent current){
+        if(!closed&&current instanceof MouseEvent mouse&&mouse.getID()==MouseEvent.MOUSE_PRESSED&&mouse.getSource() instanceof Component source
+            &&SwingUtilities.isDescendingFrom(source,anchor.target))mouse.consume();
+        close();
     }
     @Override public Subscription onClosed(Runnable handler){kit.guard();java.util.Objects.requireNonNull(handler);if(closed){handler.run();return () -> {}; }listeners.add(handler);return () -> listeners.remove(handler);}
     @Override public void close(){if(closed)return;closed=true;

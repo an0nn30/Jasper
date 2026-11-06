@@ -43,31 +43,17 @@ public final class DataStores implements AutoCloseable {
      * memory and a new in-memory context.
      *
      * @param persistent the history and bookmarks in the plugin's data folder, which these close
-     */
-    public DataStores(Stores persistent) {
-        this(persistent, () -> false);
-    }
-
-    /**
-     * As {@link #DataStores(Stores)}, with {@code devNullMode} saying whether the Use /dev/null mode setting is on now,
-     * which {@link #forNewItem()} reads.
-     *
-     * @param persistent the history and bookmarks in the plugin's data folder, which these close
-     * @param devNullMode whether new items open in /dev/null; read each time one opens, on the UI thread
+     * @param devNullMode whether Use /dev/null mode is on now, which {@link #forNewItem()} reads each time an item opens;
+     *     UI thread
      */
     public DataStores(Stores persistent, BooleanSupplier devNullMode) {
         this(persistent, () -> new Stores(BrowserDatabase.memory(), EventQueue::invokeLater), PageContext::memory, devNullMode);
     }
 
     /**
-     * As {@link #DataStores(Stores)}, each /dev/null store's history and bookmarks made by {@code memory} and its context
-     * by {@code contexts}: a test's.
+     * As {@link #DataStores(Stores, BooleanSupplier)}, each /dev/null store's history and bookmarks made by {@code memory}
+     * and its context by {@code contexts}: a test's, which keeps them in memory and records the contexts' release.
      */
-    DataStores(Stores persistent, Supplier<Stores> memory, Supplier<PageContext> contexts) {
-        this(persistent, memory, contexts, () -> false);
-    }
-
-    /** As the constructor above, with {@code devNullMode} saying whether new items open in /dev/null. */
     DataStores(Stores persistent, Supplier<Stores> memory, Supplier<PageContext> contexts, BooleanSupplier devNullMode) {
         this.devNullMode = Objects.requireNonNull(devNullMode, "devNullMode");
         plugins = Objects.requireNonNull(persistent, "persistent");

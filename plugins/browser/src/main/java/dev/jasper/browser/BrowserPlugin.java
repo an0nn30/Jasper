@@ -178,8 +178,8 @@ public class BrowserPlugin implements Plugin {
         context.platform().browser(role);
         WebAddressItems.register(context, role, settings);
         // Spec section 16: a saved item comes back at once, in the persistent store, or in a new /dev/null one if it was in
-        // /dev/null mode, and its page loads the first time it
-        // shows, or, after a run that ended while Chromium ran, once the user loads it.
+        // /dev/null mode, and its page loads the first time it shows, or, after a run that ended while Chromium ran,
+        // once the user loads it.
         context.windows().restorer(BrowserRestore.KIND, request -> {
             // A saved /dev/null item comes back in a new store of its own, any other in the persistent one, whatever the setting.
             DataStore store = BrowserRestore.devNull(request.state()) ? dataStores.newDevNull() : dataStores.persistent();

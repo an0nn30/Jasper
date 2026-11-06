@@ -177,7 +177,7 @@ class BrowserItemInsertTest {
                 context.set(plugin);
                 settings.set(BrowserSettings.declare(plugin.settings()));
             });
-            var items = new BrowserItems(context.get(), settings.get()::read, new DataStores(memory.make()), page -> { },
+            var items = new BrowserItems(context.get(), settings.get()::read, new DataStores(memory.make(), () -> false), page -> { },
                 (Duration delay, Runnable task) -> () -> { }, request -> new CompletableFuture<>());
             BrowserItem item = items.open(URI.create("https://example.com/"), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
             Page page = item.page();

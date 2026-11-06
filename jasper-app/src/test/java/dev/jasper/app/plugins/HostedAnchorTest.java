@@ -56,4 +56,54 @@ class HostedAnchorTest {
             window.close();kit.close();ui.closeAll();
         });
     }
+
+    /**
+     * Swing closes a popup on the press that lands outside it, and that press then reaches the control under it. A press that
+     * dismisses an anchored popover on the popover's own anchor is consumed, so the anchor's action does not run and the
+     * popover is not opened again by the click that closed it; a press elsewhere, and Escape, close it and consume nothing.
+     */
+    @Test void aPressOnAnOpenPopoversAnchorClosesItAndIsConsumedAnyOtherDismissalIsNot() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var windows=AppContractTest.headlessWindows();
+            var model=new dev.jasper.app.contributions.Contributions();
+            model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(java.util.UUID.randomUUID(),tab -> {},tab -> {},tab -> {},() -> {}));
+            var ui=new HostedUi("test.popover",model,new Containment(() -> true),Runnable::run,() -> true,() -> true,getClass().getClassLoader(),() -> dev.jasper.sdk.Variant.DARK,h -> () -> {},windows,null);
+            var kit=new HostedKit("test.popover",() -> true,ui::kitThemes,null,new Containment(() -> true));ui.kit(kit);
+            var view=kit.create(picker(ControlState.READY),e -> {});
+            var window=ui.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("owner","Owner"),null,view);
+            var anchor=view.anchor("pick");
+            var target=((HostedAnchor) anchor).target;
+            java.util.function.Supplier<HostedPopover> open=() -> {
+                var popover=(HostedPopover) ui.windows().popover(anchor);
+                popover.setContent(kit.create(picker(ControlState.READY),e -> {}));
+                popover.show();
+                return popover;
+            };
+            java.util.function.BiFunction<java.awt.Component,Integer,java.awt.event.MouseEvent> mouse=(source,id) ->
+                new java.awt.event.MouseEvent(source,id,System.currentTimeMillis(),0,2,2,1,false);
+
+            var closed=new AtomicInteger();
+            var popover=open.get();popover.onClosed(closed::incrementAndGet);
+            var press=mouse.apply(target,java.awt.event.MouseEvent.MOUSE_PRESSED);
+            popover.dismissed(press);
+            assertThat(closed).as("the press on the anchor closes it").hasValue(1);
+            assertThat(press.isConsumed()).as("and the anchor's action does not run").isTrue();
+
+            popover=open.get();var elsewhere=mouse.apply(new JButton(),java.awt.event.MouseEvent.MOUSE_PRESSED);
+            popover.dismissed(elsewhere);
+            assertThat(elsewhere.isConsumed()).as("a press elsewhere").isFalse();
+
+            popover=open.get();var release=mouse.apply(target,java.awt.event.MouseEvent.MOUSE_RELEASED);
+            popover.dismissed(release);
+            assertThat(release.isConsumed()).as("only a press is consumed").isFalse();
+
+            popover=open.get();var escape=new java.awt.event.KeyEvent(target,java.awt.event.KeyEvent.KEY_PRESSED,0,0,java.awt.event.KeyEvent.VK_ESCAPE,(char) 27);
+            popover.dismissed(escape);
+            assertThat(escape.isConsumed()).as("Escape").isFalse();
+
+            popover=open.get();popover.dismissed(null);
+            assertThat(anchor.isOpen()).as("a later click on the anchor finds it open to open a popover again").isTrue();
+            window.close();kit.close();ui.closeAll();
+        });
+    }
 }

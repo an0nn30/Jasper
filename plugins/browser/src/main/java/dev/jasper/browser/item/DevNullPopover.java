@@ -11,7 +11,8 @@ import java.util.Objects;
 
 /**
  * What the /dev/null indicator opens (spec section 12): a popover from the indicator that says the item's browsing
- * activity is not saved and where the mode is set. Escape, a click outside and a second click on the indicator close it.
+ * activity is not saved and where the mode is set. Escape and a click outside close it, as does a click on the indicator, which the host consumes
+ * as it closes the popover, so that the click does not open it again.
  * UI thread.
  */
 final class DevNullPopover {
@@ -20,12 +21,8 @@ final class DevNullPopover {
     static final String HEADING = "/dev/null Mode",
         BODY = "Your browsing activity is not being saved. No history, bookmarks, or other data will be stored. "
             + "This mode is set in Settings › Tools › Browser › Privacy & Data.";
-    // How long after it closed a click on the indicator is that same click: an outside click closes a popover as it is
-    // pressed, and the indicator then reports its action.
-    private static final long SAME_CLICK_NANOS = 300_000_000L;
     private final PluginPopover popover;
     private boolean closed;
-    private long closedAt;
 
     private DevNullPopover(PluginPopover popover) {
         this.popover = popover;
@@ -49,7 +46,7 @@ final class DevNullPopover {
             content = context.kit().create(spec(), event -> { });
             popover.setContent(content);
             content = null; // the popover's now, which disposes it as it closes
-            popover.onClosed(shown::ended);
+            popover.onClosed(() -> shown.closed = true);
             popover.show();
         } catch (RuntimeException | Error failure) {
             if (content != null) content.close();
@@ -64,17 +61,7 @@ final class DevNullPopover {
         return !closed;
     }
 
-    /** Whether it closed just now, so that the click on the indicator which closed it is not one to open it again. */
-    boolean justClosed() {
-        return closed && System.nanoTime() - closedAt < SAME_CLICK_NANOS;
-    }
-
-    private void ended() {
-        closed = true;
-        closedAt = System.nanoTime();
-    }
-
-    /** Closes it, as a second click on the indicator does. */
+    /** Closes it. */
     void close() {
         popover.close();
     }

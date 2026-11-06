@@ -427,7 +427,7 @@ class PageMenuTest {
         host = new FakePluginHost();
         var started = new AtomicReference<BrowserItems>();
         host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(),
-            plugin -> started.set(new BrowserItems(plugin, BrowserSettings.declare(plugin.settings())::read, new DataStores(memory.make()), any -> { })));
+            plugin -> started.set(new BrowserItems(plugin, BrowserSettings.declare(plugin.settings())::read, new DataStores(memory.make(), () -> false), any -> { })));
         items = started.get();
         host.activateTerminalWindow(host.addTerminalWindow());
         item = items.open(URI.create(PAGE), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());

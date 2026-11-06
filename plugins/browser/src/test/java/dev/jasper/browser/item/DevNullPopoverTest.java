@@ -22,8 +22,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * The /dev/null indicator's popover (spec section 12), on the testkit's fake host: its two texts, opening from the
- * indicator and closing with a second click on it or with its item. Escape and a click outside are the host's, which the
- * fake does not make; their closing is the GUI check. The items are stand-ins' over stores in memory.
+ * indicator and closing with its item. Escape, a click outside and a click on the indicator are the host's, which
+ * the fake does not make (HostedAnchorTest covers the last); their closing is the GUI check.
+ * The items are stand-ins' over stores in memory.
  */
 class DevNullPopoverTest {
     private static final String ID = "dev.jasper.browser";
@@ -34,7 +35,7 @@ class DevNullPopoverTest {
         memory.close();
     }
 
-    @Test void theIndicatorOpensAPopoverWithItsTwoTextsAndASecondClickClosesIt() throws Exception {
+    @Test void theIndicatorOpensAPopoverWithItsTwoTexts() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
             var started = new Started(host);
             var item = started.devNullItem();
@@ -56,9 +57,7 @@ class DevNullPopoverTest {
             });
 
             view.emit(new UiEvent.Action(BrowserToolbar.DEVNULL));
-            assertThat(host.popoverViews(ID)).as("a second click").isEmpty();
-            view.emit(new UiEvent.Action(BrowserToolbar.DEVNULL));
-            assertThat(host.popoverViews(ID)).as("the click that closed it is not one to open it again").isEmpty();
+            assertThat(host.popoverViews(ID)).as("an action while it is open opens no second one").hasSize(1);
             item.close();
             assertThat(host.failures()).isEmpty();
         } });
@@ -78,10 +77,8 @@ class DevNullPopoverTest {
             FakeKitView second = host.contentView(ID, "example.com").orElseThrow();
             var popover = DevNullPopover.show(started.context, second);
             assertThat(popover.open()).isTrue();
-            assertThat(popover.justClosed()).isFalse();
             popover.close();
             assertThat(popover.open()).isFalse();
-            assertThat(popover.justClosed()).isTrue();
             again.close();
             assertThat(host.failures()).isEmpty();
         } });
@@ -100,7 +97,8 @@ class DevNullPopoverTest {
                 settings.set(BrowserSettings.declare(plugin.settings()));
             });
             context = started.get();
-            var stores = new DataStores(memory.make(), memory::make, () -> PageTestAccess.recordingContext(new AtomicInteger()));
+            var stores = new DataStores(memory.make(), memory::make, () -> PageTestAccess.recordingContext(new AtomicInteger()),
+                () -> false);
             items = new BrowserItems(context, settings.get()::read, stores, page -> { });
         }
 

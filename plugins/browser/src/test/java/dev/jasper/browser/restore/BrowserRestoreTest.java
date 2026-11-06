@@ -561,35 +561,6 @@ class BrowserRestoreTest {
         assertThat(BrowserRestore.devNull(saved(Map.of()))).isFalse();
     }
 
-    /**
-     * Plan 6: a saved /dev/null item comes back in a new /dev/null store of its own at the start page, whatever address it
-     * carries, saving no address; a saved ordinary item comes back in the persistent store, with the setting on too.
-     */
-    @Test void aSavedDevNullItemComesBackAtTheStartPageInANewStoreAndAnOrdinaryOneInThePersistentStore() throws Exception {
-        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
-            var items = restoring(host, page -> { });
-            host.setSetting(ID, "devnull_mode", true);
-            UUID window = host.addTerminalWindow();
-            var withAddress = saved(Map.of("devnull", "true", "url", "https://secret.example/"));
-            assertThat(host.restoreTab(ID, window, "Web Browser", withAddress)).isPresent();
-            BrowserItem one = items.items().getLast();
-            assertThat(one.devNull()).isTrue();
-            assertThat(one.url()).isEqualTo(START);
-            assertThat(host.savedTitle(one.tab())).isEqualTo("Web Browser");
-            assertThat(host.restoreState(one.tab()).orElseThrow().values()).containsOnly(Map.entry("devnull", "true"));
-            assertThat(host.restoreTab(ID, window, "Web Browser", saved(Map.of("devnull", "true")))).isPresent();
-            BrowserItem two = items.items().getLast();
-            assertThat(two.store()).as("a store of its own").isNotSameAs(one.store());
-
-            assertThat(host.restoreTab(ID, window, "Docs", saved(Map.of("url", EXAMPLE.toString(), "devnull", "TRUE")))).isPresent();
-            BrowserItem ordinary = items.items().getLast();
-            assertThat(ordinary.devNull()).as("with the setting on, a saved ordinary item is persistent").isFalse();
-            assertThat(ordinary.store().devNull()).isFalse();
-            assertThat(ordinary.url()).isEqualTo(EXAMPLE);
-            assertThat(host.failures()).isEmpty();
-        } });
-    }
-
     private static RestoreState state(URI url, String target, int zoom) {
         return new RestoreState(BrowserRestore.KIND, Map.of("url", url.toString(), "target", target, "zoom", Integer.toString(zoom)));
     }
@@ -623,13 +594,10 @@ class BrowserRestoreTest {
         var items = new AtomicReference<BrowserItems>();
         host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(), started -> {
             context.set(started);
-            var declared = BrowserSettings.declare(started.settings());
-            var stores = new DataStores(memory.make(), () -> declared.read().devNullMode());
-            items.set(new BrowserItems(started, declared::read, stores, start));
+            var stores = new DataStores(memory.make(), () -> false);
+            items.set(new BrowserItems(started, BrowserSettings.declare(started.settings())::read, stores, start));
             started.windows().restorer(BrowserRestore.KIND, request -> {
-                // As the plugin's restorer chooses the store, which BrowserPluginTest checks in the plugin itself.
-                items.get().restore(request.state(), START, request.window(), wait,
-                    BrowserRestore.devNull(request.state()) ? stores.newDevNull() : stores.persistent());
+                items.get().restore(request.state(), START, request.window(), wait, stores.persistent());
                 return Optional.empty();
             });
         });

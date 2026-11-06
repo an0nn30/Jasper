@@ -402,7 +402,7 @@ class BookmarkPanelTest {
                 settings.set(BrowserSettings.declare(plugin.settings()));
             });
             // Title waits never end, and the engine is never asked: neither is what these tests are about.
-            items = new BrowserItems(context, settings.get()::read, new DataStores(stores), page -> { }, (delay, task) -> () -> { },
+            items = new BrowserItems(context, settings.get()::read, new DataStores(stores, () -> false), page -> { }, (delay, task) -> () -> { },
                 request -> new CompletableFuture<>());
             item = items.open(URI.create(address), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
             String tabTitle = Optional.ofNullable(URI.create(address).getHost()).orElse(TabTitle.UNTITLED);

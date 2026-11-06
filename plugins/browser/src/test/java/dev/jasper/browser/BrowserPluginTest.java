@@ -334,6 +334,13 @@ class BrowserPluginTest {
             assertThat(host.restoreTab(ID, window, "Docs",
                 BrowserRestore.state(URI.create("https://example.com/docs"), Optional.empty(), OptionalInt.empty(), false).orElseThrow())).isPresent();
             assertThat(plugin.items().items().getLast().devNull()).isFalse();
+
+            host.setSetting(ID, "devnull_mode", true);
+            for (String devnull : new String[] { "TRUE", "1" })
+                assertThat(host.restoreTab(ID, window, "Docs", new dev.jasper.sdk.RestoreState(BrowserRestore.KIND,
+                    Map.of("url", "https://example.com/docs", "devnull", devnull)))).isPresent();
+            assertThat(plugin.items().items().subList(plugin.items().items().size() - 2, plugin.items().items().size()))
+                .as("with the setting on, a saved ordinary item comes back persistent").allSatisfy(item -> assertThat(item.devNull()).isFalse());
             assertThat(host.failures()).isEmpty();
         } });
     }

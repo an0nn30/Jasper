@@ -796,7 +796,7 @@ public final class BrowserItem implements AutoCloseable {
                 render();
                 view.selectAll(BrowserToolbar.ADDRESS);
             }
-            case BrowserToolbar.DEVNULL -> toggleDevNullPopover();
+            case BrowserToolbar.DEVNULL -> openDevNullPopover();
             case BrowserToolbar.SETTINGS -> items.showSettings();
             case BrowserToolbar.SHOW_HISTORY, BrowserToolbar.HISTORY -> showHistory();
             case BrowserToolbar.BOOKMARKS -> showBookmarks();
@@ -831,13 +831,12 @@ public final class BrowserItem implements AutoCloseable {
         }));
     }
 
-    /** The /dev/null indicator: opens its popover, or closes it when it is open. */
-    private void toggleDevNullPopover() {
-        if (devNullPopover != null && devNullPopover.open()) {
-            devNullPopover.close();
-            return;
-        }
-        if (devNullPopover != null && devNullPopover.justClosed()) return; // the click that closed it
+    /**
+     * The /dev/null indicator: opens its popover. A click on the indicator while the popover is open dismisses it in the
+     * host, which consumes that press, so this action does not run for it.
+     */
+    private void openDevNullPopover() {
+        if (devNullPopover != null && devNullPopover.open()) return;
         try {
             devNullPopover = DevNullPopover.show(items.context(), view);
         } catch (IllegalArgumentException | IllegalStateException unanchored) { // the view or its indicator cannot anchor now

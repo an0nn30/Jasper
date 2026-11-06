@@ -271,7 +271,7 @@ class DataStoresTest {
 
     /** The stores over {@code plugins}, whose /dev/null stores are in memory with recording contexts. UI thread. */
     private DataStores stores(Stores plugins) {
-        return new DataStores(plugins, memory::make, () -> PageTestAccess.recordingContext(released));
+        return new DataStores(plugins, memory::make, () -> PageTestAccess.recordingContext(released), () -> false);
     }
 
     /** A Chromium that never starts: nothing here asks for its client. */

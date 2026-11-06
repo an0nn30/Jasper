@@ -112,7 +112,7 @@ class WebAddressItemsTest {
                 context.set(plugin);
                 recorded.context = plugin;
                 var settings = BrowserSettings.declare(plugin.settings());
-                new BrowserItems(plugin, settings::read, new DataStores(memory.make()), page -> { });
+                new BrowserItems(plugin, settings::read, new DataStores(memory.make(), () -> false), page -> { });
                 WebAddressItems.register(plugin, recorded, settings);
             });
             assertThat(host.contextMenu(second)).containsExactlyElementsOf(SHOWN);
@@ -146,7 +146,7 @@ class WebAddressItemsTest {
             host.start(INFO, Set.of(), Set.of(), plugin -> {
                 declined.context = plugin;
                 var settings = BrowserSettings.declare(plugin.settings());
-                new BrowserItems(plugin, settings::read, new DataStores(memory.make()), page -> { });
+                new BrowserItems(plugin, settings::read, new DataStores(memory.make(), () -> false), page -> { });
                 WebAddressItems.register(plugin, declined, settings);
             });
             assertThat(host.chooseFromContextMenu(pane, RIGHT)).isTrue();
@@ -167,7 +167,7 @@ class WebAddressItemsTest {
             var chromium = new AtomicReference<>(Chromium.State.NOT_STARTED);
             host.start(INFO, Set.of(), Set.of(), plugin -> {
                 var settings = BrowserSettings.declare(plugin.settings());
-                items.set(new BrowserItems(plugin, settings::read, new DataStores(memory.make()), page -> { }));
+                items.set(new BrowserItems(plugin, settings::read, new DataStores(memory.make(), () -> false), page -> { }));
                 var role = new BrowserRole(plugin, items.get(), settings, chromium::get);
                 plugin.platform().browser(role);
                 WebAddressItems.register(plugin, role, settings);
