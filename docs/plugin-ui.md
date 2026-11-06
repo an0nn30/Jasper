@@ -67,6 +67,7 @@ control shows.
 | `Sorted` | the owner and the column | a click on a table's or tree's column header; the owner orders the rows |
 | `ColumnsResized` | the owner and the widths of its columns | a header boundary drag or double-click fit that has ended; the kit already shows the widths |
 | `SuggestionChosen` | the field, the suggestion and whether Tab chose it | Tab or Enter on a field's selected suggestion, or a click on one; the list has hidden |
+| `TokensChanged` | the token field and its whole list of tokens | a token added (Enter, a comma, the focus leaving) or removed (Backspace, a token's remove button); the field already shows it |
 
 Users drag a column boundary in any table or column tree to resize and double-click it to fit the column; the kit keeps
 the widths for the open view until the plugin changes its column ids or a column's `width`. A plugin remembers them across restarts with
@@ -351,6 +352,25 @@ that fill in the defaults; the [SDK reference](sdk-reference.html#dev.jasper.sdk
   edit selects the first again. A `TEXTAREA` and a `NUMBER` field take no suggestions, nor does a field with a
   `listId`.
 
+[`TokenField`](sdk-reference.html#dev.jasper.sdk.ui.Nodes.TokenField)`(label, hint, tokens)` (SDK 0.29.0) holds short
+tokens, such as a bookmark's tags. Each token shows as a chip in the look's tag style, in the case the user typed it,
+with a remove button inside it named "Remove" and the token, and the user types the next token after the chips, which
+wrap as the field fills. The label shows over the field as a `STANDARD` field's does, except in a `FormRow`, a
+`SettingRow` or a prompt, and is always the accessible name; the hint shows while there are no tokens and nothing is
+typed.
+
+- Enter adds the typed text as a token, and so does the focus leaving the field; a comma, a line break or a tab, typed
+  or pasted, ends the token before it. Enter with nothing typed reaches the form's `PRIMARY`. Backspace with nothing
+  typed removes the last token. Each change reports `TokensChanged` with the whole list, once.
+- The field is one Tab stop. Left with the caret at the start of the typed text selects the last chip, which shows the
+  focus ring; Left, Right, Home and End move among the chips; Backspace or Delete removes the selected chip's token and
+  selects the chip before or after it; Right past the last chip, Escape and typing return to the typed text.
+- The tokens follow [`TokenField.kept`](sdk-reference.html#dev.jasper.sdk.ui.Nodes.TokenField.kept(List)): trimmed,
+  nonblank, at most 64 characters, without control characters, no two matching ignoring the case of ASCII letters, and
+  at most 100. Typed text the rule refuses is dropped, and a field whose `tokens` break it is refused.
+- The field shows each change at once. An update that changes `tokens`, or one that comes while the field reports a
+  change and differs from what it shows, replaces them and keeps the text being typed.
+
 ### Secrets
 
 [`Secret`](sdk-reference.html#dev.jasper.sdk.ui.Nodes.Secret)`(hint, label, revealGroup, kind, copyAction,
@@ -586,6 +606,10 @@ event dispatch thread, so run the test in `SwingUtilities.invokeAndWait`. A plug
   answers by selecting all its text; `setComposing(id, true)` plays an input method.
 - `press(id, key)` presses `UP`, `DOWN`, `TAB`, `ENTER` or `ESCAPE` in a field as a person would, and
   `suggestions(id)` and `selectedSuggestion(id)` show what its list of suggestions shows.
+- In a token field, `type(id, text)` types the next token (each comma, line break or tab adds the text before it),
+  `press(id, key)` takes `ENTER`, `BACK_SPACE`, `LEFT`, `RIGHT`, `HOME`, `END`, `DELETE` and `ESCAPE`,
+  `removeToken(id, token)` clicks a token's remove button, and `tokens(id)`, `tokenText(id)` and `selectedToken(id)`
+  show its tokens, the text typed and the chip the keyboard selected; moving the focus elsewhere adds the typed text.
 - `choose(id, path...)` chooses an item of a menu button's menu or a button's hold menu as a person would, by item ids
   from the menu down through submenus; a disabled item, a submenu, a separator and the children of a disabled submenu
   report nothing.

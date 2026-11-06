@@ -1,10 +1,10 @@
 # Command palette
 
 The command palette is one search over Jasper's commands and over every scope the plugins add: shell history,
-snippets, project files, recent files, Vault logins, SSH hosts, tunnels and file servers. Open it with
-**Command Palette** (Cmd+Shift+P on macOS, Ctrl+Shift+P on Linux and Windows), View › Command Palette, a click on the
-header's search field, or a scope's own shortcut (see [bundled scopes](#bundled-scopes)). It opens only in the active
-window.
+snippets, project files, recent files, Vault logins, SSH hosts, tunnels, file servers, bookmarks and visited sites. Open
+it with **Command Palette** (Cmd+Shift+P on macOS, Ctrl+Shift+P on Linux and Windows), View › Command Palette, a click
+on the header's search field, or a scope's own shortcut (see [bundled scopes](#bundled-scopes)). It opens only in the
+active window.
 
 The active [look](looks.md) decides how the palette shows. The default look drops a [card](#the-card) from the
 header's search field; the [Enterprise look](enterprise.md) shows the [Run window](#the-run-window). Both search, rank
@@ -131,7 +131,8 @@ a ▼ menu, "Choose what to open", which lists All and every scope with its shor
 ## Bundled scopes
 
 Commands is built in; every other scope belongs to a [bundled plugin](plugins.md) and goes when that plugin is
-disabled. Openers are actions, rebindable in Settings › Keymap; "none" means no default shortcut.
+disabled. Openers are actions, rebindable in Settings › Keymap; "none" means no default shortcut, and "no opener" that
+the scope has no opener action.
 
 | Scope (chip) | Id | Enter | Cmd+Enter (Ctrl+Enter) | Shift+Enter | Opener, macOS / Linux and Windows | In All | In recents |
 |---|---|---|---|---|---|---|---|
@@ -144,18 +145,21 @@ disabled. Openers are actions, rebindable in Settings › Keymap; "none" means n
 | SSH (Remote) | `dev.jasper.remote.scope` | Connect | Connect in split | Edit host… | Connect to SSH Host..., Cmd+Shift+H / Ctrl+Shift+H | yes | yes |
 | Tunnels (Remote) | `dev.jasper.remote.tunnels.scope` | Start or stop | Open in browser | Edit tunnel… | Start or Stop a Tunnel..., none | yes | yes |
 | File Servers (File Server) | `dev.jasper.fileserver.scope` | Start or Stop | Edit | | Start or Stop a File Server…, none | yes | no |
+| Bookmarks (Browser) | `dev.jasper.browser.scope.bookmarks` | Open | | | no opener | yes | yes |
+| Browser History (Browser) | `dev.jasper.browser.scope.history` | Open | | | no opener | yes | no |
 
 - History's Save as snippet… is there only while the Snippets plugin runs.
 - History is searched in All but never offered before you type, since shell commands can hold anything. Vault logins
-  are searched only with the Vault chip. History, Vault and File Servers never appear among the empty query's rows.
+  are searched only with the Vault chip. History, Vault, File Servers and Browser History never appear among the empty
+  query's rows.
 - The Tunnels scope is not tied to its opener: a shortcut you bind to Start or Stop a Tunnel... opens the palette on
   the Tunnels chip, but does nothing while the card is open, and the Run window's ▼ menu shows no shortcut for Tunnels.
 - The Sample plugin adds a Greetings scope (Paste, Paste and run; opener Sample Greetings…, Cmd+Option+Y on macOS and
   Ctrl+Alt+Shift+Y on Linux and Windows) only when its `demo_scope` setting is on.
 
 What each scope lists and does is described with its plugin: [Shell History and Snippets](history-and-snippets.md),
-[Project Index](project-index.md), [Editor](editor.md), [Credential Vault](credential-vault.md), [Remote](remote.md)
-and [File Server](file-server.md).
+[Project Index](project-index.md), [Editor](editor.md), [Credential Vault](credential-vault.md), [Remote](remote.md),
+[File Server](file-server.md) and [Browser](browser.md#palette-scopes).
 
 ## Commands
 

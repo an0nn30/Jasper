@@ -141,7 +141,7 @@ class DevToolsTest {
 
     /** A page whose DevTools Chromium is asked for through the test, which records each ask and each close at its point. */
     private Page page() {
-        Page page = new Page(PAGE, () -> { }, PageTestAccess.noFavicons());
+        Page page = new Page(PAGE, () -> { }, PageTestAccess.noFavicons(), Runnable::run);
         page.useDevToolsOpener((tools, at) -> {
             String point = at.x + "," + at.y;
             asked.add(point);

@@ -16,6 +16,7 @@ final class KitValues {
  case dev.jasper.sdk.ui.Nodes.Choice n -> new dev.jasper.ui.model.Nodes.Choice(n.id(), toModule(n.state()), dev.jasper.ui.model.Nodes.ChoiceKind.valueOf(n.kind().name()), n.options().stream().map(KitValues::toModule).toList(), n.selectedId(), n.label(), n.action(), n.icon(), n.search().map(KitValues::toModule), n.face().map(KitValues::toModule));
  case dev.jasper.sdk.ui.Nodes.Toggle n -> new dev.jasper.ui.model.Nodes.Toggle(n.id(), toModule(n.state()), n.label(), n.checked(), n.action(), n.compact(), n.tooltip(), n.pending());
  case dev.jasper.sdk.ui.Nodes.Chip n -> new dev.jasper.ui.model.Nodes.Chip(n.id(), toModule(n.state()), n.label(), dev.jasper.ui.model.Nodes.Hue.valueOf(n.hue().name()));
+ case dev.jasper.sdk.ui.Nodes.TokenField n -> new dev.jasper.ui.model.Nodes.TokenField(n.id(), toModule(n.state()), n.label(), n.hint(), n.tokens());
  case dev.jasper.sdk.ui.Nodes.Progress n -> new dev.jasper.ui.model.Nodes.Progress(n.id(), toModule(n.state()), n.fraction(), n.label());
  case dev.jasper.sdk.ui.Nodes.Strength n -> new dev.jasper.ui.model.Nodes.Strength(n.id(), toModule(n.state()), n.filled(), n.label());
  case dev.jasper.sdk.ui.Nodes.Stack n -> new dev.jasper.ui.model.Nodes.Stack(n.id(), toModule(n.state()), dev.jasper.ui.model.Nodes.LayoutRole.valueOf(n.role().name()), n.children().stream().map(KitValues::toModule).toList(), n.cancelAction());
@@ -83,5 +84,6 @@ final class KitValues {
  case dev.jasper.ui.model.UiEvent.ColumnsResized n -> new dev.jasper.sdk.ui.UiEvent.ColumnsResized(n.id(), n.widths());
  case dev.jasper.ui.model.UiEvent.Clicked n -> new dev.jasper.sdk.ui.UiEvent.Clicked(n.id(), n.itemId());
  case dev.jasper.ui.model.UiEvent.SuggestionChosen n -> new dev.jasper.sdk.ui.UiEvent.SuggestionChosen(n.fieldId(), n.suggestionId(), n.byTab());
+ case dev.jasper.ui.model.UiEvent.TokensChanged n -> new dev.jasper.sdk.ui.UiEvent.TokensChanged(n.id(), n.tokens());
  }; }
 }

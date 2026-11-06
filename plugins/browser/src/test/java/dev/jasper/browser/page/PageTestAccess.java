@@ -1,5 +1,7 @@
 package dev.jasper.browser.page;
 
+import dev.jasper.browser.store.Reached;
+
 /** Test-only access to what Chromium's handlers tell a page, for tests outside this package. */
 public final class PageTestAccess {
     private PageTestAccess() { }
@@ -78,13 +80,35 @@ public final class PageTestAccess {
     }
 
     /**
-     * The page's main frame starts loading {@code url}, as the client's load handler tells it. UI thread.
+     * The page's main frame starts loading {@code url}, reached in a way Chromium does not name ({@link Reached#OTHER}), as
+     * the client's load handler tells it. UI thread.
      *
      * @param page a page
      * @param url what it loads
      */
     public static void loadStarted(Page page, String url) {
-        page.loadStarted(url);
+        page.loadStarted(url, Reached.OTHER);
+    }
+
+    /**
+     * The page's main frame starts loading {@code url}, reached {@code reached}, as the client's load handler tells it.
+     * UI thread.
+     *
+     * @param page a page
+     * @param url what it loads
+     * @param reached how the load reached it
+     */
+    public static void loadStarted(Page page, String url, Reached reached) {
+        page.loadStarted(url, reached);
+    }
+
+    /**
+     * The page's main frame finished loading its document, as the client's load handler tells it. UI thread.
+     *
+     * @param page a page
+     */
+    public static void loadEnded(Page page) {
+        page.loadEnded();
     }
 
     /**
@@ -107,6 +131,76 @@ public final class PageTestAccess {
      */
     public static void useHistoryJumper(Page page, java.util.function.ObjIntConsumer<Page> jumper) {
         page.useHistoryJumper(jumper);
+    }
+
+    /**
+     * Has {@code page} put text into its focused field with {@code inserter} from now on, which is told the page and each
+     * text and answers what became of it, as the page's script would: a test's, as a page without Chromium inserts
+     * nothing.
+     *
+     * @param page a page
+     * @param inserter answers each insertion
+     */
+    public static void useFieldInserter(Page page, java.util.function.BiFunction<Page, String,
+            java.util.concurrent.CompletableFuture<Page.Insertion>> inserter) {
+        page.useFieldInserter(inserter);
+    }
+
+    /**
+     * Has {@code page} type text where its focus is with {@code inserter} from now on, which is told the page and each
+     * text and answers once it is typed, as DevTools' {@code Input.insertText} would: a test's, as a page without
+     * Chromium types nothing.
+     *
+     * @param page a page
+     * @param inserter answers each typing
+     */
+    public static void useTextInserter(Page page, java.util.function.BiFunction<Page, String,
+            java.util.concurrent.CompletableFuture<Void>> inserter) {
+        page.useTextInserter(inserter);
+    }
+
+    /**
+     * Has {@code page} press Return with {@code presser} from now on, which is told the page each time: a test's
+     * recording one, as a page without Chromium presses nothing.
+     *
+     * @param page a page
+     * @param presser told each Return
+     */
+    public static void useReturnPresser(Page page, java.util.function.Consumer<Page> presser) {
+        page.useReturnPresser(presser);
+    }
+
+    /**
+     * Has {@code page} read its selection with {@code reader} from now on, which is told the page each time and answers
+     * what is selected, as the page's script would: a test's, as a page without Chromium has nothing selected.
+     *
+     * @param page a page
+     * @param reader answers each read
+     */
+    public static void useSelectionReader(Page page, java.util.function.Function<Page,
+            java.util.concurrent.CompletableFuture<Page.Selection>> reader) {
+        page.useSelectionReader(reader);
+    }
+
+    /**
+     * Has {@code page} run Chromium's copy in its focused frame with {@code copier} from now on, which is told the page
+     * each time: a test's recording one, as a page without Chromium copies nothing.
+     *
+     * @param page a page
+     * @param copier told each copy
+     */
+    public static void useCopier(Page page, java.util.function.Consumer<Page> copier) {
+        page.useCopier(copier);
+    }
+
+    /**
+     * The user finished a selection in the page, as its canvas tells 100 ms after the last selection gesture: those who
+     * asked {@link Page#onSelectionGesture} are told. UI thread.
+     *
+     * @param page a page
+     */
+    public static void selectionGesture(Page page) {
+        page.selectionGestured();
     }
 
     /**

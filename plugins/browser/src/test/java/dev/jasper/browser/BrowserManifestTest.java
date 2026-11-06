@@ -15,14 +15,18 @@ class BrowserManifestTest {
         assertThat(string("name")).isEqualTo("Browser");
         assertThat(string("version")).isEqualTo("0.2.0");
         assertThat(string("entry")).isEqualTo(BrowserPlugin.class.getName());
-        assertThat(string("sdk")).isEqualTo(">=0.28.0, <0.29");
+        assertThat(string("sdk")).isEqualTo(">=0.29.0, <0.30");
         assertThat(raw("enabled_by_default")).isEqualTo("true");
         assertThat(string("icon")).isEqualTo("icons/browser.svg");
     }
 
-    /** Opening a page in the application's default browser goes through {@code Platform.browser}, which needs this. */
-    @Test void theBrowserDeclaresBrowserProvideAndNothingElseYet() throws IOException {
-        assertThat(list("capabilities")).containsExactly("browser.provide");
+    /**
+     * Opening a page in the application's default browser goes through {@code Platform.browser}, which needs the first;
+     * the Bookmarks and Browser History scopes need the second. Text inserted into a page never goes through the
+     * clipboard (H30), so the Browser reads none.
+     */
+    @Test void theBrowserDeclaresBrowserProvideAndPaletteContribute() throws IOException {
+        assertThat(list("capabilities")).containsExactly("browser.provide", "palette.contribute");
     }
 
     /** The Markdown preview's API is the one package other plugins may compile against. */

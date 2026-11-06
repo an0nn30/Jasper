@@ -10,6 +10,8 @@ import dev.jasper.sdk.palette.PaletteStep;
 import dev.jasper.sdk.palette.PaletteVerb;
 import dev.jasper.sdk.palette.ScopeSpec;
 import dev.jasper.sdk.terminal.PaneHandle;
+import dev.jasper.sdk.ui.InsertedText;
+import dev.jasper.sdk.ui.TextTarget;
 import dev.jasper.snippets.api.SnippetService;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -19,7 +21,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
-/** The Snippets scope: Enter inserts (pastes), Cmd/Ctrl+Enter pastes and runs, Shift+Enter edits the file. */
+/**
+ * The Snippets scope: Enter inserts (pastes), Cmd/Ctrl+Enter pastes and runs, Shift+Enter edits the file. Both go into the
+ * query's pane, or with none into its text target, such as a browser page's field.
+ */
 final class SnippetsScope implements PaletteScope {
     /** Spec 13: the first verb reads Insert; its id stays {@code paste}, which palette history keys on. */
     static final PaletteVerb PASTE = new PaletteVerb("paste", "Insert");
@@ -91,7 +96,10 @@ final class SnippetsScope implements PaletteScope {
         return tier;
     }
 
-    private static boolean live(PaletteQuery context) { return context.target().map(PaneHandle::isOpen).orElse(false); }
+    /** A pane to paste into, or with none the window's current item when it takes inserted text, such as a browser page. */
+    private static boolean live(PaletteQuery context) {
+        return context.target().map(PaneHandle::isOpen).orElse(false) || context.textTarget().map(TextTarget::isOpen).orElse(false);
+    }
 
     @Override public boolean available(PaletteRow row, PaletteVerb verb, PaletteQuery context) {
         if (row.token() instanceof Snippet snippet)
@@ -118,11 +126,15 @@ final class SnippetsScope implements PaletteScope {
 
     @Override public Subscription onChanged(Runnable listener) { return store.onChanged(listener); }
 
+    /** Into the pane, or with none into the text target, which presses Return itself for Paste and run. */
     private static void paste(String text, PaletteVerb verb, PaletteQuery context) {
-        context.target().ifPresent(pane -> {
+        if (context.target().isPresent()) {
+            PaneHandle pane = context.target().get();
             pane.paste(text);
             if (verb.equals(PASTE_RUN)) pane.sendText("\r");
-        });
+        } else {
+            context.textTarget().ifPresent(target -> target.insert(new InsertedText(text, verb.equals(PASTE_RUN))));
+        }
     }
 
     private static PaletteRow row(Snippet snippet) {

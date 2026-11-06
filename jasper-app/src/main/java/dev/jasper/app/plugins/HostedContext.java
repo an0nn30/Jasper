@@ -300,6 +300,11 @@ final class HostedContext implements PluginContext {
                     gate.audit(Capabilities.CLIPBOARD_READ, "read " + text.map(String::length).orElse(0) + " characters from the clipboard");
                     return text;
                 }
+                /** Any thread: the runtime publishes the setting into a volatile field (browser plan 5 Task 10). */
+                @Override public boolean copyOnSelect() {
+                    requireOpen();
+                    return host.copyOnSelect;
+                }
                 @Override public Subscription editor(dev.jasper.sdk.ui.FileEditor editor) {
                     requireOpen();
                     requireUi("Platform.editor");

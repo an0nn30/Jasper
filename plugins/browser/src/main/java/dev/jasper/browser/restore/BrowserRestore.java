@@ -92,19 +92,21 @@ public final class BrowserRestore {
     }
 
     /**
-     * {@code url} without its user name and password, which an item neither saves nor shows: everything else in it
-     * stays as written, escapes included.
+     * {@code url} without its user name and password, which an item neither saves nor shows: what its authority holds up
+     * to its last {@code @}, as Chromium reads it. Everything else in it stays as written, escapes included. An authority
+     * {@link URI} reads as a registry, such as one whose host has an underscore, has no user information of its own in
+     * {@link URI}'s terms, and loses it all the same.
      *
      * @param url an address
      * @return the address without its user information; {@code url} itself when it has none
      */
     public static URI withoutUserInfo(URI url) {
-        String userInfo = url.getRawUserInfo();
-        if (userInfo == null) return url;
-        // A URI with user information has a server authority, which starts with it and its '@'.
+        String authority = url.getRawAuthority();
+        int at = authority == null ? -1 : authority.lastIndexOf('@');
+        if (at < 0) return url;
         var address = new StringBuilder();
         if (url.getScheme() != null) address.append(url.getScheme()).append(':');
-        address.append("//").append(url.getRawAuthority(), userInfo.length() + 1, url.getRawAuthority().length());
+        address.append("//").append(authority, at + 1, authority.length());
         if (url.getRawPath() != null) address.append(url.getRawPath());
         if (url.getRawQuery() != null) address.append('?').append(url.getRawQuery());
         if (url.getRawFragment() != null) address.append('#').append(url.getRawFragment());

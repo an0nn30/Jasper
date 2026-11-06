@@ -158,7 +158,7 @@ class PageNavigationTest {
     }
 
     private static Page page() {
-        return new Page(URI.create("https://example.com/"), () -> { }, PageTestAccess.noFavicons());
+        return new Page(URI.create("https://example.com/"), () -> { }, PageTestAccess.noFavicons(), Runnable::run);
     }
 
     private static void onUiThread(Runnable test) throws Exception {

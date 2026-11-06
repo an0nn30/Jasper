@@ -156,6 +156,7 @@ them under each plugin's name.
 | Browser | Back | `dev.jasper.browser.back` | Cmd+[ | Alt+Left | Browser tabs |
 | Browser | Forward | `dev.jasper.browser.forward` | Cmd+] | Alt+Right | Browser tabs |
 | Browser | Reload Page | `dev.jasper.browser.reload` | Cmd+R | Ctrl+R | Browser tabs |
+| Browser | History | `dev.jasper.browser.history` | Cmd+Y | Ctrl+H | Browser tabs |
 
 The Sample plugin registers its demo actions only when its demo settings are on: **Run Sample Activity**
 (`dev.jasper.sample.demo`, Cmd+Option+J; Ctrl+Alt+Shift+J) and **Sample Greetings…**
@@ -166,6 +167,12 @@ History ([Browser](browser.md#the-web-menu-and-keys)). In a browser tab, Find, F
 page, on their keys and, on Linux and Windows, on Ctrl+F, F3 and Shift+F3 too, as in Editor tabs
 ([Find in page](browser.md#find-in-page)); the window's Increase, Decrease and Reset Font Size zoom it
 ([Zoom](browser.md#zoom)).
+
+On Linux and Windows, Ctrl+H deletes nothing in the text fields and tag fields of Jasper's settings and plugin panels,
+such as the browser's address field and those of Settings, the Vault manager and the SFTP panel: they leave it to the
+keymap, so in a browser tab it opens History, and elsewhere, or with the Browser plugin off, it does nothing. Password
+fields, searchable drop-downs, the search field of a picker menu, an edited breadcrumb path and a terminal pane's
+[find bar](terminal.md#find) keep Ctrl+H as Backspace.
 
 While an Editor file's pane is active, the Editor's own commands take their keys, for example Cmd+S (Ctrl+S) to save.
 They are listed in the Editor tab's right-click menu and in [Editor](editor.md#commands-and-shortcuts), and are not part

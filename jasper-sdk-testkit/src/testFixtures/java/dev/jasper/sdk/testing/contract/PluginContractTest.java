@@ -23,6 +23,7 @@ import dev.jasper.sdk.notifications.Severity;
 import dev.jasper.sdk.ui.ActionSpec;
 import dev.jasper.sdk.ui.Anchor;
 import dev.jasper.sdk.ui.DialogSpec;
+import dev.jasper.sdk.ui.InsertedText;
 import dev.jasper.sdk.ui.PanelHost;
 import dev.jasper.sdk.ui.PanelMode;
 import dev.jasper.sdk.ui.PanelPlacement;
@@ -3594,6 +3595,115 @@ public abstract class PluginContractTest {
             assertThat(things.log.getLast()).isEqualTo("search::" + window + ":-");
         }
 
+        /**
+         * One row, "ls", and every query it was given; its verbs insert the row's title into the query's text target,
+         * "paste_run" with Return after it, as Snippets does with no pane (browser plan 5 Task 10).
+         */
+        static final class Words implements PaletteScope {
+            static final PaletteVerb PASTE_RUN = new PaletteVerb("paste_run", "Paste and run");
+            final String id; final List<PaletteQuery> queries = new CopyOnWriteArrayList<>();
+            Words(String id) { this.id = id; }
+            @Override public ScopeSpec spec() { return ScopeSpec.of(id, "Words", "Search words", List.of(PASTE, PASTE_RUN)); }
+            @Override public PaletteResults search(String query, PaletteQuery context) {
+                queries.add(context);
+                return PaletteResults.of(List.of(PaletteRow.of("ls", "ls")));
+            }
+            @Override public void execute(PaletteRow row, PaletteVerb verb, PaletteQuery context) {
+                queries.add(context);
+                context.textTarget().ifPresent(target -> target.insert(new InsertedText(row.title(), verb.equals(PASTE_RUN))));
+            }
+            @Override public Subscription onChanged(Runnable listener) { return () -> { }; }
+            PaletteQuery last() { return queries.getLast(); }
+        }
+
+        /** Starts {@code test.page}, which opens no tab yet, and {@code test.a} with {@code words} and {@code capabilities}. */
+        private PluginContext pageAndWords(Words words, String... capabilities) {
+            var page = new AtomicReference<PluginContext>();
+            h.start(info("test.page"), Set.of(), Set.of(), page::set);
+            h.start(info("test.a", capabilities), Set.of(), Set.of(), context -> context.palette().register(words));
+            return page.get();
+        }
+
+        /**
+         * Browser plan 5 Task 10 (SDK 0.29.0): the window's current item, a content tab whose plugin set an insertion, is
+         * the text target of a query for that window with no pane, read again at each search and run. Inserting reaches
+         * the insertion once, with the text and whether Return follows; a kept target follows its tab, so clearing the
+         * insertion or closing the tab stops it, and the next query names none.
+         */
+        @Test void aContentTabThatTakesTextIsThePalettesTextTarget() {
+            UUID window = h.addTerminalWindow();
+            var words = new Words("test.a.words");
+            PluginContext page = pageAndWords(words, Capabilities.PALETTE_CONTRIBUTE, Capabilities.TERMINAL_INJECT);
+            var tab = new AtomicReference<dev.jasper.sdk.ui.ContentTab>();
+            List<InsertedText> taken = new CopyOnWriteArrayList<>();
+            h.ui(() -> tab.set(openContent(page, window, "page", "Page")));
+            h.searchScope("test.a.words", "", window, null);
+            assertThat(words.last().textTarget()).as("a tab with no insertion takes no text").isEmpty();
+            h.ui(() -> tab.get().setTextInsertion(Optional.of(taken::add)));
+            assertThat(h.searchScope("test.a.words", "", window, null)).containsExactly("ls|ls|true");
+            assertThat(words.last().target()).isEmpty();
+            var kept = words.last().textTarget();
+            assertThat(kept).as("the window's current item takes text").isPresent();
+            h.ui(() -> assertThat(kept.get().isOpen()).isTrue());
+            h.executeInScope("test.a.words", "ls", "paste_run", window, null);
+            assertThat(words.last().textTarget()).as("read again for the run").isPresent();
+            assertThat(taken).as("once, with Return after it").containsExactly(new InsertedText("ls", true));
+            h.ui(() -> tab.get().setTextInsertion(Optional.empty()));
+            h.ui(() -> {
+                assertThat(kept.get().isOpen()).as("the insertion was cleared").isFalse();
+                kept.get().insert(new InsertedText("pwd", false));
+            });
+            h.searchScope("test.a.words", "", window, null);
+            assertThat(words.last().textTarget()).as("read again at each search").isEmpty();
+            h.ui(() -> tab.get().setTextInsertion(Optional.of(taken::add)));
+            h.searchScope("test.a.words", "", window, null);
+            var again = words.last().textTarget();
+            assertThat(again).isPresent();
+            h.ui(() -> {
+                tab.get().close();
+                assertThat(again.get().isOpen()).as("closed with its tab").isFalse();
+                again.get().insert(new InsertedText("pwd", false));
+                tab.get().setTextInsertion(Optional.of(taken::add));
+            });
+            h.executeInScope("test.a.words", "ls", "paste", window, null);
+            assertThat(taken).as("a cleared or closed tab takes nothing").containsExactly(new InsertedText("ls", true));
+        }
+
+        /** Browser plan 5 Task 10 (SDK 0.29.0): inserting into a text target needs terminal.inject, as typing into a pane does. */
+        @Test void insertingTextNeedsTerminalInject() {
+            UUID window = h.addTerminalWindow();
+            var words = new Words("test.a.words");
+            PluginContext page = pageAndWords(words, Capabilities.PALETTE_CONTRIBUTE);
+            List<InsertedText> taken = new CopyOnWriteArrayList<>();
+            h.ui(() -> openContent(page, window, "page", "Page").setTextInsertion(Optional.of(taken::add)));
+            h.searchScope("test.a.words", "", window, null);
+            var target = words.last().textTarget().orElseThrow();
+            h.ui(() -> assertThatThrownBy(() -> target.insert(new InsertedText("ls", false)))
+                .isInstanceOfSatisfying(MissingCapabilityException.class,
+                    missing -> assertThat(missing.capability()).isEqualTo(Capabilities.TERMINAL_INJECT)));
+            assertThat(taken).isEmpty();
+        }
+
+        /**
+         * Browser plan 5 Task 10 (SDK 0.29.0): a query from a terminal pane names no text target, though a content tab that
+         * takes text is the window's current item, and neither does a query while a terminal is the current item.
+         */
+        @Test void aTerminalPaneOriginGivesNoTextTarget() {
+            UUID window = h.addTerminalWindow(), shell = h.addTerminalTab(window, "zsh");
+            UUID pane = h.addTerminalPane(shell, "zsh", Path.of("/src"));
+            var words = new Words("test.a.words");
+            PluginContext page = pageAndWords(words, Capabilities.PALETTE_CONTRIBUTE, Capabilities.TERMINAL_INJECT);
+            h.ui(() -> openContent(page, window, "page", "Page").setTextInsertion(Optional.of(text -> { })));
+            h.searchScope("test.a.words", "", window, pane);
+            assertThat(words.last().target()).isPresent();
+            assertThat(words.last().textTarget()).as("a terminal pane is the origin").isEmpty();
+            h.searchScope("test.a.words", "", window, null);
+            assertThat(words.last().textTarget()).as("the content tab is the current item").isPresent();
+            h.focusTerminalPane(pane);
+            h.searchScope("test.a.words", "", window, null);
+            assertThat(words.last().textTarget()).as("the terminal is the current item").isEmpty();
+        }
+
         @Test void duplicateScopeIdsFailEachRegistrationRemovesOnlyItselfAndAStoppedPluginsScopesVanish() {
             var a = new AtomicReference<PluginContext>();
             h.start(info("test.a", Capabilities.PALETTE_CONTRIBUTE), Set.of(), Set.of(), a::set);
@@ -4750,6 +4860,20 @@ public abstract class PluginContractTest {
         h.defaultBrowser(true);
         h.flush();
         assertThat(heard).as("nor a stopped plugin's").hasSize(3);
+    }
+
+    /**
+     * Browser plan 5 Task 10 (SDK 0.29.0): {@code copyOnSelect} gives the user's Copy on select setting, off until the host
+     * publishes it on, on any thread, and a change applies from the next read.
+     */
+    @Test void copyOnSelectFollowsTheTerminalSetting() {
+        PluginContext a = started("test.a", Set.of());
+        assertThat(a.platform().copyOnSelect()).as("off by default").isFalse();
+        h.copyOnSelect(true);
+        assertThat(a.platform().copyOnSelect()).as("read off the UI thread").isTrue();
+        h.ui(() -> assertThat(a.platform().copyOnSelect()).as("and on it").isTrue());
+        h.copyOnSelect(false);
+        assertThat(a.platform().copyOnSelect()).as("the user turned it off").isFalse();
     }
 
     @Test void theCommandLineNamesTheClientOnceTheHostKnowsIt() {

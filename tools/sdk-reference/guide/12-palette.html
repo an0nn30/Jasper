@@ -85,11 +85,15 @@ plugin registered before, the icon must be a known name, and an id already in us
 display order, an optional section label (a heading over the rows while the scope's chip is shown) and the row to select first. The
 {@link PaletteQuery} says which window the palette is in, which pane it was opened from ({@code target}), how many rows
 the scope may return ({@code maxResults}: 200 on its own chip, its share of the 200 in All, 50 when Jasper looks a recent
-use up again) and whether to show macOS glyphs. Jasper cuts the answer to {@code maxResults}.</p>
+use up again) and whether to show macOS glyphs. Jasper cuts the answer to {@code maxResults}. With no target pane,
+{@code textTarget} is the content tab the palette was opened from, or the Run window's current item, while its plugin
+takes inserted text ({@link ContentTab#setTextInsertion(Optional)}): {@link TextTarget#insert(InsertedText)} hands it an
+{@link InsertedText}, the text and whether Return follows it, and does nothing once {@link TextTarget#isOpen()} is
+false. Jasper reads both targets again before each search and run.</p>
 <p>A row has an id (unique in one answer, at most 256 characters), a title, an optional detail shown after it, a tag at
 the right (such as a shortcut), an icon, an enabled flag (a disabled row is dimmed and cannot run) and a token, any object
-of the scope's, which comes back unchanged with the row. The target pane is a handle bound to the scope's plugin: typing
-or pasting into it needs {@code terminal.inject}.</p>
+of the scope's, which comes back unchanged with the row. The target pane and the text target are handles bound to the
+scope's plugin: typing, pasting or inserting into them needs {@code terminal.inject}.</p>
 <p>Every {@link PaletteScope} method runs on the UI thread and must do no I/O: a scope that reads files keeps an index,
 refreshes it in the background, and tells the palette with the listener {@link PaletteScope#onChanged(Runnable)} gave it,
 which reruns an open query. {@link PaletteScope#activated(PaletteQuery)} is called when the palette opens on the scope's

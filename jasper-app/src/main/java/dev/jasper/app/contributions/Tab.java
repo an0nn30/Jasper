@@ -10,6 +10,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import javax.swing.Icon;
 import javax.swing.JComponent;
@@ -17,7 +18,7 @@ import javax.swing.JComponent;
 /**
  * One item of any window, the one a pane shows (workspace tabs spec 9.1; tabs and panes spec 3; the code calls an item
  * a tab): its id and kind, its content, its presentation (title, detail, icon, unsaved marker, location, host, status
- * items), its commands and focus target, and the window that holds it. Moving the
+ * items), its commands, focus target and text insertion, and the window that holds it. Moving the
  * tab between windows never replaces this object or its content; only {@link TabRegistry#remove(Tab)} disposes it. EDT
  * only.
  */
@@ -51,6 +52,7 @@ public final class Tab implements AutoCloseable {
     private List<ContentCommand> commands = List.of();
     private List<ContentStatus> status = List.of();
     private Optional<TabRestore> restore = Optional.empty();
+    private Optional<BiConsumer<String, Boolean>> insertion = Optional.empty();
 
     Tab(TabRegistry registry, TabId id, Kind kind, String plugin, String key, String title, TabContent content) {
         this.registry = registry;
@@ -141,6 +143,13 @@ public final class Tab implements AutoCloseable {
     /** What {@link #focus()} runs; the component's own focus request by default. */
     public void focusTarget(Runnable value) { if (!closed) focus = Objects.requireNonNull(value); }
     public void focus() { if (!closed) focus.run(); }
+    /**
+     * What takes the text other plugins insert into a hosted tab, such as a snippet, with whether Return follows it
+     * (SDK 0.29.0's {@code ContentTab.setTextInsertion}); empty takes none. Ignored once closed.
+     */
+    public void insertion(Optional<BiConsumer<String, Boolean>> value) { Objects.requireNonNull(value, "value"); if (!closed) insertion = value; }
+    /** @return what takes inserted text; empty while the tab takes none and once it has closed */
+    public Optional<BiConsumer<String, Boolean>> insertion() { return closed ? Optional.empty() : insertion; }
     /** Shows the tab in its window and raises the window, wherever the tab is now. */
     public void select() { registry.select(this); }
     /** A new window takes the tab, as {@code ContentTab.moveToNewWindow()} asks (tabs and panes spec 13). */
@@ -196,6 +205,7 @@ public final class Tab implements AutoCloseable {
             failure = tell(activation, listener -> listener.accept(false), failure);
         }
         closed = true;
+        insertion = Optional.empty();
         failure = tell(disposed, Runnable::run, failure);
         changed.clear(); disposed.clear(); activation.clear();
         try { content.dispose(); }

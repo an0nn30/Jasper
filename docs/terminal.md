@@ -244,7 +244,8 @@ scrollback and switching to or from the alternate screen.
 
 **Copy** copies the selection to the system clipboard. Rows that wrapped are joined without a line break, other rows end
 with one, trailing spaces are removed from each line, and a rectangle copies each row on its own line. **Copy on
-select** (`terminal.copy_on_select`) copies each finished selection.
+select** (`terminal.copy_on_select`) copies each finished selection, and also the selections you make in browser pages
+([Browser](browser.md#copy-on-select)).
 
 **Paste** sends the clipboard's text to the program and returns the pane to the live screen. Line breaks (`\r\n` or
 `\n`) are sent as carriage returns. When the program has turned on bracketed paste, the text is sent between `ESC [200~`

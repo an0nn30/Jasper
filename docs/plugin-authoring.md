@@ -2,7 +2,7 @@
 
 Most of Jasper is plugins. Remote (SSH, SFTP and tunnels), Credential Vault, the Editor, File Server, Project Index,
 Shell History, Snippets, the Browser and the Enterprise look are bundled plugins built only against the public plugin
-SDK this guide describes; a plugin of yours uses the same SDK and reaches the same places. This guide covers SDK 0.28.0,
+SDK this guide describes; a plugin of yours uses the same SDK and reaches the same places. This guide covers SDK 0.29.0,
 task by task.
 
 - The [SDK reference](sdk-reference.html) documents every type of the SDK, the testkit and the bundled plugins'
@@ -65,7 +65,7 @@ id = "dev.example.tool"
 name = "Tool"
 version = "1.0.0"
 entry = "dev.example.tool.ToolPlugin"
-sdk = ">=0.28.0, <0.29"
+sdk = ">=0.29.0, <0.30"
 description = "Runs the tool from the command palette."
 vendor = "Example"
 homepage = "https://example.dev/tool"
@@ -91,7 +91,7 @@ summary = "Run the tool"
 | `name` | string | yes | Must show something: not only spaces, zero-width or bidi characters. It titles the plugin's row, Settings page and notification groups. |
 | `version` | string | yes | One to three numbers separated by dots, without leading zeros or a pre-release tag; missing numbers are 0, so `1.0` is `1.0.0`. |
 | `entry` | string | yes | The qualified name of the [entry class](#the-entry-point-and-lifecycle), which must be in a package. |
-| `sdk` | string | yes | The SDK versions the plugin runs on: comparators `>=`, `>`, `<=`, `<` or `=` with a version, separated by commas, all of which must hold. A plugin for SDK 0.28.0 declares `sdk = ">=0.28.0, <0.29"`. |
+| `sdk` | string | yes | The SDK versions the plugin runs on: comparators `>=`, `>`, `<=`, `<` or `=` with a version, separated by commas, all of which must hold. A plugin for SDK 0.29.0 declares `sdk = ">=0.29.0, <0.30"`. |
 | `description` | string | no | The Overview on the plugin's details in Settings › Plugins; searched there. |
 | `vendor` | string | no | Shown in the plugin list, its details and its review sheet. |
 | `homepage` | string | no | An absolute `http` or `https` address, linked as "Plugin homepage ↗" on the plugin's details. Anything else is ignored with a warning in the log. |
@@ -226,7 +226,7 @@ window (actions, menus, tool windows, content tabs, dialogs, notifications, sett
 | --- | --- | --- |
 | `terminal.observe` | read `PaneHandle.info()`, `foregroundJob()` and `TabHandle.title()` and other tabs' titles in `ContentTab.tabChoices()` (which does not throw without it: its other tabs read "Tab N"), read a tab's name pieces and add your own, and subscribe to any `jasper.terminal.*` topic | See your terminals: titles, folders, the commands you run and how they end; add to tab names |
 | `terminal.selection` | read `PaneHandle.selection()` | Read the text you select in a terminal |
-| `terminal.inject` | call `PaneHandle.sendText`, `sendBytes` and `paste` | Type into your terminals |
+| `terminal.inject` | call `PaneHandle.sendText`, `sendBytes` and `paste`, and insert text into another plugin's content tab with a palette query's `TextTarget.insert` | Type into your terminals |
 | `terminal.open` | open tabs and splits with a local request (the shell, a profile or a program), open a terminal beside a content tab with `ContentTab.split(SplitChoice.TERMINAL, …)`, and read `Terminals.profiles()` and `onProfilesChanged` | Open terminal tabs, splits and windows, and run programs in them |
 | `session.provide` | open tabs and splits with `OpenRequest.session(...)` | Run its own terminal sessions, such as remote connections |
 | `palette.contribute` | call `Palette.register` and `Palette.open` | Add scopes to the command palette and open it |
@@ -565,13 +565,14 @@ modal now: a modal dialog over it, Jasper's or any plugin's, or an overlay insid
 
 ### Popovers
 
-`view.anchor(nodeId)` mints a [`UiAnchor`](sdk-reference.html#dev.jasper.sdk.ui.UiAnchor) from a mounted `Button` or
-PICKER `Choice` whose ancestors are visible, enabled and not busy. `windows().popover(anchor)` returns a
-[`PluginPopover`](sdk-reference.html#dev.jasper.sdk.ui.PluginPopover): set a view of the plugin's and `show()` it
-below the control (above when there is no room), at least as wide. It does not block; Escape or a click outside closes
-it and its content. Hiding, disabling, removing, retyping or moving the control, closing its surface or stopping the
-plugin closes the anchor for good; `onClosed` hears it. Credential Vault's credential picker opens over another
-plugin's anchor this way ([plugin APIs](plugin-apis.md)).
+`view.anchor(nodeId)` mints a [`UiAnchor`](sdk-reference.html#dev.jasper.sdk.ui.UiAnchor) from a mounted `Button`,
+`MenuButton` (since 0.29.0; the popover attaches to its button) or PICKER `Choice` whose ancestors are visible, enabled
+and not busy. A [`PluginPopover`](sdk-reference.html#dev.jasper.sdk.ui.PluginPopover) comes from
+`windows().popover(anchor)`: set a view of the plugin's and `show()` it below the control (above when there is no room),
+at least as wide. Its left edge is the control's, or, when the control's window has no room to the right, its right edge
+is. It does not block; Escape or a click outside closes it and its content. Hiding, disabling, removing, retyping or
+moving the control, closing its surface or stopping the plugin closes the anchor for good; `onClosed` hears it.
+Credential Vault's credential picker opens over another plugin's anchor this way ([plugin APIs](plugin-apis.md)).
 
 ### Quit guards
 
@@ -627,6 +628,11 @@ tab strip, the window and its menus, and the status bar; the plugin provides the
   act on its pane. `chosen` hears the id of the plugin's item chosen, or nothing when one of Jasper's items ran, the
   menu was dismissed, or the tab is closed or not on screen; it hears once. Item ids must be unique across the whole
   menu, submenus included; an item's `action` is ignored, but must not be blank.
+- `setTextInsertion(Optional.of(text -> ...))` (SDK 0.29.0) lets other plugins insert text into the tab, such as a
+  palette scope's snippet: while the tab is its window's current item, a palette query with no terminal pane names it
+  as its [text target](#palette-scopes), and each insertion hands the handler an
+  [`InsertedText`](sdk-reference.html#dev.jasper.sdk.ui.InsertedText), the text and whether Return follows it, on the
+  UI thread. Put it where the user is typing. `Optional.empty()`, the default, takes none.
 - `setFocusTarget`, `select()`, `isActive()`, `onActive(...)`; `moveToNewWindow()` moves the tab to a new window
   (a window's only tab stays where it is) and `moveToWindow(window)` to the end of another window's strip, keeping the
   view and its state, and `window()` is the window that holds it.
@@ -864,6 +870,13 @@ private static void installPaletteDemo(PluginContext context) {
   on the scope's chip, or on All while the scope takes part: a moment to refresh the index in the background.
 - **The target pane.** `PaletteQuery.target()` is the pane the palette was opened from, as the plugin's own handle:
   typing into it needs `terminal.inject`.
+- **The text target.** With no target pane, `PaletteQuery.textTarget()` (SDK 0.29.0) is the content tab the palette
+  was opened from, or the Run window's current item, while its plugin takes inserted text
+  (`ContentTab.setTextInsertion`). [`TextTarget.insert(new InsertedText(text, submit))`](sdk-reference.html#dev.jasper.sdk.ui.TextTarget)
+  hands the text to the tab's plugin, which puts it where the user is typing and presses Return after it when `submit`
+  is true; it needs `terminal.inject` and does nothing once `isOpen()` is false, after the tab closed or stopped taking
+  text. Jasper reads the text target again before each search and run; one kept from an earlier query, as a step's
+  `complete` keeps it, stays bound to its tab.
 - **Recents.** Running a row of a scope that takes part in All and in recents records its scope id, row id and title
   in `command-history.toml` in Jasper home. The empty palette offers it again while searching the title still returns
   the same row id. Rows that should not be written there belong in a scope made `withInRecents(false)` or
@@ -1134,6 +1147,9 @@ one.
   left alone.
 - `clipboardText()` returns the clipboard's text, or empty when it holds none or cannot be read. It needs
   `clipboard.read`, because the clipboard often holds something the user just copied elsewhere, such as a password.
+- `copyOnSelect()` (SDK 0.29.0), on any thread, tells whether the user turned on Copy on select
+  (`terminal.copy_on_select`, Settings › Terminal), for a view that copies its own selections as a terminal does. Read
+  it at each selection: a change applies from the next read.
 
 Plugin code does not use the AWT clipboard (`Toolkit.getSystemClipboard()` or `getSystemSelection()`):
 `verifyPluginArchitecture` rejects both in the in-repo plugins, except for the Editor's Vim registers.
@@ -1424,8 +1440,8 @@ catch (NoClassDefFoundError absent) { vault = Optional.empty(); }
 
 | Runs on, or may be called from | What |
 | --- | --- |
-| The UI thread only | `start` and `stop`; every registration (actions, menus, toolbar, status bar, rail, tool windows, content tabs, split items, restorers, dialogs, the kit, palette scopes, file sources, subcommand handlers, shell-variable contributors, the file editor); `events().subscribe`; `services().publish`; settings declarations; every `Terminals` and handle query; the clipboard; `openFile`, `isDefaultBrowser`, `onDefaultBrowserChanged` and `hasModal`. Handlers of actions, events, view events, scopes, settings changes and notification actions run there. |
-| Any thread | `events().publish`; starting activities and connections, and their handles; `services().find` and `require`; posting notifications; `PaneHandle.sendText`, `sendBytes` and `paste`; `TabNamePiece.set`; every `PendingSession` method; `Setting.get` and `set`; `openInEditor` and `browse`; `appearance().presentation()`, `terminalTypography()`, `variant()` and `workspaceVariant()`; `log()`; `Subscription.close()`. |
+| The UI thread only | `start` and `stop`; every registration (actions, menus, toolbar, status bar, rail, tool windows, content tabs, split items, restorers, dialogs, the kit, palette scopes, file sources, subcommand handlers, shell-variable contributors, the file editor); `events().subscribe`; `services().publish`; settings declarations; every `Terminals` and handle query; a palette query's `TextTarget`; the clipboard; `openFile`, `isDefaultBrowser`, `onDefaultBrowserChanged` and `hasModal`. Handlers of actions, events, view events, scopes, settings changes and notification actions run there. |
+| Any thread | `events().publish`; starting activities and connections, and their handles; `services().find` and `require`; posting notifications; `PaneHandle.sendText`, `sendBytes` and `paste`; `TabNamePiece.set`; every `PendingSession` method; `Setting.get` and `set`; `openInEditor`, `browse` and `copyOnSelect`; `appearance().presentation()`, `terminalTypography()`, `variant()` and `workspaceVariant()`; `log()`; `Subscription.close()`. |
 
 - **Slow work** goes to `context.background()`, whose tasks can run at the same time. UI-thread code does no I/O and
   returns promptly.
@@ -1471,8 +1487,8 @@ try (var host = new FakePluginHost()) {
 | Terminals | `addTerminalWindow()`, `addTerminalTab`, `addTerminalPane` (a terminal tab's one pane), `addContentTab`, `moveTab`, `closeTab`, `windowTabs(windowId)` (a window's tabs, each its items pane by pane), `focusTerminalPane`, `closeTerminalPane`, `holdPane` (a local pane that waits, `NOT_STARTED`, until its tab is shown), `setPaneInfo`, `setSelection`, `setForegroundJob`, `setShellProfiles`; `sent(paneId)`, `openRequests()`; `commandStarted`, `commandFinished`, `titleChanged`, `cwdChanged`, `remoteCwdChanged`, `sessionExited`, `bell` |
 | Restoring | `restoreState(tab)` (the restore state a tab gives), `restoreTab(pluginId, windowId, title, state)` (runs the plugin's restorer as Jasper does: the tab is placed in that window, not shown, and a session's tab waits, `NOT_STARTED`, until it is shown), `declinedRestores()` (the reasons restorers gave when no tab came back) |
 | Provided sessions | `sessionState(paneId)`, `typeIntoSession`, `sessionOutput`, `cancelSession`, `reconnectSession`, `pumpSessions` |
-| Palette scopes | `scopes()`, `scopePresentation(id)`, `scopesInAll()`, `scopesInRecents()`, `searchScope`, `availableInScope`, `stepInScope`, `completeStep`, `executeInScope`, `paletteOpens()` |
-| Everything else | `notifications()`, `clipboard()`, `activityLog()`, `connectionLog()`, `openedInEditor()`, `openedFiles()`, `browsed()`, `contentTabs()` with `contentStatus(tab)` and `contentCommands(tab)`, `contentMenu(tab)` (the right-click menu `showContextMenu` shows), `chooseFromContentMenu(tab, path...)`, `dismissContentMenu(tab)`, `contentTab(pluginId, title)` and `contentView(pluginId, title)`, `fileSources()`, `connectFileSource`, `declareSubcommand(pluginId, name, summary)` before `start` (the fake reads no `plugin.toml`), then `call(name, arguments, folder)`, `setCommandClient(path)` (what `CommandLine.client()` returns), `setDefaultBrowser(jasper)` (what `Platform.isDefaultBrowser()` returns; a change runs the `onDefaultBrowserChanged` handlers), `declareBundled(pluginId)` (a bundled plugin's file editor and web browser registrations win), `shellEnvironment(map)`, `edit(file, line, windowId)`, `openLink(address, origin, placement, target, windowId)`, `browserPlugin()`, `publishApp(topic, payload)`, `setVariant`, `setWorkspace` |
+| Palette scopes | `scopes()`, `scopePresentation(id)`, `scopesInAll()`, `scopesInRecents()`, `searchScope`, `availableInScope`, `stepInScope`, `completeStep`, `executeInScope`, `paletteOpens()`; `addTextTarget(windowId)` (a content tab that takes text, its window's current item, which a query with no pane names as its text target) and `insertedText(tabId)`; `insertText(tab, text)` (runs a plugin tab's insertion) |
+| Everything else | `notifications()`, `clipboard()`, `activityLog()`, `connectionLog()`, `openedInEditor()`, `openedFiles()`, `browsed()`, `contentTabs()` with `contentStatus(tab)` and `contentCommands(tab)`, `contentMenu(tab)` (the right-click menu `showContextMenu` shows), `chooseFromContentMenu(tab, path...)`, `dismissContentMenu(tab)`, `contentTab(pluginId, title)` and `contentView(pluginId, title)`, `fileSources()`, `connectFileSource`, `declareSubcommand(pluginId, name, summary)` before `start` (the fake reads no `plugin.toml`), then `call(name, arguments, folder)`, `setCommandClient(path)` (what `CommandLine.client()` returns), `setDefaultBrowser(jasper)` (what `Platform.isDefaultBrowser()` returns; a change runs the `onDefaultBrowserChanged` handlers), `setCopyOnSelect(on)` (what `Platform.copyOnSelect()` returns), `declareBundled(pluginId)` (a bundled plugin's file editor and web browser registrations win), `shellEnvironment(map)`, `edit(file, line, windowId)`, `openLink(address, origin, placement, target, windowId)`, `browserPlugin()`, `publishApp(topic, payload)`, `setVariant`, `setWorkspace` |
 
 Where the fake differs from Jasper:
 

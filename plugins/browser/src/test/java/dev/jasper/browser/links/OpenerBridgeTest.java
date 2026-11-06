@@ -863,7 +863,7 @@ class OpenerBridgeTest {
 
         Document(String address) {
             this.address = address;
-            page = new Page(URI.create(address), () -> { }, NO_FAVICONS);
+            page = new Page(URI.create(address), () -> { }, NO_FAVICONS, Runnable::run);
             page.onOpenItem((url, placement) -> {
                 opened.add(placement + " " + url);
                 var popup = new Document(url);

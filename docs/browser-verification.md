@@ -371,3 +371,118 @@ Each is pending.
 
 The user has no Windows or Linux host yet. Every line above waits for each of them too, with Ctrl in place of Cmd, and
 Narrator or NVDA, and Orca, in place of VoiceOver.
+
+## Plan 5: history, bookmarks and Jasper integrations
+
+### Batch 1: the user's check on macOS (pending)
+
+- **How to run it:** with the user's OK, `./gradlew :jasper-app:run` from `claude/browser-history-bookmarks` (worktree
+  `.claude/worktrees/browser-4b-4c-e6deab`), on JBR 25.0.4.1 b635.75 with JCEF. The onboarding lines need the
+  Browser's data folder (`plugins/dev.jasper.browser/data/` in Jasper home) without `onboarding-finished`. Where a line
+  reads how a visit was reached, `sqlite3 plugins/dev.jasper.browser/data/browser.sqlite "SELECT url, reached FROM
+  history ORDER BY id DESC LIMIT 5"` shows it; history and bookmarks show on their pages.
+- Each line is recorded pass or fail. Every line is pending.
+
+#### First: what only the GUI can show
+
+1. **Transition flags (H-F1):** Back, then a link, records `back_forward` and then `link`: JCEF ORs a load's flags
+   into the shared transition constants, and Jasper clears them at each load start. If the second reads
+   `back_forward`, every later visit's `reached` is wrong for the run. Pending.
+2. **Jasper's world in the page (H30, H33):** Insert puts a snippet into a page's text input, and Copy on select copies
+   a drag in a page. Both need CEF to deliver `Runtime.executionContextCreated` through JBR's out-of-process bridge
+   within 5 seconds of `Runtime.enable`; if it does not, nothing is inserted and nothing is copied. Pending.
+3. **A failed navigation (H-F19):** `https://nonexistent.invalid/` shows "Server Not Found" and leaves no history
+   entry, whether or not CEF reports a load start for it; Stop on a slow page keeps that page's entry; a link clicked
+   on a page that is still loading keeps that page's entry. Pending.
+
+#### The plan's checklist
+
+1. **Recording:** three sites visited show newest first on Cmd+Y's "Browsing History", and Jasper's pages don't.
+   Search, ×, Load More and Clear All History work. Pending.
+2. **Bookmarking:** pending.
+   - ☰ › Add Bookmark opens Edit Bookmark, tags are added with Enter and a comma, and Save keeps them;
+   - Remove Bookmark shows "Bookmark Removed";
+   - Delete Bookmark asks, then shows "Bookmark Deleted";
+   - the panel closes when the page navigates.
+3. **The bookmarks page:** search, the sorts, the tag chips, ×, Load More and Clear All. Pending.
+4. **Suggestions:** typing shows "Bookmark" and "Visited N times" rows. Pending.
+5. **The palette:** pending.
+   - Bookmarks and Browser History rows show in All, and "Open URL in Browser" for an `https://` URL;
+   - a row opens in the current browser item, or in a new tab from a terminal.
+6. **Welcome and onboarding:** with a fresh `data/`, the start page goes through the three onboarding pages to
+   "Welcome Back". Top Sites, Refresh and the Quick Actions work. Pending.
+7. **Snippets (H30):** pending.
+   - Insert reaches a text input, a text area, an editable element (a GitHub comment box) and a field in a
+     cross-origin frame, which gets it through DevTools' `Input.insertText`;
+   - Paste and run submits a search form, in the main frame and in a cross-origin frame;
+   - the clipboard is untouched after each, and a Vault password copied first is still cleared after 30 seconds.
+8. **Copy on select:** pending.
+   - on, a drag, a double-click, a triple click, a Shift+click (H32), a Shift+arrow selection, Cmd+A and the page's
+     right-click Select All (H32) copy, and a password field's selection doesn't;
+   - a selection inside a cross-origin frame copies nothing, and Cmd+C copies it (H-F2);
+   - after Copy in a terminal, a drag of the page's scrollbar does not copy the page's old selection over it (H35);
+   - off, nothing copies.
+9. **Keeping:** a relaunch keeps history and bookmarks. Pending.
+10. **Windows and Linux:** Ctrl+H opens History, from the address field too. Not run until the user has those hosts.
+
+#### Lines the task reviews added
+
+Each is pending.
+
+- **Redirects (Task 2):** a typed `http://` address that the server redirects to `https://` records one entry, at the
+  `https://` address, as `typed` (expected) or `redirect`.
+- **Jasper's pages (Task 3):** three quick Deletes on the history page all ask, as CEF's dialog origin for a
+  `jasper-about:` page skips the dialog flood; Find, the site icon and the opener bridge work on a `jasper-about:`
+  page, and its DevTools console shows no content security policy error from Jasper's injected scripts under the
+  pages' nonce policy; the welcome page's redirect to the onboarding (a 302) is followed; the pages' channel answers
+  only the pages' client; a page that navigates or closes with a request waiting cancels it (CEF's `onQueryCanceled`).
+- **History (Task 4):** Show Full History at the end of a held Back's or Forward's list; a `file:` row loads on a
+  click and a Cmd-click on it opens nothing (H3); the time column aligns ("09:41 AM" in en-US); the search field has
+  the keyboard after History.
+- **The token field (Task 6b):** the chips and their remove button's hover in both looks; the popover grows when the
+  chips wrap onto a second line; Save clicked with text still typed adds it; the selected chip's focus ring; VoiceOver
+  announces the selected chip (on Windows, the Java Access Bridge); the caret hides while a chip is selected.
+- **The Edit Bookmark panel (Task 7):** Escape and a click outside close it; under ☰ at a window's right edge it
+  right-aligns to the button (H21); Tags has the keyboard when it opens; the Vault's credential picker near a window's
+  right edge, or in a narrow dialog, right-aligns to its picker, as H21 applies to every popover; text typed in Tags
+  but not yet a tag is lost on a click outside (H25); after Delete Bookmark's question the keyboard goes back to the
+  page.
+- **The onboarding (Task 9):** a fresh data folder shows the intro, then Get Started, the features page, the setup page
+  and Start Browsing, then Welcome Back; the next launch shows Welcome Back; the Top Sites tiles and Refresh; the Quick
+  Actions open Bookmarks, History and Settings.
+- **Snippets (Task 11):** a page script that overrides `document.execCommand` or `HTMLInputElement.prototype.value`,
+  pasted into the console first, neither changes nor sees the inserted text, except through input events; Insert with
+  the palette open over a page whose input has the focus lands in that input; an insertion while the page navigates
+  inserts nothing, anywhere.
+- **Copy on select (Task 12):** a password field in a closed shadow root never copies; on macOS, Cmd+A copies whether
+  A or Cmd is let go first; Chromium's own Copy beside Copy on select on `user-select: none` text and on `&nbsp;`, and
+  a command copied with `&nbsp;` pastes into a shell with plain spaces; a scrollbar drag, a map pan or a slider drag
+  does not copy the old selection again; Shift+click extends the selection and copies it; the page menu's Select All
+  copies the page; with the page's DevTools open, the "Jasper" world appears once per document; a selection made just
+  after a navigation starts may copy nothing once, and the next gesture copies; a Markdown preview's selection copies
+  nothing (H-F34).
+
+#### Lines the final review's fix wave added
+
+Each is pending.
+
+- **Paste and run (H38):** Paste and run with the focus on a page button or a read-only field does nothing: no
+  snippet, and no Return, so the button is not pressed and the read-only field's form is not submitted. With nothing
+  focused, on a link or on a checkbox it does nothing either; in a number field it types the snippet's digits; a page
+  that navigates while the snippet goes in gets nothing more.
+- **Copy on select on a slow page (H36):** a selection finished while the page's script is busy (a loop of a few
+  seconds started from its DevTools console), then a second one, copies the second once the page is free.
+- **The data folder (H37, H41):** once a page has loaded, `ls -ld` shows `drwx------` for
+  `plugins/dev.jasper.browser/data` and `ls -l` shows `-rw-------` for `browser.sqlite` and its `-wal` and `-shm`, in a
+  fresh data folder and when they had wider permissions before the launch.
+- **Quitting with Edit Bookmark open:** tags typed in the open panel are kept after Cmd+Q, and after turning the
+  Browser off in Settings › Plugins.
+- **The bookmarks page:** with a tag chosen, removing it from its last bookmark in Edit Bookmark, then a new search or
+  sort on the page, shows every bookmark and no chip pressed.
+
+### Plan 5 on Windows and Linux (not run)
+
+The user has no Windows or Linux host yet. Every line above waits for each of them too, with Ctrl in place of Cmd, and
+Narrator or NVDA, and Orca, in place of VoiceOver. On both, Ctrl+H deletes nothing in Settings' text fields or in Edit
+Bookmark's Tags (H17), and in a terminal pane's find bar it deletes the character before the caret. On Linux, the data
+folder line holds too; on Windows the folder keeps its permissions.

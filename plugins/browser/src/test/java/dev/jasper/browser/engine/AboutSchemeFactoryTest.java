@@ -4,24 +4,30 @@ import java.awt.EventQueue;
 import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.cef.browser.CefBrowser;
 import org.cef.callback.CefCallback;
+import org.cef.handler.CefLoadHandler;
 import org.cef.misc.BoolRef;
 import org.cef.misc.IntRef;
+import org.cef.misc.StringRef;
 import org.cef.network.CefRequest.ResourceType;
+import org.cef.network.CefResponse;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Chromium's handler of one {@code jasper-about:} request (P5), driven as Chromium's IO thread drives it, without
  * Chromium: an answer ready at once is handled at once, and one still to come lets {@code open} return and continues
- * the request once it arrives, never after the request was cancelled; and only a page's main-frame request is answered
- * (plan 4b's P47).
+ * the request once it arrives, never after the request was cancelled; only a page's main-frame request is answered
+ * (plan 4b's P47); and a page's redirect is Chromium's to follow (plan 5's Task 3).
  */
 class AboutSchemeFactoryTest {
     @Test void anAnswerReadyAtOnceIsHandledAtOnceAndReadAsUtf8() {
@@ -87,6 +93,34 @@ class AboutSchemeFactoryTest {
         assertThat(runs).hasValue(1);
     }
 
+    /** A redirect is 302 to its address, which Chromium is handed to follow, with no body; a page is no redirect. */
+    @Test void aRedirectIs302ToItsAddressWithNoBody() {
+        var about = new AboutScheme();
+        about.register("welcome", () -> "<p>welcome</p>");
+        about.redirect("welcome", () -> Optional.of("jasper-about:onboarding-intro"));
+        CefBrowser page = browser();
+        var factory = new AboutSchemeFactory(about, browser -> browser == page);
+        AboutSchemeFactory.Page handler = factory.handler(page, ResourceType.RT_MAIN_FRAME, "jasper-about://welcome/");
+        assertThat(handler.open(null, new BoolRef(), new Calls())).isTrue();
+        var response = new Response();
+        var length = new IntRef(-1);
+        var redirect = new StringRef();
+        handler.getResponseHeaders(response, length, redirect);
+        assertThat(response.status).isEqualTo(302);
+        assertThat(response.statusText).isEqualTo("Found");
+        assertThat(redirect.get()).isEqualTo("jasper-about:onboarding-intro");
+        assertThat(length.get()).as("no body").isZero();
+        assertThat(read(handler)).isEmpty();
+
+        var shown = new AboutSchemeFactory.Page(CompletableFuture.completedFuture(new AboutScheme.Answer(200, "<p>page</p>")));
+        assertThat(shown.open(null, new BoolRef(), new Calls())).isTrue();
+        var page200 = new Response();
+        var none = new StringRef();
+        shown.getResponseHeaders(page200, new IntRef(), none);
+        assertThat(page200.status).isEqualTo(200);
+        assertThat(none.get()).as("no redirect").isNull();
+    }
+
     /** The body of a request whose answer is ready, opened and read as Chromium does. */
     private static String opened(AboutSchemeFactory.Page handler) {
         var handle = new BoolRef();
@@ -139,6 +173,33 @@ class AboutSchemeFactoryTest {
         /** Whether the request was continued within a second. */
         boolean awaitContinue() throws InterruptedException {
             return continued.await(1, TimeUnit.SECONDS);
+        }
+    }
+
+    /** The response Chromium hands the handler, recording what it is given. */
+    private static final class Response extends CefResponse {
+        int status;
+        String statusText, mimeType;
+        final Map<String, String> headers = new LinkedHashMap<>();
+
+        @Override public void dispose() { }
+        @Override public boolean isReadOnly() { return false; }
+        @Override public CefLoadHandler.ErrorCode getError() { return null; }
+        @Override public void setError(CefLoadHandler.ErrorCode errorCode) { }
+        @Override public int getStatus() { return status; }
+        @Override public void setStatus(int status) { this.status = status; }
+        @Override public String getStatusText() { return statusText; }
+        @Override public void setStatusText(String statusText) { this.statusText = statusText; }
+        @Override public String getMimeType() { return mimeType; }
+        @Override public void setMimeType(String mimeType) { this.mimeType = mimeType; }
+        @Override public String getHeaderByName(String name) { return headers.get(name); }
+        @Override public void setHeaderByName(String name, String value, boolean overwrite) {
+            if (overwrite || !headers.containsKey(name)) headers.put(name, value);
+        }
+        @Override public void getHeaderMap(Map<String, String> into) { into.putAll(headers); }
+        @Override public void setHeaderMap(Map<String, String> from) {
+            headers.clear();
+            headers.putAll(from);
         }
     }
 }

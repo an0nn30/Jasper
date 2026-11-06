@@ -4,6 +4,7 @@ import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.item.BrowserItem;
 import dev.jasper.browser.item.BrowserItems;
 import dev.jasper.browser.settings.BrowserSettings;
+import dev.jasper.browser.store.MemoryStores;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.terminal.PaneInfo;
@@ -45,6 +46,13 @@ class BrowserRoleTest {
     private static final URI LINK = URI.create("https://example.com/docs");
     @TempDir Path temp;
     private Started started;
+
+    // Stores in memory, one for each BrowserItems a test makes.
+    private final MemoryStores memory = new MemoryStores();
+
+    @AfterEach void closeStores() throws Exception {
+        memory.close();
+    }
 
     @AfterEach void closeHost() throws Exception {
         if (started != null) onUiThread(started.host::close);
@@ -485,7 +493,7 @@ class BrowserRoleTest {
         view().emit(new UiEvent.Action(action));
     }
 
-    private static Started start() throws Exception {
+    private Started start() throws Exception {
         return start(true);
     }
 
@@ -493,7 +501,7 @@ class BrowserRoleTest {
      * A stand-in Browser on a fake host whose start declares the Browser's settings and registers its role over its
      * items, as the plugin's does; with {@code window}, one window holding one terminal tab and pane, active.
      */
-    private static Started start(boolean window) throws Exception {
+    private Started start(boolean window) throws Exception {
         var result = new AtomicReference<Started>();
         onUiThread(() -> {
             var host = new FakePluginHost();
@@ -510,7 +518,7 @@ class BrowserRoleTest {
             host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of("browser.provide")), Set.of(), Set.of(), plugin -> {
                 context.set(plugin);
                 var settings = BrowserSettings.declare(plugin.settings());
-                items.set(new BrowserItems(plugin, settings::read, page -> { }));
+                items.set(new BrowserItems(plugin, settings::read, memory.make(), page -> { }));
                 plugin.platform().browser(new BrowserRole(plugin, items.get(), settings, chromium::get));
             });
             result.set(new Started(host, context.get(), items.get(), shown, shell, pane, chromium));

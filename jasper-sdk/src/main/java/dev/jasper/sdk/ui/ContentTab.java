@@ -54,6 +54,17 @@ public interface ContentTab extends WindowOwner, AutoCloseable {
      * @since 0.21.0
      */
     void setRestore(java.util.Optional<dev.jasper.sdk.RestoreState> state);
+    /**
+     * Lets other plugins insert text into the tab, such as a snippet from the command palette. While {@code insertion}
+     * is present and the tab is its window's current item, a palette query with no terminal pane as its origin names
+     * the tab as its {@link TextTarget}, and each {@link TextTarget#insert} hands {@code insertion} the text, on the UI
+     * thread and contained; put it where the user is typing. Empty, the default, takes no text. Ignored once the tab is
+     * closed.
+     *
+     * @param insertion receives each text inserted into the tab, or empty
+     * @since 0.29.0
+     */
+    void setTextInsertion(java.util.Optional<Consumer<InsertedText>> insertion);
     /** Selects and raises the current host, focusing its content. */
     void select();
     /**

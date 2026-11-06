@@ -16,7 +16,7 @@ import java.util.Objects;
 public final class Nodes {
     private Nodes() {}
     /** One node of a {@link ViewSpec} tree: a control, a text or a container of other nodes. */
-    public sealed interface Node permits Text, Icon, Button, MenuButton, StatusDot, Field, Secret, Choice, PickerMenu, Toggle, Chip, Progress, Strength, Stack, FormRow, SettingRow, Card, Section, Empty, ItemList, Header, Panel, Form, Split, Table, Tree, Breadcrumbs, Custom, Separator, Notice, Properties {
+    public sealed interface Node permits Text, Icon, Button, MenuButton, StatusDot, Field, Secret, Choice, PickerMenu, Toggle, Chip, Progress, Strength, Stack, FormRow, SettingRow, Card, Section, Empty, ItemList, Header, Panel, Form, Split, Table, Tree, Breadcrumbs, Custom, Separator, Notice, Properties, TokenField {
         /**
          * The node's id, never blank and unique across the whole view. The events a node reports name it by this id,
          * except a {@link UiEvent.Action}, which carries the action key the node configures. An update keeps the mounted
@@ -787,6 +787,57 @@ public final class Nodes {
             ModelChecks.label(label, "label");
             Objects.requireNonNull(hue);
         }
+    }
+
+    /**
+     * A field of short tokens, such as a bookmark's tags (since 0.29.0). Each token shows as a chip in the look's tag
+     * style, in the case the user typed it in every look, with a remove button inside it named "Remove" and the token;
+     * the user types the next token after the chips, which wrap onto further lines as the field fills. Enter adds the
+     * typed text as a token while text other than white space is typed, and so does the focus leaving the field for
+     * good; a comma, a line break or a tab, typed or pasted, ends the token before it. Enter with nothing typed passes
+     * on, to the form's PRIMARY button. Backspace with nothing typed removes the last token, and a chip's remove button
+     * removes its own.
+     *
+     * <p>The field is one Tab stop, and the keyboard reaches every chip from the typed text: Left with the caret at its
+     * start selects the last chip, which shows the focus ring and is announced as it is selected; Left, Right, Home and
+     * End move among the chips; Backspace or Delete removes the selected chip's token and selects the chip before or
+     * after it; and Right past the last chip, Escape and typing return to the typed text, the typing going into it.
+     *
+     * <p>Typed text that {@link #kept(List)} would not keep beside the tokens (blank, too long, holding a control
+     * character, a duplicate, or past the hundredth) is dropped. Every change reports {@link UiEvent.TokensChanged} with
+     * the whole list, once. The field shows each change at once; an update that changes {@code tokens}, or one that comes
+     * while the field reports a change and differs from what it shows, replaces the tokens it shows and keeps the text
+     * being typed.
+     *
+     * @param id the node id
+     * @param state the node's state; a nonblank error shows under the field
+     * @param label the field's label, drawn above it as a STANDARD {@link Field}'s is (not in a {@link FormRow} or
+     *     {@link SettingRow}, whose label names it, nor in a prompt), and its accessible name; not blank
+     * @param hint the placeholder shown while the field has no tokens and nothing typed; blank for none
+     * @param tokens the tokens, in order; copied. Each is as {@link #kept(List)} keeps it: trimmed, nonblank, at most 64
+     *     characters and without control characters, none matching another ignoring the case of ASCII letters, and at
+     *     most 100 of them
+     * @since 0.29.0
+     */
+    public record TokenField(String id, ControlState state, String label, String hint, List<String> tokens) implements Node {
+        public TokenField {
+            ModelChecks.id(id); Objects.requireNonNull(state);
+            ModelChecks.label(label, "label");
+            Objects.requireNonNull(hint);
+            tokens = ModelChecks.tokens(tokens);
+        }
+        /**
+         * The tokens a token field keeps of {@code given}: each is trimmed (as {@link String#strip()} trims), and kept
+         * only when it is nonblank, at most 64 characters and free of control characters, and when it does not match an
+         * earlier one ignoring the case of ASCII letters, so "Work" and "work" are one token and "\u00C4pfel" and
+         * "\u00E4pfel" two; the first 100 are kept, in the order given. This is the rule Jasper's Browser keeps bookmark
+         * tags by ({@code BookmarkStore.keptTags} calls it).
+         *
+         * @param given the tokens given
+         * @return those kept, in order
+         * @since 0.29.0
+         */
+        public static List<String> kept(List<String> given) { return ModelChecks.keptTokens(given); }
     }
 
     /**

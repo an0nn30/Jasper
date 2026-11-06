@@ -75,7 +75,7 @@ views close when it stops.</p>
 <tr><td>{@link UiView#focus(String)}, {@link UiView#reveal(String)}</td><td>Focus a node; scroll one into view without moving focus.</td></tr>
 <tr><td>{@link UiView#selectAll(String)}</td><td>Select a field's text without editing it or moving focus.</td></tr>
 <tr><td>{@link UiView#composing(String)}</td><td>Whether an input method holds uncommitted text in a field; leave keys to it while true.</td></tr>
-<tr><td>{@link UiView#anchor(String)}</td><td>A {@link UiAnchor} on a mounted button or PICKER choice, for a popover or a dialog attached to it.</td></tr>
+<tr><td>{@link UiView#anchor(String)}</td><td>A {@link UiAnchor} on a mounted button, menu button (since 0.29.0) or PICKER choice, for a popover or a dialog attached to it.</td></tr>
 <tr><td>{@link UiView#withSecret(String,Consumer)}, {@link UiView#clearSecret(String)}, {@link UiView#replaceSecret(String,char[])}</td><td>Read a secret field's characters (erased after the callback), clear it, or set it without an edit event.</td></tr>
 <tr><td>{@link UiView#registerContent(CustomContent)}</td><td>Fill a {@link Nodes.Custom} node with a component; see below.</td></tr>
 </tbody>
@@ -94,7 +94,7 @@ the next tree.</p>
 <thead><tr><th>Kind</th><th>Nodes</th></tr></thead>
 <tbody>
 <tr><td>Text and status</td><td>{@link Nodes.Text} (sixteen roles; the MONO roles mark data values such as hosts, paths and commands, drawn in the data face), {@link Nodes.Icon}, {@link Nodes.StatusDot}, {@link Nodes.Chip}, {@link Nodes.Progress}, {@link Nodes.Strength}, {@link Nodes.Notice}, {@link Nodes.Properties}, {@link Nodes.Separator}</td></tr>
-<tr><td>Controls</td><td>{@link Nodes.Button} (PRIMARY, SECONDARY, GHOST, DESTRUCTIVE_GHOST, LINK), {@link Nodes.MenuButton}, {@link Nodes.Field} (TEXT, SEARCH, PORT, PATH, TEXTAREA, NUMBER), {@link Nodes.Secret}, {@link Nodes.Choice} (DROPDOWN, PICKER, EXCLUSIVE, SEARCHABLE, PREVIEWS, TABS), {@link Nodes.PickerMenu}, {@link Nodes.Toggle}, {@link Nodes.Breadcrumbs}</td></tr>
+<tr><td>Controls</td><td>{@link Nodes.Button} (PRIMARY, SECONDARY, GHOST, DESTRUCTIVE_GHOST, LINK), {@link Nodes.MenuButton}, {@link Nodes.Field} (TEXT, SEARCH, PORT, PATH, TEXTAREA, NUMBER), {@link Nodes.Secret}, {@link Nodes.Choice} (DROPDOWN, PICKER, EXCLUSIVE, SEARCHABLE, PREVIEWS, TABS), {@link Nodes.PickerMenu}, {@link Nodes.Toggle}, {@link Nodes.Breadcrumbs}, {@link Nodes.TokenField}</td></tr>
 <tr><td>Collections</td><td>{@link Nodes.ItemList} with {@link ListItem} rows (SINGLE, DOUBLE, COMPACT, ORDERED, RESULTS), {@link Nodes.Table} with {@link Column}s and {@link TableRow}s, {@link Nodes.Tree} with {@link TreeItem}s</td></tr>
 <tr><td>Layout</td><td>{@link Nodes.Stack} (a {@link Nodes.LayoutRole} such as VERTICAL, INLINE or ACTIONS), {@link Nodes.Card}, {@link Nodes.Section}, {@link Nodes.FormRow}, {@link Nodes.SettingRow}, {@link Nodes.Split}, {@link Nodes.Empty}</td></tr>
 <tr><td>Compositions</td><td>{@link Nodes.Panel} with its {@link Nodes.Header}, for tool windows; {@link Nodes.Form} (PROMPT, PROMPT_COMPACT, SHEET, FULL, SETTINGS, WINDOW), for dialogs and pages</td></tr>
@@ -126,6 +126,7 @@ they concern; item, option, row and column ids in them are local to that node.</
 <tr><td>{@link UiEvent.Sorted}</td><td>A table or tree column header</td></tr>
 <tr><td>{@link UiEvent.ColumnsResized}</td><td>A header boundary drag or double-click fit that has ended; carries the widths of the columns</td></tr>
 <tr><td>{@link UiEvent.SuggestionChosen}</td><td>Tab or Enter on a field's selected {@link Nodes.Suggestion}, or a click on one; carries the field, the suggestion and whether Tab chose it</td></tr>
+<tr><td>{@link UiEvent.TokensChanged}</td><td>A token added to or removed from a {@link Nodes.TokenField}; carries its whole list</td></tr>
 </tbody>
 </table>
 <p>The kit reports what the user asked for; the plugin decides. A toggle's {@code checked} is the state the plugin's tree

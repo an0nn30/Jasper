@@ -470,6 +470,7 @@ public final class JasperApplication {
             loginItems.accept(snapshot.backgroundEnabled());
             if (plugins != null) {
                 plugins.terminalTypography(snapshot.font());
+                plugins.copyOnSelect(snapshot.terminal().copyOnSelect());
                 plugins.configurationChanged(snapshot.plugins()); reportBindingProblems();
             }
             updateMigrateAction();
@@ -1656,7 +1657,10 @@ public final class JasperApplication {
         plugins.themes(themes::library);
         // The kit the controller installed and the look plugins read: the presentation's, or the fallback when the kit was blamed (spec 4.7).
         plugins.presentation(themes.kit(), presentation.projections().plugins(), presentation.defaults());
-        plugins.terminalTypography((configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).font());
+        ConfigSnapshot saved = configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot();
+        plugins.terminalTypography(saved.font());
+        // Copy on select (terminal.copy_on_select), which plugins read with Platform.copyOnSelect at each selection.
+        plugins.copyOnSelect(saved.terminal().copyOnSelect());
         plugins.shortcuts(this::shortcutLabel);
         plugins.clipboard(clipboard);
         plugins.nativeWindows(this::nativeWindow);

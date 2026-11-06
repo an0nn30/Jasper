@@ -13,6 +13,13 @@ import dev.jasper.sdk.palette.PaletteVerb;
 import dev.jasper.sdk.palette.ScopeSpec;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.ui.ActionSpec;
+import dev.jasper.sdk.ui.ContentSpec;
+import dev.jasper.sdk.ui.ContentTab;
+import dev.jasper.sdk.ui.ControlState;
+import dev.jasper.sdk.ui.InsertedText;
+import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.TextTarget;
+import dev.jasper.sdk.ui.ViewSpec;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -101,6 +108,58 @@ class FakePaletteTest {
             a.get().platform().openInEditor(Path.of("/tmp/x.toml"));
             assertThat(host.notifications().lines()).containsExactly("test.a|ERROR|It broke|");
             assertThat(host.openedInEditor()).containsExactly(Path.of("/tmp/x.toml"));
+        }
+    }
+
+    /**
+     * Since 0.29.0: a query with no pane names the window's current item while it takes inserted text; an
+     * {@code addTextTarget} tab records what is inserted, and stops taking it once closed; a plugin's own content tab
+     * takes text only while its insertion is set, and one that throws is recorded as the host's failure. On the UI
+     * thread, as the kit is.
+     */
+    @Test void aQueryWithNoPaneNamesTheWindowsTextTargetAndInsertedTextReachesIt() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(this::textTargets);
+    }
+
+    private void textTargets() {
+        try (var host = new FakePluginHost()) {
+            var queries = new ArrayList<PaletteQuery>();
+            var context = new AtomicReference<PluginContext>();
+            host.start(new PluginInfo("test.a", "A", "1.0.0", Set.of(Capabilities.PALETTE_CONTRIBUTE, Capabilities.TERMINAL_INJECT)), Set.of(), Set.of(), c -> {
+                context.set(c);
+                c.palette().register(new PaletteScope() {
+                    @Override public ScopeSpec spec() { return ScopeSpec.of("test.a.texts", "Texts", "Search texts", List.of(PASTE)); }
+                    @Override public PaletteResults search(String query, PaletteQuery asked) {
+                        queries.add(asked);
+                        return PaletteResults.of(List.of());
+                    }
+                    @Override public void execute(PaletteRow row, PaletteVerb verb, PaletteQuery asked) { }
+                    @Override public Subscription onChanged(Runnable listener) { return () -> { }; }
+                });
+            });
+            UUID window = host.addTerminalWindow(), target = host.addTextTarget(window);
+            host.searchScope("test.a.texts", "", window, null);
+            TextTarget kept = queries.getLast().textTarget().orElseThrow();
+            assertThat(kept.isOpen()).isTrue();
+            kept.insert(new InsertedText("ls", true));
+            assertThat(host.insertedText(target)).containsExactly(new InsertedText("ls", true));
+            host.closeTab(target);
+            assertThat(kept.isOpen()).as("the kept target closes with its tab").isFalse();
+            kept.insert(new InsertedText("pwd", false));
+            assertThat(host.insertedText(target)).as("a closed tab takes nothing").containsExactly(new InsertedText("ls", true));
+            host.searchScope("test.a.texts", "", window, null);
+            assertThat(queries.getLast().textTarget()).as("a closed tab is no target").isEmpty();
+
+            var view = context.get().kit().create(new ViewSpec(new Nodes.Text("body", ControlState.READY, "Note", Nodes.TextRole.BODY)), event -> { });
+            ContentTab note = context.get().windows().openTab(new ContentSpec("note", "Note"), context.get().terminals().window(window).orElseThrow(), view);
+            assertThat(host.insertText(note, new InsertedText("ls", false))).as("no insertion set").isFalse();
+            note.setTextInsertion(Optional.of(text -> { throw new IllegalStateException("broken"); }));
+            assertThat(host.insertText(note, new InsertedText("ls", false))).isTrue();
+            assertThat(host.failures()).containsExactly("test.a content insertion: java.lang.IllegalStateException: broken");
+            ContentTab foreign = (ContentTab) java.lang.reflect.Proxy.newProxyInstance(ContentTab.class.getClassLoader(),
+                new Class<?>[] {ContentTab.class}, (proxy, method, args) -> { throw new UnsupportedOperationException(method.getName()); });
+            assertThatThrownBy(() -> host.insertText(foreign, new InsertedText("ls", false))).as("a tab no fake host made")
+                .isInstanceOf(IllegalArgumentException.class);
         }
     }
 }

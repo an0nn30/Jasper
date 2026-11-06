@@ -57,7 +57,7 @@ class PageMenuItemsTest {
 
     /** A selection of only white space can be copied, but there is nothing to search for. */
     @Test void aBlankSelectionCanBeCopiedButNotSearched() {
-        var menu = PageMenuItems.of(context(true, true, NONE, NONE, Optional.of(" \n\t "), false));
+        var menu = PageMenuItems.of(context(true, true, NONE, NONE, Optional.of(" \n\t\u00A0"), false));
         assertThat(lines(menu.leading())).containsExactly("page-menu.copy Copy", "page-menu.select-all Select All");
     }
 
@@ -81,14 +81,14 @@ class PageMenuItemsTest {
     }
 
     @Test void searchTermsAreTheSelectionWithItsWhiteSpaceCollapsedAndCutToAThousandCharacters() {
-        assertThat(PageMenuItems.searchTerms("  two\n\twords  here ")).isEqualTo("two words here");
+        assertThat(PageMenuItems.searchTerms("  two\n\twords\u00A0 here ")).isEqualTo("two words here");
         assertThat(PageMenuItems.searchTerms(" \n ")).isEmpty();
         assertThat(PageMenuItems.searchTerms("a".repeat(5_000))).isEqualTo("a".repeat(1_000));
         assertThat(PageMenuItems.searchTerms("a".repeat(999) + " b")).as("the cut's end space goes").isEqualTo("a".repeat(999));
         // A character outside the BMP that would straddle the cut is left out whole, not split into a lone surrogate.
-        String straddling = PageMenuItems.searchTerms("a".repeat(999) + "😀" + "b");
+        String straddling = PageMenuItems.searchTerms("a".repeat(999) + "\uD83D\uDE00" + "b");
         assertThat(straddling).isEqualTo("a".repeat(999));
-        assertThat(PageMenuItems.searchTerms("a".repeat(998) + "😀" + "b")).isEqualTo("a".repeat(998) + "😀");
+        assertThat(PageMenuItems.searchTerms("a".repeat(998) + "\uD83D\uDE00" + "b")).isEqualTo("a".repeat(998) + "\uD83D\uDE00");
     }
 
     /** P39: Copy Page Title is disabled while the page has no title. */

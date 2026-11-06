@@ -31,6 +31,8 @@ final class FakeContent implements ContentTab {
     boolean active,closed;
     int pins;
     Runnable focus=()->{};
+    /** What takes the text other plugins insert (SDK 0.29.0); empty while the tab takes none. */
+    Optional<Consumer<InsertedText>> insertion=Optional.empty();
     final List<Consumer<Boolean>> activated=new ArrayList<>();
     final List<Runnable> disposed=new ArrayList<>();
     /** The right-click menu the tab shows; null while it shows none. */
@@ -45,6 +47,9 @@ final class FakeContent implements ContentTab {
     public void setStatus(List<ContentStatus> values){if(closed)return;for(var value:values)if(!value.icon().isEmpty())ui.context.kit().validateIcon(value.icon());status=List.copyOf(values);}
     public void setFocusTarget(Runnable value){if(!closed)focus=value;}
     public void setRestore(Optional<dev.jasper.sdk.RestoreState> value){Objects.requireNonNull(value,"value");if(!closed)restore=value;}
+    public void setTextInsertion(Optional<Consumer<InsertedText>> value){Objects.requireNonNull(value,"value");if(!closed)insertion=value;}
+    /** Whether the tab takes inserted text now: open, with an insertion set. */
+    boolean takesText(){return !closed&&insertion.isPresent();}
     public void select(){if(closed)return;ui.host.workspace.select(tab);active(true);focus.run();}
     void active(boolean value){if(active==value)return;active=value;for(var listener:List.copyOf(activated))listener.accept(value);}
     /**
@@ -168,5 +173,5 @@ final class FakeContent implements ContentTab {
     public CompletableFuture<Boolean> requestClose(){return ui.closeContent(List.of(this),true);}
     public Subscription onActive(Consumer<Boolean> value){activated.add(value);return ()->activated.remove(value);}
     public Subscription onClosed(Runnable value){disposed.add(value);return ()->disposed.remove(value);}
-    public void close(){if(closed)return;if(menu!=null)menu.dismiss();active(false);closed=true;ui.contents.remove(this);ui.host.workspace.close(tab);for(var listener:List.copyOf(disposed))listener.run();disposed.clear();activated.clear();}
+    public void close(){if(closed)return;if(menu!=null)menu.dismiss();active(false);closed=true;insertion=Optional.empty();ui.contents.remove(this);ui.host.workspace.close(tab);for(var listener:List.copyOf(disposed))listener.run();disposed.clear();activated.clear();}
 }

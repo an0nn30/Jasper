@@ -3,6 +3,7 @@ package dev.jasper.browser.item;
 import dev.jasper.browser.engine.AboutScheme;
 import dev.jasper.browser.http.WebFetch;
 import dev.jasper.browser.page.NavigationHistory;
+import dev.jasper.browser.pages.PageHtml;
 import dev.jasper.sdk.Variant;
 import dev.jasper.sdk.ui.Appearance;
 import dev.jasper.sdk.ui.SyntaxPalette;

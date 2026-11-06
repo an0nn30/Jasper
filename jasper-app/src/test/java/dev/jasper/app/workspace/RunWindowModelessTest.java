@@ -116,6 +116,61 @@ class RunWindowModelessTest {
         });
     }
 
+    /**
+     * A scope with one row, "here", whose run inserts its title, with Return, into the target's content item while it
+     * takes text, and otherwise records {@code pane} or {@code none}.
+     */
+    static PaletteScope inserting(List<String> runs) {
+        return new PaletteScope() {
+            @Override public String id() { return "test.insert"; }
+            @Override public String label() { return "Insert"; }
+            @Override public String placeholder() { return "Search here"; }
+            @Override public List<PaletteVerb> verbs() { return List.of(new PaletteVerb("run", "Run")); }
+            @Override public PaletteResults search(String query, PaletteContext context) {
+                return new PaletteResults(List.of(PaletteRow.of("here", "here")), null, null);
+            }
+            @Override public void execute(PaletteRow row, PaletteVerb verb, PaletteContext context) {
+                var target = context.target();
+                if (target.insertText().isPresent() && target.live().getAsBoolean()) target.insertText().get().accept(row.title(), true);
+                else runs.add(target.paneId().isPresent() ? "pane" : "none");
+            }
+            @Override public Subscription onChanged(Runnable listener) { return new Subscription(() -> { }); }
+        };
+    }
+
+    /**
+     * Browser plan 5 Task 10: with a plugin's item current and no terminal pane, the card's run and the Run window's run
+     * reach the item's text insertion, read at each run; a terminal current gives its pane instead.
+     */
+    @Test void aContentItemThatTakesTextIsTheTargetOfTheCardAndTheRunWindow() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            for (var look : List.of(PaletteLook.DEFAULT, PaletteLook.RUN_WINDOW)) {
+                var runs = new ArrayList<String>();
+                try (var o = open(look)) {
+                    var palette = o.owner().commandPalette();
+                    palette.dismiss();
+                    var model = new dev.jasper.app.contributions.Contributions();
+                    o.owner().connectContributions(model);
+                    o.owner().scopes().register(inserting(runs));
+                    var terminal = o.owner().currentTerminal();
+                    var page = model.tabs().open("dev.page", "page", "Page", o.owner().id(), new javax.swing.JPanel());
+                    assertThat(o.owner().selectedContent()).isSameAs(page);
+                    palette.open("test.insert"); LayoutTestSupport.layoutTree(o.root());
+                    palette.enterPressed(0);
+                    assertThat(runs).as("%s: the item takes no text yet", look).containsExactly("none");
+                    page.insertion(java.util.Optional.of((text, submit) -> runs.add(text + "|" + submit)));
+                    palette.open("test.insert"); LayoutTestSupport.layoutTree(o.root());
+                    palette.enterPressed(0);
+                    assertThat(runs).as("%s: the item takes text now", look).containsExactly("none", "here|true");
+                    o.owner().selectTab(terminal);
+                    palette.open("test.insert"); LayoutTestSupport.layoutTree(o.root());
+                    palette.enterPressed(0);
+                    assertThat(runs).as("%s: a terminal is current", look).containsExactly("none", "here|true", "pane");
+                }
+            }
+        });
+    }
+
     /** A scope whose one row is what it reads when it searches, as History reads the target pane's folder. */
     static PaletteScope reading(String[] folder) {
         return new PaletteScope() {

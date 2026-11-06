@@ -130,6 +130,20 @@ public interface Platform {
     Optional<String> clipboardText();
 
     /**
+     * Whether Copy on select is on ({@code terminal.copy_on_select}, in Settings › Terminal): Jasper then copies each
+     * selection the user finishes in a terminal, and a plugin's view can do the same with its own selections. It
+     * follows the setting, so read it at each selection; a change applies from the next read. Off until the user turns
+     * it on. Callable from any thread; never blocks.
+     *
+     * @return whether Copy on select is on
+     * @throws UnsupportedOperationException if the host predates this query
+     * @since 0.29.0
+     */
+    default boolean copyOnSelect() {
+        throw new UnsupportedOperationException("The Copy on select setting is unavailable");
+    }
+
+    /**
      * Makes this plugin the editor Jasper opens files with: {@code config.toml}, the plugin settings files, the custom VM
      * options file, every {@link #openInEditor} and {@link #openFile}, and a Cmd-click (Ctrl-click on Linux and Windows)
      * on a file path in a local terminal pane go to {@code editor} first, on the UI thread; a click brings the path's line

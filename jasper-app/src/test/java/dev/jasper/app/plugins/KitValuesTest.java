@@ -37,9 +37,26 @@ class KitValuesTest {
     List.of(new Button("details",READY,"Details","",ButtonKind.LINK,"details",""))))),
    new Nodes.Properties("properties",READY,"Properties — minecraft-local",List.of(new PropertyRow("Host","192.168.1.124",true),
     new PropertyRow("Credentials","Vault locked",false,Optional.of(Severity.WARNING)))),
-   new Custom("custom",READY,"document",CustomKind.EDITOR,"Document"));
+   new Custom("custom",READY,"document",CustomKind.EDITOR,"Document"),
+   new TokenField("tags",READY,"Tags","Enter tags\u2026",List.of("work","\u00C4pfel")));
   assertThat(classes(nodes)).hasSize(Node.class.getPermittedSubclasses().length);
   for(var node:nodes){var spec=new ViewSpec(node);assertThat(KitValues.toModule(spec).toString().replace("titleNote=, contextActions=[]", "titleNote=")).isEqualTo(spec.toString());}
+ }
+ /**
+  * Plan 5 Task 6: the module's token rule is the SDK's, which a token field's events cross back through (KitValues.toSdk
+  * refuses tokens the SDK's rule would not keep), checked on blanks, too long, control characters and case duplicates.
+  */
+ @Test void theModulesTokenRuleKeepsWhatTheSdksKeeps(){
+  var given=new ArrayList<String>(List.of(""," ","  work  ","Work","WORK","x".repeat(64),"y".repeat(65),"a\u0000b","a\u007fb","a\u0085b","\u00C4pfel","\u00E4pfel","\u00C4PFEL",
+   "stra\u00DFe","STRASSE","\u0130stanbul","istanbul","\u0131stanbul","\u03A3\u03C3","\u03C3\u03A3"));
+  for(int i=given.size();i<120;i++)given.add(i%7==0?"Tag"+i/2:"tag"+i);
+  assertThat(given).hasSize(120);
+  var sdk=Nodes.TokenField.kept(given);
+  assertThat(dev.jasper.ui.model.Nodes.TokenField.kept(given)).isEqualTo(sdk);
+  // "\u00C4PFEL" folds its ASCII letters only, to "\u00C4pfel": a duplicate.
+  assertThat(sdk).hasSize(100).startsWith("work","x".repeat(64),"\u00C4pfel","\u00E4pfel","stra\u00DFe","STRASSE","\u0130stanbul","istanbul","\u0131stanbul","\u03A3\u03C3","\u03C3\u03A3");
+  var event=new dev.jasper.ui.model.UiEvent.TokensChanged("tags",dev.jasper.ui.model.Nodes.TokenField.kept(given));
+  assertThat(((UiEvent.TokensChanged)KitValues.toSdk(event)).tokens()).isEqualTo(sdk);
  }
  /** Plan 3b: a read-only field crosses the projection unchanged. */
  @Test void readOnlyFieldsProjectWithoutLoss(){
@@ -144,7 +161,7 @@ class KitValuesTest {
   assertThat(new MenuItem("old","Old","key","open",true,false).hue()).isEqualTo(Hue.NEUTRAL);
  }
  @Test void everyEventProjectsItsOwnerItemAndPayload(){
-  List<dev.jasper.ui.model.UiEvent> events=List.of(new dev.jasper.ui.model.UiEvent.Action("act"),new dev.jasper.ui.model.UiEvent.Edited("field","text"),new dev.jasper.ui.model.UiEvent.Selected("list",Set.of("a")),new dev.jasper.ui.model.UiEvent.Toggled("toggle",true),new dev.jasper.ui.model.UiEvent.Expanded("tree","branch",true),new dev.jasper.ui.model.UiEvent.Reordered("list","a",2),new dev.jasper.ui.model.UiEvent.Removed("list","a"),new dev.jasper.ui.model.UiEvent.SecretChanged("secret"),new dev.jasper.ui.model.UiEvent.Sorted("table","name"),new dev.jasper.ui.model.UiEvent.Clicked("tree","leaf"),new dev.jasper.ui.model.UiEvent.ColumnsResized("files",Map.of("name",180)),new dev.jasper.ui.model.UiEvent.SuggestionChosen("address","search",true));
+  List<dev.jasper.ui.model.UiEvent> events=List.of(new dev.jasper.ui.model.UiEvent.Action("act"),new dev.jasper.ui.model.UiEvent.Edited("field","text"),new dev.jasper.ui.model.UiEvent.Selected("list",Set.of("a")),new dev.jasper.ui.model.UiEvent.Toggled("toggle",true),new dev.jasper.ui.model.UiEvent.Expanded("tree","branch",true),new dev.jasper.ui.model.UiEvent.Reordered("list","a",2),new dev.jasper.ui.model.UiEvent.Removed("list","a"),new dev.jasper.ui.model.UiEvent.SecretChanged("secret"),new dev.jasper.ui.model.UiEvent.Sorted("table","name"),new dev.jasper.ui.model.UiEvent.Clicked("tree","leaf"),new dev.jasper.ui.model.UiEvent.ColumnsResized("files",Map.of("name",180)),new dev.jasper.ui.model.UiEvent.SuggestionChosen("address","search",true),new dev.jasper.ui.model.UiEvent.TokensChanged("tags",List.of("work","news")));
   assertThat(events).hasSize(UiEvent.class.getPermittedSubclasses().length);for(var event:events)assertThat(KitValues.toSdk(event).toString()).isEqualTo(event.toString());
   assertThat(Arrays.stream(SemanticColor.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.theme.SemanticColor.values()).map(Enum::name).toArray(String[]::new));
  }

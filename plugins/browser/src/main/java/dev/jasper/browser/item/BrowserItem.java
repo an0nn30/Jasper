@@ -7,10 +7,16 @@ import dev.jasper.browser.page.MenuPlace;
 import dev.jasper.browser.page.NavigationButton;
 import dev.jasper.browser.page.NavigationHistory;
 import dev.jasper.browser.page.Page;
+import dev.jasper.browser.pages.BookmarksPage;
+import dev.jasper.browser.pages.HistoryPage;
 import dev.jasper.browser.restore.BrowserRestore;
 import dev.jasper.browser.settings.BrowserSettings;
+import dev.jasper.browser.store.BookmarkStore.Bookmark;
+import dev.jasper.browser.store.Stores;
 import dev.jasper.sdk.RestoreState;
+import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.WindowOwner;
+import dev.jasper.sdk.notifications.NotificationGroup;
 import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.ui.ContentCommand;
 import dev.jasper.sdk.ui.ContentPresentation;
@@ -19,6 +25,7 @@ import dev.jasper.sdk.ui.ContentStatus;
 import dev.jasper.sdk.ui.ContentTab;
 import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.CustomContent;
+import dev.jasper.sdk.ui.InsertedText;
 import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.PixelImage;
 import dev.jasper.sdk.ui.TabPlacement;
@@ -49,9 +56,12 @@ import javax.swing.JComponent;
  * address, which the address field shows too, each without a user name or password. The icon, in the tab and at the
  * field's left, is the page's favicon once the page has loaded, Jasper's own icon on Jasper's {@code jasper-about:}
  * pages, and the globe while the page loads and whenever it has no favicon (spec sections 5 and 6). As the user types
- * into the address field, it lists the field's {@link Suggestions} at once and asks the chosen engine for its own 150
- * ms after the last keystroke, each keystroke superseding the request before; Tab or Enter on a suggestion loads it,
- * and Enter with none shown loads what the text resolves to, each then focusing the page. Its content commands
+ * into the address field, it lists the field's {@link Suggestions} at once, with the bookmarks and visited sites that
+ * match ({@link StoreSuggestions}), and asks the chosen engine for its own 150 ms after the last keystroke, each
+ * keystroke superseding the request before; Tab or Enter on a suggestion loads it, and Enter with none shown loads what
+ * the text resolves to, each then focusing the page. The bookmarks and visits load the first time the item shows or its
+ * field is edited, and the list follows them as they change. Its {@link HistoryRecorder} records each page load in
+ * history (spec section 10). Its content commands
  * {@code copy} and {@code paste} are what Jasper's Copy and Paste run in it, and {@code find}, {@code find-next} and
  * {@code find-previous}, on the keys of Editor tabs, what Jasper's Find, Find Next and Find Previous run: its
  * {@link BrowserFindBar}, the view's last row. Its {@code font-bigger}, {@code font-smaller} and {@code font-reset},
@@ -59,7 +69,10 @@ import javax.swing.JComponent;
  * down, which the item saves as its own zoom, or back to Page zoom, which leaves it none; on Windows and Linux,
  * Ctrl+wheel over the page steps the zoom too, unsaved. Chromium keeps one zoom per host, so two items on one host that
  * show at once share the zoom set last (an engine-forced gap). The mouse's back and forward buttons over the page go
- * back and forward, and an entry chosen from Back's or Forward's hold menu goes to that entry of the page's history. It
+ * back and forward, and an entry chosen from Back's or Forward's hold menu goes to that entry of the page's history,
+ * while their Show Full History loads Jasper's history page ({@link #showHistory}). The menu button's Add Bookmark
+ * bookmarks the page at once and opens its {@link BookmarkPanel}, Remove Bookmark removes the page's bookmark and says
+ * "Bookmark Removed", and Manage Bookmarks and History load Jasper's bookmarks and history pages. It
  * saves its URL, its own zoom and its target with Jasper's workspace ({@link BrowserRestore}): what it loads first until
  * it shows, then where each committed navigation takes its page.
  * Restored after a run that ended while Chromium ran, an item waits: in place of the canvas it says that Jasper closed
@@ -73,7 +86,13 @@ import javax.swing.JComponent;
  * menu, shows the page's source in the item at {@code jasper-about:source} (spec section 10), as its {@link SourcePages}
  * capture it; the item saves a source page without its token. Inspect Element, from the same menu, shows the page's
  * DevTools, inspecting the element under the pointer, in the item's one {@link DevToolsItem}, a pane below its own,
- * which closes with it. UI thread.
+ * which closes with it. Text another plugin inserts into the item, such as a snippet from the command palette (spec
+ * section 15), goes into the page's focused field ({@link Page#insertIntoField}), then Return when asked. When the
+ * page's script cannot reach the focus, as in a cross-origin frame, the text is typed where the focus is
+ * ({@link Page#insertText}), then Return when asked; a focus that takes no text gets neither; the clipboard is never
+ * touched. While Copy on select is on
+ * ({@code Platform.copyOnSelect()}, spec section 15), each selection the user finishes in the page is copied
+ * ({@link Page#onSelectionGesture}, {@link Page#selectedText}), except one in a frame of another origin. UI thread.
  */
 public final class BrowserItem implements AutoCloseable {
     static final String ROOT = "browser", PAGE = "browser.page", CONTENT = "browser.page.content";
@@ -88,16 +107,23 @@ public final class BrowserItem implements AutoCloseable {
     // The longest address the tab's location and status show; a data: address can run to megabytes.
     private static final int SHOWN_ADDRESS = 2_000;
     private final BrowserItems items;
+    // The history and bookmarks the item records into and suggests from, read once, as it opens.
+    private final Stores stores;
     private final Optional<String> target;
     private final Page page;
     private final ErrorPages errors;
     private final SourcePages sources;
-    private final BrowserToolbar toolbar = new BrowserToolbar();
+    private final HistoryRecorder history;
+    private final BrowserToolbar toolbar = new BrowserToolbar(this::storeSuggestions);
+    // The item's listening to its bookmarks and visits, which ends as it closes.
+    private final Subscription bookmarksChanged, visitsChanged;
     private final BrowserFindBar findBar;
     private final UiView view;
     private ContentTab tab;
     // The item's DevTools item while it is open; null before the first Inspect Element and once it closes.
     private DevToolsItem devTools;
+    // The Edit Bookmark panel opened last, which may have closed since; null before the first.
+    private BookmarkPanel panel;
     private URI url;
     // Where the item's restore state says it is: what it loads first until it shows, then where its page committed.
     private URI saved;
@@ -106,18 +132,25 @@ public final class BrowserItem implements AutoCloseable {
     private OptionalInt ownZoom;
     private String title;
     private boolean waiting, asked, closed;
+    // How many main-frame loads the page has started: a bookmark's panel opens only if none has since Add Bookmark.
+    private long loadStarts;
+    // Copy on select: whether a read of the page's selection is under way, and whether a gesture came meanwhile (H34);
+    // and the text a read dropped for a later one found, which that one copies if it finds the selection unchanged (H36).
+    private boolean readingSelection, selectedAgain;
+    private String keptSelection;
     // Cancels the wait for the typing to pause; and the engine's answer the field waits for, or null.
     private Runnable typingPause = NOTHING;
     private CompletableFuture<List<String>> suggestion;
 
     private BrowserItem(BrowserItems items, URI url, Optional<String> target, OptionalInt zoom, boolean waiting) {
         this.items = items;
+        stores = items.stores();
         this.target = target;
         this.url = url;
         saved = url;
         ownZoom = zoom;
         this.waiting = waiting;
-        page = new Page(url, this::changed, items.favicons());
+        page = new Page(url, this::changed, items.favicons(), items.context().background());
         showZoom(zoom.orElseGet(() -> items.settings().pageZoom()));
         page.onNavigationButton(this::navigationButton);
         page.onMagnify(this::magnify);
@@ -125,9 +158,12 @@ public final class BrowserItem implements AutoCloseable {
         page.onCloseItem(this::close);
         page.onShowItem(this::show);
         page.onAddressChange(this::committed);
+        page.onLoadStart(address -> loadStarts++);
+        page.onSelectionGesture(this::selectionFinished);
         errors = new ErrorPages(page, items.certificates(), this::load);
         page.onLoadFailure(failure -> { if (!closed) errors.failed(failure); });
         sources = new SourcePages(page, this::load);
+        history = new HistoryRecorder(page, stores, items::later);
         title = TabTitle.of("", host(url.toString()), "", false);
         findBar = new BrowserFindBar(() -> closed ? Optional.empty() : Optional.of(page.find()), this::render, this::focusFind);
         view = items.context().kit().create(spec(), this::event);
@@ -135,6 +171,9 @@ public final class BrowserItem implements AutoCloseable {
         page.view().addHierarchyListener(event -> {
             if ((event.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0 && page.view().isShowing()) shown();
         });
+        // The item draws again as the bookmarks change, and as the visits do while something is typed, for the field's list.
+        bookmarksChanged = stores.bookmarkIndex().onChanged(this::render);
+        visitsChanged = stores.visitIndex().onChanged(() -> { if (toolbar.typing()) render(); });
     }
 
     /**
@@ -174,6 +213,8 @@ public final class BrowserItem implements AutoCloseable {
         try {
             tab = items.context().windows().openTab(restore(url).map(spec::withRestore).orElse(spec), window.orElse(null), view, placement);
         } catch (RuntimeException | Error failure) {
+            bookmarksChanged.close();
+            visitsChanged.close();
             view.close();
             throw failure;
         }
@@ -188,6 +229,7 @@ public final class BrowserItem implements AutoCloseable {
             new ContentCommand("font-bigger", "Increase Font Size", null, true, () -> zoomTo(Zoom.step(zoom, 1))),
             new ContentCommand("font-smaller", "Decrease Font Size", null, true, () -> zoomTo(Zoom.step(zoom, -1))),
             new ContentCommand("font-reset", "Reset Font Size", null, true, this::resetZoom)));
+        tab.setTextInsertion(Optional.of(this::insert));
         tab.onClosed(this::closed);
         // The page's alerts, confirmations and file choosers show over this item's tab, and close with it; so does its
         // right-click menu, which copies with the plugin's clipboard and searches with the engine chosen as it opens.
@@ -271,6 +313,103 @@ public final class BrowserItem implements AutoCloseable {
     /** Pastes the clipboard into the page. */
     public void paste() {
         if (!closed) page.paste();
+    }
+
+    /**
+     * Text another plugin inserts into the item, as the tab's insertion receives it (H30, H38). It goes into the page's
+     * focused field, then Return when {@code inserted} asks. When the page's script answers that the focus is where it
+     * cannot reach, in a frame of another origin or a closed shadow root, the text is typed there, then Return when
+     * asked. When it answers that the focus takes no text, as a button, a link or a read-only field does, nothing more
+     * happens: Return is trusted input, and would press the control the page put the focus on. Each answer comes back to
+     * the UI thread, and nothing more happens once the item has closed or the page has started another main-frame load
+     * since the insertion began. Any other outcome does nothing more: a page without its browser yet, or a DevTools call
+     * that is late, refused or answered with an error, as the text may still go in.
+     */
+    private void insert(InsertedText inserted) {
+        if (closed) return;
+        String text = inserted.text();
+        long started = loadStarts;
+        page.insertIntoField(text).whenComplete((answer, failure) -> EventQueue.invokeLater(() -> {
+            if (closed) return;
+            if (failure != null) {
+                items.context().log().log(System.Logger.Level.DEBUG, "Text could not be put into a page's field", failure);
+                return;
+            }
+            if (loadStarts != started) return; // another document now: nothing is typed or pressed there
+            switch (answer) {
+                case INSERTED -> { if (inserted.submit()) page.pressReturn(); }
+                case UNREACHABLE -> page.insertText(text).whenComplete((typed, notTyped) -> EventQueue.invokeLater(() -> {
+                    if (closed) return;
+                    if (notTyped != null) items.context().log().log(System.Logger.Level.DEBUG, "Text could not be typed into a page", notTyped);
+                    else if (inserted.submit() && loadStarts == started) page.pressReturn();
+                }));
+                case NOT_EDITABLE -> { }
+            }
+        }));
+    }
+
+    /**
+     * The user finished a selection in the page. While Copy on select is on, the page's selection is read, and its text,
+     * if any, is copied on the UI thread, if Copy on select is still on and the item still open by then. One read runs at
+     * a time (H34): a gesture during it starts none, but once it ends the selection is read once more, and only that
+     * latest read is copied, so a page that answers late queues no copies. The dropped read's text is kept for the read
+     * after it (H36): the page counted the selection's change as read by the dropped read, so the read after it finds the
+     * selection unchanged, and copies the kept text; if it finds a new selection, it copies that. A selection in a frame
+     * of another origin is not copied (F2): Chromium's copy there would run that frame's scripts, which could put anything
+     * on the clipboard; Copy copies it. A read that fails copies nothing and keeps nothing, so when it ran in the page but
+     * answered too late, the next read finds the selection unchanged and copies nothing.
+     */
+    private void selectionFinished() {
+        if (closed || items.closed() || !items.context().platform().copyOnSelect()) return;
+        if (readingSelection) selectedAgain = true;
+        else readSelection();
+    }
+
+    /** Reads the page's selection; its answer comes back to {@link #selectionRead} on the UI thread. */
+    private void readSelection() {
+        readingSelection = true;
+        selectedAgain = false;
+        page.selectedText().whenComplete((selection, failure) -> EventQueue.invokeLater(() -> selectionRead(selection, failure)));
+    }
+
+    /**
+     * A read of the page's selection answered {@code selection}, or failed: what it found is copied, unless a gesture
+     * came meanwhile, when it is kept and the selection is read once more. What it found is its non-empty text, or for a
+     * selection unchanged the text kept for it; nothing for anything else.
+     */
+    private void selectionRead(Page.Selection selection, Throwable failure) {
+        readingSelection = false;
+        String kept = keptSelection;
+        keptSelection = null;
+        if (closed || items.closed()) return;
+        if (failure != null) items.context().log().log(System.Logger.Level.DEBUG, "A page's selection could not be read", failure);
+        String found = failure != null || selection == null ? null : switch (selection) {
+            case Page.Selection.Text text -> text.text().isEmpty() ? null : text.text();
+            case Page.Selection.Unchanged unchanged -> kept;
+            case Page.Selection.InFrame frame -> null;
+            case Page.Selection.None none -> null;
+        };
+        if (!items.context().platform().copyOnSelect()) {
+            selectedAgain = false;
+        } else if (selectedAgain) { // a later gesture: only the read for it is copied
+            keptSelection = found;
+            readSelection();
+        } else if (found != null) {
+            items.context().platform().copy(found);
+        }
+    }
+
+    /**
+     * Loads Jasper's history page, and the page takes the focus, as Web › History and the hold menus' Show Full History
+     * do.
+     */
+    public void showHistory() {
+        if (!closed) loadAndFocus(HistoryPage.ADDRESS);
+    }
+
+    /** Loads Jasper's bookmarks page, and the page takes the focus, as the menu button's Manage Bookmarks does. */
+    void showBookmarks() {
+        if (!closed) loadAndFocus(BookmarksPage.ADDRESS);
     }
 
     /** Focuses the address field and selects its text, as Open Location does. */
@@ -399,7 +538,28 @@ public final class BrowserItem implements AutoCloseable {
     private void shown() {
         if (asked || closed || waiting) return;
         asked = true;
+        loadIndexes();
         items.start(page);
+    }
+
+    /** The bookmarks and visits load, the first time any item asks. */
+    private void loadIndexes() {
+        stores.bookmarkIndex().load();
+        stores.visitIndex().load();
+    }
+
+    /** The rows of the bookmarks and visits for {@code typed}, as their indexes hold them. */
+    private List<Nodes.Suggestion> storeSuggestions(String typed) {
+        return StoreSuggestions.of(typed, stores.bookmarkIndex().all(), stores.visitIndex().all());
+    }
+
+    /**
+     * The plugin stops, before the stores close, and before the host closes the plugin's popovers: an Edit Bookmark panel
+     * still open closes, and its bookmark keeps the tags it shows (H23), and the page's last title lands in history.
+     */
+    void flush() {
+        if (panel != null) panel.close();
+        history.flush();
     }
 
     /**
@@ -432,6 +592,9 @@ public final class BrowserItem implements AutoCloseable {
 
     private void closed() {
         closed = true;
+        history.flush();
+        bookmarksChanged.close();
+        visitsChanged.close();
         endSuggestions();
         sources.close();
         if (devTools != null) devTools.close();
@@ -536,6 +699,7 @@ public final class BrowserItem implements AutoCloseable {
     /** The page's address, title, loading state or where it can go changed. */
     private void changed() {
         if (closed) return;
+        history.titled(page.title());
         url = AddressInput.parse(errors.address()).orElse(url);
         render();
         present();
@@ -545,6 +709,7 @@ public final class BrowserItem implements AutoCloseable {
         if (closed || findBar.event(event)) return;
         switch (event) {
             case UiEvent.Edited edited when edited.id().equals(BrowserToolbar.ADDRESS) -> {
+                loadIndexes();
                 toolbar.edited(edited.text());
                 suggest(edited.text());
                 render();
@@ -570,6 +735,10 @@ public final class BrowserItem implements AutoCloseable {
                 view.selectAll(BrowserToolbar.ADDRESS);
             }
             case BrowserToolbar.SETTINGS -> items.showSettings();
+            case BrowserToolbar.SHOW_HISTORY, BrowserToolbar.HISTORY -> showHistory();
+            case BrowserToolbar.BOOKMARKS -> showBookmarks();
+            case BrowserToolbar.BOOKMARK_ADD -> addBookmark();
+            case BrowserToolbar.BOOKMARK_REMOVE -> removeBookmark();
             case LOAD_PAGE -> {
                 endWait();
                 page.focus();
@@ -577,6 +746,51 @@ public final class BrowserItem implements AutoCloseable {
             // An entry of Back's or Forward's hold menu.
             default -> NavigationHistory.entryId(action).ifPresent(page::goToHistoryEntry);
         }
+    }
+
+    /**
+     * Add Bookmark: the page is bookmarked at once, at the address the item shows, with its title, or none while the item
+     * shows its error page; then, unless the item has closed or its page has started another load meanwhile, the
+     * bookmark's {@link BookmarkPanel} opens from the menu button. The bookmarks load, if they have not, so the menu
+     * offers Remove Bookmark once the bookmark is stored.
+     */
+    private void addBookmark() {
+        loadIndexes();
+        long started = loadStarts;
+        String title = errors.shown().isPresent() ? "" : page.title();
+        CompletableFuture<Bookmark> added = stores.bookmarks().add(errors.address(), title, System.currentTimeMillis());
+        added.whenComplete((bookmark, failure) -> EventQueue.invokeLater(() -> {
+            if (failure != null) {
+                items.context().log().log(System.Logger.Level.DEBUG, "A page could not be bookmarked", failure);
+                return;
+            }
+            if (!closed && !items.closed() && tab != null && loadStarts == started) openPanel(bookmark);
+        }));
+    }
+
+    /** The bookmark's panel, from the menu button; none while the button cannot anchor one. */
+    private void openPanel(Bookmark bookmark) {
+        try {
+            panel = BookmarkPanel.open(items.context(), view.anchor(BrowserToolbar.MENU), stores, bookmark, bookmarkNotices(), page, tab);
+        } catch (IllegalArgumentException | IllegalStateException unanchored) { // the view or its menu button cannot anchor now
+            items.context().log().log(System.Logger.Level.DEBUG, "The bookmark's panel could not open", unanchored);
+        }
+    }
+
+    /** Remove Bookmark: the page's bookmark is removed, and once it is gone "Bookmark Removed" says so, its title only. */
+    private void removeBookmark() {
+        stores.bookmarks().remove(errors.address()).whenComplete((removed, failure) -> EventQueue.invokeLater(() -> {
+            if (failure != null) {
+                items.context().log().log(System.Logger.Level.DEBUG, "A bookmark could not be removed", failure);
+                return;
+            }
+            if (removed && !items.closed()) bookmarkNotices().info("Bookmark Removed", "");
+        }));
+    }
+
+    /** The group the bookmark notifications post in, which the plugin declared as it started: the same group again. */
+    private NotificationGroup bookmarkNotices() {
+        return items.context().notifications().group(BookmarkPanel.GROUP);
     }
 
     /** The address field loads {@code address}, and the page takes the focus. */
@@ -649,7 +863,7 @@ public final class BrowserItem implements AutoCloseable {
 
     private ViewSpec spec() {
         Nodes.Node bar = toolbar.node(shown(errors.address()), page.loading(), errors.canGoBack(), page.canGoForward(), icon(),
-            page.history(), items.settings(), errors.notSecure());
+            page.history(), items.settings(), errors.notSecure(), Optional.of(stores.bookmarkIndex().has(errors.address())));
         // A waiting item keeps the canvas's slot, hidden: a slot that leaves the view closes its content, the page.
         Nodes.Node canvas = new Nodes.Custom(PAGE, waiting ? HIDDEN : ControlState.READY, CONTENT, Nodes.CustomKind.PREVIEW, "Web page");
         return new ViewSpec(new Nodes.Split(ROOT, ControlState.READY, Nodes.SplitKind.DOCUMENT,

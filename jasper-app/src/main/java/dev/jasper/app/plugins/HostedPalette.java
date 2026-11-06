@@ -2,6 +2,7 @@ package dev.jasper.app.plugins;
 
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.palette.PaletteContext;
+import dev.jasper.app.palette.PaletteTarget;
 import dev.jasper.sdk.Capabilities;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.palette.Palette;
@@ -13,6 +14,9 @@ import dev.jasper.sdk.palette.PaletteStep;
 import dev.jasper.sdk.palette.PaletteVerb;
 import dev.jasper.sdk.palette.ScopeSpec;
 import dev.jasper.sdk.terminal.WindowHandle;
+import dev.jasper.sdk.ui.InsertedText;
+import dev.jasper.sdk.ui.TextTarget;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -72,7 +76,29 @@ final class HostedPalette implements Palette {
     private PaletteQuery query(PaletteContext context) {
         var windowId = context.target().windowId().orElseThrow(() -> new IllegalStateException("The palette has no window"));
         return new PaletteQuery(terminals.windowHandle(windowId), context.target().paneId().map(terminals::paneHandle),
-            context.maxResults(), context.macOs());
+            context.maxResults(), context.macOs(), textTarget(context.target()));
+    }
+
+    /**
+     * The origin's content item while it takes inserted text and no terminal pane is the origin (SDK 0.29.0): read at
+     * each query, as the target pane is, and bound to this plugin, whose {@code terminal.inject} inserting needs.
+     */
+    private Optional<TextTarget> textTarget(PaletteTarget target) {
+        if (target.paneId().isPresent() || target.insertText().isEmpty() || !target.live().getAsBoolean()) return Optional.empty();
+        var insert = target.insertText().get();
+        var taking = target.live();
+        return Optional.of(new TextTarget() {
+            @Override public void insert(InsertedText text) {
+                Objects.requireNonNull(text, "text");
+                gate.require(Capabilities.TERMINAL_INJECT);
+                ui.guard("TextTarget.insert");
+                if (!taking.getAsBoolean()) return;
+                gate.audit(Capabilities.TERMINAL_INJECT, "inserted " + text.text().getBytes(StandardCharsets.UTF_8).length
+                    + " bytes into a content tab" + (text.submit() ? ", then Return" : ""));
+                insert.accept(text.text(), text.submit());
+            }
+            @Override public boolean isOpen() { ui.guard("TextTarget.isOpen"); return taking.getAsBoolean(); }
+        });
     }
 
     private dev.jasper.app.palette.PaletteRow appRow(PaletteRow row) {

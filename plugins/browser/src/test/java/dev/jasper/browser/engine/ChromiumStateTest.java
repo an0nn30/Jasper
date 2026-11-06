@@ -40,6 +40,8 @@ class ChromiumStateTest {
     private final AtomicInteger tellings = new AtomicInteger();
     private final AtomicBoolean toldOnUi = new AtomicBoolean();
     private final CompletableFuture<Throwable> told = new CompletableFuture<>();
+    // Each time the start made the data directory its owner's alone, and whether the marker was there yet.
+    private final List<String> restricted = new CopyOnWriteArrayList<>();
     // The run marker's warnings, captured instead of printed. The logger is held, so it keeps the handler.
     private final List<String> warnings = new CopyOnWriteArrayList<>();
     private final Logger markerLog = Logger.getLogger(RunMarker.class.getName());
@@ -208,6 +210,20 @@ class ChromiumStateTest {
     }
 
     /**
+     * Plan 5's H37: the start makes the data directory its owner's alone as it enters JCEF, before it writes the marker
+     * and before Chromium makes its profile there, cookies included.
+     */
+    @Test void aStartThatEntersMakesTheDataDirectoryItsOwnersAloneFirst() throws Exception {
+        Chromium chromium = chromium(recording, LIMIT);
+        chromium.client();
+        assertThat(restricted).as("asked for, not entered").isEmpty();
+        assertThat(chromium.enter()).isTrue();
+        assertThat(restricted).containsExactly("before the marker");
+        end(chromium);
+        assertThat(restricted).hasSize(1);
+    }
+
+    /**
      * Jasper's close deletes the marker at once: a quit's dispose can outlast Jasper's exit, and Chromium's end, which
      * deletes it too, may never come. The close on the UI thread returns before Chromium ends.
      */
@@ -242,6 +258,7 @@ class ChromiumStateTest {
         EventQueue.invokeAndWait(chromium::close);
         assertThat(chromium.enter()).as("the worker comes too late").isFalse();
         assertThat(marker()).doesNotExist();
+        assertThat(restricted).as("nothing done in the data directory").isEmpty();
     }
 
     /** A start that threw before Chromium had an app keeps its marker, as Chromium may have loaded, until the close. */
@@ -275,7 +292,8 @@ class ChromiumStateTest {
     /** A marker that cannot be written fails neither the start nor the close, and is a warning. */
     @Test void aMarkerThatCannotBeWrittenFailsNothing() throws Exception {
         Path notADirectory = Files.createFile(data.resolve("file"));
-        Chromium chromium = new Chromium(notADirectory, recording, new AboutScheme(), new PreviewScheme(), cause -> tellings.incrementAndGet(), process, LIMIT);
+        Chromium chromium = new Chromium(notADirectory, () -> { }, recording, new AboutScheme(), new PreviewScheme(),
+            cause -> tellings.incrementAndGet(), process, LIMIT);
         var client = chromium.client();
         assertThat(chromium.enter()).isTrue();
         assertThat(warnings).singleElement().asString().startsWith("The browser's run marker could not be written: ");
@@ -427,7 +445,8 @@ class ChromiumStateTest {
     }
 
     private Chromium chromium(Executor worker, Duration limit) {
-        return new Chromium(data, worker, new AboutScheme(), new PreviewScheme(), cause -> {
+        return new Chromium(data, () -> restricted.add(Files.exists(marker()) ? "after the marker" : "before the marker"), worker,
+            new AboutScheme(), new PreviewScheme(), cause -> {
             tellings.incrementAndGet();
             toldOnUi.set(EventQueue.isDispatchThread());
             told.complete(cause);

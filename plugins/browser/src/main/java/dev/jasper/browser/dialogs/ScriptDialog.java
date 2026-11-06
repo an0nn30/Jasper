@@ -1,5 +1,6 @@
 package dev.jasper.browser.dialogs;
 
+import dev.jasper.browser.engine.AboutScheme;
 import dev.jasper.browser.page.DialogPlace;
 import dev.jasper.browser.page.Page;
 import dev.jasper.sdk.Subscription;
@@ -26,8 +27,10 @@ import java.util.function.LongSupplier;
  * Confirmation", the page's message shows as plain text, and its buttons are OK, or Cancel and OK. It shows only while
  * its item is its window's active item, waiting until then, so a page the user is not looking at cannot cover the
  * window; and a page whose dialogs come one straight after another is refused them by its {@link DialogFlood} until it
- * loads again. The script is answered exactly once: true for OK; false for Cancel, Escape, the dialog's own close, its
- * item's close, Chromium cancelling the page's dialogs, a refusal, or a page with nowhere to show it.
+ * loads again. Jasper's own pages, whose origin is {@code jasper-about:}, are never refused as a flood: their
+ * {@code confirm()}s ask before each row is deleted, as iTerm2's pages do, however quickly the user deletes rows. The
+ * script is answered exactly once: true for OK; false for Cancel, Escape, the dialog's own close, its item's close,
+ * Chromium cancelling the page's dialogs, a refusal, or a page with nowhere to show it.
  */
 final class ScriptDialog {
     /** What the script asked. */
@@ -43,6 +46,8 @@ final class ScriptDialog {
     private static final Map<Page, DialogFlood> FLOODS = new WeakHashMap<>();
     private final Page page;
     private final Kind kind;
+    // Whether the dialog is one of Jasper's own pages', which no flood guard refuses.
+    private final boolean jaspers;
     private final String message;
     private final BiConsumer<Boolean, String> reply;
     private final LongSupplier clock;
@@ -54,9 +59,10 @@ final class ScriptDialog {
     private Subscription waiting;
     private List<Subscription> ends = List.of();
 
-    private ScriptDialog(Page page, Kind kind, String message, BiConsumer<Boolean, String> reply, LongSupplier clock) {
+    private ScriptDialog(Page page, Kind kind, String origin, String message, BiConsumer<Boolean, String> reply, LongSupplier clock) {
         this.page = page;
         this.kind = kind;
+        jaspers = AboutScheme.page(origin).isPresent();
         this.message = shown(message);
         this.reply = reply;
         this.clock = clock;
@@ -68,23 +74,25 @@ final class ScriptDialog {
      *
      * @param page the page whose script asks, or null for none, which is answered at once as cancelled
      * @param kind alert or confirm
+     * @param origin the origin of the document that asks, as Chromium names it; a {@code jasper-about:} one is Jasper's
+     *     own page, whose dialogs no flood guard refuses; null for none
      * @param message the page's message, or null for none
      * @param reply told once whether the user chose OK, and no text
      */
-    static void ask(Page page, Kind kind, String message, BiConsumer<Boolean, String> reply) {
-        ask(page, kind, message, reply, () -> System.nanoTime() / 1_000_000);
+    static void ask(Page page, Kind kind, String origin, String message, BiConsumer<Boolean, String> reply) {
+        ask(page, kind, origin, message, reply, () -> System.nanoTime() / 1_000_000);
     }
 
     /**
-     * {@link #ask(Page, Kind, String, BiConsumer)} timed by {@code clock}, which the page's flood guard reads.
+     * {@link #ask(Page, Kind, String, String, BiConsumer)} timed by {@code clock}, which the page's flood guard reads.
      *
      * @param clock a monotonic clock's milliseconds
      */
-    static void ask(Page page, Kind kind, String message, BiConsumer<Boolean, String> reply, LongSupplier clock) {
+    static void ask(Page page, Kind kind, String origin, String message, BiConsumer<Boolean, String> reply, LongSupplier clock) {
         Objects.requireNonNull(kind, "kind");
         Objects.requireNonNull(reply, "reply");
         Objects.requireNonNull(clock, "clock");
-        EventQueue.invokeLater(new ScriptDialog(page, kind, message, reply, clock)::start);
+        EventQueue.invokeLater(new ScriptDialog(page, kind, origin, message, reply, clock)::start);
     }
 
     /** UI thread. */
@@ -95,10 +103,12 @@ final class ScriptDialog {
             return;
         }
         place = found.get();
-        flood = FLOODS.computeIfAbsent(page, ScriptDialog::flood);
-        if (!flood.admit(clock.getAsLong())) {
-            answer(false);
-            return;
+        if (!jaspers) {
+            flood = FLOODS.computeIfAbsent(page, ScriptDialog::flood);
+            if (!flood.admit(clock.getAsLong())) {
+                answer(false);
+                return;
+            }
         }
         // Whichever comes first ends a dialog shown or waiting: its page's close with its item, or Chromium's reset.
         ends = List.of(page.onClose(this::dismiss), page.onDialogsReset(this::dismiss));
@@ -168,12 +178,12 @@ final class ScriptDialog {
         else finish(false);
     }
 
-    /** The dialog is over: the script gets its answer, the first time only, and the page's guard its close. */
+    /** The dialog is over: the script gets its answer, the first time only, and the page's guard, if it asked, its close. */
     private void finish(boolean ok) {
         if (!answer(ok)) return;
         stopWaiting();
         for (Subscription end : ends) end.close();
-        flood.closed(clock.getAsLong());
+        if (flood != null) flood.closed(clock.getAsLong());
     }
 
     private void stopWaiting() {

@@ -31,8 +31,8 @@ bundled plugins, the plugin SDK, and the libraries the application is built from
 - [Editor](editor.md): editing local and remote files in workspace panes, several views of one file, previewing
   Markdown and the `jasper editor` command. Its Vim mode has a list of [supported keys](editor-vim-reference.md) and of
   [differences from Vim](vim-divergences.md).
-- [Browser](browser.md): web pages in workspace tabs and panes, the Web menu, links and popups in a page, where the
-  links you click in a terminal open, and making Jasper your default browser.
+- [Browser](browser.md): web pages in workspace tabs and panes, the Web menu, history and bookmarks, links and popups
+  in a page, where the links you click in a terminal open, and making Jasper your default browser.
 - [File Server](file-server.md): sharing a folder over HTTP, HTTPS, FTP, FTPS, SFTP and TFTP.
 - [Project Index](project-index.md): indexing projects and finding their files from the command palette.
 - [Shell History and Snippets](history-and-snippets.md): searching shell history and saving commands.

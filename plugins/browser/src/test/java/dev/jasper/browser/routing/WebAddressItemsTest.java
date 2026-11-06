@@ -5,6 +5,7 @@ import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.item.BrowserItem;
 import dev.jasper.browser.item.BrowserItems;
 import dev.jasper.browser.settings.BrowserSettings;
+import dev.jasper.browser.store.MemoryStores;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.terminal.PaneInfo;
@@ -21,6 +22,7 @@ import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.SwingUtilities;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -33,8 +35,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 class WebAddressItemsTest {
     private static final String ID = "dev.jasper.browser", LINKS = "open_links_from_terminal";
     private static final String RIGHT = "dev.jasper.browser.open_url_split_right", DOWN = "dev.jasper.browser.open_url_split_down";
-    private static final PluginInfo INFO = new PluginInfo(ID, "Browser", "0.1.0", Set.of("browser.provide"));
+    private static final PluginInfo INFO = new PluginInfo(ID, "Browser", "0.1.0", Set.of("browser.provide", "palette.contribute"));
     private static final List<String> SHOWN = List.of("web-address:" + RIGHT, "web-address:" + DOWN);
+
+    // Stores in memory, one for each BrowserItems a test makes.
+    private final MemoryStores memory = new MemoryStores();
+
+    @AfterEach void closeStores() throws Exception {
+        memory.close();
+    }
 
     @Test void theItemsAreThereWhileLinksMayOpenInJasperAndGoWhileTheyGoToTheDefaultBrowser() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
@@ -102,7 +111,7 @@ class WebAddressItemsTest {
                 context.set(plugin);
                 recorded.context = plugin;
                 var settings = BrowserSettings.declare(plugin.settings());
-                new BrowserItems(plugin, settings::read, page -> { });
+                new BrowserItems(plugin, settings::read, memory.make(), page -> { });
                 WebAddressItems.register(plugin, recorded, settings);
             });
             assertThat(host.contextMenu(second)).containsExactlyElementsOf(SHOWN);
@@ -136,7 +145,7 @@ class WebAddressItemsTest {
             host.start(INFO, Set.of(), Set.of(), plugin -> {
                 declined.context = plugin;
                 var settings = BrowserSettings.declare(plugin.settings());
-                new BrowserItems(plugin, settings::read, page -> { });
+                new BrowserItems(plugin, settings::read, memory.make(), page -> { });
                 WebAddressItems.register(plugin, declined, settings);
             });
             assertThat(host.chooseFromContextMenu(pane, RIGHT)).isTrue();
@@ -157,7 +166,7 @@ class WebAddressItemsTest {
             var chromium = new AtomicReference<>(Chromium.State.NOT_STARTED);
             host.start(INFO, Set.of(), Set.of(), plugin -> {
                 var settings = BrowserSettings.declare(plugin.settings());
-                items.set(new BrowserItems(plugin, settings::read, page -> { }));
+                items.set(new BrowserItems(plugin, settings::read, memory.make(), page -> { }));
                 var role = new BrowserRole(plugin, items.get(), settings, chromium::get);
                 plugin.platform().browser(role);
                 WebAddressItems.register(plugin, role, settings);

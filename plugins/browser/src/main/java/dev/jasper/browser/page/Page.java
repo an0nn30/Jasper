@@ -1,6 +1,7 @@
 package dev.jasper.browser.page;
 
 import dev.jasper.browser.engine.Chromium;
+import dev.jasper.browser.store.Reached;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.ui.PixelImage;
 import dev.jasper.sdk.ui.TabPlacement;
@@ -14,7 +15,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -29,7 +32,7 @@ import org.cef.browser.CefFrame;
 /**
  * One page as its item drives it, in plain types: the canvas it is drawn on, where it is, its title and favicon,
  * whether it loads, where it can go and its history, its find in page, its zoom, its failed loads and the certificates
- * it may go on past, the HTML it shows, its {@link DevTools}, and what it is asked to do. Its
+ * it may go on past, the HTML it shows, what the user selects in it, its {@link DevTools}, and what it is asked to do. Its
  * Chromium browser is made only once {@link #start} asks for it, the first time its item shows; until then the page
  * holds the address it will load and the zoom it will show at, and asks nothing of Chromium. Every method runs on the
  * UI thread, and so does every callback it makes. This is the one class that makes a {@link PageView}: the page's, and
@@ -43,11 +46,30 @@ public final class Page implements AutoCloseable {
     private final PageView view = new PageView();
     private final Runnable changed;
     private final Favicons favicons;
+    // Where the answers of the page's DevTools runs are read: the plugin's background executor.
+    private final Executor background;
     private final Function<Page, CompletableFuture<NavigationHistory.History>> historyReader;
     private ObjIntConsumer<Page> historyJumper;
     // Given the page, reads the HTML its main frame shows: Chromium's, or a test's.
     private Function<Page, CompletableFuture<Optional<String>>> sourceReader = page -> chromiumSource(page.readyBrowser());
+    // Given the page and a text, puts the text into the field the user is typing in, or types it where the focus is; given
+    // the page, presses Return in it: through its browser's DevTools, or a test's.
+    private BiFunction<Page, String, CompletableFuture<Insertion>> fieldInserter =
+        (page, typed) -> page.pageText().map(text -> text.insertIntoField(typed)).orElseGet(Page::noBrowser);
+    private BiFunction<Page, String, CompletableFuture<Void>> textInserter =
+        (page, typed) -> page.pageText().map(text -> text.insertText(typed)).orElseGet(Page::noBrowser);
+    private Consumer<Page> returnPresser = page -> page.pageText().ifPresent(PageText::pressReturn);
+    // Given the page, reads what is selected in it, through its browser's DevTools; or a test's.
+    private Function<Page, CompletableFuture<Selection>> selectionReader =
+        page -> page.pageText().map(PageText::selectedText).orElseGet(() -> CompletableFuture.completedFuture(new Selection.None()));
+    // Given the page, runs Chromium's copy in its focused frame; or a test's.
+    private Consumer<Page> copier = page -> page.onFocusedFrame(CefFrame::copy);
+    // The page's text insertion and selection reads through its browser's DevTools, made the first time either is asked
+    // for once the browser is ready; null before.
+    private PageText pageText;
     private final List<Consumer<String>> loadStarts = new CopyOnWriteArrayList<>();
+    private final List<Runnable> selectionGestures = new CopyOnWriteArrayList<>();
+    private final List<BiConsumer<String, Reached>> visits = new CopyOnWriteArrayList<>();
     private final List<Consumer<NavigationButton>> navigationButtons = new CopyOnWriteArrayList<>();
     private final List<IntConsumer> magnifies = new CopyOnWriteArrayList<>();
     private final List<Runnable> closes = new CopyOnWriteArrayList<>();
@@ -78,6 +100,8 @@ public final class Page implements AutoCloseable {
     // changes the address and not the document.
     private Optional<PixelImage> favicon = Optional.empty();
     private long document;
+    // Whether the main frame's document has finished loading: from its load start until its load ends, not.
+    private boolean documentLoaded;
     private URI declaredIcon;
     private CompletableFuture<Optional<PixelImage>> iconFetch;
     // The history as last read; whether a read runs, and whether the history changed since that read began.
@@ -106,10 +130,11 @@ public final class Page implements AutoCloseable {
      * @param url what it loads first
      * @param changed told whenever its address, title, favicon, loading state, where it can go or its history changes
      * @param favicons fetches the favicons its documents name
+     * @param background the plugin's background executor, where the answers of its DevTools runs are read
      */
-    public Page(URI url, Runnable changed, Favicons favicons) {
+    public Page(URI url, Runnable changed, Favicons favicons, Executor background) {
         // Functions of the page, not of its browser's type: making a page loads no Chromium class.
-        this(url, changed, favicons, page -> NavigationHistory.read(page.readyBrowser()),
+        this(url, changed, favicons, background, page -> NavigationHistory.read(page.readyBrowser()),
             (page, id) -> NavigationHistory.goTo(page.readyBrowser(), id));
     }
 
@@ -119,15 +144,17 @@ public final class Page implements AutoCloseable {
      * @param url what it loads first
      * @param changed told whenever its address, title, favicon, loading state, where it can go or its history changes
      * @param favicons fetches the favicons its documents name
+     * @param background where the answers of its DevTools runs are read
      * @param historyReader given the page, reads its history, as {@link NavigationHistory#read} reads its browser's
      * @param historyJumper given the page and an entry's id, goes there, as {@link NavigationHistory#goTo} does
      */
-    Page(URI url, Runnable changed, Favicons favicons, Function<Page, CompletableFuture<NavigationHistory.History>> historyReader,
-         ObjIntConsumer<Page> historyJumper) {
+    Page(URI url, Runnable changed, Favicons favicons, Executor background,
+         Function<Page, CompletableFuture<NavigationHistory.History>> historyReader, ObjIntConsumer<Page> historyJumper) {
         requested = Objects.requireNonNull(url, "url");
         address = url.toString();
         this.changed = Objects.requireNonNull(changed, "changed");
         this.favicons = Objects.requireNonNull(favicons, "favicons");
+        this.background = Objects.requireNonNull(background, "background");
         this.historyReader = Objects.requireNonNull(historyReader, "historyReader");
         this.historyJumper = Objects.requireNonNull(historyJumper, "historyJumper");
         titleRead.setRepeats(false);
@@ -269,9 +296,12 @@ public final class Page implements AutoCloseable {
         onFocusedFrame(CefFrame::cut);
     }
 
-    /** Copies the selection of the page's focused frame, as its Edit menu's Copy would. */
+    /**
+     * Copies the selection of the page's focused frame, as its Edit menu's Copy would: Chromium's copy, which runs that
+     * frame's {@code copy} handlers, so its scripts may put what they like on the clipboard, as in Chrome.
+     */
     public void copy() {
-        onFocusedFrame(CefFrame::copy);
+        if (!closed) copier.accept(this);
     }
 
     /** Pastes the clipboard into the page's focused frame, as its Edit menu's Paste would. */
@@ -279,9 +309,124 @@ public final class Page implements AutoCloseable {
         onFocusedFrame(CefFrame::paste);
     }
 
-    /** Selects all of the page's focused frame, as its Edit menu's Select All would. */
+    /**
+     * Puts {@code text} into the field the user is typing in on the page, as text another plugin inserts into its item
+     * asks (spec section 15). {@link PageText} runs {@code insert-text.js} in an isolated world of the main frame. The
+     * script follows the focus through same-origin frames and open shadow roots to an {@code <input>} of a type that takes
+     * text (text, search, url, tel, email, number or password), a {@code <textarea>} or an editable element, neither
+     * disabled nor read-only, and inserts the text there as typing would. It completes on any thread.
+     *
+     * @param text the text
+     * @return what became of the text ({@link Insertion}). It fails before the page has its browser, after
+     *     {@link #close()}, and when a DevTools call is late, refused or answered with an error, as the text may still go
+     *     in or nothing can tell
+     */
+    public CompletableFuture<Insertion> insertIntoField(String text) {
+        Objects.requireNonNull(text, "text");
+        if (closed) return noBrowser();
+        CompletableFuture<Insertion> inserted = fieldInserter.apply(this, text);
+        return inserted == null ? noBrowser() : inserted;
+    }
+
+    /**
+     * Types {@code text} into whatever has the page's focus, a cross-origin frame's field included, as an input method
+     * commits text: DevTools' {@code Input.insertText} ({@link PageText}), without the clipboard. It is trusted input, so
+     * the page gets user activation from it, as from the user's own typing. It completes on any thread.
+     *
+     * @param text the text
+     * @return done once DevTools has answered; failed before the page has its browser, after {@link #close()}, and when
+     *     the call is late, refused or answered with an error
+     */
+    public CompletableFuture<Void> insertText(String text) {
+        Objects.requireNonNull(text, "text");
+        if (closed) return noBrowser();
+        CompletableFuture<Void> typed = textInserter.apply(this, text);
+        return typed == null ? noBrowser() : typed;
+    }
+
+    /**
+     * Presses Return in the page, where its focus is, as the user would, after text inserted into its item asks for it:
+     * Return's key down, with its text, then its key up whatever the down's answer, through DevTools ({@link PageText}).
+     * The key events are trusted input, so the page gets user activation from them, as from the user's own Return.
+     * Nothing before the page has its browser or after {@link #close()}.
+     */
+    public void pressReturn() {
+        if (!closed) returnPresser.accept(this);
+    }
+
+    /** What became of text put into the field the user is typing in, as {@link #insertIntoField} answers (H38). */
+    public enum Insertion {
+        /** The focused field took the text. */
+        INSERTED,
+        /**
+         * The focus is where Jasper's world cannot reach: in a frame of another origin, or inside a closed shadow root,
+         * which the script tells by a focused element that could host one and cannot take the focus itself.
+         */
+        UNREACHABLE,
+        /**
+         * The focus takes no text: nothing is focused, or the page's body is; a button, a link, a checkbox or any other
+         * element that takes no text; a field disabled or read-only; or a number field or an editable element whose
+         * document refused the text.
+         */
+        NOT_EDITABLE
+    }
+
+    /** What is selected in a page, as {@link #selectedText} reads it. */
+    public sealed interface Selection permits Selection.Text, Selection.InFrame, Selection.Unchanged, Selection.None {
+        /**
+         * Text the user selected in the page, or in its focused field.
+         *
+         * @param text the text; empty when nothing is selected
+         */
+        record Text(String text) implements Selection {
+            /** Checks that the text is given. */
+            public Text {
+                Objects.requireNonNull(text, "text");
+            }
+        }
+
+        /** The focus is in a frame of another origin, whose selection Jasper does not read. */
+        record InFrame() implements Selection { }
+
+        /** The selection has not changed since the last read in its document or field (H35, H36). */
+        record Unchanged() implements Selection { }
+
+        /**
+         * Nothing that can be copied: no browser yet, the page closed, a password field focused or one CSS masks, changed
+         * or not, a field whose type has no selection, or a selection of more than 1,048,576 characters, which
+         * {@code PageText} reads at most.
+         */
+        record None() implements Selection { }
+    }
+
+    /**
+     * What the user has selected in the page, as copy on select reads it (spec section 15): {@code selection.js}, which
+     * {@link PageText} runs in Jasper's isolated world of the main frame, follows the focus through same-origin frames and open
+     * shadow roots. A focused {@code <input>} or {@code <textarea>} gives the selected part of its value, but a password
+     * field or one CSS masks never does, and anything else gives the selection of the deepest same-origin document, its
+     * non-breaking spaces as spaces; the focus in a cross-origin frame gives {@link Selection.InFrame}. A selection gives
+     * its text only when it changed since the last read there, as a {@code selectionchange} told Jasper's world (H35),
+     * and {@link Selection.Unchanged} otherwise; the first read in a document or field gives it. Each read that runs
+     * counts the change as read, one whose answer comes too late included. No page script can steer what
+     * the script reads, but a page can change its own selection, during a drag or before the read, and that is what is
+     * read. It completes on any thread.
+     *
+     * @return what is selected; {@link Selection.None} before the page has its browser and after {@link #close()}. It
+     *     fails when a DevTools call is late, refused or answered with an error, or its answer cannot be read
+     */
+    public CompletableFuture<Selection> selectedText() {
+        if (closed) return CompletableFuture.completedFuture(new Selection.None());
+        CompletableFuture<Selection> read = selectionReader.apply(this);
+        return read == null ? CompletableFuture.completedFuture(new Selection.None()) : read;
+    }
+
+    /**
+     * Selects all of the page's focused frame, as its Edit menu's Select All would, as the page menu's Select All asks: a
+     * selection gesture, which those who asked {@link #onSelectionGesture} hear as they hear the canvas's.
+     */
     public void selectAll() {
         onFocusedFrame(CefFrame::selectAll);
+        if (!closed) view.selectionGesture();
     }
 
     /** Opens Chromium's print dialog for the page. */
@@ -499,6 +644,25 @@ public final class Page implements AutoCloseable {
     }
 
     /**
+     * Tells {@code listener} each time the user has finished a selection in the page, as copy on select copies after it:
+     * 100 ms after the last of the selection gestures {@link PageView} counts, the mouse's and the keyboard's. A change
+     * the page's scripts make to the selection is none. The canvas times gestures only while something listens.
+     *
+     * @param listener told on the UI thread
+     * @return the registration; the page's close ends it
+     */
+    public Subscription onSelectionGesture(Runnable listener) {
+        Objects.requireNonNull(listener, "listener");
+        if (closed) return () -> { };
+        selectionGestures.add(listener);
+        view.onSelectionGesture(this::selectionGestured);
+        return () -> {
+            selectionGestures.remove(listener);
+            if (selectionGestures.isEmpty()) view.endSelectionGestures();
+        };
+    }
+
+    /**
      * Tells {@code listener} each time the page's main frame starts loading, with the address it loads.
      *
      * @param listener told on the UI thread
@@ -508,6 +672,29 @@ public final class Page implements AutoCloseable {
         Objects.requireNonNull(listener, "listener");
         loadStarts.add(listener);
         return () -> loadStarts.remove(listener);
+    }
+
+    /**
+     * Tells {@code listener} each time the page's main frame starts loading a document, as {@link #onLoadStart} does, with
+     * how the load reached it: each of the page's visits, for its item's history.
+     *
+     * @param listener told the address it loads and how, on the UI thread
+     * @return the registration; the page's close ends it
+     */
+    public Subscription onVisit(BiConsumer<String, Reached> listener) {
+        Objects.requireNonNull(listener, "listener");
+        visits.add(listener);
+        return () -> visits.remove(listener);
+    }
+
+    /**
+     * Whether the document the page's main frame shows has finished loading, as Chromium reported its load's end: false
+     * from each main-frame load start until that load ends.
+     *
+     * @return whether it has
+     */
+    public boolean documentLoaded() {
+        return documentLoaded;
     }
 
     /**
@@ -773,6 +960,9 @@ public final class Page implements AutoCloseable {
         if (closed) return;
         closed = true;
         loadStarts.clear();
+        selectionGestures.clear();
+        view.endSelectionGestures();
+        visits.clear();
         navigationButtons.clear();
         magnifies.clear();
         navigations.clear();
@@ -830,6 +1020,12 @@ public final class Page implements AutoCloseable {
         for (IntConsumer listener : magnifies) listener.accept(direction);
     }
 
+    /** The user finished a selection in the page, as its canvas tells. */
+    void selectionGestured() {
+        if (closed) return;
+        for (Runnable listener : selectionGestures) listener.run();
+    }
+
     /** The browser, once it hears what it is asked, shows the page at its zoom. */
     private void showZoom() {
         if (ready && !closed) browser.setZoomLevel(zoomLevel);
@@ -872,9 +1068,11 @@ public final class Page implements AutoCloseable {
         if (!titleRead.isRunning()) titleRead.start();
     }
 
-    /** The main frame finished loading. */
+    /** The main frame finished loading its document. */
     void loadEnded() {
-        if (!closed) readHistory();
+        if (closed) return;
+        documentLoaded = true;
+        readHistory();
     }
 
     /**
@@ -959,6 +1157,52 @@ public final class Page implements AutoCloseable {
         sourceReader = Objects.requireNonNull(replacement, "replacement");
     }
 
+    /** Has the page put text into its focused field with {@code replacement} from now on, as a test's answering one. */
+    void useFieldInserter(BiFunction<Page, String, CompletableFuture<Insertion>> replacement) {
+        fieldInserter = Objects.requireNonNull(replacement, "replacement");
+    }
+
+    /** Has the page type text where its focus is with {@code replacement} from now on, as a test's answering one. */
+    void useTextInserter(BiFunction<Page, String, CompletableFuture<Void>> replacement) {
+        textInserter = Objects.requireNonNull(replacement, "replacement");
+    }
+
+    /** Has the page press Return with {@code replacement} from now on, as a test's recording one. */
+    void useReturnPresser(Consumer<Page> replacement) {
+        returnPresser = Objects.requireNonNull(replacement, "replacement");
+    }
+
+    /** Has the page read what is selected in it with {@code replacement} from now on, as a test's answering one. */
+    void useSelectionReader(Function<Page, CompletableFuture<Selection>> replacement) {
+        selectionReader = Objects.requireNonNull(replacement, "replacement");
+    }
+
+    /** Has the page run text insertions and selection reads with {@code replacement} from now on, as a test's. */
+    void usePageText(PageText replacement) {
+        pageText = Objects.requireNonNull(replacement, "replacement");
+    }
+
+    /** Has the page run Chromium's copy with {@code replacement} from now on, as a test's recording one. */
+    void useCopier(Consumer<Page> replacement) {
+        copier = Objects.requireNonNull(replacement, "replacement");
+    }
+
+    /**
+     * The page's text insertion and selection reads through its browser's DevTools, made the first time either is asked
+     * for: none before the browser is ready, after {@link #close()}, or for a browser without a DevTools client.
+     */
+    private Optional<PageText> pageText() {
+        PageBrowser ready = readyBrowser();
+        if (ready == null || closed) return Optional.empty();
+        if (pageText == null) pageText = PageText.of(ready, background).orElse(null);
+        return Optional.ofNullable(pageText);
+    }
+
+    /** What text inserted into a page without its browser gives: a failure, so its item does nothing more. */
+    private static <T> CompletableFuture<T> noBrowser() {
+        return CompletableFuture.failedFuture(new IllegalStateException("The page has no browser to insert text into"));
+    }
+
     /** Has the page find with {@code replacement} from now on, as a test's recording one. */
     void useFind(PageFind replacement) {
         find = Objects.requireNonNull(replacement, "replacement");
@@ -988,21 +1232,25 @@ public final class Page implements AutoCloseable {
     }
 
     /**
-     * The main frame started loading {@code url}: the page has no title until the new document gives one, whatever
-     * Chromium reports for a document without one, and no favicon until the new document names one. A favicon still
-     * being fetched for the document before is dropped, and the find's search ends.
+     * The main frame started loading {@code url}, reached {@code reached}: the page has no title until the new document
+     * gives one, whatever Chromium reports for a document without one, and no favicon until the new document names one. A
+     * favicon still being fetched for the document before is dropped, and the find's search ends.
      */
-    void loadStarted(String url) {
+    void loadStarted(String url, Reached reached) {
         if (closed) return;
         if (find != null) find.dropped();
         document++;
+        if (pageText != null) pageText.newDocument(); // the world it ran in went with the document
+        documentLoaded = false;
         dropFaviconFetch();
         declaredIcon = null;
         boolean cleared = !title.isEmpty() || favicon.isPresent();
         title = "";
         favicon = Optional.empty();
         if (cleared) changed.run();
-        for (Consumer<String> listener : loadStarts) listener.accept(url == null ? "" : url);
+        String started = url == null ? "" : url;
+        for (Consumer<String> listener : loadStarts) listener.accept(started);
+        for (BiConsumer<String, Reached> listener : visits) listener.accept(started, reached);
     }
 
     /** The icon the current document named, or empty before it names one. */

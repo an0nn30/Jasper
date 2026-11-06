@@ -746,8 +746,17 @@ class AppContractTest extends PluginContractTest {
                                 .orElseThrow(() -> new IllegalArgumentException("No such scope: " + scopeId));
                         }
                         private dev.jasper.app.palette.PaletteContext context(UUID windowId, UUID paneIdOrNull) {
-                            var target = new dev.jasper.app.palette.PaletteTarget(text -> { }, () -> { }, Optional::empty, () -> true,
-                                Optional.of(windowId), Optional.ofNullable(paneIdOrNull));
+                            dev.jasper.app.palette.PaletteTarget target;
+                            if (paneIdOrNull != null) target = new dev.jasper.app.palette.PaletteTarget(text -> { }, () -> { }, Optional::empty,
+                                () -> true, Optional.of(windowId), Optional.of(paneIdOrNull), Optional.empty());
+                            else {
+                                // As WindowCommandPalette: with no terminal pane, the window's current item when it is a content
+                                // tab, whose insertion the target reads at each call.
+                                target = terminalFixture.selected(windowId).flatMap(id -> contributions.tabs().tab(new dev.jasper.app.layout.TabId(id)))
+                                    .filter(tab -> tab.kind() == dev.jasper.app.contributions.Tab.Kind.HOSTED)
+                                    .map(tab -> dev.jasper.app.palette.PaletteTarget.content(windowId, tab::insertion))
+                                    .orElseGet(() -> dev.jasper.app.palette.PaletteTarget.window(windowId));
+                            }
                             return new dev.jasper.app.palette.PaletteContext(true, target, 5);
                         }
                         private dev.jasper.app.palette.PaletteRow row(String scopeId, String rowId) {
@@ -843,6 +852,7 @@ class AppContractTest extends PluginContractTest {
                     if (was != jasper) host.defaultBrowserChanged(jasper);
                 });
             }
+            @Override public void copyOnSelect(boolean on) { onEdt(() -> host.copyOnSelect = on); }
             @Override public void close() {
                 try { stopAll(); flush(); }
                 finally { dev.jasper.app.testsupport.TempFolders.delete(data); }

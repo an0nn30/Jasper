@@ -227,6 +227,14 @@ final class ThemePainting {
         g.fill(ring);
     }
 
+    /**
+     * Gives {@code component} the focus ring a focused control has (the halo the view paints round it, at {@code radius}),
+     * or takes it away: for a part the keyboard selects while the focus stays elsewhere, such as a token field's chip.
+     */
+    static void focusRing(JComponent component, KitContext context, boolean shown, double radius) {
+        component.putClientProperty("Jasper.kit.halo", shown ? new Halo(context, false, radius, 0, 0) : null);
+    }
+
     private record Halo(KitContext context, boolean error,double radius,int inset,double bottomTrim) {}
     /** The client property holding a primary button's {@link Drop}. */
     static final String DROP = "Jasper.kit.drop";

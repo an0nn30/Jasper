@@ -16,7 +16,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Starting and stopping the Browser costs no Chromium, and nor does opening a browser item that is not shown, or
- * restoring a window of them: no {@code org.cef} or {@code com.jetbrains.cef} class loads until a page is first shown. A forked
+ * restoring a window of them: no {@code org.cef} or {@code com.jetbrains.cef} class loads until a page is first shown.
+ * Nor do they cost the browsing database (spec section 19): no {@code org.sqlite} class loads and no
+ * {@code browser.sqlite} is made. A forked
  * headless JVM runs the plugin with the SDK's fake host and logs every class it
  * loads, because a class loaded in this JVM cannot be told apart from one another test loaded. The log goes to the
  * fork's standard output, not a file: {@code -Xlog} splits its options at colons, which Windows paths hold. The output
@@ -30,6 +32,7 @@ class StartLoadsNoChromiumTest {
         List<String> loaded = fork(Main.START);
         assertThat(loaded.contains(BrowserPlugin.class.getName())).as("the log shows the plugin's own class").isTrue();
         assertThat(chromium(loaded)).as("Chromium classes loaded").isEmpty();
+        assertNoDatabase(loaded, Main.START);
     }
 
     @Test void openingABrowserItemThatIsNotShownLoadsNoChromiumClass() throws Exception {
@@ -37,6 +40,7 @@ class StartLoadsNoChromiumTest {
         assertThat(loaded).as("the log shows the item, its page and its canvas")
             .contains("dev.jasper.browser.item.BrowserItem", "dev.jasper.browser.page.Page", "dev.jasper.browser.page.PageView");
         assertThat(chromium(loaded)).as("Chromium classes loaded").isEmpty();
+        assertNoDatabase(loaded, Main.OPEN);
     }
 
     /** Spec section 19: restored items hold only their saved state until shown. */
@@ -45,6 +49,7 @@ class StartLoadsNoChromiumTest {
         assertThat(loaded).as("the log shows the restore, the items and their pages")
             .contains("dev.jasper.browser.restore.BrowserRestore", "dev.jasper.browser.item.BrowserItem", "dev.jasper.browser.page.Page");
         assertThat(chromium(loaded)).as("Chromium classes loaded").isEmpty();
+        assertNoDatabase(loaded, Main.RESTORE);
     }
 
     /**
@@ -58,6 +63,7 @@ class StartLoadsNoChromiumTest {
             .contains("dev.jasper.browser.preview.PreviewService", "dev.jasper.browser.preview.PagePreview",
                 "dev.jasper.browser.page.PreviewPage", "dev.jasper.browser.page.PageView");
         assertThat(chromium(loaded)).as("Chromium classes loaded").isEmpty();
+        assertNoDatabase(loaded, Main.PREVIEW);
     }
 
     /** Runs {@link Main} in a forked JVM, in {@code mode}: the classes it loaded, in order. */
@@ -75,6 +81,20 @@ class StartLoadsNoChromiumTest {
         List<String> lines = Files.readAllLines(output, StandardCharsets.ISO_8859_1);
         assertThat(fork.exitValue()).as("the fork's output:\n" + diagnostics(lines)).isZero();
         return lines.stream().map(LOADED::matcher).filter(Matcher::find).map(match -> match.group(1)).toList();
+    }
+
+    /**
+     * Spec section 19 and F28: the fork in {@code mode} loaded no sqlite-jdbc class and left no {@code browser.sqlite}
+     * under its plugins' folder, though the plugin's stores were made and closed.
+     */
+    private void assertNoDatabase(List<String> loaded, String mode) throws Exception {
+        assertThat(loaded).as("the log shows the stores").contains("dev.jasper.browser.store.Stores");
+        assertThat(loaded.stream().filter(name -> name.startsWith("org.sqlite.")).toList()).as("sqlite-jdbc classes loaded").isEmpty();
+        Path plugins = temp.resolve(mode + "-plugins");
+        assertThat(plugins.resolve("dev.jasper.browser").resolve("data")).as("the Browser's data folder, where it would be").isDirectory();
+        try (var files = Files.walk(plugins)) {
+            assertThat(files.filter(file -> file.getFileName().toString().startsWith("browser.sqlite")).toList()).as("database files").isEmpty();
+        }
     }
 
     private static List<String> chromium(List<String> loaded) {
@@ -108,7 +128,7 @@ class StartLoadsNoChromiumTest {
                 try (var host = new FakePluginHost(Path.of(args[0]))) {
                     var window = host.addTerminalWindow();
                     host.activateTerminalWindow(window);
-                    host.start(new PluginInfo("dev.jasper.browser", "Browser", "0.1.0", Set.of("browser.provide")), Set.of(), Set.of(), new BrowserPlugin());
+                    host.start(new PluginInfo("dev.jasper.browser", "Browser", "0.1.0", Set.of("browser.provide", "palette.contribute")), Set.of(), Set.of(), new BrowserPlugin());
                     if (args[1].equals(OPEN) && (!host.invoke("dev.jasper.browser.new_tab", window, null) || host.contentTabs().size() != 1))
                         failures.add("New Browser Tab opened no item");
                     if (args[1].equals(RESTORE)) {

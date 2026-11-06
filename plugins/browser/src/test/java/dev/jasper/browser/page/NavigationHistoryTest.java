@@ -201,7 +201,7 @@ class NavigationHistoryTest {
     @Test void aPageKeepsTheHistoryLastReadAndTellsOnlyAChange() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var changes = new AtomicInteger();
-            var page = new Page(EXAMPLE, changes::incrementAndGet, PageTestAccess.noFavicons());
+            var page = new Page(EXAMPLE, changes::incrementAndGet, PageTestAccess.noFavicons(), Runnable::run);
             assertThat(page.history()).isEqualTo(History.EMPTY);
             History history = new History(1, List.of(entry(1, "One"), entry(2, "Two")));
             page.historyRead(history);
@@ -344,7 +344,7 @@ class NavigationHistoryTest {
     @Test void withoutABrowserThereIsNoHistoryAndNoJump() throws Exception {
         assertThat(NavigationHistory.read(null)).isCompletedWithValue(History.EMPTY);
         NavigationHistory.goTo(null, 3);
-        Page page = onUiThread(() -> new Page(EXAMPLE, () -> { }, PageTestAccess.noFavicons()));
+        Page page = onUiThread(() -> new Page(EXAMPLE, () -> { }, PageTestAccess.noFavicons(), Runnable::run));
         onUiThread(() -> PageTestAccess.titleChanged(page, "Example Domain"));
         assertThat(onUiThread(page::history)).isEqualTo(History.EMPTY);
         onUiThread(() -> {
@@ -369,7 +369,7 @@ class NavigationHistoryTest {
         final List<String> told = new CopyOnWriteArrayList<>();
 
         Page page(Runnable changed) {
-            return new Page(EXAMPLE, changed, PageTestAccess.noFavicons(), page -> {
+            return new Page(EXAMPLE, changed, PageTestAccess.noFavicons(), Runnable::run, page -> {
                 pages.add(page);
                 var read = new CompletableFuture<History>();
                 reads.add(read);

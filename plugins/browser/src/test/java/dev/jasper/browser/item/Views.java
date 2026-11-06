@@ -13,6 +13,9 @@ final class Views {
         List<Nodes.Node> children = switch (root) {
             case Nodes.Split split -> split.children();
             case Nodes.Stack stack -> stack.children();
+            case Nodes.Form form -> form.sections();
+            case Nodes.Card card -> card.children();
+            case Nodes.FormRow row -> List.of(row.control());
             default -> List.of();
         };
         for (Nodes.Node child : children) {

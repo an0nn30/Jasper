@@ -206,8 +206,11 @@ placeholders, the tag "1 field" or "*n* fields". The list holds at most 200 rows
 | Cmd+Enter | Ctrl+Enter | Paste and run | Pastes the command, after its placeholders are filled, then sends Return |
 | Shift+Enter | Shift+Enter | Edit file | Opens `snippets.toml` in your [default editor](editor.md#default-editor) |
 
-Insert and Paste and run use the pane and the paste described for [History](#searching-history), and do nothing when
-there is no open terminal pane or the snippet is no longer in the file. Edit file needs no pane.
+Insert and Paste and run use the pane and the paste described for [History](#searching-history). With no terminal
+pane, when the palette opened over a browser page or the Run window's current item is one, they put the command into
+the page's field you are typing in, and Paste and run presses Return after it
+([Browser](browser.md#snippets-in-page-fields)). They do nothing when there is neither, or the snippet is no longer in
+the file. Edit file needs no pane.
 
 A search ignores case, and every word of the query must be found in the snippet's name, keywords or command. Snippets
 rank in this order, ties keeping file order:

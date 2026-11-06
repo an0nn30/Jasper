@@ -95,6 +95,6 @@ class PreviewServiceTest {
 
     /** A Chromium that never starts here: its worker refuses, and nothing asks it for a client. */
     private Chromium chromium() {
-        return new Chromium(data, task -> { throw new AssertionError("Chromium started"); }, new AboutScheme(), scheme, cause -> { });
+        return new Chromium(data, () -> { }, task -> { throw new AssertionError("Chromium started"); }, new AboutScheme(), scheme, cause -> { });
     }
 }

@@ -19,6 +19,11 @@ public final class KitOwnership {
      * which it is only while the input has the focus. The list stays kit-owned.
      */
     public static final String SUGGESTIONS = "Jasper.kit.suggestions";
+    /**
+     * Client property on a token field's input holding the token whose chip the keyboard has selected (a {@code String}),
+     * or null while the typed text has the keys, so a host (or a headless test) can read the selection.
+     */
+    public static final String SELECTED_TOKEN = "Jasper.kit.selectedToken";
     private KitOwnership() {}
     static void mark(JComponent component, String id) { component.putClientProperty(KEY, id); component.setName(id); }
     static void clear(JComponent component) { component.putClientProperty(KEY,null); component.setName(null); }

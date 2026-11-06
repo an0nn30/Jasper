@@ -382,4 +382,21 @@ class ViewSpecTest {
         assertThatIllegalArgumentException().isThrownBy(() -> new ViewSpec(new Tree("tree", ControlState.READY, List.of(three), Set.of(), Set.of(), "", columns)));
         assertThat(new ItemList("l", ControlState.READY, ListKind.SINGLE, List.of(), Set.of(), "", List.of()).emptyText()).isEmpty();
     }
+    /** Plan 5 Task 6 (SDK 0.29.0): the model's token field keeps the SDK's token rule, and so does its event. */
+    @Test void aTokenFieldsTokensFollowTheSdksTokenRule() {
+        var field = new TokenField("tags", ControlState.READY, "Tags", "Enter tags\u2026", new ArrayList<>(List.of("work", "\u00C4pfel", "\u00E4pfel")));
+        assertThat(field.tokens()).containsExactly("work", "\u00C4pfel", "\u00E4pfel");
+        assertThat(new ViewSpec(field).root()).isEqualTo(field);
+        var hundred = java.util.stream.IntStream.range(0, 100).mapToObj(i -> "tag" + i).toList();
+        var more = new ArrayList<>(hundred); more.add("tag100");
+        assertThatIllegalArgumentException().isThrownBy(() -> new TokenField("tags", ControlState.READY, "Tags", "", more));
+        for (var refused : List.of(List.of("work", "WORK"), List.of(" "), List.of("work "), List.of("x".repeat(65)), List.of("a\u007fb")))
+            assertThatIllegalArgumentException().as("%s", refused).isThrownBy(() -> new TokenField("tags", ControlState.READY, "Tags", "", refused));
+        assertThatIllegalArgumentException().isThrownBy(() -> new TokenField("tags", ControlState.READY, "Tags", "", List.of("work ")))
+            .withMessage("A token must not have leading or trailing white space: \"work \"");
+        assertThat(TokenField.kept(List.of(" work ", "Work", "", "x".repeat(65), "a\nb", "news"))).containsExactly("work", "news");
+        assertThat(TokenField.kept(more)).isEqualTo(hundred);
+        assertThat(new UiEvent.TokensChanged("tags", List.of("work")).tokens()).containsExactly("work");
+        assertThatIllegalArgumentException().isThrownBy(() -> new UiEvent.TokensChanged("tags", List.of("work", "Work")));
+    }
 }

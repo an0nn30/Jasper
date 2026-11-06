@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Bookmarks</title>
+{{style}}
+</head>
+<body>
+<main>
+<h1>Bookmarks</h1>
+<p class="subtitle">Manage and organize your saved websites</p>
+<div class="toolbar">
+<input type="search" id="search" placeholder="Search bookmarks..." aria-label="Search bookmarks" autocomplete="off" autofocus>
+<button type="button" id="clear" class="danger">Clear All</button>
+</div>
+<div class="toolbar">
+<label for="sort" class="muted">Sort by:</label>
+<select id="sort">
+<option value="date">Date Added</option>
+<option value="title">Title</option>
+<option value="url">URL</option>
+</select>
+</div>
+<div class="toolbar" id="tagbar" hidden>
+<span class="muted">Filter by tags:</span>
+<div class="chips" id="tags"></div>
+</div>
+<p id="failure" class="failure" role="alert" hidden></p>
+<ul class="list" id="bookmarks"></ul>
+<p id="empty" class="empty" hidden>No bookmarks found</p>
+<button type="button" id="more" class="more" hidden>Load More</button>
+</main>
+{{script}}
+</body>
+</html>

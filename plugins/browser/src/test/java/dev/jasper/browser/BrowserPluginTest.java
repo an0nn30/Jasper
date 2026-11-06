@@ -5,16 +5,15 @@ import dev.jasper.browser.api.PreviewEvent;
 import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.item.BrowserItems;
 import dev.jasper.browser.restore.BrowserRestore;
+import dev.jasper.browser.store.CapturedLog;
+import dev.jasper.browser.store.MemoryStores;
 import dev.jasper.sdk.PluginInfo;
-import dev.jasper.sdk.Variant;
-import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.testing.FakePluginHost;
 import dev.jasper.sdk.ui.Nodes;
-import dev.jasper.sdk.ui.WorkspacePalette;
-import java.awt.Color;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -22,16 +21,22 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 /** The plugin's registrations and its part in Chromium's life, on the SDK's fake host; nothing here starts Chromium. */
 class BrowserPluginTest {
     private static final String ID = "dev.jasper.browser";
-    private static final PluginInfo INFO = new PluginInfo(ID, "Browser", "0.1.0", Set.of("browser.provide"));
+    private static final PluginInfo INFO = new PluginInfo(ID, "Browser", "0.1.0", Set.of("browser.provide", "palette.contribute"));
 
     @Test void aChromiumThatCannotStartPostsOneNotificationWithTheReasonWhileThePluginRuns() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
@@ -43,6 +48,78 @@ class BrowserPluginTest {
             host.stopAll();
             plugin.startFailed(new IllegalStateException("late"));
             assertThat(host.notifications().lines()).as("a stopped plugin only logs").hasSize(1);
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /** Plan 5: a database that cannot be used posts one notification with the reason, while the plugin runs. */
+    @Test void historyAndBookmarksThatAreUnavailablePostANotificationWithTheReasonWhileThePluginRuns() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost(); var log = new CapturedLog("dev.jasper.plugins." + ID)) {
+            var plugin = new BrowserPlugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            plugin.storesUnavailable(new java.sql.SQLException("[SQLITE_NOTADB] file is not a database"));
+            assertThat(host.notifications().lines())
+                .containsExactly("dev.jasper.browser|WARNING|Browser history and bookmarks are unavailable|[SQLITE_NOTADB] file is not a database");
+            host.stopAll();
+            plugin.storesUnavailable(new java.sql.SQLException("late"));
+            assertThat(host.notifications().lines()).as("a stopped plugin only logs").hasSize(1);
+            assertThat(log.records()).extracting(LogRecord::getLevel, LogRecord::getMessage).containsExactly(
+                tuple(Level.WARNING, "Browser history and bookmarks are unavailable: [SQLITE_NOTADB] file is not a database"),
+                tuple(Level.WARNING, "Browser history and bookmarks are unavailable: late"));
+            assertThat(log.records()).allSatisfy(logged -> assertThat(logged.getThrown()).isInstanceOf(java.sql.SQLException.class));
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /**
+     * Spec section 19: the start makes the plugin's history and bookmarks without opening their database, and the stop
+     * closes them, the database never opened.
+     */
+    @Test void theStartMakesTheStoresWithoutOpeningThemAndTheStopClosesThem() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var plugin = new BrowserPlugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            assertThat(MemoryStores.started(plugin.stores())).isFalse();
+            assertThat(plugin.stores().closed()).isNotDone();
+            host.stopAll();
+            assertThat(plugin.stores().closed()).isDone();
+            assertThat(MemoryStores.started(plugin.stores())).isFalse();
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /**
+     * Plan 5's H37: the data folder, which holds the history and Chromium's cookies, is its owner's alone once the
+     * database first opens; the start leaves it as it was.
+     */
+    @Test @DisabledOnOs(OS.WINDOWS) void theDataFolderIsItsOwnersAloneOnceTheDatabaseOpens(@TempDir Path root) throws Exception {
+        Path data = Files.createDirectories(root.resolve(ID).resolve("data"));
+        Files.setPosixFilePermissions(data, PosixFilePermissions.fromString("rwxr-xr-x"));
+        var plugin = new BrowserPlugin();
+        var host = new AtomicReference<FakePluginHost>();
+        SwingUtilities.invokeAndWait(() -> {
+            host.set(new FakePluginHost(root));
+            host.get().start(INFO, Set.of(), Set.of(), plugin);
+        });
+        try {
+            assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(data))).as("after the start").isEqualTo("rwxr-xr-x");
+            plugin.stores().bookmarks().all().get(10, TimeUnit.SECONDS);
+            assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(data))).isEqualTo("rwx------");
+        } finally {
+            SwingUtilities.invokeAndWait(() -> host.get().close());
+        }
+    }
+
+    /** Spec section 11: the start registers the Bookmarks and Browser History scopes, which read nothing until searched. */
+    @Test void theStartRegistersTheBookmarksAndBrowserHistoryScopesWithoutOpeningTheDatabase() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var plugin = new BrowserPlugin();
+            UUID window = host.addTerminalWindow();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            assertThat(host.searchScope("dev.jasper.browser.scope.bookmarks", "", window, null)).isEmpty();
+            assertThat(host.searchScope("dev.jasper.browser.scope.history", "", window, null)).isEmpty();
+            assertThat(MemoryStores.started(plugin.stores())).isFalse();
+            host.stopAll();
             assertThat(host.failures()).isEmpty();
         } });
     }
@@ -135,6 +212,15 @@ class BrowserPluginTest {
             assertThat(BrowserPlugin.SPLIT.icon()).contains(BrowserItems.GLOBE);
             assertThat(host.actionSpec(BrowserPlugin.SPLIT.rightAction())).as("the split item's Browser Right").isPresent();
             assertThat(host.actionSpec(BrowserPlugin.SPLIT.downAction())).isPresent();
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /** Spec section 15: the bookmark notifications are a group of their own, which Settings lists from the start. */
+    @Test void theStartDeclaresTheBookmarksNotificationGroup() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            host.start(INFO, Set.of(), Set.of(), new BrowserPlugin());
+            assertThat(host.notifications().groups()).contains("dev.jasper.browser.bookmarks|Bookmarks|CARD");
             assertThat(host.failures()).isEmpty();
         } });
     }
@@ -237,36 +323,10 @@ class BrowserPluginTest {
         } });
     }
 
-    @Test void theWelcomePageIsInTheWorkspaceColoursWithSettingsAsAQuickAction() {
-        var palette = new WorkspacePalette(new Color(0x10, 0x20, 0x30), new Color(0x11, 0x21, 0x31), Color.BLACK, new Color(0xee, 0xee, 0xee),
-            new Color(0x99, 0x99, 0x99), new Color(0x44, 0x44, 0x44, 0x80), Color.BLUE, Color.WHITE, Color.GRAY, new Color(0x33, 0x66, 0xff),
-            Color.GREEN, Color.ORANGE, Color.RED);
-        String html = WelcomePage.render(palette, true);
-        assertThat(html).contains("<meta charset=\"utf-8\">", "<meta name=\"color-scheme\" content=\"dark\">", "<title>Welcome</title>",
-            "<h1>Welcome</h1>", "Quick Actions", "<a href=\"jasper-about:settings\">Settings</a>",
-            "--background: #102030;", "--card: #112131;", "--text: #eeeeee;", "--muted: #999999;", "--border: rgba(68, 68, 68, 0.502);",
-            "--accent: #3366ff;");
-        assertThat(html).doesNotContain("transition", "animation", "http:", "https:");
-        assertThat(WelcomePage.render(palette, false)).contains("content=\"light\"");
-    }
-
     /** Whether the browser item whose tab is called {@code title} shows the placeholder of an item that waits. UI thread. */
     private static boolean waits(FakePluginHost host, String title) {
         var root = (Nodes.Split) host.contentView(ID, title).orElseThrow().spec().root();
         return root.children().stream().anyMatch(node -> node instanceof Nodes.Empty empty && empty.state().visible()
             && empty.title().equals("Jasper closed while this page was open."));
-    }
-
-    @Test void theWelcomePageIsBuiltAgainAfterAThemeChange() throws Exception {
-        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
-            var context = new AtomicReference<PluginContext>();
-            host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(), context::set);
-            var welcome = new WelcomePage(context.get().appearance());
-            String before = welcome.html();
-            assertThat(before).contains("<h1>Welcome</h1>");
-            host.setVariant(context.get().appearance().variant() == Variant.DARK ? Variant.LIGHT : Variant.DARK);
-            host.flush();
-            assertThat(welcome.html()).isNotEqualTo(before).contains("<h1>Welcome</h1>");
-        } });
     }
 }

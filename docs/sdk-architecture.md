@@ -252,10 +252,10 @@ where the look draws one (`TitleInset`).
   window or a shown modal dialog it owns, directly or through a dialog, or while `WindowInput.showsModal` finds the
   window's root marked by an overlay or a visible modal dialog owned by its native window, Jasper's own included.
 - **Anchors and popovers.** `UiView.anchor(id)` mints a `UiAnchor` only for a mounted, visible, enabled, not busy
-  `Button` or PICKER `Choice`. Hiding, disabling, busying, removing, retyping or reparenting the control, closing its
-  surface or stopping the plugin invalidates it for good; a refresh of the same control keeps it. `Windows.popover`
-  attaches non-modal content from the anchor's own plugin; an anchor also owns a `DialogSpec` dialog above the
-  surface that shows it. Neither passes view ownership to another plugin.
+  `Button`, `MenuButton` or PICKER `Choice`. Hiding, disabling, busying, removing, retyping or reparenting the control,
+  closing its surface or stopping the plugin invalidates it for good; a refresh of the same control keeps it.
+  `Windows.popover` attaches non-modal content from the anchor's own plugin; an anchor also owns a `DialogSpec` dialog
+  above the surface that shows it. Neither passes view ownership to another plugin.
 - **File pickers.** `WindowSurface.chooseFile`, `Windows.chooseFiles`, `chooseDirectory`, `chooseSaveFile` and
   `choose` all open Jasper's own file chooser document-modally over the owner (over a modal dialog the owner shows), with
   its I/O on a worker; a save target that exists is confirmed first. `HostedUi` checks the plugin's lifetime and the UI
@@ -336,6 +336,9 @@ value equal to the current one; otherwise it replaces the value and then runs ea
 handler, contained, skipping those of a plugin that has stopped. Registering delivers no initial value, and a plugin's
 registrations close when it stops. Only the saved `terminal.font` settings publish, so a pane's temporary zoom never
 does. The testkit's `FakePluginHost.setTerminalTypography` mirrors it, and shared contract cases hold both hosts to it.
+`Platform.copyOnSelect()` reads `PluginHost.copyOnSelect`, a volatile field, so any thread can read it;
+`JasperApplication` passes `terminal.copy_on_select` to `PluginRuntime.copyOnSelect` before plugins start and with
+every configuration snapshot.
 
 `Appearance.presentation()` returns one immutable `Presentation` per run, read from any thread.
 `PluginRuntime.presentation(Kit, PluginLook, DefaultSource)` hands the host the installed kit, the presentation's
@@ -474,6 +477,11 @@ while the Run window stays open, refocuses its field and applies the query and r
 `plugins.HostedPalette` adapts an SDK scope: contained calls, a `PaletteQuery` built from the target's window and pane
 ids through the plugin's own handles, the plugin's row kept as the app row's token so it comes back unchanged, and the
 manifest's `icon_hue` for a scope that names no hue. `Palette.register` and `Palette.open` need `palette.contribute`.
+With no terminal pane current, `WindowCommandPalette` makes the target with `PaletteTarget.content` from the window's
+`selectedContent()`: its `insertText` and `live` read the item's `Tab.insertion()`, which
+`ContentTab.setTextInsertion` sets in plain types and wraps in the tab plugin's containment, at each call.
+`HostedPalette` names a `TextTarget` while `live` holds, and its `insert` checks `terminal.inject`, the UI thread and
+`live` again before it hands the text on.
 
 The palette shows either no chip, where a query searches every scope whose `ScopeSpec.inAll` is true, or one scope's
 chip. A scope that is out of All is also out of the recent and most-used rows the empty palette offers, whatever its

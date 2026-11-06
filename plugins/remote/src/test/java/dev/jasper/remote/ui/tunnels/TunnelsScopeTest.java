@@ -43,7 +43,7 @@ class TunnelsScopeTest {
     final TunnelsScope scope = new TunnelsScope(() -> List.of(quick, socks, db), () -> error, id -> states.getOrDefault(id, TunnelState.STOPPED),
         id -> id.equals(PROD) ? Optional.of("prod") : Optional.empty(),
         (w, t) -> events.add("toggle " + t.bindPort()), (w, t) -> events.add("browse " + t.bindPort()), (w, t) -> events.add("edit " + t.bindPort()));
-    final PaletteQuery query = new PaletteQuery(window(), Optional.empty(), 10, true);
+    final PaletteQuery query = new PaletteQuery(window(), Optional.empty(), 10, true, Optional.empty());
 
     @Test void savedTunnelsComeFirstWithTheirMappingStateAndHost() {
         assertThat(scope.spec().id()).isEqualTo(TunnelsScope.ID);

@@ -14,6 +14,7 @@ import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.Toolkit;
 import java.awt.Transparency;
+import java.awt.dnd.DragSource;
 import java.awt.dnd.DropTarget;
 import java.awt.dnd.DropTargetAdapter;
 import java.awt.dnd.DropTargetDragEvent;
@@ -33,9 +34,11 @@ import java.awt.image.BufferedImage;
 import java.awt.image.VolatileImage;
 import java.text.AttributedCharacterIterator;
 import java.text.AttributedString;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 import java.util.function.IntFunction;
@@ -69,6 +72,15 @@ import javax.swing.Timer;
  * gesture (spec section 7), Ctrl+wheel is the page's, as in Chromium; and so it is everywhere on a canvas without a
  * magnifier, as DevTools' is, which Chromium then zooms.
  *
+ * <p><b>Selections.</b> While something listens ({@link #onSelectionGesture}), the view tells it once, 100 ms after the
+ * last selection gesture the page got: the left button's release after a drag past the platform's drag threshold, of a
+ * double or triple click, or of a Shift+click, which extends the selection; the first release after a press of Shift
+ * with a key that moves the caret (an arrow, Home, End, Page Up or Page Down), or of the platform's Select All, Cmd+A on
+ * macOS and Ctrl+A elsewhere; and the page menu's Select All, which its page tells ({@link #selectionGesture}). Those
+ * are what Copy on select copies after. A plain click is none, and nor is Shift with a key that types or moves the
+ * focus, so no page script can have a selection of its own copied on a click or as the user types; nor is a change the
+ * page's scripts make. Nothing is timed while nothing listens, as on a Markdown preview's canvas and DevTools'.
+ *
  * <p><b>Showing.</b> While the view does not show (its tab is hidden, or it is out of its window) its page draws one
  * frame a second; showing again restores 60. The page itself is not told it is hidden: its scripts and network work go
  * on.
@@ -80,6 +92,9 @@ import javax.swing.Timer;
 public final class PageView extends JComponent {
     static final int SHOWN_FRAME_RATE = 60, HIDDEN_FRAME_RATE = 1;
     private static final int RESIZE_DELAY_MILLIS = 100;
+    /** How long after the last selection gesture the view's listener hears it. */
+    static final Duration SELECTION_DELAY = Duration.ofMillis(100);
+    private static final Runnable NOTHING = () -> { };
     private static final int HOVER_PADDING = 4, HOVER_MAX_CHARS = 512;
     private static final String ELLIPSIS = "…";
 
@@ -114,6 +129,19 @@ public final class PageView extends JComponent {
     private int takenKey = KeyEvent.VK_UNDEFINED;
     // UI thread: the notches Ctrl+wheel has turned that no step took yet, as Chromium keeps them; negative away from the user.
     private double magnifyTurn;
+    // Runs a task on the UI thread after a delay and answers what cancels it: a Swing timer, or a test's.
+    private final BiFunction<Duration, Runnable, Runnable> later;
+    // UI thread: told once the user has finished a selection, or null while nothing listens; and what cancels the timer
+    // that tells it, restarted by each gesture.
+    private Runnable selectionListener;
+    private Runnable selectionTimer = NOTHING;
+    // UI thread: where the left button went down on the page while it is held, whether it has moved past the drag
+    // threshold since, and whether Shift was down as it went down; null when it is not held, or the window took its press
+    // or release.
+    private Point leftPressedAt;
+    private boolean leftDragged, leftShifted;
+    // UI thread: whether a key press the page got selects, so the next release the page gets ends a selection.
+    private boolean keySelecting;
 
     /** Where the view's showing state and keys go: its browser's, or before it has one, nowhere. */
     record Hooks(Consumer<Boolean> visibility, IntConsumer frameRate, Consumer<KeyEvent> keys) {
@@ -127,6 +155,7 @@ public final class PageView extends JComponent {
     public PageView() {
         taken = KeyEvent::isConsumed;
         navigationButtons = NavigationButton::of;
+        later = PageView::onUiAfter;
         install();
     }
 
@@ -138,13 +167,16 @@ public final class PageView extends JComponent {
      * @param frameRate told the frames a second the page draws
      * @param keys handed each key event that reaches the page
      * @param navigationButtons which navigation button, if any, each of AWT's mouse buttons is
+     * @param later times the view's selection gestures, as a test's clock does: it runs a task on the UI thread after a
+     *     delay, and answers what cancels it
      */
     PageView(Predicate<KeyEvent> taken, Consumer<Boolean> visibility, IntConsumer frameRate, Consumer<KeyEvent> keys,
-             IntFunction<Optional<NavigationButton>> navigationButtons) {
+             IntFunction<Optional<NavigationButton>> navigationButtons, BiFunction<Duration, Runnable, Runnable> later) {
         this.taken = Objects.requireNonNull(taken, "taken");
         hooks = new Hooks(Objects.requireNonNull(visibility, "visibility"), Objects.requireNonNull(frameRate, "frameRate"),
             Objects.requireNonNull(keys, "keys"));
         this.navigationButtons = Objects.requireNonNull(navigationButtons, "navigationButtons");
+        this.later = Objects.requireNonNull(later, "later");
         install();
     }
 
@@ -165,6 +197,7 @@ public final class PageView extends JComponent {
             @Override public void focusLost(FocusEvent event) {
                 typedTaken = false;
                 takenKey = KeyEvent.VK_UNDEFINED;
+                keySelecting = false;
                 PageBrowser target = browser;
                 if (target != null) target.setFocus(false);
             }
@@ -292,6 +325,23 @@ public final class PageView extends JComponent {
     }
 
     /**
+     * Tells {@code listener} once each time the user has finished a selection in the page: 100 ms after the last of the
+     * selection gestures that follow each other more closely. Until something listens, no gesture is timed. UI thread.
+     *
+     * @param listener told on the UI thread; it replaces the one before
+     */
+    void onSelectionGesture(Runnable listener) {
+        selectionListener = Objects.requireNonNull(listener, "listener");
+    }
+
+    /** Nothing listens for selection gestures any more: a gesture not yet told is dropped, and none is timed. UI thread. */
+    void endSelectionGestures() {
+        selectionListener = null;
+        selectionTimer.run();
+        selectionTimer = NOTHING;
+    }
+
+    /**
      * Shows {@code url} at the view's bottom left, as the address of the link under the pointer. Any thread.
      *
      * @param url the address, or empty or null to show none
@@ -384,7 +434,10 @@ public final class PageView extends JComponent {
 
     @Override protected void processMouseEvent(MouseEvent event) {
         super.processMouseEvent(event);
-        if (event.isConsumed()) return; // the window's, as the pane drag's press and click are
+        if (event.isConsumed()) { // the window's, as the pane drag's press and click are
+            if (event.getID() == MouseEvent.MOUSE_PRESSED || event.getID() == MouseEvent.MOUSE_RELEASED) leftPressedAt = null;
+            return;
+        }
         Optional<NavigationButton> navigationButton = navigationButtons.apply(event.getButton());
         if (navigationButton.isPresent()) { // its press, release and click are not the page's
             event.consume();
@@ -399,12 +452,42 @@ public final class PageView extends JComponent {
         PageBrowser target = browser;
         if (target != null) target.sendMouseEvent(event);
         if (press) requestFocusInWindow();
+        selectingWithMouse(event);
     }
 
     @Override protected void processMouseMotionEvent(MouseEvent event) {
         super.processMouseMotionEvent(event);
+        if (event.isConsumed()) return;
         PageBrowser target = browser;
-        if (!event.isConsumed() && target != null) target.sendMouseEvent(event);
+        if (target != null) target.sendMouseEvent(event);
+        selectingWithMouse(event);
+    }
+
+    /**
+     * A mouse event the page got: the left button's release after a drag past the platform's drag threshold, of a double
+     * or triple click, or of a Shift+click, which extends the selection, is a selection gesture; a plain click is none.
+     */
+    private void selectingWithMouse(MouseEvent event) {
+        switch (event.getID()) {
+            case MouseEvent.MOUSE_PRESSED -> {
+                if (event.getButton() != MouseEvent.BUTTON1) return;
+                leftPressedAt = event.getPoint();
+                leftDragged = false;
+                leftShifted = (event.getModifiersEx() & InputEvent.SHIFT_DOWN_MASK) != 0;
+            }
+            case MouseEvent.MOUSE_DRAGGED -> {
+                Point from = leftPressedAt;
+                if (from == null || leftDragged) return;
+                int threshold = DragSource.getDragThreshold();
+                leftDragged = Math.abs(event.getX() - from.x) > threshold || Math.abs(event.getY() - from.y) > threshold;
+            }
+            case MouseEvent.MOUSE_RELEASED -> {
+                if (event.getButton() != MouseEvent.BUTTON1 || leftPressedAt == null) return;
+                leftPressedAt = null;
+                if (leftDragged || leftShifted || event.getClickCount() >= 2) selectionGesture();
+            }
+            default -> { }
+        }
     }
 
     @Override protected void processMouseWheelEvent(MouseWheelEvent event) {
@@ -451,6 +534,57 @@ public final class PageView extends JComponent {
         }
         if (event.getID() == KeyEvent.KEY_PRESSED && activates(event.getKeyCode())) activation.activate(event.getWhen());
         hooks.keys().accept(event);
+        selectingWithKeys(event);
+    }
+
+    /**
+     * A key event the page got: a press of Shift with a key that moves the caret, or of the platform's Select All,
+     * selects, and the first release the page gets after it, of that key or of a modifier let go first, is a selection
+     * gesture.
+     */
+    private void selectingWithKeys(KeyEvent event) {
+        if (event.getID() == KeyEvent.KEY_PRESSED) {
+            if (selects(event.getKeyCode(), event.getModifiersEx(), osName)) keySelecting = true;
+        } else if (event.getID() == KeyEvent.KEY_RELEASED && keySelecting) {
+            keySelecting = false;
+            selectionGesture();
+        }
+    }
+
+    /**
+     * Whether pressing {@code keyCode} with {@code modifiers}, AWT's extended modifiers, selects on the platform
+     * {@code osName} names: Shift with an arrow, Home, End, Page Up or Page Down, whatever other modifiers make it a word
+     * or a line; or Select All, Cmd+A on macOS and Ctrl+A elsewhere, with no other modifier.
+     */
+    static boolean selects(int keyCode, int modifiers, String osName) {
+        boolean movesCaret = switch (keyCode) {
+            case KeyEvent.VK_LEFT, KeyEvent.VK_RIGHT, KeyEvent.VK_UP, KeyEvent.VK_DOWN, KeyEvent.VK_KP_LEFT, KeyEvent.VK_KP_RIGHT,
+                 KeyEvent.VK_KP_UP, KeyEvent.VK_KP_DOWN, KeyEvent.VK_HOME, KeyEvent.VK_END, KeyEvent.VK_PAGE_UP,
+                 KeyEvent.VK_PAGE_DOWN -> true;
+            default -> false;
+        };
+        if (movesCaret && (modifiers & InputEvent.SHIFT_DOWN_MASK) != 0) return true;
+        int chord = InputEvent.SHIFT_DOWN_MASK | InputEvent.CTRL_DOWN_MASK | InputEvent.META_DOWN_MASK | InputEvent.ALT_DOWN_MASK
+            | InputEvent.ALT_GRAPH_DOWN_MASK;
+        int menu = osName.startsWith("Mac") ? InputEvent.META_DOWN_MASK : InputEvent.CTRL_DOWN_MASK;
+        return keyCode == KeyEvent.VK_A && (modifiers & chord) == menu;
+    }
+
+    /**
+     * The user made a selection gesture, the view's own or the page menu's Select All, which its page tells: the timer that
+     * tells the view's listener starts again, while one listens. UI thread.
+     */
+    void selectionGesture() {
+        if (selectionListener == null) return;
+        selectionTimer.run();
+        selectionTimer = later.apply(SELECTION_DELAY, this::selectionFinished);
+    }
+
+    /** The last selection gesture was {@link #SELECTION_DELAY} ago: the listener hears it, if one still listens. */
+    private void selectionFinished() {
+        selectionTimer = NOTHING;
+        Runnable listener = selectionListener;
+        if (listener != null) listener.run();
     }
 
     /**
@@ -583,6 +717,14 @@ public final class PageView extends JComponent {
         g.drawRect(0, top, width - 1, height - 1);
         g.setColor(foreground);
         g.drawString(shown, HOVER_PADDING, top + HOVER_PADDING / 2 + metrics.getAscent());
+    }
+
+    /** A UI-thread timer that runs {@code task} once, after {@code delay}; the answer stops it. */
+    private static Runnable onUiAfter(Duration delay, Runnable task) {
+        var timer = new Timer((int) delay.toMillis(), event -> task.run());
+        timer.setRepeats(false);
+        timer.start();
+        return timer::stop;
     }
 
     /** {@code url} as it fits in {@code room}, cut at its end with an ellipsis when it does not. */

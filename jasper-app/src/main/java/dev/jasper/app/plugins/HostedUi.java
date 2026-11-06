@@ -689,6 +689,13 @@ final class HostedUi {
         private Runnable contained(Runnable run) { return run == null ? null : () -> containment.run(pluginId, "content status", run); }
         public void setFocusTarget(Runnable focus) { requireUi("content focus"); entry.focusTarget(() -> containment.run(pluginId, "content focus", focus)); }
         public void setRestore(Optional<dev.jasper.sdk.RestoreState> state) { requireUi("content restore"); entry.restore(state.map(HostedUi::restore)); }
+        /** SDK 0.29.0: the tab's plugin hears each inserted text contained, as its own, whoever inserts it. */
+        public void setTextInsertion(Optional<Consumer<dev.jasper.sdk.ui.InsertedText>> insertion) {
+            requireUi("content insertion");
+            java.util.Objects.requireNonNull(insertion, "insertion");
+            entry.insertion(insertion.map(taking -> (text, submit) -> containment.run(pluginId, "content insertion",
+                () -> taking.accept(new dev.jasper.sdk.ui.InsertedText(text, submit)))));
+        }
         public void select() { requireUi("select content"); entry.select(); }
         public void moveToNewWindow() { requireUi("move content"); entry.moveToNewWindow(); }
         public void moveToWindow(WindowHandle window) {

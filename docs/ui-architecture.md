@@ -25,7 +25,7 @@ outside `java.`, `javax.`, `jdk.` and the UI packages in those three. FlatLaf (3
 (2.0.0) are implementation dependencies.
 
 The SDK's `ui` values mirror the model without exposing Swing or UI types: the SDK and module `Nodes` declare the same
-31 node kinds and enum constants, and `dev.jasper.app.plugins.KitValues` translates one into the other. The host and
+32 node kinds and enum constants, and `dev.jasper.app.plugins.KitValues` translates one into the other. The host and
 the testkit implement the same SDK facade. Plugins never load the engine: a plugin class loader's parent is the
 platform loader, so nothing on the application classpath except the SDK is visible to it, and `verifyUiDistribution`
 checks that no plugin runtime or staged plugin jar carries `dev/jasper/ui/`.
@@ -387,7 +387,7 @@ These `KitView` methods serve the app's native hosts; none is part of the plugin
 | `setFieldTrailing(fieldId, button)` | An owned action inside a TEXT or SEARCH field |
 | `setTreeRowPresentation`, `setButtonValuePresentation`, `setButtonKeycaps`, `attachTreeDetail` | Keymap rows: locked rows and keycaps, the shortcut recorder face, keycap values and a detail below a tree leaf (`TreeDetailHandle`) |
 | `setArtworkPresentation(iconId, …)` | Identity row or header treatment for an icon |
-| `anchorTarget(id)` | The component a host attaches a popup to: a visible, enabled, idle `Button` or PICKER `Choice` |
+| `anchorTarget(id)` | The component a host attaches a popup to: a visible, enabled, idle `Button`, `MenuButton` (its main button) or PICKER `Choice` |
 | `panelHeader`, `setPanelHostActions`, `setPanelHostHeader` | Borrowed panel headers (see [Panels](#panels)) |
 
 ### Shells, dialogs and surfaces
@@ -419,14 +419,15 @@ These `KitView` methods serve the app's native hosts; none is part of the plugin
 
 ## Descriptor vocabulary
 
-`Nodes` is the sealed vocabulary of 31 node kinds: `Text`, `Icon`, `Button`, `MenuButton`, `StatusDot`, `Field`,
+`Nodes` is the sealed vocabulary of 32 node kinds: `Text`, `Icon`, `Button`, `MenuButton`, `StatusDot`, `Field`,
 `Secret`, `Choice`, `PickerMenu`, `Toggle`, `Chip`, `Progress`, `Strength`, `Stack`, `FormRow`, `SettingRow`, `Card`,
 `Section`, `Empty`, `ItemList`, `Header`, `Panel`, `Form`, `Split`, `Table`, `Tree`, `Breadcrumbs`, `Custom`,
-`Separator`, `Notice`, `Properties`. Every node carries a `ControlState(visible, enabled, busy, error)`; `error` is
-validation prose and `ControlState.READY` is visible, enabled, idle and without an error. No node carries pixel
-dimensions, delegates or secret values, and no domain meaning is inferred from ids or text. `UiEvent` has 12 kinds:
+`Separator`, `Notice`, `Properties`, `TokenField`. Every node carries a `ControlState(visible, enabled, busy,
+error)`; `error` is validation prose and `ControlState.READY` is visible, enabled, idle and without an error. No node
+carries pixel dimensions, delegates or secret values, and no domain meaning is inferred from ids or text. `UiEvent` has
+13 kinds:
 `Action`, `Edited`, `Selected`, `Toggled`, `Expanded`, `Removed`, `Reordered`, `SecretChanged`, `Clicked`, `Sorted`,
-`ColumnsResized`, `SuggestionChosen`.
+`ColumnsResized`, `SuggestionChosen`, `TokensChanged`.
 
 `ViewSpec` validates the whole tree: unique node ids and `Custom` content ids; depth at most 128 and at most 100,000
 nodes; a `Notice` only in a form's sections or a VERTICAL stack; a `Separator` only in an INLINE or ACTIONS stack and
@@ -467,6 +468,22 @@ the title; and a field's `listId` naming an `ItemList` in the same view.
   input's forward traversal keys meanwhile. A choice, Escape, a permanent focus loss and a press outside hide the list
   until the next edit; it appears on screen only while the input has the focus, and never over another open menu. A
   TEXTAREA, a NUMBER field and a field with a `listId` take no suggestions.
+- Token fields (`TokenFields`): a field's box (`FieldSurface`, painted by the field policy) holding a chip per token, an
+  `Indicators.ChipControl` in the neutral hue that the kit's `tag` face styles and paints (its text as entered: the chip
+  is `entered`, which the classic face does not upper-case), with a non-focusable ghost remove button ("Remove" and the
+  token) in its trailing padding, then the input. The chips flow in lines `ICON_GAP` apart; the input follows the last
+  one while four widths of 'm' fit beside it, and otherwise takes a line of its own. One line stands centred in
+  `FIELD_HEIGHT`, and each further line adds the room a line leaves there. A key listener on the input takes Enter while
+  nonblank text is typed and Backspace while none is, before the bindings, so Enter with nothing typed reaches the form;
+  a document filter adds the text before each comma, line break or tab typed or pasted (once a filter is installed, the
+  document no longer turns line breaks into spaces); a permanent focus loss adds the typed text too. The chips are no
+  Tab stops: the focus stays in the input while Left at the caret's start selects the last chip (`selected`), which
+  `ThemePainting.focusRing` gives the view's focus halo, `KitOwnership.SELECTED_TOKEN` publishes on the input and the
+  input announces as its accessible active descendant, the caret hidden meanwhile; the key listener then takes Left,
+  Right, Home, End, Backspace, Delete and Escape for the chips, and any other key, typing, a press or a focus loss
+  returns to the typed text. The input's accessible description names the tokens ("Tags: work, news") before the hint or
+  error. `TokenField.kept` decides what stays. An update replaces the shown tokens when its tokens change, or when they
+  differ from the shown ones while the field reports a change; the typed text stays.
 - Field actions: `trailingAction` (Enter, not TEXTAREA or PATH), `alternateAction` (Shift+Enter, not TEXTAREA),
   `cancelAction` (Escape) and `listId`, which drives an `ItemList` with the arrow and page keys while the field keeps
   focus. A list named by a field's `listId` reserves its `visibleRows` selectable-row height even when filtered or

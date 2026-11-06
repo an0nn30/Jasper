@@ -5,6 +5,7 @@ import dev.jasper.browser.page.Favicons;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.restore.BrowserRestore;
 import dev.jasper.browser.settings.BrowserSettings;
+import dev.jasper.browser.store.Stores;
 import dev.jasper.sdk.RestoreState;
 import dev.jasper.sdk.WindowOwner;
 import dev.jasper.sdk.plugin.PluginContext;
@@ -25,8 +26,9 @@ import javax.swing.Timer;
 
 /**
  * The plugin's open browser items, in every window: it opens them, finds one by the OSC 8 target it was opened for,
- * and knows each window's focused one. It registers the globe every item shows, gives the items the settings and the
- * certificates the user went on past, shared by them all until Jasper quits, hands each error page's Try Again and
+ * and knows each window's focused one. It registers the globe every item shows, gives the items the settings, the
+ * history and bookmarks they record into and suggest from, and the certificates the user went on past, shared by them
+ * all until Jasper quits, hands each error page's Try Again and
  * Continue to the item whose page it is, finds the item's capture a source page shows, and holds the fetchers of their
  * pages' favicons and their address fields' search suggestions until {@link #close()}. A page is made, and Chromium so
  * asked for, only when its item first shows. UI thread.
@@ -39,6 +41,7 @@ public final class BrowserItems implements AutoCloseable {
         + "M 1.7 8 L 14.3 8 M 8 1.7 A 2.7 6.3 0 1 0 8 14.3 A 2.7 6.3 0 1 0 8 1.7 Z");
     private final PluginContext context;
     private final Supplier<BrowserSettings> settings;
+    private final Stores stores;
     private final Consumer<Page> start;
     private final BiFunction<Duration, Runnable, Runnable> later;
     private final Function<URI, CompletableFuture<List<String>>> suggest;
@@ -57,21 +60,23 @@ public final class BrowserItems implements AutoCloseable {
      *
      * @param context the plugin's context; while it starts, as the globe is registered now
      * @param settings the settings as they are now, which the items read each time they search or suggest
+     * @param stores the history and bookmarks, which the items record into and suggest from; the plugin closes them
      * @param start makes a page, the first time its item shows
      */
-    public BrowserItems(PluginContext context, Supplier<BrowserSettings> settings, Consumer<Page> start) {
-        this(context, settings, start, BrowserItems::onUiAfter, null);
+    public BrowserItems(PluginContext context, Supplier<BrowserSettings> settings, Stores stores, Consumer<Page> start) {
+        this(context, settings, stores, start, BrowserItems::onUiAfter, null);
     }
 
     /**
-     * As {@link #BrowserItems(PluginContext, Supplier, Consumer)}, with {@code later} running a task on the UI thread
-     * after a delay, answering what cancels it, and {@code suggest} fetching an engine's suggestions; null fetches them
-     * with the plugin's own {@link SuggestionFetcher}.
+     * As {@link #BrowserItems(PluginContext, Supplier, Stores, Consumer)}, with {@code later} running a task on the UI
+     * thread after a delay, answering what cancels it, and {@code suggest} fetching an engine's suggestions; null fetches
+     * them with the plugin's own {@link SuggestionFetcher}.
      */
-    BrowserItems(PluginContext context, Supplier<BrowserSettings> settings, Consumer<Page> start,
+    BrowserItems(PluginContext context, Supplier<BrowserSettings> settings, Stores stores, Consumer<Page> start,
                  BiFunction<Duration, Runnable, Runnable> later, Function<URI, CompletableFuture<List<String>>> suggest) {
         this.context = Objects.requireNonNull(context, "context");
         this.settings = Objects.requireNonNull(settings, "settings");
+        this.stores = Objects.requireNonNull(stores, "stores");
         this.start = Objects.requireNonNull(start, "start");
         this.later = Objects.requireNonNull(later, "later");
         this.suggest = suggest == null ? this::fetchSuggestions : suggest;
@@ -193,10 +198,13 @@ public final class BrowserItems implements AutoCloseable {
     }
 
     /**
-     * The plugin stops: the favicon and suggestion fetches under way end, and no page or field fetches one from now on.
+     * The plugin stops: each item's open Edit Bookmark panel closes, keeping its tags, and its page gives history its last
+     * title, before the plugin closes the stores; the favicon and suggestion fetches under way end, and no page or field
+     * fetches one from now on.
      */
     @Override public void close() {
         closed = true;
+        for (BrowserItem item : List.copyOf(open)) item.flush();
         if (favicons != null) favicons.close();
         if (suggestions != null) suggestions.close();
     }
@@ -212,6 +220,11 @@ public final class BrowserItems implements AutoCloseable {
 
     PluginContext context() {
         return context;
+    }
+
+    /** The history and bookmarks, which each item reads once, as it opens. */
+    Stores stores() {
+        return stores;
     }
 
     /** The certificates the user went on past, which every item shares. Any thread. */

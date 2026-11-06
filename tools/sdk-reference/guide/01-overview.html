@@ -43,7 +43,7 @@ component's workspace opacity ({@code java.awt.Component}), custom content ({@co
 <h3>The bundled plugins</h3>
 <p>Each bundled plugin is an ordinary plugin on this SDK: it declares capabilities, requires other plugins and exports
 packages exactly as yours would, and each can be turned off in Settings › Plugins. Every one declares
-{@code sdk = ">=0.28.0, <0.29"}.</p>
+{@code sdk = ">=0.29.0, <0.30"}.</p>
 <table>
 <thead><tr><th>Plugin</th><th>Id</th><th>Capabilities</th><th>Exports</th><th>Requires (optional)</th></tr></thead>
 <tbody>
@@ -54,7 +54,7 @@ packages exactly as yours would, and each can be turned off in Settings › Plug
 <tr><td>Project Index</td><td>{@code dev.jasper.indexer}</td><td>{@code terminal.observe}, {@code terminal.open}, {@code palette.contribute}</td><td></td><td>Editor, Remote</td></tr>
 <tr><td>Shell History</td><td>{@code dev.jasper.history}</td><td>{@code palette.contribute}, {@code terminal.observe}, {@code terminal.inject}</td><td></td><td>Snippets</td></tr>
 <tr><td>Snippets</td><td>{@code dev.jasper.snippets}</td><td>{@code palette.contribute}, {@code terminal.inject}</td><td>{@code dev.jasper.snippets.api}</td><td></td></tr>
-<tr><td>Browser: web pages and the Editor's Markdown preview</td><td>{@code dev.jasper.browser}</td><td>{@code browser.provide}</td><td>{@code dev.jasper.browser.api}</td><td></td></tr>
+<tr><td>Browser: web pages and the Editor's Markdown preview</td><td>{@code dev.jasper.browser}</td><td>{@code browser.provide}, {@code palette.contribute}</td><td>{@code dev.jasper.browser.api}</td><td></td></tr>
 <tr><td>Enterprise look (off by default)</td><td>{@code dev.jasper.enterprise}</td><td>{@code presentation.provide}</td><td></td><td></td></tr>
 <tr><td>Sample</td><td>{@code dev.jasper.sample}</td><td>{@code terminal.observe}, {@code terminal.inject}, {@code terminal.open}, {@code session.provide}, {@code palette.contribute}</td><td></td><td></td></tr>
 </tbody>

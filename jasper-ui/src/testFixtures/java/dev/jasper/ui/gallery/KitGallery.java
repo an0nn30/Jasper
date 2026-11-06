@@ -110,6 +110,9 @@ public final class KitGallery {
             List.of(new Nodes.Button("footnote-cancel", ControlState.READY, "Cancel", "", ButtonKind.SECONDARY, "cancel", ""),
                 new Nodes.Button("footnote-unlock", ControlState.READY, "Unlock", "", ButtonKind.PRIMARY, "unlock", "")),
             "cancel", FormSubmission.PRIMARY, "Auto-locks after 15 min idle"))));
+        // Plan 5 (SDK 0.29.0): a bookmark's tags, each a chip with its remove button, before the typed text.
+        result.add(new Fixture("token-field", "", "normal", 360, 70, new ViewSpec(new Nodes.TokenField("bookmark-tags", ControlState.READY, "Tags",
+            "Enter tags\u2026", List.of("work", "reading", "jcef")))));
         // Plan 3c (SDK 0.18): tree columns, cell nodes with the bare DROPDOWN, heading rows and the empty states.
         result.add(new Fixture("tables-0-18", "", "normal", 640, 860, TableFixtures.create()));
         return List.copyOf(result);

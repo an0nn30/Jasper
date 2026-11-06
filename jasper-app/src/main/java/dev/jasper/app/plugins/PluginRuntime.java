@@ -415,6 +415,20 @@ public final class PluginRuntime {
         terminalTypography(HostedTypography.from(Objects.requireNonNull(font, "font")));
     }
 
+    private boolean copyOnSelect;
+
+    /**
+     * Publishes whether Copy on select is on ({@code terminal.copy_on_select}) before plugin startup and on configuration
+     * changes; plugins read it with {@code Platform.copyOnSelect} on any thread, from their next read. UI thread only.
+     *
+     * @param on whether the setting is on
+     */
+    public void copyOnSelect(boolean on) {
+        if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Copy on select is published on the UI thread");
+        copyOnSelect = on;
+        if (host != null) host.copyOnSelect = on;
+    }
+
     /** The presentation given before plugin startup: its kit, what plugins learn of its look, and its defaults. */
     private record Given(dev.jasper.ui.kit.Kit kit, dev.jasper.app.presentation.PluginLook look, dev.jasper.app.config.DefaultSource defaults) { }
     private Given given;
@@ -915,6 +929,7 @@ public final class PluginRuntime {
         created.openSettings = openSettings;
         created.commandClient = commandClient;
         created.defaultBrowser = defaultBrowser;
+        created.copyOnSelect = copyOnSelect;
         Set<String> loadingIds = new HashSet<>();
         for (PluginCandidate loading : resolution.load()) loadingIds.add(loading.id());
         List<PluginCandidate> notLoading = byId.values().stream().filter(discovered -> !loadingIds.contains(discovered.id())).toList();

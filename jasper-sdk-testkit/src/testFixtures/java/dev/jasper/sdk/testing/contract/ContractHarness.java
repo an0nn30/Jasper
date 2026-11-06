@@ -414,4 +414,6 @@ public interface ContractHarness extends AutoCloseable {
          * on the UI thread, by the time {@link #flush} returns.
          */
         void defaultBrowser(boolean jasper);
+        /** Sets whether Copy on select is on, as the user's {@code terminal.copy_on_select} says; until then it is off. */
+        void copyOnSelect(boolean on);
 }

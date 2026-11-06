@@ -99,6 +99,68 @@ class FakeKitTest { @Test void kitOwnsCreatedViews() throws Exception {
   assertThatIllegalArgumentException().isThrownBy(() -> view.suggestions("root"));
   kit.close();
  });}
+ /**
+  * Plan 5 Task 6 (SDK 0.29.0): the fake's token field follows the host's: typing reports nothing until Enter, a comma or
+  * the focus leaving adds it; Backspace deletes typed text, then removes the last token; text the token rule refuses is
+  * dropped; a field that takes no input takes nothing; an update that changes the tokens replaces them and keeps the
+  * typed text, as does one the owner makes while the field reports.
+  */
+ @Test void aTokenFieldsTypingKeysAndUpdatesFollowTheHostsInTheFake() throws Exception {javax.swing.SwingUtilities.invokeAndWait(() -> {
+  var kit=new FakeKit("sample");var events=new java.util.ArrayList<dev.jasper.sdk.ui.UiEvent>();
+  var ready=dev.jasper.sdk.ui.ControlState.READY;var busy=new dev.jasper.sdk.ui.ControlState(true,true,true,"");
+  java.util.function.BiFunction<dev.jasper.sdk.ui.ControlState,java.util.List<String>,dev.jasper.sdk.ui.ViewSpec> spec=(state,tokens) -> new dev.jasper.sdk.ui.ViewSpec(
+   new dev.jasper.sdk.ui.Nodes.Stack("root",ready,dev.jasper.sdk.ui.Nodes.LayoutRole.VERTICAL,java.util.List.of(new dev.jasper.sdk.ui.Nodes.TokenField("tags",state,"Tags","",tokens),
+    new dev.jasper.sdk.ui.Nodes.Field("title",ready,dev.jasper.sdk.ui.Nodes.FieldKind.TEXT,"","","Title",""))));
+  java.util.function.Function<java.util.List<String>,dev.jasper.sdk.ui.UiEvent> changed=tokens -> new dev.jasper.sdk.ui.UiEvent.TokensChanged("tags",tokens);
+  var view=kit.create(spec.apply(ready,java.util.List.of("work")),events::add);
+  assertThat(view.tokens("tags")).containsExactly("work");assertThat(view.tokenText("tags")).isEmpty();
+  view.type("tags","newz");assertThat(view.focused()).as("typing takes the focus").contains("tags");
+  view.press("tags","BACK_SPACE");assertThat(view.tokenText("tags")).isEqualTo("new");
+  view.type("tags","news");view.press("tags","ENTER");
+  view.type("tags","Work, ,"+"x".repeat(65)+",a\u0007b,later");
+  assertThat(view.tokenText("tags")).isEqualTo("later");
+  view.clickInto("title");
+  assertThat(events).containsExactly(changed.apply(java.util.List.of("work","news")),changed.apply(java.util.List.of("work","news","later")));
+  view.press("tags","BACK_SPACE");view.press("tags","ENTER");
+  assertThat(events.getLast()).as("Backspace with nothing typed removes the last; Enter with nothing typed reports nothing").isEqualTo(changed.apply(java.util.List.of("work","news")));
+  assertThat(events).hasSize(3);
+  view.removeToken("tags","work");assertThat(view.tokens("tags")).containsExactly("news");
+  assertThatIllegalArgumentException().isThrownBy(() -> view.removeToken("tags","work"));
+  view.type("tags","dra");view.update(spec.apply(ready,java.util.List.of("work")));
+  assertThat(view.tokens("tags")).as("an update that leaves the tokens as they were keeps the person's").containsExactly("news");
+  view.update(spec.apply(ready,java.util.List.of("a","b")));assertThat(view.tokens("tags")).containsExactly("a","b");assertThat(view.tokenText("tags")).isEqualTo("dra");
+  view.update(spec.apply(busy,java.util.List.of("a","b")));int before=events.size();
+  view.type("tags","c,");view.press("tags","BACK_SPACE");view.removeToken("tags","a");
+  assertThat(events).as("a busy field takes nothing").hasSize(before);assertThat(view.tokenText("tags")).isEqualTo("dra");
+  view.emit(changed.apply(java.util.List.of("x")));assertThat(view.tokens("tags")).as("an emitted change shows as a person's does").containsExactly("x");
+  assertThatIllegalArgumentException().isThrownBy(() -> view.press("tags","TAB"));
+  assertThatIllegalArgumentException().isThrownBy(() -> view.tokens("title"));
+  assertThatIllegalArgumentException().isThrownBy(() -> view.selectAll("tags"));
+  view.close();
+  FakeKitView[] holder={null};var kept=new java.util.ArrayList<dev.jasper.sdk.ui.UiEvent>();
+  var limited=kit.create(spec.apply(ready,java.util.List.of("a","b")),event -> {kept.add(event);
+   if(event instanceof dev.jasper.sdk.ui.UiEvent.TokensChanged change)holder[0].update(spec.apply(ready,change.tokens().subList(0,Math.min(2,change.tokens().size()))));});
+  var keys=new java.util.ArrayList<dev.jasper.sdk.ui.UiEvent>();var chips=kit.create(spec.apply(ready,java.util.List.of("a","b","c")),keys::add);
+  chips.type("tags","z");chips.press("tags","LEFT");assertThat(chips.selectedToken("tags")).as("Left with text typed moves the caret").isEmpty();
+  chips.press("tags","BACK_SPACE");chips.press("tags","LEFT");assertThat(chips.selectedToken("tags")).contains("c");
+  chips.press("tags","HOME");assertThat(chips.selectedToken("tags")).contains("a");chips.press("tags","LEFT");assertThat(chips.selectedToken("tags")).contains("a");
+  chips.press("tags","END");chips.press("tags","LEFT");assertThat(chips.selectedToken("tags")).contains("b");
+  chips.press("tags","DELETE");assertThat(chips.selectedToken("tags")).contains("c");
+  chips.clickInto("title");assertThat(chips.selectedToken("tags")).as("the focus leaving deselects").isEmpty();
+  chips.press("tags","LEFT");chips.press("tags","BACK_SPACE");chips.press("tags","BACK_SPACE");
+  assertThat(chips.selectedToken("tags")).as("the last one gone").isEmpty();assertThat(chips.tokens("tags")).isEmpty();
+  chips.press("tags","ESCAPE");chips.press("tags","RIGHT");chips.press("tags","DELETE");
+  assertThat(keys).containsExactly(changed.apply(java.util.List.of("a","c")),changed.apply(java.util.List.of("a")),changed.apply(java.util.List.of()));
+  assertThatIllegalArgumentException().isThrownBy(() -> chips.selectedToken("title"));chips.close();
+  var pasted=new java.util.ArrayList<dev.jasper.sdk.ui.UiEvent>();var paste=kit.create(spec.apply(ready,java.util.List.of()),pasted::add);
+  paste.type("tags","work\nnews\r\nhome\tx");
+  assertThat(pasted).as("line breaks and tabs separate as commas do, in one change").containsExactly(changed.apply(java.util.List.of("work","news","home")));
+  assertThat(paste.tokenText("tags")).isEqualTo("x");paste.close();
+  holder[0]=limited;limited.type("tags","c,");
+  assertThat(kept).containsExactly(changed.apply(java.util.List.of("a","b","c")));
+  assertThat(limited.tokens("tags")).as("an update while the field reports replaces what it shows").containsExactly("a","b");
+  kit.close();
+ });}
  /** Plan 3c: rows unmount a table's empty state, so the fake drops focus inside it and refuses its nodes, as the host does. */
  @Test void rowsReplacingAFocusedEmptyStateClearFocusInTheFake() throws Exception {javax.swing.SwingUtilities.invokeAndWait(() -> {
   var kit=new FakeKit("sample");var view=(FakeKitView)kit.create(KitContractTest.tables("card",false),e -> {});
@@ -140,5 +202,10 @@ class FakeKitContractTest extends KitContractTest {
  protected java.util.List<String> suggestions(dev.jasper.sdk.ui.UiView view,String id){return ((FakeKitView)view).suggestions(id).stream().map(dev.jasper.sdk.ui.Nodes.Suggestion::title).toList();}
  protected void press(dev.jasper.sdk.ui.UiView view,String id,String key){((FakeKitView)view).press(id,key);}
  protected void choose(dev.jasper.sdk.ui.UiView view,String id,String... path){((FakeKitView)view).choose(id,path);}
+ protected java.util.List<String> tokens(dev.jasper.sdk.ui.UiView view,String id){return ((FakeKitView)view).tokens(id);}
+ protected void removeToken(dev.jasper.sdk.ui.UiView view,String id,String token){((FakeKitView)view).removeToken(id,token);}
+ /** The fake's focus moves as {@code focus} moves it, which a token field it leaves answers by adding its typed text. */
+ protected void leave(dev.jasper.sdk.ui.UiView view,String id,String to){view.focus(to);}
+ protected java.util.Optional<String> selectedToken(dev.jasper.sdk.ui.UiView view,String id){return ((FakeKitView)view).selectedToken(id);}
  protected void stop(dev.jasper.sdk.ui.UiKit kit){((FakeKit)kit).close();}
 }

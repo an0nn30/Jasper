@@ -240,6 +240,38 @@ class TextFieldsTest {
             } finally { release(context); }
         });
     }
+    /**
+     * Plan 5's call: Chrome's address bar opens History on Ctrl+H, so on Windows and Linux every kit text field leaves
+     * Ctrl+H to the window's keymap, where the Browser's History has it; macOS keeps it as Delete Backward, and Backspace
+     * deletes everywhere.
+     */
+    @Test void ctrlHIsLeftToTheWindowsKeymapOnWindowsAndLinuxWhileBackspaceStillDeletes() {
+        assertThat(TextFields.releasesCtrlH("Mac OS X")).isFalse();
+        assertThat(TextFields.releasesCtrlH("Linux")).isTrue();
+        assertThat(TextFields.releasesCtrlH("Windows 11")).isTrue();
+        assertThat(TextFields.ctrlHReleased).as("this platform's").isEqualTo(TextFields.releasesCtrlH(System.getProperty("os.name", "")));
+        // Both platforms' paths, whichever this one is.
+        for (boolean released : new boolean[] {false, true}) Edt.run(() -> {
+            boolean prior = TextFields.ctrlHReleased;
+            TextFields.ctrlHReleased = released;
+            var context = KitFixtures.context();
+            try (var view = new KitView(context, stack(field("a", FieldKind.TEXT, "abc"), field("b", FieldKind.TEXTAREA, "abc"),
+                    field("c", FieldKind.SEARCH, "abc")), e -> {})) {
+                for (String id : java.util.List.of("a", "b", "c")) {
+                    var input = editor(view, id);
+                    input.setCaretPosition(3);
+                    boolean took = SwingUtilities.processKeyBindings(new java.awt.event.KeyEvent(input, java.awt.event.KeyEvent.KEY_PRESSED,
+                        System.currentTimeMillis(), java.awt.event.InputEvent.CTRL_DOWN_MASK, java.awt.event.KeyEvent.VK_H, java.awt.event.KeyEvent.CHAR_UNDEFINED));
+                    assertThat(took).as(id + ": the field takes Ctrl+H").isEqualTo(!released);
+                    assertThat(input.getText()).as(id + " after Ctrl+H").isEqualTo(released ? "abc" : "ab");
+                    input.setCaretPosition(input.getText().length());
+                    SwingUtilities.processKeyBindings(new java.awt.event.KeyEvent(input, java.awt.event.KeyEvent.KEY_PRESSED,
+                        System.currentTimeMillis(), 0, java.awt.event.KeyEvent.VK_BACK_SPACE, java.awt.event.KeyEvent.CHAR_UNDEFINED));
+                    assertThat(input.getText()).as(id + " after Backspace").isEqualTo(released ? "ab" : "a");
+                }
+            } finally { TextFields.ctrlHReleased = prior; release(context); }
+        });
+    }
     @Test void disabledOrBusyFieldsAndBrowseCannotEmitEditsOrActions() {
         Edt.run(() -> {
             var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();

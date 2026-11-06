@@ -32,7 +32,7 @@ class FileServerScopeTest {
         @Override public boolean isOpen() { return true; }
         @Override public void toFront() { }
     };
-    final PaletteQuery query = new PaletteQuery(window, Optional.empty(), 50, true);
+    final PaletteQuery query = new PaletteQuery(window, Optional.empty(), 50, true, Optional.empty());
     final FileServerScope scope = new FileServerScope(() -> views, HOME, (w, id) -> events.add("toggle " + id), (w, id) -> events.add("edit " + id),
         "dev.jasper.fileserver.servers");
 

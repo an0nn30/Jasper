@@ -157,7 +157,8 @@ final class Forms {
             if (owner.interactive()
                     && (node instanceof Nodes.Field
                             || node instanceof Nodes.Secret
-                            || node instanceof Nodes.Choice)) return owner.focusTarget();
+                            || node instanceof Nodes.Choice
+                            || node instanceof Nodes.TokenField)) return owner.focusTarget();
             for (var child : ControlRegistry.children(node)) {
                 Component found = input(child);
                 if (found != null) return found;

@@ -61,6 +61,7 @@ public final class Chromium implements AutoCloseable {
     private static final System.Logger LOG = System.getLogger(Chromium.class.getName());
 
     private final Path dataDir;
+    private final Runnable restrictData;
     private final Executor worker;
     private final AboutScheme about;
     private final PreviewScheme previews;
@@ -87,20 +88,24 @@ public final class Chromium implements AutoCloseable {
      * A Chromium that starts nothing until {@link #client()} is first called.
      *
      * @param dataDir the plugin's data directory, which keeps Chromium's cookies, cache and log, and its run marker
+     * @param restrictData makes the data directory its owner's alone (plan 5's H37); run on the worker as the start enters
+     *     JCEF, before anything is written there
      * @param worker a platform thread of the plugin's own, which runs the start; never the UI thread, which the start
      *     needs free, or a virtual thread
      * @param about the pages {@code jasper-about:} serves
      * @param previews the Markdown previews' origins {@code jasper-preview:} serves
      * @param startFailed told once, on the UI thread, why Chromium cannot serve pages
      */
-    public Chromium(Path dataDir, Executor worker, AboutScheme about, PreviewScheme previews, Consumer<Throwable> startFailed) {
-        this(dataDir, worker, about, previews, startFailed, StartOnce.PROCESS, START_LIMIT);
+    public Chromium(Path dataDir, Runnable restrictData, Executor worker, AboutScheme about, PreviewScheme previews,
+                    Consumer<Throwable> startFailed) {
+        this(dataDir, restrictData, worker, about, previews, startFailed, StartOnce.PROCESS, START_LIMIT);
     }
 
     /** As the public constructor, with the once-per-process guard and the start's time limit given. */
-    Chromium(Path dataDir, Executor worker, AboutScheme about, PreviewScheme previews, Consumer<Throwable> startFailed,
-            StartOnce process, Duration startLimit) {
+    Chromium(Path dataDir, Runnable restrictData, Executor worker, AboutScheme about, PreviewScheme previews,
+            Consumer<Throwable> startFailed, StartOnce process, Duration startLimit) {
         this.dataDir = Objects.requireNonNull(dataDir, "dataDir");
+        this.restrictData = Objects.requireNonNull(restrictData, "restrictData");
         this.worker = Objects.requireNonNull(worker, "worker");
         this.about = Objects.requireNonNull(about, "about");
         this.previews = Objects.requireNonNull(previews, "previews");
@@ -315,11 +320,12 @@ public final class Chromium implements AutoCloseable {
 
     /**
      * The worker begins the start: whether it may call JCEF, which it may only while the start is under way. When it may,
-     * Chromium is marked first, so a fatal error while it initializes leaves the mark. A close that comes between the
-     * two leaves no mark: once closed, the marker is not written. Worker.
+     * the data directory is made its owner's alone, then Chromium is marked, so a fatal error while it initializes leaves
+     * the mark. A close that comes between the two leaves no mark: once closed, the marker is not written. Worker.
      */
     boolean enter() {
         if (!life.enter()) return false;
+        restrictData.run();
         marker.started();
         return true;
     }

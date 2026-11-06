@@ -1,5 +1,6 @@
 package dev.jasper.browser.page;
 
+import dev.jasper.browser.store.Reached;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
@@ -56,7 +57,7 @@ class PageCloseTest {
      */
     @Test void aPageKeepsItsZoomLevelAndRefusesOneThatIsNotFinite() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            var page = new Page(EXAMPLE, () -> { }, NO_FAVICONS);
+            var page = new Page(EXAMPLE, () -> { }, NO_FAVICONS, Runnable::run);
             assertThat(page.zoomLevel()).as("100%").isEqualTo(0.0);
             page.setZoomLevel(-1.5);
             assertThat(page.zoomLevel()).isEqualTo(-1.5);
@@ -74,17 +75,17 @@ class PageCloseTest {
     @Test void aMainFrameLoadStartClearsTheTitle() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var changes = new AtomicInteger();
-            var page = new Page(EXAMPLE, changes::incrementAndGet, NO_FAVICONS);
+            var page = new Page(EXAMPLE, changes::incrementAndGet, NO_FAVICONS, Runnable::run);
             page.titleChanged("Example Domain");
             assertThat(page.title()).isEqualTo("Example Domain");
             var started = new ArrayList<String>();
             page.onLoadStart(started::add);
             int before = changes.get();
-            page.loadStarted("https://example.org/");
+            page.loadStarted("https://example.org/", Reached.LINK);
             assertThat(page.title()).isEmpty();
             assertThat(changes.get()).as("told once").isEqualTo(before + 1);
             assertThat(started).containsExactly("https://example.org/");
-            page.loadStarted("https://example.org/again");
+            page.loadStarted("https://example.org/again", Reached.LINK);
             assertThat(changes.get()).as("already blank: nothing to tell").isEqualTo(before + 1);
             page.titleChanged("Example Org");
             assertThat(page.title()).isEqualTo("Example Org");
@@ -93,7 +94,7 @@ class PageCloseTest {
     }
 
     private Page page() {
-        var page = new Page(EXAMPLE, () -> { }, NO_FAVICONS);
+        var page = new Page(EXAMPLE, () -> { }, NO_FAVICONS, Runnable::run);
         page.onCloseItem(itemCloses::incrementAndGet);
         return page;
     }

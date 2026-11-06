@@ -18,6 +18,8 @@ final class Indicators {
         /** Whether the chip sits on a selected row's accent fill: white text on a white tint; set by the row before each population. */
         boolean inked;
         InteractiveRows.Ink ink = InteractiveRows.Ink.SELECTION;
+        /** A token the user entered (a token field's chip): the tag face draws its text as entered, never re-cased. */
+        boolean entered;
         ChipControl(KitView view, Nodes.Chip node) { super(view, node, new ChipLabel(view.context())); refresh(); }
         void panelRow(boolean value) { if (panelRow != value) { panelRow = value; ((ChipLabel)component).panelRow = value; refresh(); } }
         @Override void refresh() {

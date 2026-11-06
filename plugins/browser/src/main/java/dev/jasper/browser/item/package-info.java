@@ -6,14 +6,22 @@
  * {@link dev.jasper.browser.item.AddressInput} and {@link dev.jasper.browser.item.TabTitle} decide what the address field
  * loads and what the tab is called, {@link dev.jasper.browser.item.SearchEngine} where a search goes, the field's
  * suggestions what it offers as the user types, with the engine's own fetched through the {@code http} package apart
- * from Chromium, and {@link dev.jasper.browser.item.FaviconDecoder} turns a page's favicon into the image its tab and
+ * from Chromium and the bookmarks and visited sites of the {@code store} package's indexes ({@code StoreSuggestions}),
+ * and {@link dev.jasper.browser.item.FaviconDecoder} turns a page's favicon into the image its tab and
  * address field show. A failed load shows {@link dev.jasper.browser.item.ErrorPage} in place of the page, as the
  * item's {@code ErrorPages} decide, whose Continue past a certificate error the plugin run's
  * {@code CertificateAllowance} remembers for every item. View Source shows
  * {@link dev.jasper.browser.item.SourcePage}, a page's source fetched again through the {@code http} package or as the
- * item's {@code SourcePages} captured it, and {@link dev.jasper.browser.item.PageHtml} gives Jasper's own pages the
- * theme's colours and their tokens. Inspect Element shows a page's DevTools in its item's {@code DevToolsItem}, a pane
- * below the item's that is never saved. Each item saves its restore
- * state through the {@code restore} package, and {@code BrowserItems} opens saved ones again.
+ * item's {@code SourcePages} captured it; both take the theme's colours and their tokens from the {@code pages}
+ * package's {@link dev.jasper.browser.pages.PageHtml}. Inspect Element shows a page's DevTools in its item's
+ * {@code DevToolsItem}, a pane below the item's that is never saved. Each item records its page's loads and titles in
+ * the {@code store} package's history ({@code HistoryRecorder}), and the Web menu's History and the hold menus' Show
+ * Full History load the {@code pages} package's history page. The menu button's Add Bookmark bookmarks the page in the
+ * {@code store} package's bookmarks and opens {@link dev.jasper.browser.item.BookmarkPanel}, where its tags are
+ * edited, and its Manage Bookmarks and History load the {@code pages} package's bookmarks and history pages. Text another
+ * plugin inserts into an item, such as a snippet, goes into its page's focused field, or is typed where the page's focus
+ * is, through DevTools and never the clipboard. While Copy on select is on, each item copies the selections the user
+ * finishes in its page, but none in a frame of another origin. Each item
+ * saves its restore state through the {@code restore} package, and {@code BrowserItems} opens saved ones again.
  */
 package dev.jasper.browser.item;

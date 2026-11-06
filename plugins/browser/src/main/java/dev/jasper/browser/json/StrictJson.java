@@ -11,14 +11,16 @@ import java.util.Optional;
  * JSON from a page, from Chromium or from a search engine, as the JDK reads none: one object or one array, read whole
  * and strictly, no deeper than its reader allows. Anything else, such as a repeated name, text after the value, a
  * trailing comma, a raw control character or an escape other than JSON's, is nothing. Nesting is bounded, so no text
- * can exhaust the stack. It also writes the one piece of JSON Jasper puts into a page's scripts that is not its own:
- * a string, {@link #quote}.
+ * can exhaust the stack. It also writes the JSON Jasper puts into a page's scripts that is not its own, a string
+ * ({@link #quote}), and the answers Jasper's own pages are given ({@link #write}).
  */
 public final class StrictJson {
-    /** What JSON's {@code null} reads as. */
+    /** What JSON's {@code null} reads as, and what {@link #write} writes as {@code null}. */
     public static final Object NULL = Marker.NULL;
     /** What a number reads as unless it is an integer of at most 18 digits, which reads as a {@link Long}. */
     public static final Object NUMBER = Marker.NUMBER;
+    /** How many arrays and objects {@link #write} nests at most, the outermost the first. */
+    static final int WRITE_DEPTH = 64;
     private static final char[] HEX = "0123456789abcdef".toCharArray();
 
     private StrictJson() { }
@@ -51,6 +53,60 @@ public final class StrictJson {
             }
         }
         return out.append('"').toString();
+    }
+
+    /**
+     * {@code value} as compact JSON: a map as an object of its entries in the map's order, a list as an array, a string as
+     * {@link #quote} writes it, a {@link Long} as a decimal integer, a {@link Boolean} as {@code true} or {@code false}, and
+     * {@link #NULL} as {@code null}. Every string reads back, through JSON or JavaScript, as it was.
+     *
+     * @param value what to write, with maps and lists nested at most {@value #WRITE_DEPTH} deep
+     * @return the JSON
+     * @throws IllegalArgumentException for anything else: Java's null, another kind of number or object, a map key that
+     *     is no string, or nesting deeper than the bound, as a list that holds itself is
+     */
+    public static String write(Object value) {
+        var out = new StringBuilder();
+        write(value, out, 0);
+        return out.toString();
+    }
+
+    private static void write(Object value, StringBuilder out, int depth) {
+        switch (value) {
+            case String text -> out.append(quote(text));
+            case Long number -> out.append(number.longValue());
+            case Boolean flag -> out.append(flag.booleanValue());
+            case Marker marker when marker == Marker.NULL -> out.append("null");
+            case Map<?, ?> members -> {
+                enter(depth);
+                out.append('{');
+                boolean first = true;
+                for (var member : members.entrySet()) {
+                    if (!(member.getKey() instanceof String name))
+                        throw new IllegalArgumentException("A JSON object's names are strings, not " + member.getKey());
+                    if (!first) out.append(',');
+                    first = false;
+                    out.append(quote(name)).append(':');
+                    write(member.getValue(), out, depth + 1);
+                }
+                out.append('}');
+            }
+            case List<?> values -> {
+                enter(depth);
+                out.append('[');
+                for (int at = 0; at < values.size(); at++) {
+                    if (at > 0) out.append(',');
+                    write(values.get(at), out, depth + 1);
+                }
+                out.append(']');
+            }
+            case null, default -> throw new IllegalArgumentException("JSON holds no " + (value == null ? "Java null" : value.getClass().getName()));
+        }
+    }
+
+    /** One more array or object, {@code depth} being those it is inside. */
+    private static void enter(int depth) {
+        if (depth >= WRITE_DEPTH) throw new IllegalArgumentException("JSON nested deeper than " + WRITE_DEPTH + " levels");
     }
 
     private enum Marker { NULL, NUMBER }
