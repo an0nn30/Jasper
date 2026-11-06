@@ -3,6 +3,8 @@ package dev.jasper.browser.item;
 import dev.jasper.browser.page.PageTestAccess;
 import dev.jasper.browser.settings.BrowserSettings;
 import dev.jasper.browser.store.BookmarkStore.Bookmark;
+import dev.jasper.browser.store.BrowserDatabase;
+import dev.jasper.browser.store.DataFolder;
 import dev.jasper.browser.store.MemoryStores;
 import dev.jasper.browser.store.Reached;
 import dev.jasper.browser.store.Stores;
@@ -15,7 +17,9 @@ import dev.jasper.sdk.ui.MenuItem;
 import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.TabPlacement;
 import dev.jasper.sdk.ui.UiEvent;
+import java.awt.EventQueue;
 import java.net.URI;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -27,6 +31,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
@@ -43,6 +48,7 @@ class BookmarkPanelTest {
     private final MemoryStores memory = new MemoryStores();
     private FakePluginHost host;
     private PluginContext context;
+    private BrowserItems items;
     private BrowserItem item;
     private FakeKitView view;
 
@@ -242,6 +248,40 @@ class BookmarkPanelTest {
         assertThat(bookmarks(stores)).allSatisfy(bookmark -> assertThat(bookmark.tags()).isEmpty());
     }
 
+    /**
+     * Plan 5's final review: at quit, or as the plugin is turned off, the host stops the plugin before it closes its
+     * popovers, and the stop closes the stores; so the items close an open panel first, as the stop closes them, and the
+     * bookmark keeps the tags shown (H23). The stores keep a file here, which a second database reads once they closed.
+     */
+    @Test void aPanelOpenAsThePluginStopsKeepsItsTagsBeforeTheStoresClose(@TempDir Path data) throws Exception {
+        Stores stores = new Stores(BrowserDatabase.file(new DataFolder(data), cause -> { }), EventQueue::invokeLater);
+        try {
+            open(A, stores);
+            onUi(() -> view.choose(BrowserToolbar.MENU, BrowserToolbar.BOOKMARK_ADD));
+            stores.bookmarks().all().get(10, TimeUnit.SECONDS);
+            onUi(() -> { });
+            onUi(() -> panel().type(BookmarkPanel.TAGS, "work,"));
+            onUi(() -> {
+                // As BrowserPlugin.stop does.
+                items.close();
+                stores.close();
+            });
+            stores.closed().get(10, TimeUnit.SECONDS);
+        } finally {
+            stores.close();
+            stores.closed().get(10, TimeUnit.SECONDS);
+        }
+        Stores again = new Stores(BrowserDatabase.file(new DataFolder(data), cause -> { }), EventQueue::invokeLater);
+        try {
+            assertThat(again.bookmarks().all().get(10, TimeUnit.SECONDS)).singleElement()
+                .satisfies(bookmark -> assertThat(bookmark.tags()).containsExactly("work"));
+        } finally {
+            again.close();
+            again.closed().get(10, TimeUnit.SECONDS);
+        }
+        onUi(() -> assertThat(host.popoverViews(ID)).as("the panel closed with the items").isEmpty());
+    }
+
     /** Add Bookmark for a page bookmarks never keep, which its disabled item would not report, stores nothing and opens nothing. */
     @Test void aRefusedAddOpensNoPanelAndStoresNothing() throws Exception {
         Stores stores = open("jasper-about:welcome");
@@ -349,7 +389,11 @@ class BookmarkPanelTest {
 
     /** A stand-in Browser's item at {@code address}, with stores in memory, which the test's fields hold; its stores. */
     private Stores open(String address) throws Exception {
-        Stores stores = memory.make();
+        return open(address, memory.make());
+    }
+
+    /** As {@link #open(String)}, with {@code stores}. */
+    private Stores open(String address, Stores stores) throws Exception {
         onUi(() -> {
             host = new FakePluginHost();
             var settings = new AtomicReference<BrowserSettings.Declared>();
@@ -358,7 +402,7 @@ class BookmarkPanelTest {
                 settings.set(BrowserSettings.declare(plugin.settings()));
             });
             // Title waits never end, and the engine is never asked: neither is what these tests are about.
-            var items = new BrowserItems(context, settings.get()::read, stores, page -> { }, (delay, task) -> () -> { },
+            items = new BrowserItems(context, settings.get()::read, stores, page -> { }, (delay, task) -> () -> { },
                 request -> new CompletableFuture<>());
             item = items.open(URI.create(address), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
             String tabTitle = Optional.ofNullable(URI.create(address).getHost()).orElse(TabTitle.UNTITLED);

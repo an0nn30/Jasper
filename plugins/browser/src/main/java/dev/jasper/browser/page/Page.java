@@ -15,6 +15,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
@@ -45,6 +46,8 @@ public final class Page implements AutoCloseable {
     private final PageView view = new PageView();
     private final Runnable changed;
     private final Favicons favicons;
+    // Where the answers of the page's DevTools runs are read: the plugin's background executor.
+    private final Executor background;
     private final Function<Page, CompletableFuture<NavigationHistory.History>> historyReader;
     private ObjIntConsumer<Page> historyJumper;
     // Given the page, reads the HTML its main frame shows: Chromium's, or a test's.
@@ -127,10 +130,11 @@ public final class Page implements AutoCloseable {
      * @param url what it loads first
      * @param changed told whenever its address, title, favicon, loading state, where it can go or its history changes
      * @param favicons fetches the favicons its documents name
+     * @param background the plugin's background executor, where the answers of its DevTools runs are read
      */
-    public Page(URI url, Runnable changed, Favicons favicons) {
+    public Page(URI url, Runnable changed, Favicons favicons, Executor background) {
         // Functions of the page, not of its browser's type: making a page loads no Chromium class.
-        this(url, changed, favicons, page -> NavigationHistory.read(page.readyBrowser()),
+        this(url, changed, favicons, background, page -> NavigationHistory.read(page.readyBrowser()),
             (page, id) -> NavigationHistory.goTo(page.readyBrowser(), id));
     }
 
@@ -140,15 +144,17 @@ public final class Page implements AutoCloseable {
      * @param url what it loads first
      * @param changed told whenever its address, title, favicon, loading state, where it can go or its history changes
      * @param favicons fetches the favicons its documents name
+     * @param background where the answers of its DevTools runs are read
      * @param historyReader given the page, reads its history, as {@link NavigationHistory#read} reads its browser's
      * @param historyJumper given the page and an entry's id, goes there, as {@link NavigationHistory#goTo} does
      */
-    Page(URI url, Runnable changed, Favicons favicons, Function<Page, CompletableFuture<NavigationHistory.History>> historyReader,
-         ObjIntConsumer<Page> historyJumper) {
+    Page(URI url, Runnable changed, Favicons favicons, Executor background,
+         Function<Page, CompletableFuture<NavigationHistory.History>> historyReader, ObjIntConsumer<Page> historyJumper) {
         requested = Objects.requireNonNull(url, "url");
         address = url.toString();
         this.changed = Objects.requireNonNull(changed, "changed");
         this.favicons = Objects.requireNonNull(favicons, "favicons");
+        this.background = Objects.requireNonNull(background, "background");
         this.historyReader = Objects.requireNonNull(historyReader, "historyReader");
         this.historyJumper = Objects.requireNonNull(historyJumper, "historyJumper");
         titleRead.setRepeats(false);
@@ -1188,7 +1194,7 @@ public final class Page implements AutoCloseable {
     private Optional<PageText> pageText() {
         PageBrowser ready = readyBrowser();
         if (ready == null || closed) return Optional.empty();
-        if (pageText == null) pageText = PageText.of(ready).orElse(null);
+        if (pageText == null) pageText = PageText.of(ready, background).orElse(null);
         return Optional.ofNullable(pageText);
     }
 

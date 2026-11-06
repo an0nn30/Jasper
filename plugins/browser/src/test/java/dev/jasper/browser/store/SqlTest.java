@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** The stores' one search rule (plan 5's H16), which history and bookmarks both search by. */
 class SqlTest {
-    private static final String PAIR = "😀";
+    private static final String PAIR = "\uD83D\uDE00";
 
     @Test void aSearchCountsItsFirst256CharactersThenTheirFirstEightWordsAsTyped() {
         assertThat(Sql.searched("")).isEmpty();

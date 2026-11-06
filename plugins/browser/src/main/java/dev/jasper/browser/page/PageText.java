@@ -13,7 +13,6 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -60,7 +59,8 @@ import org.cef.browser.CefDevToolsClient;
  * on, then its key up. Both are trusted input, so they give the page user activation, as the user's own typing does.
  *
  * <p>The evaluation's answer, up to {@value #MAX_SELECTION_ANSWER} characters for a read, is read on the parsing
- * executor, off the UI thread; the other answers where they arrive. Each later call is made on the UI thread, as the
+ * executor, the plugin's background executor, off the UI thread; that bound, checked before the parse, bounds the parse
+ * too. The other answers are read where they arrive. Each later call is made on the UI thread, as the
  * page's other DevTools calls are. The methods run on the UI thread; their futures complete on any thread.
  */
 final class PageText {
@@ -127,14 +127,15 @@ final class PageText {
      * on.
      *
      * @param browser a page's ready browser
+     * @param parsing the plugin's background executor, where the evaluations' answers are read
      * @return them; empty when the browser has no DevTools client
      */
-    static Optional<PageText> of(PageBrowser browser) {
+    static Optional<PageText> of(PageBrowser browser, Executor parsing) {
         try {
             CefDevToolsClient client = browser.getDevToolsClient();
             if (client == null) return Optional.empty();
             var text = new PageText((method, parameters) -> parameters == null ? client.executeDevToolsMethod(method)
-                : client.executeDevToolsMethod(method, parameters), EventQueue::invokeLater, ForkJoinPool.commonPool(), TIMEOUT);
+                : client.executeDevToolsMethod(method, parameters), EventQueue::invokeLater, parsing, TIMEOUT);
             // Added once, before Runtime is first enabled: JCEF walks its listeners unsynchronized as each event arrives,
             // and no domain reports events on this client until then.
             client.addEventListener(text::event);

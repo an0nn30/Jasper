@@ -198,12 +198,13 @@ public final class BrowserItems implements AutoCloseable {
     }
 
     /**
-     * The plugin stops: each item's page gives history its last title, before the plugin closes the stores; the favicon
-     * and suggestion fetches under way end, and no page or field fetches one from now on.
+     * The plugin stops: each item's open Edit Bookmark panel closes, keeping its tags, and its page gives history its last
+     * title, before the plugin closes the stores; the favicon and suggestion fetches under way end, and no page or field
+     * fetches one from now on.
      */
     @Override public void close() {
         closed = true;
-        for (BrowserItem item : List.copyOf(open)) item.flushHistory();
+        for (BrowserItem item : List.copyOf(open)) item.flush();
         if (favicons != null) favicons.close();
         if (suggestions != null) suggestions.close();
     }

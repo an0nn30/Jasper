@@ -28,10 +28,11 @@ import org.cef.handler.CefMessageRouterHandlerAdapter;
  * <p>CEF adds the function to every frame of every browser on the client, web pages' too, so every query is untrusted
  * and {@link AboutScheme#query} alone decides which it answers: the main frame of the page that has the queries, with
  * that page's secret. On Chromium's thread the router decides only what it can without reading the request: a
- * persistent query, one longer than {@link AboutScheme#LONGEST_REQUEST}, and one from a browser {@code jasper-about:}
- * does not answer ({@link Chromium#answersAbout}: a page's DevTools, or none) are refused there and then. It reads the
- * asking frame's address, whether it is the main frame, and the browser's identifier, as Chromium names them for the
- * query, and hands the rest to the plugin's background executor: the secret, the page and the answer.
+ * persistent query, one longer than {@link AboutScheme#LONGEST_REQUEST}, one from a browser {@code jasper-about:} does
+ * not answer ({@link Chromium#answersAbout}: a page's DevTools, or none), and one from a sub-frame or from a frame that
+ * shows no {@code jasper-about:} address, as a web page's, are refused there and then. It reads the asking frame's
+ * address, whether it is the main frame, and the browser's identifier, as Chromium names them for the query, and hands
+ * the rest to the plugin's background executor: the secret, the page and the answer.
  *
  * <p>A query refused fails with {@value #REFUSED} and {@value #NOT_ITS_OWN}; an answer that fails, with
  * {@value #ANSWER_FAILED} and its reason. A query its page cancels, or that ends as the page goes, has its answer
@@ -106,6 +107,10 @@ public final class AboutQueries {
                 // As Chromium names them for this query: the frame may show another document by the time it is read.
                 String address = frame.getURL();
                 boolean main = frame.isMain();
+                if (!main || AboutScheme.page(address).isEmpty()) { // a sub-frame's, or a web page's: nothing to read
+                    asked.fail(REFUSED, NOT_ITS_OWN);
+                    return true;
+                }
                 int identifier = browser.getIdentifier();
                 waiting.put(queryId, asked);
                 background.execute(() -> answer(queryId, asked, address, main, identifier, request));

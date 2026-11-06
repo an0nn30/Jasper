@@ -277,7 +277,7 @@ class PageMenuTest {
     @Test void inspectElementIsTheItemsAtThePointOnThePagesCanvas() throws Exception {
         onUiThread(() -> {
             var inspected = new ArrayList<Point>();
-            var page = new Page(URI.create(PAGE), () -> { }, PageTestAccess.noFavicons());
+            var page = new Page(URI.create(PAGE), () -> { }, PageTestAccess.noFavicons(), Runnable::run);
             var place = new MenuPlace(tab((proxy, method, args) -> null), copied -> { }, () -> "Google", terms -> URI.create(PAGE),
                 () -> false, () -> { }, () -> { }, () -> { }, inspected::add);
             var pointed = new PageMenu.Pointed(new Point(40, 70), NONE, NONE, NONE, NONE, false, NONE);
@@ -345,7 +345,7 @@ class PageMenuTest {
             show(plain());
             assertThat(ended).hasValue(1);
             assertThat(host.contentMenu(tab)).isEmpty();
-            var unplaced = new Page(URI.create(PAGE), () -> { }, PageTestAccess.noFavicons());
+            var unplaced = new Page(URI.create(PAGE), () -> { }, PageTestAccess.noFavicons(), Runnable::run);
             PageMenu.show(unplaced, plain(), ended::incrementAndGet);
             assertThat(ended).hasValue(2);
             unplaced.close();
@@ -458,7 +458,7 @@ class PageMenuTest {
 
     /** A page without an item whose menu shows over {@code tab}, copying into {@code copies}. UI thread. */
     private static Page placed(ContentTab tab, List<String> copies) {
-        var page = new Page(URI.create(PAGE), () -> { }, PageTestAccess.noFavicons());
+        var page = new Page(URI.create(PAGE), () -> { }, PageTestAccess.noFavicons(), Runnable::run);
         page.setMenuPlace(new MenuPlace(tab, copies::add, () -> "Google", terms -> URI.create("https://google.com/search?q=" + terms),
             page::canGoBack, page::back, page::reload, () -> { }, at -> { }));
         return page;

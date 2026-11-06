@@ -340,6 +340,36 @@ class AboutSchemeTest {
     }
 
     /**
+     * Plan 5's final review: a query from a sub-frame, or from a frame that shows no {@code jasper-about:} address, as a
+     * web page's, is refused on Chromium's thread too, before it reaches the background; CEF adds the query function to
+     * every frame of every page.
+     */
+    @Test void theRouterRefusesAtOnceASubFramesQueryAndOneFromAFrameShowingNoJasperPage() {
+        var about = history();
+        var asked = new AtomicInteger();
+        about.registerQueries("history", (browser, request) -> {
+            asked.incrementAndGet();
+            return CompletableFuture.completedFuture("{}");
+        });
+        String request = about.secret("history").orElseThrow() + "{}";
+        CefBrowser page = browser(7);
+        var background = new ArrayDeque<Runnable>();
+        var router = new AboutQueries.Router(about, browser -> browser == page, background::add);
+        var replies = new Replies();
+        router.onQuery(page, frame("https://evil.example/", true), 1, request, false, replies);
+        router.onQuery(page, frame("file:///Users/someone/page.html", true), 2, request, false, replies);
+        router.onQuery(page, frame(null, true), 3, request, false, replies);
+        router.onQuery(page, frame("jasper-about://history/", false), 4, request, false, replies);
+        router.onQuery(page, frame("https://evil.example/jasper-about:history", true), 5, request, false, replies);
+        assertThat(replies.calls).as("each refused there and then").hasSize(5).containsOnly(REFUSED);
+        assertThat(background).as("nothing reaches the background").isEmpty();
+        router.onQuery(page, frame("JASPER-ABOUT:history", true), 6, request, false, replies);
+        assertThat(background).as("Jasper's page, its scheme in any case, goes on").hasSize(1);
+        runOnAnotherThread(background, "jasper-test-background");
+        assertThat(asked).hasValue(1);
+    }
+
+    /**
      * A page's query is handed to the background, where it is read and answered: never on Chromium's thread. The
      * answer goes back as success; a query its page's queries refuse fails with 2, and an answer that fails with 1 and
      * its reason.

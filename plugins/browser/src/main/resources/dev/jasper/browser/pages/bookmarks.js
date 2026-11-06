@@ -33,6 +33,11 @@
     more.disabled = true;
     jasper.ask(request).then(function (answer) {
       if (ticket !== asked) return;
+      // The answer is filtered by a tag no bookmark has any more: the list is asked for again without it.
+      if (letGo(answer.tags)) {
+        ask(false);
+        return;
+      }
       if (!continued) {
         list.replaceChildren();
         shownCount = 0;
@@ -67,9 +72,20 @@
     list.append(row);
   }
 
-  /** A toggle chip for each tag any bookmark has; a chosen tag no bookmark has any more is let go. */
+  /** Lets go of each chosen tag that no bookmark has any more, of those in tags: whether any was. */
+  function letGo(tags) {
+    let any = false;
+    for (const tag of Array.from(chosen)) {
+      if (!tags.includes(tag)) {
+        chosen.delete(tag);
+        any = true;
+      }
+    }
+    return any;
+  }
+
+  /** A toggle chip for each tag any bookmark has. */
   function showTags(tags) {
-    for (const tag of Array.from(chosen)) if (!tags.includes(tag)) chosen.delete(tag);
     tagList.replaceChildren();
     for (const tag of tags) {
       const chip = jasper.el('button', {type: 'button', class: 'chip', 'aria-pressed': chosen.has(tag) ? 'true' : 'false'}, tag);

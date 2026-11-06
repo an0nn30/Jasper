@@ -163,7 +163,7 @@ class PageTextTest {
 
     /** H30: the text is typed where the focus is, cross-origin frames included, without the clipboard. */
     @Test void insertTextAsksInputInsertTextWithTheTextAsAJsonString() throws Exception {
-        String hostile = "echo \"hi\" \\ </script> 😀\n";
+        String hostile = "echo \"hi\" \\ </script>\u2028\uD83D\uDE00\n";
         text.insertText(hostile).get(5, TimeUnit.SECONDS);
         assertThat(devTools.methods()).containsExactly("Input.insertText");
         assertThat(devTools.raw.getFirst()).isEqualTo("{\"text\":" + StrictJson.quote(hostile) + "}");
@@ -338,7 +338,7 @@ class PageTextTest {
     @Test void aMainFrameLoadStartBeginsANewDocument() throws Exception {
         var runs = new ArrayList<CompletableFuture<Page.Insertion>>();
         javax.swing.SwingUtilities.invokeAndWait(() -> {
-            var page = new Page(java.net.URI.create("https://example.com/"), () -> { }, PageTestAccess.noFavicons());
+            var page = new Page(java.net.URI.create("https://example.com/"), () -> { }, PageTestAccess.noFavicons(), Runnable::run);
             page.usePageText(text);
             runs.add(text.insertIntoField("one"));
             page.loadStarted("https://example.com/next", dev.jasper.browser.store.Reached.LINK);

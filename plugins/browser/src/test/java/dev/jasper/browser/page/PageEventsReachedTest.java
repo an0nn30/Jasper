@@ -55,7 +55,7 @@ class PageEventsReachedTest {
 
     /** F1: a flag a Back left on TT_LINK reads once, with that load, and never with the next link. */
     @Test void aLoadStartReadsItsTransitionAndClearsTheFlagsJcefLeftOnIt() throws Exception {
-        Page page = onUiThread(() -> new Page(URI.create("https://a.example/"), () -> { }, PageTestAccess.noFavicons()));
+        Page page = onUiThread(() -> new Page(URI.create("https://a.example/"), () -> { }, PageTestAccess.noFavicons(), Runnable::run));
         var visits = new CopyOnWriteArrayList<Reached>();
         onUiThread(() -> page.onVisit((url, reached) -> visits.add(reached)));
         PageBrowser browser = PageTestAccess.pageBrowser(page);

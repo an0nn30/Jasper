@@ -51,15 +51,16 @@ import java.util.concurrent.RejectedExecutionException;
 
 /**
  * The Browser: web pages as Jasper items. Its start registers New Browser Tab, New Browser Window and the Browser split
- * item, the globe they show, the Web menu, Settings › Browser, the Bookmarks notification group, the welcome page and the onboarding pages, the
- * history page and its queries, the Bookmarks and Browser History palette scopes, the error page with its Try Again and Continue actions, View Source's page, the Browser
- * as Jasper's web browser, the terminal's Open URL in Split items and the restorer of saved browser items, publishes
- * the Markdown previews' service ({@link MarkdownPreviews}), and makes Chromium's engine, which starts Chromium only
+ * item, the globe they show, the Web menu, Settings › Browser, the Bookmarks notification group, the welcome page and
+ * the onboarding pages, the history and bookmarks pages and their queries, the Bookmarks and Browser History palette
+ * scopes, the error page with its Try Again and Continue actions, View Source's page, the Browser as Jasper's web
+ * browser, the terminal's Open URL in Split items and the restorer of saved browser items, publishes the Markdown
+ * previews' service ({@link MarkdownPreviews}), and makes Chromium's engine, which starts Chromium only
  * when a browser item or a Markdown preview first shows, so starting the plugin, and restoring its items, loads no
  * Chromium class. After a run that ended while Chromium ran, the items it restores wait to be loaded. It makes the
  * items' history and bookmarks too, in {@code browser.sqlite} in its data folder, which opens only once an item first
- * shows or its address field is edited, so the start opens no database and loads no sqlite-jdbc class
- * (spec section 19).
+ * shows or its address field is edited, so the start opens no database and loads no sqlite-jdbc class (spec section
+ * 19); that folder, which holds Chromium's cookies too, is made its owner's alone before either writes there.
  */
 public class BrowserPlugin implements Plugin {
     static final String NEW_TAB = "dev.jasper.browser.new_tab", NEW_WINDOW = "dev.jasper.browser.new_window";
@@ -174,7 +175,8 @@ public class BrowserPlugin implements Plugin {
     }
 
     /**
-     * Jasper quits. The items give history their pages' last titles, then the history and bookmarks close: their database
+     * Jasper quits, or the plugin is turned off. The items close their open Edit Bookmark panels, whose bookmarks keep the
+     * tags they show, and give history their pages' last titles, then the history and bookmarks close: their database
      * takes no more work and closes once the work given before has run. The items' favicon fetches and View Source's
      * fetches end. On the UI thread {@link Chromium#close()} only starts Chromium's dispose, and every Markdown preview
      * still open is then unavailable. The database's end and Chromium's are waited for on the plugin's background

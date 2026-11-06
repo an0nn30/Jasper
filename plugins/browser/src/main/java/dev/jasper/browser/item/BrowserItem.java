@@ -122,6 +122,8 @@ public final class BrowserItem implements AutoCloseable {
     private ContentTab tab;
     // The item's DevTools item while it is open; null before the first Inspect Element and once it closes.
     private DevToolsItem devTools;
+    // The Edit Bookmark panel opened last, which may have closed since; null before the first.
+    private BookmarkPanel panel;
     private URI url;
     // Where the item's restore state says it is: what it loads first until it shows, then where its page committed.
     private URI saved;
@@ -148,7 +150,7 @@ public final class BrowserItem implements AutoCloseable {
         saved = url;
         ownZoom = zoom;
         this.waiting = waiting;
-        page = new Page(url, this::changed, items.favicons());
+        page = new Page(url, this::changed, items.favicons(), items.context().background());
         showZoom(zoom.orElseGet(() -> items.settings().pageZoom()));
         page.onNavigationButton(this::navigationButton);
         page.onMagnify(this::magnify);
@@ -551,8 +553,12 @@ public final class BrowserItem implements AutoCloseable {
         return StoreSuggestions.of(typed, stores.bookmarkIndex().all(), stores.visitIndex().all());
     }
 
-    /** The plugin stops: the page's last title lands in history, before the stores close. */
-    void flushHistory() {
+    /**
+     * The plugin stops, before the stores close, and before the host closes the plugin's popovers: an Edit Bookmark panel
+     * still open closes, and its bookmark keeps the tags it shows (H23), and the page's last title lands in history.
+     */
+    void flush() {
+        if (panel != null) panel.close();
         history.flush();
     }
 
@@ -765,7 +771,7 @@ public final class BrowserItem implements AutoCloseable {
     /** The bookmark's panel, from the menu button; none while the button cannot anchor one. */
     private void openPanel(Bookmark bookmark) {
         try {
-            BookmarkPanel.open(items.context(), view.anchor(BrowserToolbar.MENU), stores, bookmark, bookmarkNotices(), page, tab);
+            panel = BookmarkPanel.open(items.context(), view.anchor(BrowserToolbar.MENU), stores, bookmark, bookmarkNotices(), page, tab);
         } catch (IllegalArgumentException | IllegalStateException unanchored) { // the view or its menu button cannot anchor now
             items.context().log().log(System.Logger.Level.DEBUG, "The bookmark's panel could not open", unanchored);
         }
