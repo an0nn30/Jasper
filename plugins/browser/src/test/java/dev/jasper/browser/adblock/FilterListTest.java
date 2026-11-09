@@ -186,7 +186,11 @@ class FilterListTest {
         }
     }
 
-    /** Ruling V53: each download whose {@code updating()} a test reads is held on the server until it has read it. */
+    /**
+     * Ruling V53: each download whose {@code updating()} a test reads is held on the server until it has read it. V58:
+     * each check runs on the list's lane, which the first download's end may still be running on its client's thread,
+     * so the test waits for the lane before it reads the status or moves the clock.
+     */
     @Test void anUpdateIsDueAfter24HoursOrFromAnotherAddress() throws Exception {
         filters = list(this::client);
         filters.enabled(true);
@@ -198,11 +202,13 @@ class FilterListTest {
         assertThat(hits("/list.json")).isEqualTo(1);
         clock.advance(Duration.ofHours(23));
         filters.checkNow();
+        awaitLane();
         assertThat(filters.status().updating()).as("not due at 23 hours").isFalse();
         assertThat(hits("/list.json")).isEqualTo(1);
         clock.advance(Duration.ofHours(1));
         server.list.shut();
         filters.checkNow();
+        awaitLane();
         assertThat(filters.status().updating()).as("due at 24 hours").isTrue();
         var due = filters.updateNow();
         server.list.open();
@@ -211,6 +217,7 @@ class FilterListTest {
         server.other.shut();
         address.set(at("/other.json"));
         filters.checkNow();
+        awaitLane();
         assertThat(filters.status().updating()).as("due at once from another address").isTrue();
         var moved = filters.updateNow();
         server.other.open();
@@ -374,12 +381,14 @@ class FilterListTest {
         assertThat(filters.status().rules()).as("the cached list's count stays").isEqualTo(3);
         assertThat(told.get()).as("the change is told").isPositive();
         filters.enabled(true);
+        awaitLane();
         assertThat(filters.active()).as("loaded again from its cache").isPresent();
         assertThat(hits("/list.json")).isEqualTo(1);
 
         address.set(at("/late"));
         clock.advance(Duration.ofDays(1));
         filters.checkNow();
+        awaitLane();
         assertThat(filters.status().updating()).isTrue();
         filters.enabled(false);
         server.late.countDown();
@@ -495,6 +504,27 @@ class FilterListTest {
         filters.updateNow().get(10, TimeUnit.SECONDS);
     }
 
+    /**
+     * V58's seam: the list's lane is idle once the work it was given has run, here on an executor the test runs by
+     * hand, which is what a test waits for before it reads what that work changed.
+     */
+    @Test void theLaneIsIdleOnceTheWorkItWasGivenHasRun() {
+        address.set(URI.create("http://lists.example/list.json"));
+        var waiting = new java.util.ArrayDeque<Runnable>();
+        filters = new FilterList(data, () -> { }, waiting::add, () -> { throw new AssertionError("A refused address asks for no client"); },
+            clock, address::get, Duration.ofHours(1), DEADLINE);
+        assertThat(filters.idle()).as("given nothing").isTrue();
+        filters.enabled(true);
+        filters.start();
+        assertThat(filters.idle()).as("its check waits for the executor").isFalse();
+        assertThat(filters.status().error()).isEmpty();
+        assertThat(waiting).hasSize(1);
+        waiting.poll().run();
+        assertThat(filters.idle()).isTrue();
+        assertThat(waiting).isEmpty();
+        assertThat(filters.status().error()).contains(ListDownload.REFUSED_ADDRESS);
+    }
+
     /** A cache that cannot be read is no cache: the list downloads again. */
     @Test void aCacheThatCannotBeReadIsDownloadedAgain() throws Exception {
         Files.createDirectories(data.resolve("adblock"));
@@ -508,6 +538,16 @@ class FilterListTest {
         var update = filters.updateNow();
         server.list.open();
         assertThat(update.get(10, TimeUnit.SECONDS).rules()).isEqualTo(3);
+    }
+
+    /**
+     * Waits until the list's lane has run the work it was given (V58): a download's end runs the lane on its client's
+     * thread, so a check given then runs there, a little later.
+     */
+    private void awaitLane() throws InterruptedException {
+        long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (!filters.idle() && System.nanoTime() < until) Thread.sleep(1);
+        assertThat(filters.idle()).as("the list's lane, idle").isTrue();
     }
 
     private FilterList list(Supplier<HttpClient> clients) {

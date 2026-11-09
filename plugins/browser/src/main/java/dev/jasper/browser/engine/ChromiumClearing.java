@@ -59,7 +59,8 @@ final class ChromiumClearing {
      * @param restrictData makes the data directory its owner's alone (H37); run on the worker before the marker
      * @param worker Chromium's worker, which alone enters the start
      * @param life Chromium's life, which says how a clearing goes now
-     * @param running whether Chromium runs, asked on the UI thread before each native step
+     * @param running whether Chromium runs, asked on the UI thread before each native step, and on Chromium's thread as
+     *     a clearing's helper browser is made
      * @param app Chromium's app, which the live clearing calls once Chromium runs
      */
     ChromiumClearing(Path dataDir, Runnable restrictData, Executor worker, ChromiumLife<CefClient> life, BooleanSupplier running,

@@ -16,6 +16,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 /**
  * A compiled list, applied: which requests it blocks, and which of a page's elements it hides. A rule matches a
@@ -36,10 +37,12 @@ import java.util.function.Predicate;
  * for each rule it examines, whether or not its trigger fits (ruling V50); a read of a character at its filter's
  * charge ({@link UrlFilter}); a check of a literal 1 and 1 more for each 32 characters of the address; and the compile
  * of an expression its {@link PatternCache} does not hold, by the size of the filter's source or expression, the
- * longer (V48). Past that, a request is not blocked and a page hides only what the rules already read proved. A rule whose match runs past its own 100,000, or
- * past the stack, counts as matching when it is an ignore rule and as not matching otherwise, so that both bounds err
- * toward allowing the request and hiding less (V50). A rule set is immutable but for its cache of compiled
- * expressions, and safe on any thread.
+ * longer (V48). Past that, a request is not blocked and a page hides only what the rules already read proved. A rule
+ * whose match runs past its own 100,000, or past the stack, counts as matching when it is an ignore rule and as not
+ * matching otherwise, so that both bounds err toward allowing the request and hiding less (V50). No lookup scans the
+ * entries of a hash a list can choose (V57): the cache keeps each rule's expression by its place, a rule's domain lists
+ * are kept sorted and searched by halves, and the index keys by strings in hash maps, which keep strings of one hash in
+ * a tree. A rule set is immutable but for its cache of compiled expressions, and safe on any thread.
  */
 public final class RuleSet {
     private static final Set<ResourceKind> PAGE = Collections.unmodifiableSet(EnumSet.of(ResourceKind.DOCUMENT));
@@ -62,14 +65,15 @@ public final class RuleSet {
     // The sheet every page shares: what every page hides, and what every http and https page hides, by the case rule
     // that reads its scheme.
     private final Shared everyPage, webPage, lowerCaseWebPage;
-    // The compiled expressions of the rules' filters (V48).
-    private final PatternCache patterns = new PatternCache();
+    // The compiled expressions of the rules' filters, each by its rule's place (V48, V57).
+    private final PatternCache patterns;
     private final AtomicBoolean logged = new AtomicBoolean();
 
     private RuleSet(List<Rule> rules, Consumer<Rule> examined, BiConsumer<UrlFilter, String> ran) {
         this.examined = examined;
         this.ran = ran;
         entries = rules.stream().sorted(Comparator.comparingInt(Rule::index)).map(Entry::of).toArray(Entry[]::new);
+        patterns = new PatternCache(Arrays.stream(entries).map(entry -> entry.rule().filter()).toArray(UrlFilter[]::new));
         Map<String, Integer> rarity = rarity(entries);
         requests = Index.of(entries, entry -> entry.rule().action() != Action.HIDE, rarity);
         pages = Index.of(entries, entry -> entry.rule().action() == Action.IGNORE_PREVIOUS
@@ -135,7 +139,7 @@ public final class RuleSet {
             for (int at = candidates.length - 1; at >= 0; at--) {
                 Entry entry = entries[candidates[at]];
                 examine(entry, reads);
-                if (matches(entry, request, reads)) return entry.rule().action() == Action.BLOCK;
+                if (matches(candidates[at], request, reads)) return entry.rule().action() == Action.BLOCK;
             }
             return false;
         } catch (UrlFilter.Reads.Exhausted exhausted) {
@@ -153,7 +157,7 @@ public final class RuleSet {
         int lastBlock = -1, lastIgnore = -1;
         for (int at = 0; at < entries.length; at++) {
             Action action = entries[at].rule().action();
-            if (action == Action.HIDE || !fits(entries[at], request) || !scanned(entries[at], request)) continue;
+            if (action == Action.HIDE || !fits(entries[at], request) || !scanned(at, request)) continue;
             if (action == Action.BLOCK) lastBlock = at;
             else lastIgnore = at;
         }
@@ -199,9 +203,10 @@ public final class RuleSet {
     String scanStylesheet(String pageUrl) {
         Request page = Request.page(pageUrl);
         var sheet = new StringBuilder();
-        for (Entry entry : entries) {
+        for (int at = 0; at < entries.length; at++) {
+            Entry entry = entries[at];
             Action action = entry.rule().action();
-            if (action == Action.BLOCK || !fits(entry, page) || !scanned(entry, page)) continue;
+            if (action == Action.BLOCK || !fits(entry, page) || !scanned(at, page)) continue;
             if (action == Action.IGNORE_PREVIOUS) sheet.setLength(0);
             else for (String part : ContentRules.parts(entry.rule().selector())) sheet.append(part).append(HIDDEN);
         }
@@ -218,7 +223,7 @@ public final class RuleSet {
                 Entry entry = entries[candidates[at]];
                 examine(entry, reads);
                 boolean ignore = entry.rule().action() == Action.IGNORE_PREVIOUS;
-                if (!(ignore || own) || !matches(entry, page, reads)) continue;
+                if (!(ignore || own) || !matches(candidates[at], page, reads)) continue;
                 if (ignore) {
                     ignored = candidates[at];
                     break;
@@ -257,10 +262,12 @@ public final class RuleSet {
     }
 
     /**
-     * Whether the rule counts as matching the request: its trigger fits, the address holds its literal, and its filter
-     * matches the address, or ran past its own charge or the stack and the rule ignores the earlier rules.
+     * Whether the rule at {@code place} counts as matching the request: its trigger fits, the address holds its
+     * literal, and its filter matches the address, or ran past its own charge or the stack and the rule ignores the
+     * earlier rules.
      */
-    private boolean matches(Entry entry, Request request, UrlFilter.Reads reads) {
+    private boolean matches(int place, Request request, UrlFilter.Reads reads) {
+        Entry entry = entries[place];
         if (!fits(entry, request)) return false;
         UrlFilter filter = entry.rule().filter();
         String literal = filter.literalText();
@@ -269,12 +276,13 @@ public final class RuleSet {
             if (!(filter.caseSensitive() ? request.url() : request.folded()).contains(literal)) return false;
         }
         ran.accept(filter, request.url());
-        return counts(entry, filter.match(request.url(), reads, patterns));
+        return counts(entry, filter.match(request.url(), reads, patterns, place));
     }
 
-    /** Whether a scan counts the rule, whose trigger fits, as matching: as {@link #matches} does, without its charge. */
-    private boolean scanned(Entry entry, Request request) {
-        return counts(entry, entry.rule().filter().match(request.url(), new UrlFilter.Reads(Integer.MAX_VALUE), patterns));
+    /** Whether a scan counts the rule at {@code place}, whose trigger fits, as matching: as {@link #matches} does, uncharged. */
+    private boolean scanned(int place, Request request) {
+        Entry entry = entries[place];
+        return counts(entry, entry.rule().filter().match(request.url(), new UrlFilter.Reads(Integer.MAX_VALUE), patterns, place));
     }
 
     /**
@@ -434,35 +442,49 @@ public final class RuleSet {
     }
 
     /**
-     * A domain list's hosts.
+     * A domain list's hosts, sorted and looked up by halves, so that no lookup goes by a hash a list can choose (V57):
+     * the probing sets {@link Set#copyOf} makes scan the hosts of one hash.
      *
-     * @param exactly the hosts it names alone
-     * @param withSubdomains the hosts it names with a {@code *}, which covers their subdomains too
+     * @param exactly the hosts it names alone, sorted, each once
+     * @param withSubdomains the hosts it names with a {@code *}, which covers their subdomains too, sorted, each once
      */
-    private record Domains(Set<String> exactly, Set<String> withSubdomains) {
-        private static final Domains NONE = new Domains(Set.of(), Set.of());
+    private record Domains(String[] exactly, String[] withSubdomains) {
+        private static final String[] NO_HOSTS = {};
+        // Up to how many hosts a lookup compares each, which for so few is faster than halving.
+        private static final int SHORT_LIST = 8;
+        private static final Domains NONE = new Domains(NO_HOSTS, NO_HOSTS);
 
         static Domains of(List<String> written) {
             if (written.isEmpty()) return NONE;
-            var exactly = new HashSet<String>();
-            var withSubdomains = new HashSet<String>();
-            for (String domain : written) {
-                if (domain.startsWith("*")) withSubdomains.add(domain.substring(1));
-                else exactly.add(domain);
-            }
-            return new Domains(Set.copyOf(exactly), Set.copyOf(withSubdomains));
+            return new Domains(sortedOnce(written.stream().filter(domain -> !domain.startsWith("*"))),
+                sortedOnce(written.stream().filter(domain -> domain.startsWith("*")).map(domain -> domain.substring(1))));
+        }
+
+        /** The hosts in order, each once. */
+        private static String[] sortedOnce(Stream<String> hosts) {
+            String[] sorted = hosts.sorted().toArray(String[]::new);
+            int kept = 0;
+            for (String host : sorted) if (kept == 0 || !sorted[kept - 1].equals(host)) sorted[kept++] = host;
+            return kept == sorted.length ? sorted : Arrays.copyOf(sorted, kept);
         }
 
         boolean isEmpty() {
-            return exactly.isEmpty() && withSubdomains.isEmpty();
+            return exactly.length == 0 && withSubdomains.length == 0;
         }
 
         boolean covers(String host) {
             if (host.isEmpty()) return false;
-            if (exactly.contains(host) || withSubdomains.contains(host)) return true;
-            if (withSubdomains.isEmpty()) return false;
+            if (holds(exactly, host) || holds(withSubdomains, host)) return true;
+            if (withSubdomains.length == 0) return false;
             for (int dot = host.indexOf('.'); dot >= 0; dot = host.indexOf('.', dot + 1))
-                if (withSubdomains.contains(host.substring(dot + 1))) return true;
+                if (holds(withSubdomains, host.substring(dot + 1))) return true;
+            return false;
+        }
+
+        /** Whether the sorted {@code hosts} hold {@code host}: a few compared in turn, more searched by halves. */
+        private static boolean holds(String[] hosts, String host) {
+            if (hosts.length > SHORT_LIST) return Arrays.binarySearch(hosts, host) >= 0;
+            for (String held : hosts) if (held.equals(host)) return true;
             return false;
         }
     }

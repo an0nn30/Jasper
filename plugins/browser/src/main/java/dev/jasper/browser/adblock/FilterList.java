@@ -567,6 +567,16 @@ public final class FilterList implements AutoCloseable {
         recheck(address);
     }
 
+    /**
+     * Whether the list's lane has run all the work it was given: a test's seam (V58), as a download's end runs the lane
+     * on its client's thread, where work given meanwhile runs after it.
+     */
+    boolean idle() {
+        synchronized (tasks) {
+            return !draining && tasks.isEmpty();
+        }
+    }
+
     /** Runs {@code task} on the background executor after the list's tasks before it; nothing once the executor refuses. */
     private void later(Runnable task) {
         synchronized (tasks) {

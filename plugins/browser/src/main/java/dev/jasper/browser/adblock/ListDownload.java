@@ -33,10 +33,10 @@ import java.util.function.BooleanSupplier;
  * ({@link #fetches}), as TLS is the list's only integrity, with the client {@link #client(Optional)} makes, which
  * connects within 30 seconds and follows no redirect itself. The download follows at most 5 (ruling V38), each target
  * resolved against the address that answered, checked as the first address is and never from https to http, and only
- * then asked, so a target the list may not come from is never asked; nor is one once the client has been retired, as
- * the proxy changed (ruling V51). Only a final 200 is read, at most 32 MiB of it, counted before it is decoded, and one
- * deadline covers the whole download, its redirects and body included ({@link #get}). Why a download failed is told in
- * words Settings shows ({@link #reason}). Any thread.
+ * then asked, so a target the list may not come from is never asked; nor is any address, the first included, once the
+ * client has been retired, as the proxy changed (rulings V51 and V58). Only a final 200 is read, at most 32 MiB of it,
+ * counted before it is decoded, and one deadline covers the whole download, its redirects and body included
+ * ({@link #get}). Why a download failed is told in words Settings shows ({@link #reason}). Any thread.
  */
 public final class ListDownload {
     /** How long a connection to the list's server may take. */
@@ -112,9 +112,16 @@ public final class ListDownload {
         return result;
     }
 
-    /** Asks {@code address}, the target of {@code redirects} redirects so far, and follows its answer. */
+    /**
+     * Asks {@code address}, the target of {@code redirects} redirects so far, unless the client has been retired since
+     * (V51, V58), and follows its answer.
+     */
     private static void ask(HttpClient client, URI address, Duration deadline, BooleanSupplier current, int redirects,
                             CompletableFuture<byte[]> result, Exchange exchange) {
+        if (!current.getAsBoolean()) {
+            result.completeExceptionally(new Refused(RETIRED));
+            return;
+        }
         Body body = new Body();
         CompletableFuture<HttpResponse<byte[]>> sent;
         try {
@@ -150,10 +157,6 @@ public final class ListDownload {
             }
             if (!allowed(address, next.get())) {
                 result.completeExceptionally(new Refused(REDIRECTED));
-                return;
-            }
-            if (!current.getAsBoolean()) {
-                result.completeExceptionally(new Refused(RETIRED));
                 return;
             }
             if (!result.isDone()) ask(client, next.get(), deadline, current, redirects + 1, result, exchange);

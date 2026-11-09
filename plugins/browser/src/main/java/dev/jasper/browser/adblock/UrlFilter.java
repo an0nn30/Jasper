@@ -70,7 +70,7 @@ public final class UrlFilter {
      * character measured being 37 ns, for classes of two members, case-sensitive.
      */
     static final int COMPILE_CHARGE = 8;
-    /** What a compile is charged whatever its expression's length, for the pattern it makes: 150 to 300 ns measured. */
+    /** What a compile is charged whatever its expression's length, for the pattern it makes: 53 to 340 ns measured. */
     static final int COMPILE_BASE = 50;
     /**
      * A compile of a case-sensitive expression that begins with a run of 4 characters or more is charged the square of
@@ -227,22 +227,23 @@ public final class UrlFilter {
      * @throws Reads.Exhausted when the call's reads are spent
      */
     boolean matches(String url, Reads reads) {
-        return match(url, reads, null) == Outcome.MATCHED;
+        return match(url, reads, null, 0) == Outcome.MATCHED;
     }
 
     /**
-     * What a match of the address comes to, its reads charged to {@code reads}, its expression from {@code patterns},
-     * which charges a compile there, or, null, compiled anew uncharged. A match past its own 100,000 or past the stack is
-     * recorded there and comes to {@link Outcome#OVERRAN}, as every match does once the stack has overflowed.
+     * What a match of the address comes to, its reads charged to {@code reads}, its expression the one
+     * {@code patterns} keeps as filter {@code id}, which charges a compile there, or, {@code patterns} null, compiled
+     * anew uncharged. A match past its own 100,000 or past the stack is recorded there and comes to
+     * {@link Outcome#OVERRAN}, as every match does once the stack has overflowed.
      *
      * @throws Reads.Exhausted when the call's reads are spent, or cannot pay for the compile, which is then not started
      */
-    Outcome match(String url, Reads reads, PatternCache patterns) {
+    Outcome match(String url, Reads reads, PatternCache patterns, int id) {
         Objects.requireNonNull(url, "url");
         if (everything) return Outcome.MATCHED;
         if (overflowed) return Outcome.OVERRAN;
         try {
-            Pattern pattern = patterns == null ? compile() : patterns.pattern(this, reads);
+            Pattern pattern = patterns == null ? compile() : patterns.pattern(id, reads);
             return pattern.matcher(new Budget(url, reads, cost)).find() ? Outcome.MATCHED : Outcome.UNMATCHED;
         } catch (Budget.Spent spent) {
             reads.overrun(this);
@@ -443,15 +444,17 @@ public final class UrlFilter {
         }
 
         /**
-         * How many characters the expression begins with that Java reads as one run: letters, digits and escaped
-         * punctuation, up to the first other character or the one a quantifier follows, which Java reads apart.
+         * How many characters the expression begins with that Java reads as one run: letters, digits and every other
+         * printable character escaped, the space included (V58), up to the first other character or the one a
+         * quantifier follows, which Java reads apart.
          */
         private static int run(CharSequence expression) {
             int at = 0, run = 0;
             while (at < expression.length()) {
                 char c = expression.charAt(at);
-                boolean escaped = c == '\\' && at + 1 < expression.length() && PUNCTUATION.indexOf(expression.charAt(at + 1)) >= 0;
-                if (!escaped && !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9')) break;
+                boolean escaped = c == '\\' && at + 1 < expression.length() && printable(expression.charAt(at + 1))
+                    && !alphanumeric(expression.charAt(at + 1));
+                if (!escaped && !alphanumeric(c)) break;
                 int next = at + (escaped ? 2 : 1);
                 if (next < expression.length() && "*+?".indexOf(expression.charAt(next)) >= 0) break;
                 run++;
@@ -607,8 +610,15 @@ public final class UrlFilter {
 
         /** {@code c} as Java's grammar takes it for itself, in a class or out: escaped unless a letter or digit. */
         private static String escaped(char c) {
-            boolean plain = c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9';
-            return plain ? String.valueOf(c) : "\\" + c;
+            return alphanumeric(c) ? String.valueOf(c) : "\\" + c;
+        }
+
+        private static boolean alphanumeric(char c) {
+            return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9';
+        }
+
+        private static boolean printable(char c) {
+            return c >= 0x20 && c <= 0x7E;
         }
     }
 

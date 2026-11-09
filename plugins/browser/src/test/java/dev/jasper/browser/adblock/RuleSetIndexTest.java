@@ -145,9 +145,12 @@ class RuleSetIndexTest {
         assertThat(mostForAMatch).as("the most a match was charged").isPositive().isLessThanOrEqualTo(UrlFilter.STEPS / 10);
     }
 
-    /** Final review B (V48): over the fixture, whose filters the cache holds, each filter's expression compiles once. */
+    /**
+     * Final review B (V48): over the fixture, whose filters the cache holds, each rule's expression compiles once; V57:
+     * each rule's own, as the cache keeps them by their places.
+     */
     @Test void eachFilterOfTheFixtureCompilesOnce() {
-        var ran = new HashSet<UrlFilter>();
+        Set<UrlFilter> ran = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
         RuleSet set = RuleSet.of(rules, rule -> { }, (filter, url) -> ran.add(filter));
         for (int round = 0; round < 2; round++) {
             for (String url : urls)
@@ -157,7 +160,7 @@ class RuleSetIndexTest {
             for (String page : PAGES) set.stylesheet(page);
         }
         long compiled = ran.stream().filter(filter -> !filter.matchesEverything()).count();
-        assertThat(compiled).as("filters run").isGreaterThan(20);
+        assertThat(compiled).as("rules whose filters ran").isGreaterThan(20);
         assertThat(set.patterns().compiles()).as("each once").isEqualTo(compiled);
         assertThat(set.patterns().size()).isEqualTo((int) compiled);
         assertThat(set.patterns().weight()).isPositive().isLessThan(PatternCache.WEIGHT / 100);

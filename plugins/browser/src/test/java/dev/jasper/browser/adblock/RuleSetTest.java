@@ -339,6 +339,30 @@ class RuleSetTest {
         }
     }
 
+    /**
+     * W1's re-review (V57): domain lists whose hosts all share one hash, which a list can choose, answer as any other:
+     * each host is found, and a host of that hash that the list does not name is not.
+     */
+    @Test void domainListsWhoseHostsShareOneHashAnswerAsAnyOther() {
+        var hosts = new ArrayList<String>();
+        for (int n = 0; n < 1_024; n++) {
+            var host = new StringBuilder();
+            for (int bit = 0; bit < 10; bit++) host.append((n >> bit & 1) == 1 ? "c0" : "an");
+            hosts.add(host.append(".test").toString());
+        }
+        assertThat(hosts.stream().map(String::hashCode).distinct().count()).as("one hash").isEqualTo(1);
+        List<String> named = hosts.subList(0, 1_023), wildcard = named.stream().map(host -> "*" + host).toList();
+        String absent = hosts.get(1_023);
+        RuleSet rules = rules(List.of(rule(trigger("url-filter", "/only/", "if-domain", named), block()),
+            rule(trigger("url-filter", "/never/", "unless-domain", wildcard), block())));
+        for (String host : List.of(named.getFirst(), named.get(511), named.getLast())) {
+            assertThat(rules.blocks("https://cdn.test/only/x.js", SCRIPT, "https://" + host + "/")).as(host).isTrue();
+            assertThat(rules.blocks("https://cdn.test/never/x.js", SCRIPT, "https://www." + host + "/")).as(host).isFalse();
+        }
+        assertThat(rules.blocks("https://cdn.test/only/x.js", SCRIPT, "https://" + absent + "/")).as("the hash, unnamed").isFalse();
+        assertThat(rules.blocks("https://cdn.test/never/x.js", SCRIPT, "https://www." + absent + "/")).isTrue();
+    }
+
     /** Final review B (V48): a filter's compile is charged to the first call that runs it, by its expression's size. */
     @Test void aFiltersCompileIsChargedToTheFirstCallThatRunsIt() {
         List<Rule> compiled = ContentRules.compile(List.of(rule(trigger("url-filter", "ads[0-9]x"), block()))).rules();

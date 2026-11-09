@@ -24,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
  * Final review B (ruling V48): a rule set's compiled filters are kept in one cache, the least recently used out first,
  * within an estimated weight of 32 MiB. A compile is charged to the call that needs it before it starts, and runs
  * outside the cache's lock, so a list of the allowed size never holds the heap, and no call waits on another's compile.
+ * W1's re-review (V57): the cache keeps each filter by its place in the rule set, so no list can choose the hash its
+ * lookups go by.
  */
 class PatternCacheTest {
     private static final String DIGITS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
@@ -34,23 +36,23 @@ class PatternCacheTest {
         UrlFilter a = filter("aaa.b"), b = filter("bbb.c"), c = filter("ccc.d");
         assertThat(List.of(a.weight(), b.weight(), c.weight())).as("one weight").containsOnly(a.weight());
         var compiled = new ArrayList<UrlFilter>();
-        var cache = new PatternCache(2L * a.weight(), filter -> {
+        var cache = new PatternCache(new UrlFilter[] {a, b, c}, 2L * a.weight(), filter -> {
             compiled.add(filter);
             return filter.compile();
         });
         var reads = new UrlFilter.Reads(RuleSet.CALL_READS);
-        assertThat(cache.pattern(a, reads).pattern()).isEqualTo(a.expression());
-        cache.pattern(b, reads);
+        assertThat(cache.pattern(0, reads).pattern()).isEqualTo(a.expression());
+        cache.pattern(1, reads);
         assertThat(reads.used()).as("each compile, charged").isEqualTo(a.compileCost() + b.compileCost());
-        cache.pattern(a, reads);
+        cache.pattern(0, reads);
         assertThat(reads.used()).as("a cached filter is not charged").isEqualTo(a.compileCost() + b.compileCost());
-        cache.pattern(c, reads);
+        cache.pattern(2, reads);
         assertThat(cache.size()).as("b, the least recently used, made room").isEqualTo(2);
         assertThat(cache.weight()).isEqualTo(2L * a.weight());
         var again = new UrlFilter.Reads(RuleSet.CALL_READS);
-        cache.pattern(a, again);
+        cache.pattern(0, again);
         assertThat(again.used()).isZero();
-        assertThat(cache.pattern(b, again).pattern()).isEqualTo(b.expression());
+        assertThat(cache.pattern(1, again).pattern()).isEqualTo(b.expression());
         assertThat(again.used()).as("an evicted filter compiles again, charged").isEqualTo(b.compileCost());
         assertThat(compiled).containsExactly(a, b, c, b);
         assertThat(cache.compiles()).isEqualTo(4);
@@ -60,11 +62,11 @@ class PatternCacheTest {
     /** A compile the call's charge left cannot pay is not started: the call ends spent, in the safe direction. */
     @Test void aCompileTheCallCannotPayIsNotStarted() {
         UrlFilter a = filter("aaa.b");
-        var cache = new PatternCache(PatternCache.WEIGHT, filter -> {
+        var cache = new PatternCache(new UrlFilter[] {a}, PatternCache.WEIGHT, filter -> {
             throw new AssertionError("A compile the call cannot pay is not started");
         });
         var reads = new UrlFilter.Reads(a.compileCost() - 1);
-        assertThatThrownBy(() -> cache.pattern(a, reads)).isInstanceOf(UrlFilter.Reads.Exhausted.class);
+        assertThatThrownBy(() -> cache.pattern(0, reads)).isInstanceOf(UrlFilter.Reads.Exhausted.class);
         assertThat(reads.used()).as("spent").isEqualTo(a.compileCost() - 1);
         assertThat(cache.size()).isZero();
         assertThat(cache.compiles()).isZero();
@@ -75,7 +77,7 @@ class PatternCacheTest {
         UrlFilter slow = filter("slow.x"), quick = filter("quick.y"), kept = filter("kept.z");
         var started = new CountDownLatch(1);
         var release = new CountDownLatch(1);
-        var cache = new PatternCache(PatternCache.WEIGHT, filter -> {
+        var cache = new PatternCache(new UrlFilter[] {slow, quick, kept}, PatternCache.WEIGHT, filter -> {
             if (filter.equals(slow)) {
                 started.countDown();
                 try {
@@ -86,14 +88,14 @@ class PatternCacheTest {
             }
             return filter.compile();
         });
-        cache.pattern(kept, unbounded());
+        cache.pattern(2, unbounded());
         ExecutorService other = Executors.newSingleThreadExecutor();
         try {
-            CompletableFuture<Pattern> waiting = CompletableFuture.supplyAsync(() -> cache.pattern(slow, unbounded()), other);
+            CompletableFuture<Pattern> waiting = CompletableFuture.supplyAsync(() -> cache.pattern(0, unbounded()), other);
             assertThat(started.await(10, TimeUnit.SECONDS)).isTrue();
             assertTimeoutPreemptively(Duration.ofSeconds(10), () -> {
-                assertThat(cache.pattern(kept, unbounded()).pattern()).isEqualTo(kept.expression());
-                assertThat(cache.pattern(quick, unbounded()).pattern()).isEqualTo(quick.expression());
+                assertThat(cache.pattern(2, unbounded()).pattern()).isEqualTo(kept.expression());
+                assertThat(cache.pattern(1, unbounded()).pattern()).isEqualTo(quick.expression());
             });
             assertThat(waiting).isNotDone();
             release.countDown();
@@ -110,7 +112,7 @@ class PatternCacheTest {
         UrlFilter shared = filter("shared.x");
         var both = new CountDownLatch(2);
         var made = new CopyOnWriteArrayList<Pattern>();
-        var cache = new PatternCache(PatternCache.WEIGHT, filter -> {
+        var cache = new PatternCache(new UrlFilter[] {shared}, PatternCache.WEIGHT, filter -> {
             both.countDown();
             try {
                 assertThat(both.await(10, TimeUnit.SECONDS)).isTrue();
@@ -123,17 +125,78 @@ class PatternCacheTest {
         });
         ExecutorService threads = Executors.newFixedThreadPool(2);
         try {
-            var first = CompletableFuture.supplyAsync(() -> cache.pattern(shared, unbounded()), threads);
-            var second = CompletableFuture.supplyAsync(() -> cache.pattern(shared, unbounded()), threads);
+            var first = CompletableFuture.supplyAsync(() -> cache.pattern(0, unbounded()), threads);
+            var second = CompletableFuture.supplyAsync(() -> cache.pattern(0, unbounded()), threads);
             assertThat(List.of(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS))).allSatisfy(pattern -> assertThat(made).contains(pattern));
             assertThat(made).hasSize(2);
             assertThat(first.get()).as("both get the one kept").isSameAs(second.get());
             assertThat(cache.size()).isEqualTo(1);
             assertThat(cache.weight()).isEqualTo(shared.weight());
-            assertThat(cache.pattern(shared, unbounded())).isSameAs(first.get());
+            assertThat(cache.pattern(0, unbounded())).isSameAs(first.get());
         } finally {
             threads.shutdownNow();
         }
+    }
+
+    /** V57: equal filters at two places are kept apart, each compiled and weighed, as the cache keys neither by its filter. */
+    @Test void equalFiltersAtTwoPlacesAreKeptApart() {
+        UrlFilter first = filter("same.x"), second = filter("same.x");
+        assertThat(first).isEqualTo(second);
+        var compiled = new ArrayList<UrlFilter>();
+        var cache = new PatternCache(new UrlFilter[] {first, second}, PatternCache.WEIGHT, filter -> {
+            compiled.add(filter);
+            return filter.compile();
+        });
+        var reads = new UrlFilter.Reads(RuleSet.CALL_READS);
+        Pattern one = cache.pattern(0, reads), other = cache.pattern(1, reads);
+        assertThat(one).isNotSameAs(other);
+        assertThat(compiled).hasSize(2).allSatisfy(filter -> assertThat(filter).isEqualTo(first));
+        assertThat(reads.used()).isEqualTo(2L * first.compileCost());
+        assertThat(cache.size()).isEqualTo(2);
+        assertThat(cache.weight()).isEqualTo(2L * first.weight());
+        assertThat(cache.pattern(1, reads)).isSameAs(other);
+    }
+
+    /**
+     * W1's re-review (V57): 8,192 filters whose sources all share one hash, each in 30 or 31 of a list's 250,000 rules,
+     * cost what the same list of 8,192 distinct hashes costs: each call is charged the same and compiles as much, and
+     * neither takes long; keyed by its filters, the colliding list's every lookup was a walk of one bin under the lock,
+     * 11 to 13 s a request.
+     */
+    @Test void filtersWhoseSourcesShareOneHashCostWhatOthersCost() {
+        assertTimeoutPreemptively(Duration.ofSeconds(60), () -> {
+            RuleSet colliding = flood(true), control = flood(false);
+            assertThat(colliding.size()).isEqualTo(ContentRules.MAX_RULES);
+            for (int call = 0; call < 10; call++) {
+                var flooded = new UrlFilter.Reads(RuleSet.CALL_READS);
+                var plain = new UrlFilter.Reads(RuleSet.CALL_READS);
+                assertThat(colliding.blocks(URLS.getFirst(), IMAGE, "https://page.example/", flooded)).isFalse();
+                assertThat(control.blocks(URLS.getFirst(), IMAGE, "https://page.example/", plain)).isFalse();
+                assertThat(flooded.used()).as("call %d's charge", call).isEqualTo(plain.used());
+                assertThat(colliding.patterns().compiles()).as("call %d's compiles", call).isEqualTo(control.patterns().compiles());
+                assertThat(colliding.patterns().size()).isEqualTo(control.patterns().size());
+            }
+            assertThat(colliding.patterns().compiles()).as("duplicates compile apart").isGreaterThan(8_192);
+        });
+    }
+
+    /**
+     * 250,000 block rules over 8,192 filters of 13 groups, each {@code (Aa)} or, by a bit of its number, {@code (BB)},
+     * whose hashes are all one, or, {@code colliding} false, {@code (Bc)}, whose hashes differ.
+     */
+    private static RuleSet flood(boolean colliding) {
+        var sources = new ArrayList<String>(8_192);
+        for (int n = 0; n < 8_192; n++) {
+            var source = new StringBuilder();
+            for (int bit = 0; bit < 13; bit++) source.append((n >> bit & 1) == 1 ? (colliding ? "(BB)" : "(Bc)") : "(Aa)");
+            sources.add(source.toString());
+        }
+        assertThat(sources.stream().map(String::hashCode).distinct().count()).isEqualTo(colliding ? 1 : 8_192);
+        var list = new ArrayList<Map<String, Object>>(ContentRules.MAX_RULES);
+        for (int at = 0; at < ContentRules.MAX_RULES; at++) list.add(rule(trigger("url-filter", sources.get(at % 8_192)), block()));
+        ContentRules.Compiled compiled = ContentRules.compile(list);
+        assertThat(compiled.skipped()).isZero();
+        return RuleSet.of(compiled.rules());
     }
 
     /**

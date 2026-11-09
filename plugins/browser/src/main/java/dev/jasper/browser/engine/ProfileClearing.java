@@ -113,7 +113,8 @@ final class ProfileClearing {
      *
      * @param client the clearing client
      * @param origins the origins, as {@code scheme://host[:port]}
-     * @param running whether Chromium still runs; asked on the UI thread before each call
+     * @param running whether Chromium still runs; asked on the UI thread before each call, and on Chromium's thread as
+     *     the helper browser is made
      * @return completes once every origin is cleared; fails as {@link #clearOrigins} does. Completing it otherwise, as a
      *     caller that gives up does, makes no further call
      */

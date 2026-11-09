@@ -161,6 +161,22 @@ class UrlFilterTest {
         assertThat(filter("abc", true).compileCost()).isEqualTo(base + 3 * each);
     }
 
+    /**
+     * W1's re-review (V58): a space is written escaped, as every character but a letter or digit is, and Java reads it
+     * in the run, so a case-sensitive leading run of spaces is charged its square, and weighs Java's table for it.
+     */
+    @Test void aLeadingRunOfSpacesIsChargedAsJavaReadsIt() {
+        int each = UrlFilter.COMPILE_CHARGE, base = UrlFilter.COMPILE_BASE;
+        UrlFilter spaces = filter("abc" + " ".repeat(2_045), true);
+        assertThat(spaces.expression()).isEqualTo("abc" + "\\ ".repeat(2_045));
+        assertThat(spaces.compileCost()).as("the run of 2,048").isEqualTo(base + 4_093 * each + 2_048 * 2_048 / UrlFilter.RUN_SQUARE);
+        assertThat(spaces.weight()).isEqualTo(UrlFilter.PATTERN_BYTES + 4_093 + 2_048 * UrlFilter.NODE_BYTES + UrlFilter.TABLE_BYTES + 4 * 2_048);
+        UrlFilter mixed = filter(" a b~c" + ".".repeat(10), true);
+        assertThat(mixed.compileCost()).as("spaces and ~ in the run").isEqualTo(base + 19 * each + 6 * 6 / UrlFilter.RUN_SQUARE);
+        assertThat(filter(" ".repeat(2_048), false).compileCost()).as("not case-sensitive: no table").isEqualTo(base + 4_096 * each);
+        assertThat(filter("abcd$", true).compileCost()).as("\\z ends the run").isEqualTo(base + 6 * each + 4 * 4 / UrlFilter.RUN_SQUARE);
+    }
+
     @Test void onlyPrintableAsciiAndPunctuationEscapes() {
         assertThat(UrlFilter.of("caf" + (char) 0xE9, false)).isEmpty();
         assertThat(UrlFilter.of("a" + (char) 0x09 + "b", false)).isEmpty();

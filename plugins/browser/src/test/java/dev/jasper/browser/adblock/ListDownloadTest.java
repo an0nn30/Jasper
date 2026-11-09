@@ -178,6 +178,16 @@ class ListDownloadTest {
         assertThat(server.hits("/list.json")).isZero();
     }
 
+    /** W1's re-review (V58): a client retired before the download's first request is asked for nothing at all. */
+    @Test void aRetiredClientIsAskedForNothing() {
+        URI address = server.at("/list.json");
+        CompletableFuture<byte[]> download = ListDownload.get(client, address, GENEROUS, () -> false);
+        Throwable failure = catchThrowable(() -> download.get(10, TimeUnit.SECONDS));
+        assertThat(failure).isInstanceOf(ExecutionException.class);
+        assertThat(ListDownload.reason(failure, address, GENEROUS)).isEqualTo("the HTTP proxy changed during the download");
+        assertThat(server.hits("/list.json")).isZero();
+    }
+
     /** Each way a download fails, with the reason Settings shows after "Could not update the filter list: ". */
     @Test void eachFailureHasItsReason() throws Exception {
         assertThat(reason("/error")).isEqualTo("the server answered HTTP 500");
