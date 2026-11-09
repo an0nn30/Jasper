@@ -7,12 +7,12 @@
 docs; Task 13, the user's GUI check on macOS, is pending** (branch `claude/browser-privacy`, worktree
 `.claude/worktrees/browser-4b-4c-e6deab`, cut from local `main` `ef3347601`, which has plans 4a, 4b, 4c, 9 and 5
 merged; the plan `daa19c574`, then commits `827ac12ba` to `03af74d75`, local `main` `67653bbf6` (Mermaid, plan 9's
-slice 1b) merged in as `965c11432`, and the docs; not merged or pushed; see `docs/STATUS.md`). Executed with per-task
-subagents and reviews, each task's fix rounds until a re-review found every finding addressed. The pre-flight scan's
-findings F1-F44 were adopted as rulings (V0, cited V-F*n*) except where V1-V6 decide otherwise, and the controller's
-further rulings are V7-V46; plan 4a's R0-R48 and the banners of 4b, 4c, 9 and 5 bind. On 2026-11-06 the user chose V1
-("Clear now + wipe") and V3 ("Match Chrome"), which are no longer interim, and asked for no change to V2. The task
-reviews recorded these deviations from the plan's text, each with its ruling:
+slice 1b) merged in as `965c11432`, and the docs, `7ad704159` and `51b74b627`; not merged or pushed; see
+`docs/STATUS.md`). Executed with per-task subagents and reviews, each task's fix rounds until a re-review found every
+finding addressed. The pre-flight scan's findings F1-F44 were adopted as rulings (V0, cited V-F*n*) except where V1-V6
+decide otherwise, and the controller's further rulings are V7-V46; plan 4a's R0-R48 and the banners of 4b, 4c, 9 and 5
+bind. On 2026-11-06 the user chose V1 ("Clear now + wipe") and V3 ("Match Chrome"), which are no longer interim, and
+asked for no change to V2. The task reviews recorded these deviations from the plan's text, each with its ruling:
 - **Versions:** `JasperSdk.VERSION` 0.29.0 to 0.30.0, every bundled range `>=0.30.0, <0.31` (Task 1a). New SDK
   members, each `@since 0.30.0`: `NotificationHandle.remove()`, `ContentTab.setSavedTitle(Optional<String>)` (V-F2),
   and the testkit's `FakeNotifications.Post.count()` and `removed()` and `FakePluginHost.savedTitle`. **The Browser
@@ -116,18 +116,22 @@ reviews recorded these deviations from the plan's text, each with its ruling:
   `Chromium` is made; "The proxy could not be set" is one constant.
 - **The merge** (`965c11432`): local `main` `67653bbf6`; one conflict, in `BrowserPlugin.java`, both sides kept; four
   test calls to `PreviewScheme()` given `Runnable::run`.
-- **Task 12**, the docs: the Browser guide (/dev/null mode, site permissions, page notifications, audio, clearing data,
-  ad blocking, the HTTP proxy, and the toolbar, the welcome page, History, certificate errors, Restore, Jasper's own
-  requests, Settings and Files), the configuration guide's plugin table, AGENTS.md's Verified JCEF behaviour (V-F38 and
-  V10), this banner and STATUS. `docs/packaging.md`'s camera and microphone section came with Task 5. Before the docs,
-  at `965c11432`, `./gradlew check` (JBR 25.0.4.1 b635.75 jcef, 13m 54s) gave **15,518 tests, 0 failures, 0 errors,
-  103 skipped** (1,388 classes in the 16 build folders, without the example plugin's: jasper-app 5,291 with 90
-  skipped, Editor 5,387 with 4 skipped, Browser 1,324 with 1 skipped, jasper-ui 1,020, Remote 659, jasper-sdk 135,
-  jasper-sdk-testkit 310), the 15,086 of plan 5 and slice 1b and plan 6's 432; the example external plugin's `check
-  pluginZip` against `build/sdk-release` passes (1 test). The full checks after each task: 15,078 (Task 1a), 15,088
-  (1b), 15,139 (2), 15,181 (4), 15,208 (5), 15,279 (7), 15,328 (8), 15,421 and 15,424 (9), 15,454 and 15,477 (10),
-  15,494 and 15,510 (11), each with 0 failures, 0 errors and 103 skipped.
-- **Task 13**, the checklist: [Plan 6: privacy](../../browser-verification.md#plan-6-privacy), every line pending.
+- **Task 12** (`7ad704159` "Docs: the browser's privacy features"), the docs: the Browser guide (/dev/null mode, site
+  permissions, page notifications, audio, clearing data, ad blocking, the HTTP proxy, and the toolbar, the welcome
+  page, History, certificate errors, Restore, Jasper's own requests, Settings and Files), the configuration guide's
+  plugin table, AGENTS.md's Verified JCEF behaviour (V-F38 and V10), this banner and STATUS. `docs/packaging.md`'s
+  camera and microphone section came with Task 5. After both docs commits, at `51b74b627`, `./gradlew check --continue`
+  (JBR 25.0.4.1 b635.75 jcef, 10m 13s, 31 of 172 tasks run) gave **15,518 tests, 0 failures, 0 errors, 103 skipped**
+  (1,388 classes in the 16 build folders, without the example plugin's: jasper-app 5,291 with 90 skipped, Editor 5,387
+  with 4 skipped, Browser 1,324 with 1 skipped, jasper-ui 1,020, Remote 659, jasper-sdk 135, jasper-sdk-testkit 310),
+  as at `965c11432` before the docs: the 15,086 of plan 5 and slice 1b and plan 6's 432. The example external plugin's
+  `check pluginZip` against `build/sdk-release` passes (1 test, up to date: no SDK change); `sdkReference` changed
+  nothing; source hygiene is clean over 3,452 Java files, and no file the docs touched holds a raw U+00A0, U+2028 or
+  U+2029. The full checks after each task: 15,078 (Task 1a), 15,088 (1b), 15,139 (2), 15,181 (4), 15,208 (5), 15,279
+  (7), 15,328 (8), 15,421 and 15,424 (9), 15,454 and 15,477 (10), 15,494 and 15,510 (11), each with 0 failures, 0
+  errors and 103 skipped. No GUI was launched.
+- **Task 13** (`51b74b627` "Docs: plan 6's GUI check, pending"), the checklist:
+  [Plan 6: privacy](../../browser-verification.md#plan-6-privacy), every line pending.
 
 The controller's rulings, one line each:
 - V0: every ruling the pre-flight scan proposed (F1-F44) is adopted and cited as V-F*n*, except where V1-V6 decide

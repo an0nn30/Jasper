@@ -2,12 +2,12 @@
 
 **Browser plan 6: privacy — 2026-11-09** (`claude/browser-privacy`, worktree `.claude/worktrees/browser-4b-4c-e6deab`,
 from local `main` `ef3347601`, which has plans 4a, 4b, 4c, 9 and 5 merged; the plan `daa19c574`, commits `827ac12ba`
-to `03af74d75`, local `main` `67653bbf6` (Mermaid, plan 9's slice 1b) merged in as `965c11432`, and the docs; not
-merged or pushed; [plan](superpowers/plans/2026-10-30-browser-6-privacy.md), whose banner lists every deviation by
-task, [spec](superpowers/specs/2026-10-26-jasper-browser-plugin-design.md) sections 6, 12, 14, 16, 17, 21 and 23,
-[guide](browser.md#devnull-mode); executed with per-task subagents and reviews, Task 1 as 1a and 1b, each task's fix
-rounds until its re-review found every finding addressed; the final review and its fix wave are to come). The Browser
-gains iTerm2's privacy features:
+to `03af74d75`, local `main` `67653bbf6` (Mermaid, plan 9's slice 1b) merged in as `965c11432`, and the docs,
+`7ad704159` and `51b74b627`; not merged or pushed; [plan](superpowers/plans/2026-10-30-browser-6-privacy.md), whose
+banner lists every deviation by task, [spec](superpowers/specs/2026-10-26-jasper-browser-plugin-design.md) sections 6,
+12, 14, 16, 17, 21 and 23, [guide](browser.md#devnull-mode); executed with per-task subagents and reviews, Task 1 as 1a
+and 1b, each task's fix rounds until its re-review found every finding addressed; the final review and its fix wave are
+to come). The Browser gains iTerm2's privacy features:
 - **/dev/null mode** (`devnull_mode`): each new tab, window or pane opens in a browsing group of its own, an in-memory
   Chromium context and an in-memory database, which the tabs its page opens join; its cookies, storage, history, site
   permissions, audio choices and certificate allowances end with the group's last tab. The toolbar's indicator and its
@@ -44,12 +44,13 @@ mode, site permissions, page notifications, audio, clearing data, ad blocking an
 welcome page, History, certificate errors, Restore, Jasper's own requests, Settings and Files), the configuration
 guide's plugin table, AGENTS.md's Verified JCEF behaviour (`setPreference`, and JCEF's lack of a context that shares
 another's storage), the plan's banner and this entry; `docs/packaging.md`'s camera and microphone usage descriptions
-came with Task 5. Verification: at `965c11432`, before the docs, `./gradlew check` (JBR 25.0.4.1 b635.75 jcef, 13m
-54s) gave **15,518 tests, 0 failures, 0 errors, 103 skipped** (1,388 classes in the 16 build folders, without the
-example plugin's: jasper-app 5,291 with 90 skipped, Editor 5,387 with 4 skipped, Browser 1,324 with 1 skipped,
-jasper-ui 1,020, Remote 659, jasper-sdk 135, jasper-sdk-testkit 310), that is, the 15,086 of plan 5 and slice 1b and
-plan 6's 432; the example external plugin's `check pluginZip` against `build/sdk-release` passes (1 test). No GUI was
-launched.
+came with Task 5. Verification: after both docs commits, at `51b74b627`, `./gradlew check --continue` (JBR 25.0.4.1
+b635.75 jcef, 10m 13s) gave **15,518 tests, 0 failures, 0 errors, 103 skipped** (1,388 classes in the 16 build
+folders, without the example plugin's: jasper-app 5,291 with 90 skipped, Editor 5,387 with 4 skipped, Browser 1,324
+with 1 skipped, jasper-ui 1,020, Remote 659, jasper-sdk 135, jasper-sdk-testkit 310), as at `965c11432` before the
+docs: the 15,086 of plan 5 and slice 1b and plan 6's 432; the example external plugin's `check pluginZip` against
+`build/sdk-release` passes (1 test); `sdkReference` changed nothing; source hygiene is clean over 3,452 Java files, and
+no file the docs touched holds a raw U+00A0, U+2028 or U+2029. No GUI was launched.
 
 The controller's rulings, one line each (the pre-flight scan's F1-F44 adopted as V0; the banner gives each V-F*n* where
 it applied):
