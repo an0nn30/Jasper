@@ -3,12 +3,14 @@
 **Browser plan 6: privacy — 2026-11-09** (`claude/browser-privacy`, worktree `.claude/worktrees/browser-4b-4c-e6deab`,
 from local `main` `ef3347601`, which has plans 4a, 4b, 4c, 9 and 5 merged; the plan `daa19c574`, commits `827ac12ba`
 to `03af74d75`, local `main` `67653bbf6` (Mermaid, plan 9's slice 1b) merged in as `965c11432`, the docs, `7ad704159`,
-`51b74b627` and `1092ada75`, and the final fix wave, `c7be4d2ed` and `5125f2ba0`, and its docs; not merged or pushed;
+`51b74b627` and `1092ada75`, and the final fix wave, `c7be4d2ed` and `5125f2ba0`, its docs, `cb0c7dca6` and
+`eee0926bd`, and W1's round 2, `baa0f084a`, and its docs; not merged or pushed;
 [plan](superpowers/plans/2026-10-30-browser-6-privacy.md), whose banner lists every deviation by task,
 [spec](superpowers/specs/2026-10-26-jasper-browser-plugin-design.md) sections 6, 12, 14, 16, 17, 21 and 23,
 [guide](browser.md#devnull-mode); executed with per-task subagents and reviews, Task 1 as 1a and 1b, each task's fix
 rounds until its re-review found every finding addressed; the final reviews passed the branch "With fixes" and the docs
-"Approved with fixes", and the fix wave that followed is done). The Browser gains iTerm2's privacy features:
+"Approved with fixes", and the fix wave that followed, with a round after W1's re-review, is done). The Browser gains
+iTerm2's privacy features:
 - **/dev/null mode** (`devnull_mode`): each new tab, window or pane opens in a browsing group of its own, an in-memory
   Chromium context and an in-memory database, which the tabs its page opens join; its cookies, storage, history, site
   permissions, audio choices and certificate allowances end with the group's last tab. The toolbar's indicator and its
@@ -48,14 +50,17 @@ another's storage), the plan's banner and this entry; `docs/packaging.md`'s came
 came with Task 5. The fix wave added the notifications guide's Bookmarks and Page notifications groups, and the
 README's, Plugins' and the docs index's Browser descriptions (V47, V55). The fix wave's code: W1 bounds the content
 blocker's compiled patterns, its parse, its examining and its filter list's client (V48-V53, V56), and W2 makes part
-A's fixes and moves Chromium's clearing into `ChromiumClearing`, a pure move (V54, V46). Verification: after the fix
-wave's code and docs, `./gradlew check --continue` (JBR 25.0.4.1 b635.75 jcef, 10m 40s) gave **15,540 tests, 0
-failures, 0 errors, 103 skipped** (1,389 classes in the 16 build folders, without the example plugin's: jasper-app
-5,292 with 90 skipped, Editor 5,387 with 4 skipped, Browser 1,345 with 1 skipped, jasper-ui 1,020, Remote 659,
-jasper-sdk 135, jasper-sdk-testkit 310), that is, the 15,518 after the docs (the 15,086 of plan 5 and slice 1b and plan
-6's 432) and the wave's 22; the example external plugin's `check pluginZip` against `build/sdk-release` passes (1
-test); `sdkReference` changed nothing; source hygiene is clean over 3,455 Java files, and no file the docs or the wave
-touched holds a raw U+00A0, U+2028 or U+2029. No GUI was launched.
+A's fixes and moves Chromium's clearing into `ChromiumClearing`, a pure move (V54, V46). W1's re-review found the
+pattern cache open to a hash flood and a leading run of spaces uncharged, and W1's round 2 keys the cache by each
+filter's place and a rule's domain lists by sorted arrays, charges the run, checks the first request against a retired
+client and makes `FilterListTest` wait for the list's lane (V57, V58). Verification: after the round's code and docs,
+`./gradlew check --continue` (JBR 25.0.4.1 b635.75 jcef, 10m 34s) gave **15,546 tests, 0 failures, 0 errors, 103
+skipped** (1,389 classes in the 16 build folders, without the example plugin's: jasper-app 5,292 with 90 skipped,
+Editor 5,387 with 4 skipped, Browser 1,351 with 1 skipped, jasper-ui 1,020, Remote 659, jasper-sdk 135,
+jasper-sdk-testkit 310), that is, the wave's 15,540 (the 15,518 after the docs and the wave's 22) and the round's 6;
+the example external plugin's `check pluginZip` against `build/sdk-release` passes (1 test, up to date: no SDK
+change); source hygiene is clean, and no file the docs, the wave or the round touched holds a raw U+00A0, U+2028 or
+U+2029. No GUI was launched.
 
 The controller's rulings, one line each (the pre-flight scan's F1-F44 adopted as V0; the banner gives each V-F*n* where
 it applied):
@@ -193,13 +198,24 @@ it applied):
   expression, as the 10 ms bound needs; a hostile list's first call may take about 30 ms while the JIT is cold;
   gathering the always bucket's candidates stays uncharged (1 to 7 ms, bounded by the 250,000 rules); V34 is amended
   with the measured 404 MB parse peak at the cap.
+- V57: the pattern cache keeps each filter by its place in the rule set, so no list chooses a lookup's hash, and every
+  hash map or set keyed by a type a list controls that is not `Comparable` is keyed the same way; strings stay, as a
+  `HashMap` keeps one hash's strings in a tree; equal filters at two places compile and weigh apart.
+- V58: `run()` counts a `\` before any printable character but a letter or digit, the space included; the first
+  request is checked against a retired client, as each redirect is; `FilterListTest` waits for the list's lane; the
+  two nits; V56 amended with the domain buckets' gathering (9 to 14 ms warm, up to 42 ms in a first call, bounded by
+  the 500,000 hosts of `MAX_LIST_DOMAINS`).
+- V59: W2's calls are accepted: `UNANSWERED` replaces all six identical copies, three of them older than plan 6; the
+  refusal while the proxy is off logs on `NetworkPreferences`' logger; the `CompletionException` unwrap stays per
+  package; the 121- to 125-character Javadoc lines stay.
 
 Known gaps and follow-ups (the banner has them all, with the deferred minors by task): muting, hiding and the
 notification stand-in are cooperative scripts in the page's own world, which a page can undo and detect; an audio
 context or a shadow root's autoplay set up before Jasper's script ran plays on; a hidden element's suppressed lazy load
 is a side channel (Task 10's M9); a list's parse and compile peak at about 400 to 600 MB on the background executor
 (V34, as V49 and V56 amend it); a hostile list's first call may take about 30 ms while the JIT is cold, and gathering
-the always bucket's candidates is not charged (V56); with the proxy on, a 407 fails the page, and DNS prediction and
+the candidates of the always bucket and of the domain buckets is not charged (up to 42 ms in a first call, V56 as V58
+amends it); with the proxy on, a 407 fails the page, and DNS prediction and
 WebRTC STUN go around it (V3); with it off, Jasper's own fetches ignore a proxy the system alone names unless the JVM
 runs with `-Djava.net.useSystemProxies=true` (V42); a kept context that refuses a change keeps its old route (V45); a
 `*.localhost` fetch may be looked up by the system resolver, and a non-decimal, trailing-dot or zone-id loopback or

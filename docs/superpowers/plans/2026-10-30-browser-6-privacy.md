@@ -5,14 +5,16 @@
 
 **Execution status (2026-11-09): Tasks 1-11 executed and reviewed (Task 1 as 1a and 1b, ruling V6), and Task 12, the
 docs; the final reviews passed the branch "With fixes" and the docs "Approved with fixes", and the fix wave that
-followed is done; Task 13, the user's GUI check on macOS, is pending** (branch `claude/browser-privacy`, worktree
+followed, with a round after W1's re-review, is done; Task 13, the user's GUI check on macOS, is pending** (branch
+`claude/browser-privacy`, worktree
 `.claude/worktrees/browser-4b-4c-e6deab`, cut from local `main` `ef3347601`, which has plans 4a, 4b, 4c, 9 and 5
 merged; the plan `daa19c574`, then commits `827ac12ba` to `03af74d75`, local `main` `67653bbf6` (Mermaid, plan 9's
 slice 1b) merged in as `965c11432`, the docs, `7ad704159`, `51b74b627` and `1092ada75`, and the fix wave, `c7be4d2ed`
-and `5125f2ba0`, and its docs; not merged or pushed; see `docs/STATUS.md`). Executed with per-task subagents and
+and `5125f2ba0`, its docs, `cb0c7dca6` and `eee0926bd`, and W1's round 2, `baa0f084a`, and its docs; not merged or
+pushed; see `docs/STATUS.md`). Executed with per-task subagents and
 reviews, each task's fix rounds until a re-review found every finding addressed. The pre-flight scan's findings F1-F44
 were adopted as rulings (V0, cited V-F*n*) except where V1-V6 decide otherwise, and the controller's further rulings
-are V7-V56; plan 4a's R0-R48 and the banners of 4b, 4c, 9 and 5 bind. On 2026-11-06 the user chose V1 ("Clear now +
+are V7-V59; plan 4a's R0-R48 and the banners of 4b, 4c, 9 and 5 bind. On 2026-11-06 the user chose V1 ("Clear now +
 wipe") and V3 ("Match Chrome"), which are no longer interim, and asked for no change to V2. The task reviews recorded
 these deviations from the plan's text, each with its ruling:
 - **Versions:** `JasperSdk.VERSION` 0.29.0 to 0.30.0, every bundled range `>=0.30.0, <0.31` (Task 1a). New SDK
@@ -182,6 +184,33 @@ these deviations from the plan's text, each with its ruling:
     `build/sdk-release` passes (1 test, up to date: no SDK change); `sdkReference` changed nothing; source hygiene is
     clean over 3,455 Java files, and no file the wave touched holds a raw U+00A0, U+2028 or U+2029. No GUI was
     launched.
+- **W1's re-review** (of `1092ada75..c7be4d2ed`): items 1-5 addressed, item 6, the lane race, not; a Critical, the
+  pattern cache's hash flood, and an Important, a case-sensitive leading run of spaces left uncharged; rulings V57 and
+  V58, and V59 for W2's calls, which its re-review found addressed.
+- **W1's round 2** (V57, V58): `baa0f084a` "Browser: the content blocker's last fixes":
+  - **V57:** `PatternCache` keeps each filter by its place in the rule set, in arrays of the rule set's size, so no
+    list chooses the hash a lookup goes by, and equal filters at two places compile and weigh apart. The review's
+    `HashFlood` (8,192 filters of one `String` hash over 250,000 rules) takes 5.8 to 6.9 ms a request, against 10.9 to
+    12.8 s, and its control 5.8 to 9.2 ms. The audit found one more: a rule's domain lists were `Set.copyOf`'s probing
+    sets, which scan the hosts of one hash (0.83 ms a request at 488 rules of 1,023 colliding hosts, 0.05 ms now); they
+    are sorted arrays, short ones compared in turn. Every other hashed key in `adblock` and `http` is a `String` in a
+    `HashMap`, which keeps one hash's strings in a tree, a fixed set, an identity map or an enum set.
+  - **V58:** `run()` counts a `\` before any printable character but a letter or digit, the space included, so the
+    review's `SpaceRunCalls` takes 2.3 ms a request (32.9 ms its first), against 14 ms and 55.7 ms; the first request,
+    not only each redirect, is checked against a retired client; `FilterListTest` waits for the list's lane
+    (`FilterList.idle()`, a test's seam) before it reads the status or moves the clock, and `DrainRace`'s scenario so
+    waiting loses 0 of 2,000 runs under 24 busy threads, where as written it loses 17; `RuleSet`'s long Javadoc line
+    and `COMPILE_BASE`'s measured 53 to 340 ns. W2's re-review's minors: the `running` parameters of `ProfileClearing`
+    and `ChromiumClearing` say Chromium's thread asks too, and the README's /dev/null mode keeps no history, cookies or
+    site data rather than saving nothing.
+  - Verification: the tests first (22 compile errors), then each fix reverted alone against them, each failing its
+    tests (keying by the filter 2, the run 1, the first request 1, the lane 1). `./gradlew check --continue` (JBR
+    25.0.4.1 b635.75 jcef, 10m 34s, after the round's code and docs but for these counts): **15,546 tests, 0 failures,
+    0 errors, 103 skipped** (1,389 classes in the 16 build folders, without the example plugin's: jasper-app 5,292
+    with 90 skipped, Editor 5,387 with 4 skipped, Browser 1,351 with 1 skipped, jasper-ui 1,020, Remote 659,
+    jasper-sdk 135, jasper-sdk-testkit 310), that is, the wave's 15,540 and the round's 6 Browser tests; the example
+    external plugin's `check pluginZip` against `build/sdk-release` passes (1 test, up to date: no SDK change); source
+    hygiene is clean, and no file the round touched holds a raw U+00A0, U+2028 or U+2029. No GUI was launched.
 
 The controller's rulings, one line each:
 - V0: every ruling the pre-flight scan proposed (F1-F44) is adopted and cited as V-F*n*, except where V1-V6 decide
@@ -318,13 +347,25 @@ The controller's rulings, one line each:
   expression, as the 10 ms bound needs; a hostile list's first call may take about 30 ms while the JIT is cold;
   gathering the always bucket's candidates stays uncharged (1 to 7 ms, bounded by the 250,000 rules); V34 is amended
   with the measured 404 MB parse peak at the cap.
+- V57: the pattern cache keeps each filter by its place in the rule set, so no list chooses a lookup's hash, and every
+  hash map or set keyed by a type a list controls that is not `Comparable` is keyed the same way; strings stay, as a
+  `HashMap` keeps one hash's strings in a tree; equal filters at two places compile and weigh apart.
+- V58: `run()` counts a `\` before any printable character but a letter or digit, the space included; the first
+  request is checked against a retired client, as each redirect is; `FilterListTest` waits for the list's lane; the
+  two nits; V56 amended with the domain buckets' gathering (9 to 14 ms warm, up to 42 ms in a first call, bounded by
+  the 500,000 hosts of `MAX_LIST_DOMAINS`).
+- V59: W2's calls are accepted: `UNANSWERED` replaces all six identical copies, three of them older than plan 6; the
+  refusal while the proxy is off logs on `NetworkPreferences`' logger; the `CompletionException` unwrap stays per
+  package; the 121- to 125-character Javadoc lines stay.
 
 Known gaps:
 - V34, as V49 and V56 amend it: a list's parse and compile, on the background executor once per list change, peak at
   about 404 MB for 2,000,000 empty objects and about 600 MB for 250,000 real-looking rules.
 - V56: a hostile list's first call may take about 30 ms while the JIT is cold (5 to 9 ms once warm); gathering the
-  always bucket's candidates is not charged (1 to 7 ms at 250,000 rules); a filter of long literals is estimated at 5
-  to 10 times its weight, so the cache holds fewer of them than 32 MiB would.
+  always bucket's candidates is not charged (1 to 7 ms at 250,000 rules), nor, as V58 amends it, the domain buckets'
+  (9 to 14 ms warm, up to 42 ms in a first call, at 250,000 rules whose `if-domain` covers the page, bounded by the
+  500,000 hosts of `MAX_LIST_DOMAINS`); a filter of long literals is estimated at 5 to 10 times its weight, so the
+  cache holds fewer of them than 32 MiB would; equal filters at two places compile apart (V57).
 - On an 8 KiB address the literal-check charge reaches the call budget after about 7,800 checks, so only a list that
   large is cut short there, in the safe direction (a 200-character address allows about 285,000).
 - Task 10's M9: a hidden element's suppressed lazy load is a side channel a list author could use with
