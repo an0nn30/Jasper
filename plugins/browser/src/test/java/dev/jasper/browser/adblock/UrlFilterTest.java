@@ -5,8 +5,10 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 /**
@@ -50,6 +52,29 @@ class UrlFilterTest {
         assertThat(UrlFilter.of("((a+)?)+", false)).as("a repeated group holding one, however deep").isEmpty();
     }
 
+    /** Review C1 (V29): a quantified group that can match nothing branches without a read, which no budget counts. */
+    @Test void aQuantifiedGroupThatCanMatchNothingIsRefused() {
+        for (String source : List.of("(x?)?", "((a)?)?", "(a?b?)?", "(a*)?", "(a*b?)?", "((x?))?", "x(y*)?z"))
+            assertThat(UrlFilter.of(source, false)).as(source).isEmpty();
+        for (String source : List.of("([^/]+\\.)?", "(a+)?", "^https?://([^/]+\\.)?doubleclick\\.net", "(x?)", "(a?b)?", "((a)?b)?",
+            "(ab)*"))
+            assertThat(UrlFilter.of(source, false)).as(source).isPresent();
+        assertThat(UrlFilter.of("http.*" + "(x?)?".repeat(40) + "y", false)).isEmpty();
+    }
+
+    /** Review M3 (V29): at most 256 quantified atoms, so the matcher's recursion stays shallow. */
+    @Test void atMost256QuantifiedAtoms() {
+        assertThat(UrlFilter.of("a?".repeat(256), false)).isPresent();
+        assertThat(UrlFilter.of("a?".repeat(257), false)).isEmpty();
+        assertThat(UrlFilter.of("http.*" + "(xy)?".repeat(256) + "y", false)).as("257 quantified atoms").isEmpty();
+        UrlFilter groups = filter("http.*" + "(xy)?".repeat(255) + "y", false);
+        assertTimeoutPreemptively(Duration.ofSeconds(5), () -> {
+            assertThat(groups.matches("http://a.test/xyxyy")).isTrue();
+            assertThat(groups.matches("http://a.test/" + "x".repeat(8 * 1024))).isFalse();
+            assertThat(groups.matches("http://a.test/" + "xz".repeat(4 * 1024))).isFalse();
+        });
+    }
+
     @Test void atMostFourUnboundedQuantifiers() {
         assertThat(UrlFilter.of("a*b+c*d+", false)).isPresent();
         assertThat(UrlFilter.of("a*b+c*d+e*", false)).isEmpty();
@@ -69,6 +94,21 @@ class UrlFilterTest {
         assertThat(longest.matches("ab".repeat(1_023))).isFalse();
         UrlFilter groups = filter("(a)b".repeat(512), false);
         assertThat(groups.matches("ab".repeat(512))).isTrue();
+    }
+
+    /** Review I1 (V31): a class is written out as its members, which Java reads in one step however many there are. */
+    @Test void aClassIsWrittenOutAsItsMemberCharacters() {
+        assertThat(filter("[a-cx-z0-9]", false).expression()).isEqualTo("[0123456789abcxyz]");
+        assertThat(filter("[^a-c/]x", false).expression()).isEqualTo("[^\\/abc]x");
+        assertThat(filter("[ -~]", false).expression()).as("every printable character, the 33 that are no letter or digit escaped")
+            .hasSize(2 + 62 + 33 * 2).doesNotContain("-~");
+        UrlFilter negated = filter("[^a-c]x", false);
+        assertThat(negated.matches("bx")).isFalse();
+        assertThat(negated.matches("Bx")).as("either case").isFalse();
+        assertThat(negated.matches("dx")).isTrue();
+        assertThat(filter("[a-c]x", false).matches("BX")).isTrue();
+        assertThat(filter("[a-c]x", true).matches("BX")).isFalse();
+        assertThat(filter("[-a]", false).matches("-")).isTrue();
     }
 
     @Test void onlyPrintableAsciiAndPunctuationEscapes() {
@@ -137,23 +177,34 @@ class UrlFilterTest {
         assertThat(filter("p$", false).matches(head + "pppp" + "x".repeat(10))).as("$ is the end of what is read").isTrue();
     }
 
-    @Test void aMatchOverItsStepBudgetCountsAsNoMatchAndIsLoggedOnce() {
+    @Test void aMatchOverItsStepBudgetCountsAsNoMatchAndLogsNothingItself() {
         UrlFilter heavy = filter("a.*.*.*.*x", false);
         String url = "https://a.test/" + "a".repeat(2 * 1024 * 1024);
         try (var log = new CapturedLog(UrlFilter.class.getName())) {
             assertTimeoutPreemptively(Duration.ofSeconds(10), () -> {
                 assertThat(heavy.matches(url)).isFalse();
-                assertThat(heavy.matches(url)).isFalse();
-            });
-            assertThat(log.records()).singleElement().satisfies(record -> {
-                assertThat(record.getLevel()).isEqualTo(java.util.logging.Level.WARNING);
-                assertThat(record.getMessage()).contains("a.*.*.*.*x").doesNotContain("https://a.test/");
+                assertThat(heavy.matches(url)).as("no filter is disabled: it runs again").isFalse();
             });
             UrlFilter exponential = filter("a?".repeat(30) + "a".repeat(30), false);
             assertTimeoutPreemptively(Duration.ofSeconds(10), () -> assertThat(exponential.matches("a".repeat(30))).isFalse());
-            assertThat(log.records()).hasSize(2);
+            assertThat(log.records()).as("the rule set logs, once a list").isEmpty();
         }
         assertThat(heavy.matches("https://a.test/ax")).as("a short address is within the budget").isTrue();
+    }
+
+    /** Review I1 (V30): a match spends the reads of the call it is part of, and ends the call once they are gone. */
+    @Test void aMatchSpendsItsCallsReads() {
+        UrlFilter heavy = filter("a.*.*.*.*x", false);
+        String url = "https://a.test/" + "a".repeat(8 * 1024);
+        var reads = new UrlFilter.Reads(1_000_000);
+        assertThat(heavy.matches(url, reads)).as("over its own 100,000").isFalse();
+        assertThat(reads.used()).isEqualTo(100_000);
+        assertThat(reads.overran()).containsSame(heavy);
+        assertThatThrownBy(() -> heavy.matches(url, new UrlFilter.Reads(5_000))).isInstanceOf(UrlFilter.Reads.Exhausted.class);
+        var light = new UrlFilter.Reads(1_000);
+        assertThat(filter("ads", false).matches("https://a.test/ads", light)).isTrue();
+        assertThat(light.used()).isPositive().isLessThan(100);
+        assertThat(light.overran()).isEmpty();
     }
 
     @Test void equalWhenTheSourceAndTheCaseRuleAreEqual() {
@@ -164,19 +215,30 @@ class UrlFilterTest {
     }
 
     /**
-     * Over random filters in WebKit's alphabet, every filter that is accepted compiles, and every address it matches
-     * holds its literal: the invariant the rule set's index stands on.
+     * Over random filters in WebKit's alphabet, some built from groups that can match nothing, every filter that is
+     * accepted compiles, quantifies no group that can match nothing, and every address it matches holds its literal:
+     * the invariants the budget and the rule set's index stand on.
      */
     @Test void everyAcceptedFilterCompilesAndEveryMatchHoldsItsLiteral() {
         var random = new Random(20_261_106L);
         String alphabet = "abcAB.*+?()[]^$\\-/", text = "abcAB./-";
-        int accepted = 0, matched = 0;
+        String[] atoms = {"a", "b", "A", ".", "[ab]", "(a?)", "(b*)", "(ab)", "(a?b?)", "(a)", "(.)", "((a)?)", "(a?b)"};
+        String[] quantifiers = {"", "", "*", "+", "?"};
+        int accepted = 0, matched = 0, nullable = 0;
         for (int round = 0; round < 40_000; round++) {
             var source = new StringBuilder();
-            for (int at = 1 + random.nextInt(9); at > 0; at--) source.append(alphabet.charAt(random.nextInt(alphabet.length())));
+            if (round % 2 == 0) {
+                for (int at = 1 + random.nextInt(9); at > 0; at--) source.append(alphabet.charAt(random.nextInt(alphabet.length())));
+            } else {
+                for (int at = 1 + random.nextInt(4); at > 0; at--)
+                    source.append(atoms[random.nextInt(atoms.length)]).append(quantifiers[random.nextInt(quantifiers.length)]);
+            }
             boolean caseSensitive = random.nextBoolean();
+            boolean quantifiesNullable = quantifiesANullableGroup(source.toString());
+            if (quantifiesNullable) nullable++;
             Optional<UrlFilter> parsed = UrlFilter.of(source.toString(), caseSensitive);
             if (parsed.isEmpty()) continue;
+            assertThat(quantifiesNullable).as("%s quantifies a group that can match nothing", source).isFalse();
             accepted++;
             UrlFilter filter = parsed.get();
             for (int sample = 0; sample < 8; sample++) {
@@ -190,6 +252,33 @@ class UrlFilterTest {
         }
         assertThat(accepted).as("filters accepted").isGreaterThan(2_000);
         assertThat(matched).as("matches checked").isGreaterThan(2_000);
+        assertThat(nullable).as("filters quantifying a group that can match nothing").isGreaterThan(1_000);
+    }
+
+    /**
+     * Whether a group of {@code source} that a quantifier follows holds what matches the empty text, as Java's own
+     * expressions read the group; a filter it cannot read holds none.
+     */
+    private static boolean quantifiesANullableGroup(String source) {
+        var opens = new java.util.ArrayDeque<Integer>();
+        boolean inClass = false;
+        try {
+            for (int at = 0; at < source.length(); at++) {
+                char c = source.charAt(at);
+                if (c == '\\') at++;
+                else if (inClass) inClass = c != ']';
+                else if (c == '[') inClass = true;
+                else if (c == '(') opens.push(at);
+                else if (c == ')') {
+                    int open = opens.pop();
+                    if (at + 1 < source.length() && "*+?".indexOf(source.charAt(at + 1)) >= 0
+                        && Pattern.compile("(?:" + source.substring(open + 1, at) + ")").matcher("").matches()) return true;
+                }
+            }
+        } catch (RuntimeException unreadable) {
+            return false;
+        }
+        return false;
     }
 
     private static Optional<String> literal(String source) {

@@ -16,16 +16,21 @@ import java.util.Set;
  * {@code unless-domain}, and its action is {@code block}, {@code css-display-none} with its {@code selector}, or
  * {@code ignore-previous-rules}. Every other rule is skipped and counted, as are the rules past the first 250,000
  * kept. The list may be hostile, so a kept rule's filter keeps to {@link UrlFilter}'s bounds, each domain list has at
- * most 1,024 hosts, and a selector has at most 1,024 characters, none of them a brace, {@code ;}, {@code @},
- * {@code <} or a control character, so that a rule can only hide what its selector selects.
+ * most 1,024 hosts and the list's rules 500,000 in all, and a selector list has at most 5,000 selectors, its parts
+ * between top-level commas ({@link #parts}), each of at most 1,024 characters, none of them a brace, {@code ;},
+ * {@code @}, {@code <} or a control character, so that a rule can only hide what its selectors select.
  */
 public final class ContentRules {
     /** How many rules a list keeps at most. */
     static final int MAX_RULES = 250_000;
     /** How many hosts an {@code if-domain} or {@code unless-domain} list has at most. */
     static final int MAX_DOMAINS = 1_024;
-    /** How many characters a selector has at most. */
+    /** How many hosts a list's {@code if-domain} and {@code unless-domain} lists have at most in all. */
+    static final int MAX_LIST_DOMAINS = 500_000;
+    /** How many characters a selector of a selector list has at most. */
     static final int MAX_SELECTOR = 1_024;
+    /** How many selectors a selector list has at most. */
+    static final int MAX_PARTS = 5_000;
     private static final String FILTER = "url-filter", CASE = "url-filter-is-case-sensitive", TYPES = "resource-type", LOAD = "load-type",
         IF_DOMAIN = "if-domain", UNLESS_DOMAIN = "unless-domain";
     private static final Set<String> RULE_KEYS = Set.of("trigger", "action"),
@@ -56,14 +61,18 @@ public final class ContentRules {
      */
     public static Compiled compile(List<Map<String, Object>> list) {
         var rules = new ArrayList<Rule>();
-        int skipped = 0;
+        int skipped = 0, domains = 0;
         for (Map<String, Object> item : list) {
             if (rules.size() == MAX_RULES) {
                 skipped++;
                 continue;
             }
             try {
-                rules.add(rule(item, rules.size()));
+                Rule rule = rule(item, rules.size());
+                int hosts = rule.ifDomain().size() + rule.unlessDomain().size();
+                require(domains + hosts <= MAX_LIST_DOMAINS);
+                domains += hosts;
+                rules.add(rule);
             } catch (Unsupported unsupported) {
                 skipped++;
             }
@@ -170,12 +179,52 @@ public final class ContentRules {
         return domains;
     }
 
+    /**
+     * The selectors of a selector list, as a page hides one line for each: its parts between the commas that are
+     * outside parentheses, brackets and quotes and not escaped, each without the spaces around it. A list of more than
+     * 5,000 is read only to the one after the 5,000th.
+     *
+     * @param list a {@code css-display-none} rule's {@code selector}
+     * @return its parts, in order; one empty part for each comma with nothing beside it
+     */
+    static List<String> parts(String list) {
+        var parts = new ArrayList<String>();
+        int depth = 0, start = 0;
+        char quote = 0;
+        for (int at = 0; at < list.length() && parts.size() <= MAX_PARTS; at++) {
+            char c = list.charAt(at);
+            if (c == '\\') at++;
+            else if (quote != 0) {
+                if (c == quote) quote = 0;
+            } else if (c == '"' || c == '\'') quote = c;
+            else if (c == '(' || c == '[') depth++;
+            else if ((c == ')' || c == ']') && depth > 0) depth--;
+            else if (c == ',' && depth == 0) {
+                parts.add(trimmed(list, start, at));
+                start = at + 1;
+            }
+        }
+        if (parts.size() <= MAX_PARTS) parts.add(trimmed(list, start, list.length()));
+        return parts;
+    }
+
+    /** The text from {@code start} to {@code end} without the spaces around it, but for an escaped one. */
+    private static String trimmed(String list, int start, int end) {
+        while (start < end && list.charAt(start) == ' ') start++;
+        while (end > start && list.charAt(end - 1) == ' ' && !(end - 2 >= start && list.charAt(end - 2) == '\\')) end--;
+        return list.substring(start, end);
+    }
+
     private static String selector(Object value) throws Unsupported {
         String selector = text(value);
-        require(!selector.isBlank() && selector.length() <= MAX_SELECTOR);
-        for (int at = 0; at < selector.length(); at++) {
-            char c = selector.charAt(at);
-            require(c >= 0x20 && c != 0x7F && "{};@<".indexOf(c) < 0);
+        List<String> parts = parts(selector);
+        require(parts.size() <= MAX_PARTS);
+        for (String part : parts) {
+            require(!part.isEmpty() && part.length() <= MAX_SELECTOR);
+            for (int at = 0; at < part.length(); at++) {
+                char c = part.charAt(at);
+                require(c >= 0x20 && c != 0x7F && "{};@<".indexOf(c) < 0);
+            }
         }
         return selector;
     }

@@ -4,12 +4,19 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import static dev.jasper.browser.adblock.ContentRulesTest.block;
+import static dev.jasper.browser.adblock.ContentRulesTest.hide;
+import static dev.jasper.browser.adblock.ContentRulesTest.ignore;
+import static dev.jasper.browser.adblock.ContentRulesTest.rule;
+import static dev.jasper.browser.adblock.ContentRulesTest.trigger;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -25,7 +32,8 @@ class RuleSetIndexTest {
     private static final List<String> PAGES = List.of("https://news.example.co.uk/article/1", "https://www.shop.test/cart",
         "https://shop.test/", "https://trusted.test/home", "https://adnet.test/home", "https://sponsor-friends.test/",
         "https://popups.test/", "https://clean.test/", "about:blank", "https://video.example/watch?v=9", "https://www.tracker.test/",
-        "https://market.test/");
+        "https://market.test/", "file:///Users/ada/page.html", "data:text/html,hello", "HTTPS://NEWS.EXAMPLE.CO.UK/ARTICLE/1",
+        "Http://shop.test/");
     private static List<Rule> rules;
     private static List<String> urls;
 
@@ -41,10 +49,7 @@ class RuleSetIndexTest {
 
     @Test void theFixturesAddressesAnswerAsAScanDoesForEveryKindAndPage() {
         var runs = new ArrayList<Run>();
-        RuleSet set = RuleSet.of(rules, (filter, url) -> {
-            runs.add(new Run(filter, url));
-            return filter.matches(url);
-        });
+        RuleSet set = RuleSet.of(rules, rule -> { }, (filter, url) -> runs.add(new Run(filter, url)));
         int blocked = 0, pairs = 0;
         for (String url : urls)
             for (Set<ResourceKind> kinds : KINDS)
@@ -62,10 +67,7 @@ class RuleSetIndexTest {
 
     @Test void addressesBuiltFromTheRulesLiteralsAnswerAsAScanDoes() {
         var runs = new ArrayList<Run>();
-        RuleSet set = RuleSet.of(rules, (filter, url) -> {
-            runs.add(new Run(filter, url));
-            return filter.matches(url);
-        });
+        RuleSet set = RuleSet.of(rules, rule -> { }, (filter, url) -> runs.add(new Run(filter, url)));
         List<String> literals = rules.stream().flatMap(rule -> rule.filter().literal().stream()).distinct().toList();
         var random = new Random(20_261_106L);
         int blocked = 0, pairs = 0;
@@ -96,10 +98,7 @@ class RuleSetIndexTest {
 
     @Test void eachPagesStylesheetIsTheOneAScanGives() {
         var runs = new ArrayList<Run>();
-        RuleSet set = RuleSet.of(rules, (filter, url) -> {
-            runs.add(new Run(filter, url));
-            return filter.matches(url);
-        });
+        RuleSet set = RuleSet.of(rules, rule -> { }, (filter, url) -> runs.add(new Run(filter, url)));
         var pages = new ArrayList<>(PAGES);
         pages.addAll(urls);
         int hidden = 0;
@@ -111,6 +110,69 @@ class RuleSetIndexTest {
         }
         assertThat(hidden).isGreaterThan(pages.size());
         assertEveryRunHadItsLiteral(runs);
+    }
+
+    /** Review I1 (V30): no call over the fixture spends a tenth of its reads, so a real list is never cut short. */
+    @Test void noCallOverTheFixtureSpendsATenthOfItsReads() {
+        RuleSet set = RuleSet.of(rules);
+        int most = 0;
+        var pages = new ArrayList<>(PAGES);
+        pages.addAll(urls);
+        for (String url : urls)
+            for (Set<ResourceKind> kinds : KINDS)
+                for (String page : PAGES) {
+                    var reads = new UrlFilter.Reads(RuleSet.CALL_READS);
+                    set.blocks(url, kinds, page, reads);
+                    most = Math.max(most, reads.used());
+                }
+        for (String page : pages) {
+            var reads = new UrlFilter.Reads(RuleSet.CALL_READS);
+            set.stylesheet(page, reads);
+            most = Math.max(most, reads.used());
+        }
+        assertThat(most).isPositive().isLessThanOrEqualTo(RuleSet.CALL_READS / 10);
+    }
+
+    /** Review M2: a page's sheet examines a few of the list's hide rules, not every one. */
+    @Test void aPagesSheetExaminesFewOfTheHideRules() {
+        var list = new ArrayList<Map<String, Object>>();
+        for (int at = 0; at < 2_000; at++) list.add(rule(trigger("url-filter", ".*", "if-domain", List.of("*site" + at + ".test")), hide(".s" + at)));
+        for (int at = 0; at < 200; at++) list.add(rule(trigger("url-filter", ".*"), hide(".g" + at)));
+        for (int at = 0; at < 200; at++) list.add(rule(trigger("url-filter", "^https?://([^/]+\\.)?page" + at + "\\.test/"), hide(".p" + at)));
+        for (int at = 0; at < 10; at++) list.add(rule(trigger("url-filter", ".*", "unless-domain", List.of("*site" + at + ".test")), hide(".u" + at)));
+        list.add(rule(trigger("url-filter", ".*", "if-domain", List.of("*clean.test")), ignore()));
+        ContentRules.Compiled compiled = ContentRules.compile(list);
+        var examined = new ArrayList<Rule>();
+        RuleSet set = RuleSet.of(compiled.rules(), examined::add, (filter, url) -> { });
+        List<String> lines = set.stylesheet("https://www.site7.test/a").lines().toList();
+        assertThat(lines).hasSize(200 + 1 + 9);
+        assertThat(examined).as("of %d hide rules", 2_410).hasSizeLessThanOrEqualTo(12);
+        examined.clear();
+        assertThat(set.stylesheet("https://www.page42.test/a").lines()).hasSize(200 + 1 + 10);
+        assertThat(examined).hasSizeLessThanOrEqualTo(12);
+        long hideRules = rules.stream().filter(rule -> rule.action() == Rule.Action.HIDE).count();
+        examined.clear();
+        RuleSet fixture = RuleSet.of(rules, examined::add, (filter, url) -> { });
+        for (String page : PAGES) fixture.stylesheet(page);
+        long hidesExamined = examined.stream().filter(rule -> rule.action() == Rule.Action.HIDE).count();
+        assertThat(hidesExamined).as("hide rules examined over %d pages, of %d", PAGES.size(), hideRules).isLessThan(PAGES.size() * hideRules / 2);
+    }
+
+    /** V32: a literal is keyed by the rarest of its first 64 4-grams, counted over the first 64 of each literal. */
+    @Test void aLiteralIsKeyedByOneOfItsFirst64FourGrams() {
+        String head = "/common-head-" + "h".repeat(60), tail = "q".repeat(2_000 - head.length());
+        var list = new ArrayList<Map<String, Object>>();
+        for (int at = 0; at < 5; at++) list.add(rule(trigger("url-filter", head), block()));
+        list.add(rule(trigger("url-filter", head + tail), block()));
+        List<Rule> compiled = ContentRules.compile(list).rules();
+        assertThat(compiled.getLast().filter().literal()).hasValueSatisfying(literal -> assertThat(literal).hasSize(2_000));
+        var examined = new HashSet<Rule>();
+        RuleSet set = RuleSet.of(compiled, examined::add, (filter, url) -> { });
+        set.blocks("https://a.test/" + tail, Set.of(ResourceKind.SCRIPT), "https://a.test/");
+        assertThat(examined).as("an address holding the literal's tail alone").doesNotContain(compiled.getLast());
+        set.blocks("https://a.test/" + head, Set.of(ResourceKind.SCRIPT), "https://a.test/");
+        assertThat(examined).as("an address holding its head").contains(compiled.getLast());
+        assertThat(set.blocks("https://a.test/" + head + tail, Set.of(ResourceKind.SCRIPT), "https://a.test/")).isTrue();
     }
 
     /** An address with a literal of the rules in it, or one a character off, at a random place in a random address. */

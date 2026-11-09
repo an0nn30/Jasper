@@ -1,9 +1,12 @@
 package dev.jasper.browser.adblock;
 
+import dev.jasper.browser.store.CapturedLog;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Level;
 import org.junit.jupiter.api.Test;
 import static dev.jasper.browser.adblock.ContentRulesTest.block;
 import static dev.jasper.browser.adblock.ContentRulesTest.hide;
@@ -11,6 +14,7 @@ import static dev.jasper.browser.adblock.ContentRulesTest.ignore;
 import static dev.jasper.browser.adblock.ContentRulesTest.rule;
 import static dev.jasper.browser.adblock.ContentRulesTest.trigger;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 /**
  * Which requests a compiled list blocks, and which elements it hides on a page: a request is blocked when its last
@@ -94,7 +98,8 @@ class RuleSetTest {
         assertThat(allowed.blocks("https://a.test/ads/other/x.js", SCRIPT, PAGE)).isTrue();
         RuleSet blocked = rules(List.of(rule(trigger("url-filter", "/ads/self/"), ignore()), rule(trigger("url-filter", "/ads/"), block())));
         assertThat(blocked.blocks("https://a.test/ads/self/x.js", SCRIPT, PAGE)).isTrue();
-        RuleSet again = rules(List.of(rule(trigger("url-filter", "/ads/"), block()), rule(trigger("url-filter", ".*", "if-domain", List.of("*news.test")), ignore()),
+        RuleSet again = rules(List.of(rule(trigger("url-filter", "/ads/"), block()),
+            rule(trigger("url-filter", ".*", "if-domain", List.of("*news.test")), ignore()),
             rule(trigger("url-filter", "/ads/popup"), block())));
         assertThat(again.blocks("https://a.test/ads/x.js", SCRIPT, "https://news.test/")).isFalse();
         assertThat(again.blocks("https://a.test/ads/x.js", SCRIPT, "https://other.test/")).isTrue();
@@ -155,6 +160,85 @@ class RuleSetTest {
             assertThat(sheet.length()).as(page).isLessThanOrEqualTo(2 * 1024 * 1024).isGreaterThan(2 * 1024 * 1024 - 1_100);
             assertThat(sheet).as("whole lines").endsWith("{display:none!important}\n");
             assertThat(lines(sheet)).allSatisfy(selector -> assertThat(selector).hasSizeGreaterThan(990));
+        }
+    }
+
+    /** V28: each part of a selector list is a line of its own, and an ignore keeps the parts after it. */
+    @Test void eachPartOfASelectorListIsALineOfItsOwn() {
+        RuleSet rules = rules(List.of(rule(trigger("url-filter", ".*"), hide(".a, .b")),
+            rule(trigger("url-filter", ".*", "if-domain", List.of("*clean.test")), ignore()),
+            rule(trigger("url-filter", ".*"), hide(".c, .d ,.e,.f,.g")),
+            rule(trigger("url-filter", ".*", "if-domain", List.of("news.test")), hide("aside, .f:not(.g, .h)"))));
+        assertThat(rules.stylesheet("https://other.test/")).isEqualTo(".a{display:none!important}\n.b{display:none!important}\n"
+            + ".c{display:none!important}\n.d{display:none!important}\n.e{display:none!important}\n.f{display:none!important}\n"
+            + ".g{display:none!important}\n");
+        assertThat(lines(rules.stylesheet("https://clean.test/"))).as("the lines after the ignore, of a rule with several")
+            .containsExactly(".c", ".d", ".e", ".f", ".g");
+        assertThat(lines(rules.stylesheet("https://news.test/"))).containsExactly(".a", ".b", ".c", ".d", ".e", ".f", ".g", "aside",
+            ".f:not(.g, .h)");
+        assertThat(lines(rules.scanStylesheet("https://news.test/"))).containsExactly(".a", ".b", ".c", ".d", ".e", ".f", ".g", "aside",
+            ".f:not(.g, .h)");
+    }
+
+    /** V28: a rule for every http and https page is shared by those pages alone, their scheme read by its case rule. */
+    @Test void theRulesForEveryWebPageAreSharedByWebPagesAlone() {
+        var examined = new ArrayList<Rule>();
+        List<Rule> compiled = ContentRules.compile(List.of(rule(trigger("url-filter", "^https?://"), hide(".web")),
+            rule(trigger("url-filter", "^https?://", "url-filter-is-case-sensitive", true), hide(".exact, .exact-too")),
+            rule(trigger("url-filter", "^HTTPS?:\\/\\/.*"), hide(".upper-written")),
+            rule(trigger("url-filter", "^HTTPS?://", "url-filter-is-case-sensitive", true), hide(".upper-only")),
+            rule(trigger("url-filter", ".*"), hide(".every")))).rules();
+        RuleSet rules = RuleSet.of(compiled, examined::add, (filter, url) -> { });
+        List<String> web = List.of(".every", ".web", ".upper-written", ".exact", ".exact-too");
+        assertThat(lines(rules.genericStylesheet("https://a.test/"))).containsExactlyInAnyOrderElementsOf(web);
+        assertThat(lines(rules.genericStylesheet("http://a.test/"))).containsExactlyInAnyOrderElementsOf(web);
+        assertThat(lines(rules.stylesheet("https://a.test/"))).containsExactlyInAnyOrderElementsOf(web);
+        assertThat(examined).as("no shared rule is examined").isEmpty();
+        assertThat(lines(rules.genericStylesheet("HTTPS://A.TEST/"))).containsExactlyInAnyOrder(".every", ".web", ".upper-written");
+        assertThat(lines(rules.stylesheet("HTTPS://A.TEST/"))).containsExactlyInAnyOrder(".every", ".web", ".upper-written", ".upper-only");
+        assertThat(examined).as("the rule for upper-case schemes alone").extracting(Rule::selector).containsOnly(".upper-only");
+        assertThat(lines(rules.genericStylesheet("Https://a.test/"))).containsExactlyInAnyOrder(".every", ".web", ".upper-written");
+        for (String page : List.of("file:///Users/ada/a.html", "data:text/html,x", "about:blank", "ftp://a.test/", "httpx://a.test/", "https:/a.test/"))
+            assertThat(lines(rules.stylesheet(page))).as(page).containsExactly(".every");
+        for (String page : List.of("https://a.test/", "http://a.test/", "HTTPS://A.TEST/", "Http://a.test/", "file:///x", "data:,x", "about:blank"))
+            assertThat(lines(rules.stylesheet(page))).as(page).containsExactlyInAnyOrderElementsOf(lines(rules.scanStylesheet(page)));
+    }
+
+    /** Review I1 (V30): a call spends at most 2,000,000 reads, however many rules run, and keeps what it proved. */
+    @Test void aCallSpendsAtMost2000000ReadsAcrossItsRules() {
+        var list = new ArrayList<Map<String, Object>>();
+        list.add(rule(trigger("url-filter", "/ads/"), block()));
+        list.add(rule(trigger("url-filter", ".*"), hide(".below")));
+        for (int at = 0; at < 10_000; at++) list.add(rule(trigger("url-filter", "z.*.*.*.*q"), at % 2 == 0 ? block() : hide(".heavy")));
+        list.add(rule(trigger("url-filter", ".*"), hide(".above")));
+        list.add(rule(trigger("url-filter", "^https?://a\\.test/"), hide(".proved")));
+        RuleSet rules = rules(list);
+        String url = "https://a.test/ads/" + "z".repeat(8 * 1024);
+        try (var log = new CapturedLog(RuleSet.class.getName())) {
+            assertTimeoutPreemptively(Duration.ofSeconds(5), () -> {
+                assertThat(rules.blocks(url, SCRIPT, PAGE)).as("not blocked past the budget").isFalse();
+                assertThat(lines(rules.stylesheet(url))).as("the proved lines").containsExactly(".above", ".proved");
+                assertThat(lines(rules.genericStylesheet(url))).as("no hide rule runs").containsExactly(".below", ".above");
+                assertThat(rules.blocks(url, SCRIPT, PAGE)).isFalse();
+            });
+            assertThat(log.records()).as("once a list").singleElement().satisfies(record -> {
+                assertThat(record.getLevel()).isEqualTo(Level.WARNING);
+                assertThat(record.getMessage()).doesNotContain("https://a.test/");
+            });
+        }
+        assertThat(rules.blocks("https://a.test/ads/x", SCRIPT, PAGE)).as("a short address is within it").isTrue();
+        var reads = new UrlFilter.Reads(RuleSet.CALL_READS);
+        assertThat(rules.blocks(url, SCRIPT, PAGE, reads)).isFalse();
+        assertThat(reads.used()).isEqualTo(RuleSet.CALL_READS);
+    }
+
+    /** Review I1 (V30): one rule past its own budget counts as no match, and the call goes on to the next. */
+    @Test void aRuleOverItsOwnBudgetCountsAsNoMatchAndTheCallGoesOn() {
+        RuleSet rules = rules(List.of(rule(trigger("url-filter", "/ads/"), block()), rule(trigger("url-filter", "z.*.*.*.*q"), ignore())));
+        try (var log = new CapturedLog(RuleSet.class.getName())) {
+            assertThat(rules.blocks("https://a.test/ads/" + "z".repeat(8 * 1024), SCRIPT, PAGE)).isTrue();
+            assertThat(rules.blocks("https://a.test/ads/" + "z".repeat(8 * 1024), SCRIPT, PAGE)).isTrue();
+            assertThat(log.records()).singleElement().satisfies(record -> assertThat(record.getMessage()).contains("z.*.*.*.*q"));
         }
     }
 

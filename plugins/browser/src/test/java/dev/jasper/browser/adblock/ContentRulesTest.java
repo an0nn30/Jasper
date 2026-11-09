@@ -60,7 +60,8 @@ class ContentRulesTest {
         assertThat(only(rule(trigger("url-filter", "x"), block())).action()).isEqualTo(Action.BLOCK);
         Rule hide = only(rule(trigger("url-filter", ".*"), hide("div[id^=\"ad-\"] > .banner, #promo")));
         assertThat(hide.action()).isEqualTo(Action.HIDE);
-        assertThat(hide.selector()).isEqualTo("div[id^=\"ad-\"] > .banner, #promo");
+        assertThat(hide.selector()).as("the list as written").isEqualTo("div[id^=\"ad-\"] > .banner, #promo");
+        assertThat(ContentRules.parts(hide.selector())).containsExactly("div[id^=\"ad-\"] > .banner", "#promo");
         assertThat(only(rule(trigger("url-filter", "x"), ignore())).action()).isEqualTo(Action.IGNORE_PREVIOUS);
     }
 
@@ -134,10 +135,46 @@ class ContentRulesTest {
     @Test void aSelectorThatCouldReachPastItsOwnRuleIsSkippedAndCounted() {
         for (String selector : List.of("a{color:red}", "a}b", "a;b", "@import url(x)", "a<b", "", " ", "a\nb", "a" + (char) 0x7F))
             assertSkipped("'" + selector + "'", rule(trigger("url-filter", ".*"), hide(selector)));
-        assertSkipped("1,025 characters", rule(trigger("url-filter", ".*"), hide("a".repeat(1_025))));
+        assertSkipped("a part of 1,025 characters", rule(trigger("url-filter", ".*"), hide(".b, " + "a".repeat(1_025))));
         assertThat(ContentRules.compile(List.of(rule(trigger("url-filter", ".*"), hide("a".repeat(1_024))))).rules()).hasSize(1);
+        String shortParts = IntStream.range(0, 500).mapToObj(at -> ".p" + at).collect(java.util.stream.Collectors.joining(", "));
+        assertThat(shortParts).hasSizeGreaterThan(3_000);
+        assertThat(ContentRules.compile(List.of(rule(trigger("url-filter", ".*"), hide(shortParts)))).rules()).as("a long list of short parts")
+            .hasSize(1);
+        for (String selector : List.of("a, b{c}", ".a, ", ", .a", ".a,,.b", ".a, \"x;\"", ".a, [title=\"@\"]"))
+            assertSkipped("'" + selector + "'", rule(trigger("url-filter", ".*"), hide(selector)));
         assertSkipped("no selector", rule(trigger("url-filter", ".*"), Map.of("type", "css-display-none")));
         assertSkipped("a selector that is no string", rule(trigger("url-filter", ".*"), Map.of("type", "css-display-none", "selector", true)));
+    }
+
+    /** V28: a selector list is split at its top-level commas, at most 5,000 parts, each checked on its own. */
+    @Test void aSelectorListIsSplitAtItsTopLevelCommas() {
+        assertThat(ContentRules.parts(".a, .b ,#c")).containsExactly(".a", ".b", "#c");
+        assertThat(ContentRules.parts(".a\\,b")).as("an escaped comma").containsExactly(".a\\,b");
+        assertThat(ContentRules.parts("div:not(.a, .b), p")).containsExactly("div:not(.a, .b)", "p");
+        assertThat(ContentRules.parts("[x=\",\"], [y=',']")).containsExactly("[x=\",\"]", "[y=',']");
+        assertThat(ContentRules.parts("a[title=\"a, b\"] > b")).containsExactly("a[title=\"a, b\"] > b");
+        assertThat(ContentRules.parts(":is(a, [x=\")\"], b), c")).containsExactly(":is(a, [x=\")\"], b)", "c");
+        assertThat(ContentRules.parts(".a")).containsExactly(".a");
+        String limit = IntStream.range(0, 5_000).mapToObj(at -> ".p" + at).collect(java.util.stream.Collectors.joining(","));
+        assertThat(ContentRules.compile(List.of(rule(trigger("url-filter", ".*"), hide(limit)))).rules()).hasSize(1);
+        assertSkipped("5,001 parts", rule(trigger("url-filter", ".*"), hide(limit + ",.q")));
+    }
+
+    /** V32: a list holds at most 500,000 domain entries in all; a rule past them is skipped and counted. */
+    @Test void aListHoldsAtMost500000DomainEntries() {
+        List<String> full = IntStream.range(0, 1_024).mapToObj(at -> "d" + at + ".test").toList();
+        var list = new java.util.ArrayList<Map<String, Object>>();
+        for (int at = 0; at < 488; at++) list.add(rule(trigger("url-filter", "x", at % 2 == 0 ? "if-domain" : "unless-domain", full), block()));
+        list.add(rule(trigger("url-filter", "x", "if-domain", full), block()));
+        list.add(rule(trigger("url-filter", "x", "if-domain", full.subList(0, 500_000 - 488 * 1_024)), block()));
+        list.add(rule(trigger("url-filter", "x", "unless-domain", List.of("e.test")), block()));
+        list.add(rule(trigger("url-filter", "x"), block()));
+        ContentRules.Compiled compiled = ContentRules.compile(list);
+        assertThat(compiled.skipped()).isEqualTo(2);
+        assertThat(compiled.rules()).hasSize(490);
+        assertThat(compiled.rules().stream().mapToInt(rule -> rule.ifDomain().size() + rule.unlessDomain().size()).sum()).isEqualTo(500_000);
+        assertThat(compiled.rules().getLast().ifDomain()).isEmpty();
     }
 
     @Test void anItemThatIsNoRuleIsSkippedAndCounted() {
