@@ -10,6 +10,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -36,7 +37,8 @@ import java.util.function.Supplier;
  * passed since the last update, when nothing is cached, or when the cache came from another address, so a new address
  * downloads at its next check. Once started and on, the list checks every hour, the first check at once, on a daemon
  * thread of its own, which it makes only once a check is scheduled and ends at its close (ruling V37). Its client,
- * which the given supplier makes on the background executor at the first download, is {@link ListDownload#client()}'s.
+ * which the given supplier makes on the background executor at the first download, is
+ * {@link ListDownload#client(Optional)}'s, made again for the next download once it has changed ({@link #clientChanged}).
  * The list read ({@link BlockerJson#read}) and compiled ({@link ContentRules#compile}) is cached, then replaces the one
  * applied; anything that fails keeps the old list, and the failure is what {@link #status()} reports until the next
  * update succeeds. {@link #updateNow()} downloads at once, on or off.
@@ -107,6 +109,10 @@ public final class FilterList implements AutoCloseable {
     // The reasons whose failures were logged with their stack traces.
     private final Set<String> traced = new HashSet<>();
     private HttpClient client;
+    // Clients changed while a download was under way, which the download's end shuts down; and the number of the
+    // client's changes, by which a client made while one came is made again.
+    private final List<HttpClient> retired = new ArrayList<>();
+    private long clientChanges;
 
     /**
      * The list of the plugin's data folder, which does nothing yet.
@@ -114,7 +120,8 @@ public final class FilterList implements AutoCloseable {
      * @param dataDir the plugin's data folder, which holds the list's folder
      * @param restrict makes the data folder its owner's alone; run before the list's first read or write there
      * @param background where the list's work runs: the plugin's background executor
-     * @param http makes the list's client, on the background executor at the first download: {@link ListDownload#client()}
+     * @param http makes the list's client, on the background executor at the first download and after it has changed:
+     *     {@link ListDownload#client(Optional)}
      * @param clock the time of an update, and of a check
      * @param url the list's address, read at each check: the Filter List URL setting
      */
@@ -238,6 +245,26 @@ public final class FilterList implements AutoCloseable {
     }
 
     /**
+     * The client the list's supplier makes has changed, as the HTTP proxy has (plan 6's F3): the next download makes a new
+     * one. A download under way finishes on the old client, which is shut down once it has ended; with none under way,
+     * the old client is shut down at once. Any thread.
+     */
+    public void clientChanged() {
+        HttpClient old;
+        synchronized (this) {
+            clientChanges++;
+            if (closed || client == null) return;
+            old = client;
+            client = null;
+            if (downloading != null) {
+                retired.add(old);
+                return;
+            }
+        }
+        old.shutdownNow();
+    }
+
+    /**
      * Has {@code listener} run whenever the status or the rule set applied changes, on the thread that changed it.
      *
      * @param listener what to run; it must return quickly and must not throw
@@ -270,6 +297,7 @@ public final class FilterList implements AutoCloseable {
         scheduler.shutdownNow();
         if (ending != null) ending.cancel(true);
         if (made != null) made.shutdownNow();
+        shutDownRetired();
         // Its listeners, which end with the plugin, are told nothing more.
         if (ended != null) ended.complete(status());
     }
@@ -426,20 +454,36 @@ public final class FilterList implements AutoCloseable {
         answer.whenComplete((body, failure) -> later(() -> install(result, address, body, failure)));
     }
 
-    /** The client, made on the first download; null once closed. Background executor. */
+    /**
+     * The client, made on the first download and after it has changed; one made while it changed is made again. Null
+     * once closed. Background executor.
+     */
     private HttpClient madeClient() {
-        synchronized (this) {
-            if (closed || client != null) return client;
-        }
-        HttpClient made = clients.get();
-        synchronized (this) {
-            if (!closed) {
-                client = made;
-                return made;
+        while (true) {
+            long changes;
+            synchronized (this) {
+                if (closed || client != null) return client;
+                changes = clientChanges;
             }
+            HttpClient made = clients.get();
+            synchronized (this) {
+                if (!closed && clientChanges == changes) {
+                    client = made;
+                    return made;
+                }
+            }
+            made.shutdownNow();
         }
-        made.shutdownNow();
-        return null;
+    }
+
+    /** Shuts down the clients changed while a download was under way, which has ended, or the list has closed. */
+    private void shutDownRetired() {
+        List<HttpClient> ending;
+        synchronized (this) {
+            ending = List.copyOf(retired);
+            retired.clear();
+        }
+        for (HttpClient old : ending) old.shutdownNow();
     }
 
     /**
@@ -470,6 +514,7 @@ public final class FilterList implements AutoCloseable {
                 loaded = on;
                 if (on) active = Optional.of(rules);
             }
+            shutDownRetired();
             changed();
             result.complete(status());
         } catch (Throwable thrown) {
@@ -493,6 +538,7 @@ public final class FilterList implements AutoCloseable {
             // A refusal's reason is all there is to it; another's trace is logged the first time its reason is seen.
             trace = !(failure instanceof ListDownload.Refused) && traced.size() < TRACED && traced.add(reason);
         }
+        shutDownRetired();
         LOG.log(System.Logger.Level.WARNING, "The ad blocking filter list could not be updated: " + reason, trace ? failure : null);
         changed();
         result.complete(status());

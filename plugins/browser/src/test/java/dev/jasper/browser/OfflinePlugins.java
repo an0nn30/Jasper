@@ -1,7 +1,9 @@
 package dev.jasper.browser;
 
+import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.http.HttpClient;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -34,7 +36,7 @@ public final class OfflinePlugins {
         return ASKED.get();
     }
 
-    private static HttpClient refused() {
+    private static HttpClient refused(Optional<InetSocketAddress> proxy) {
         ASKED.incrementAndGet();
         throw new AssertionError("A test must not download a filter list");
     }

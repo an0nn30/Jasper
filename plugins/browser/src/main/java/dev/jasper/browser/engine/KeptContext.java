@@ -1,8 +1,10 @@
 package dev.jasper.browser.engine;
 
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import org.cef.browser.CefRequestContext;
 
 /**
@@ -46,6 +48,20 @@ final class KeptContext {
     /** The kept context. */
     CefRequestContext context() {
         return context;
+    }
+
+    /**
+     * What {@code work} gives done with the kept context, unless it has been disposed or let go: under this record's lock,
+     * so no dispose of it runs meanwhile, as one may on Swing's thread while Chromium's sets the context's preferences.
+     *
+     * @param work what is done with the kept context; it must return quickly
+     * @param <T> what it gives
+     * @return what it gave; empty once the kept context has been disposed or let go
+     */
+    <T> Optional<T> ifKept(Function<CefRequestContext, T> work) {
+        synchronized (this) {
+            return disposed ? Optional.empty() : Optional.of(work.apply(context));
+        }
     }
 
     /**

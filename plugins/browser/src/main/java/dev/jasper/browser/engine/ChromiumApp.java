@@ -7,6 +7,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiPredicate;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 import org.cef.CefApp;
 import org.cef.CefClient;
@@ -52,10 +53,11 @@ final class ChromiumApp {
      * @param previewBrowser whether {@code jasper-preview:} answers a browser's request for an address: a preview's, on
      *     its own origin
      * @param terminated run once Chromium has ended, on the UI thread
-     * @param contextInitialized run once Chromium's context has initialized, on Chromium's own UI thread
+     * @param contextInitialized given Chromium's global context once Chromium's context has initialized, on Chromium's own
+     *     UI thread
      */
     static ChromiumApp start(Path dataDir, AboutScheme about, Predicate<CefBrowser> pageBrowser, PreviewScheme previews,
-            BiPredicate<CefBrowser, String> previewBrowser, Runnable terminated, Runnable contextInitialized) {
+            BiPredicate<CefBrowser, String> previewBrowser, Runnable terminated, Consumer<CefRequestContext> contextInitialized) {
         JCefAppConfig config = JCefAppConfig.getInstance();
         CefApp.setIsRemoteEnabled(false);
         SystemBootstrap.setLoader(config.getLoader());
@@ -195,20 +197,22 @@ final class ChromiumApp {
     }
 
     /**
-     * Registers {@code jasper-about} and {@code jasper-preview}, reports the context's initialization, on Chromium's own UI
-     * thread, and reports Chromium's end. JCEF tells it of each state on the UI thread.
+     * Registers {@code jasper-about} and {@code jasper-preview}, reports the context's initialization, with Chromium's
+     * global context, on Chromium's own UI thread, and reports Chromium's end. JCEF tells it of each state on the UI
+     * thread.
      */
     private static final class Handler extends CefAppHandlerAdapter {
-        private final Runnable terminated, contextInitialized;
+        private final Runnable terminated;
+        private final Consumer<CefRequestContext> contextInitialized;
 
-        Handler(String[] args, Runnable terminated, Runnable contextInitialized) {
+        Handler(String[] args, Runnable terminated, Consumer<CefRequestContext> contextInitialized) {
             super(args);
             this.terminated = terminated;
             this.contextInitialized = contextInitialized;
         }
 
         @Override public void onContextInitialized() {
-            contextInitialized.run();
+            contextInitialized.accept(CefRequestContext.getGlobalContext());
         }
 
         @Override public void onRegisterCustomSchemes(CefSchemeRegistrar registrar) {

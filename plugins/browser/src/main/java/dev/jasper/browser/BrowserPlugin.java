@@ -54,6 +54,7 @@ import dev.jasper.sdk.ui.TabPlacement;
 import dev.jasper.sdk.ui.UiEvent;
 import dev.jasper.sdk.ui.ViewSpec;
 import java.awt.EventQueue;
+import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.nio.file.Path;
@@ -69,7 +70,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 /**
  * The Browser: web pages as Jasper items. Its start registers New Browser Tab, New Browser Window and the Browser split
@@ -90,7 +90,10 @@ import java.util.function.Supplier;
  * browser that asks, and a site permission that could not be saved posts one error. Ad blocking's {@link FilterList},
  * whose statistics and Update Now Settings shows and whose switch the onboarding's setup page offers, reads its cache
  * and downloads only once a page first starts or the user turns ad blocking on, or at Update Now (the plan's call); its
- * rule set applies to every page's requests and documents, a /dev/null page's too.
+ * rule set applies to every page's requests and documents, a /dev/null page's too. The HTTP proxy, while on, is given
+ * to Chromium's contexts, the persistent one and each /dev/null group's, and the plugin's own fetches, the favicons, the
+ * suggestions, View Source's and the filter list's, go through it too; off, Chromium uses the system's proxy settings and
+ * the fetches the JDK's default.
  */
 public class BrowserPlugin implements Plugin {
     static final String NEW_TAB = "dev.jasper.browser.new_tab", NEW_WINDOW = "dev.jasper.browser.new_window";
@@ -109,7 +112,9 @@ public class BrowserPlugin implements Plugin {
     private SourcePage sources;
     private FilterList filters;
     private boolean running;
-    private final Supplier<HttpClient> filterClients;
+    // Plan 6's F3: the HTTP proxy the plugin's own fetches go through, read as the filter list makes its client.
+    private volatile Optional<InetSocketAddress> proxy = Optional.empty();
+    private final Function<Optional<InetSocketAddress>, HttpClient> filterClients;
     private final Function<BrowserSettings, URI> filterAddress;
 
     /** Created by the runtime. */
@@ -120,10 +125,11 @@ public class BrowserPlugin implements Plugin {
     /**
      * A plugin whose filter list's client and address are a test's (ruling F9): no test downloads a list from the web.
      *
-     * @param filterClients makes the filter list's client, at its first download
+     * @param filterClients makes the filter list's client through the HTTP proxy given, empty for the JDK's default, at
+     *     its first download and after the proxy changes
      * @param filterAddress the filter list's address, from the settings
      */
-    BrowserPlugin(Supplier<HttpClient> filterClients, Function<BrowserSettings, URI> filterAddress) {
+    BrowserPlugin(Function<Optional<InetSocketAddress>, HttpClient> filterClients, Function<BrowserSettings, URI> filterAddress) {
         this.filterClients = filterClients;
         this.filterAddress = filterAddress;
     }
@@ -152,10 +158,11 @@ public class BrowserPlugin implements Plugin {
         previews = new PreviewService(origins, chromium, context.background());
         context.services().publish(MarkdownPreviews.class, previews);
         BrowserSettings.Declared settings = BrowserSettings.declare(context.settings());
+        proxy = settings.proxyAddress();
         // Spec section 12: ad blocking's filter list, made with no I/O and no client. It reads its cache, and downloads
         // when an update is due, only once a page first starts or the user turns ad blocking on (F8), and while on;
-        // Update Now downloads it at once.
-        var filters = new FilterList(data, folder::restrict, context.background(), filterClients, Clock.systemUTC(),
+        // Update Now downloads it at once. Its client goes through the HTTP proxy.
+        var filters = new FilterList(data, folder::restrict, context.background(), () -> filterClients.apply(proxy), Clock.systemUTC(),
             () -> filterAddress.apply(settings.read()));
         this.filters = filters;
         filters.enabled(settings.read().adBlocking());
@@ -268,7 +275,34 @@ public class BrowserPlugin implements Plugin {
             items.restore(request.state(), settings.read().startAddress(), request.window(), endedWhileRunning, store);
             return Optional.empty();
         });
+        // Plan 6 Task 11: the HTTP proxy, for Chromium's contexts and the plugin's own fetches (F3), now and at each change.
+        // Chromium only remembers it until a page first asks for it; a proxy it refuses is told.
+        chromium.onProxyFailed(this::proxyFailed);
+        proxyChanged(settings);
+        settings.onProxyChanged(() -> { if (running) proxyChanged(settings); });
         running = true;
+    }
+
+    /**
+     * The HTTP proxy is as {@code settings} say now: Chromium's contexts are given it, the items' and View Source's fetches
+     * go through it from now on, and the filter list's next download makes its client again. UI thread.
+     */
+    private void proxyChanged(BrowserSettings.Declared settings) {
+        Optional<InetSocketAddress> address = settings.proxyAddress();
+        proxy = address;
+        chromium.setProxy(settings.proxyServer());
+        items.useProxy(address);
+        sources.useProxy(address);
+        filters.clientChanged();
+    }
+
+    /**
+     * Chromium refused the HTTP proxy: Chromium's reason goes to the plugin's log and, while the plugin runs, to one
+     * error. UI thread.
+     */
+    void proxyFailed(String reason) {
+        context.log().log(System.Logger.Level.WARNING, "The proxy could not be set: " + reason);
+        if (running) context.notifications().group().error("The proxy could not be set", reason);
     }
 
     /**

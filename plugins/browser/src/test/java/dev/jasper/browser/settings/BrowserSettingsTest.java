@@ -15,7 +15,9 @@ import dev.jasper.sdk.settings.SettingsPanel;
 import dev.jasper.sdk.testing.FakePluginHost;
 import java.net.URI;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
@@ -42,12 +44,13 @@ class BrowserSettingsTest {
             List<SettingSpec<?>> specs = recording.get().specs;
             assertThat(specs).extracting(SettingSpec::key).containsExactly("start_page", "page_zoom", "open_links_from_terminal",
                 "open_local_web_files", "search_engine", "custom_search_url", "custom_suggestions_url", "devnull_mode", "ad_blocking",
-                "filter_list_url");
+                "filter_list_url", "http_proxy", "proxy_host", "proxy_port");
             assertThat(specs).extracting(SettingSpec::label).containsExactly("Start page", "Page zoom", "Open Links From Terminal",
                 "Open Local Web Files", "Default Search Engine", "Custom Search URL", "Custom Search Suggestions URL",
-                "Use /dev/null mode (no history, cookies, or other data saved)", "Enable Ad Blocking", "Filter List URL");
+                "Use /dev/null mode (no history, cookies, or other data saved)", "Enable Ad Blocking", "Filter List URL", "Enable HTTP Proxy",
+                "Proxy Server", "Proxy Port");
             assertThat(specs).extracting(SettingSpec::section).containsExactly("General", "General", "Link Opening", "Link Opening",
-                "Search Engine", "Search Engine", "Search Engine", "Privacy & Data", "Ad Blocking", "Ad Blocking");
+                "Search Engine", "Search Engine", "Search Engine", "Privacy & Data", "Ad Blocking", "Ad Blocking", "Proxy", "Proxy", "Proxy");
             assertThat(specs).allSatisfy(spec -> assertThat(spec.description()).isNotBlank());
             assertThat(specs.get(1).kind()).isEqualTo(SettingKind.integer(25, 500));
             assertThat(specs.get(1).unit()).isEqualTo("%");
@@ -72,6 +75,13 @@ class BrowserSettingsTest {
             assertThat(specs.get(8).defaultValue()).isEqualTo(false);
             assertThat(specs.get(9).defaultValue()).isEqualTo("https://easylist-downloads.adblockplus.org/easylist_content_blocker.json");
             assertThat(specs.get(9).description()).isEqualTo("A content blocker list in WebKit's format, downloaded automatically every 24 hours.");
+            // Plan 6 Task 11: the HTTP proxy, off by default, at 127.0.0.1 and port 8118.
+            assertThat(specs.get(10).kind()).isEqualTo(SettingKind.bool());
+            assertThat(specs.get(10).defaultValue()).isEqualTo(false);
+            assertThat(specs.get(10).description()).isEqualTo("Route browser traffic through a CONNECT proxy server.");
+            assertThat(specs.get(11).defaultValue()).isEqualTo("127.0.0.1");
+            assertThat(specs.get(12).kind()).isEqualTo(SettingKind.integer(1, 65535));
+            assertThat(specs.get(12).defaultValue()).isEqualTo(8118);
             assertThat(host.failures()).isEmpty();
         } });
     }
@@ -109,7 +119,7 @@ class BrowserSettingsTest {
     /**
      * Plan 6 Task 8: the Browser's own Settings page shows the declared settings by section, as the generated page did,
      * so each declaration is recorded under its section. The sections run General, Link Opening, Search Engine, Privacy
-     * &amp; Data, Ad Blocking and Proxy, and one without a setting is left out.
+     * &amp; Data, Ad Blocking and Proxy, and one without a setting would be left out.
      */
     @Test void theDeclaredSettingsAreRecordedBySectionInTheSectionsOrder() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
@@ -118,11 +128,11 @@ class BrowserSettingsTest {
                 plugin -> declared.set(BrowserSettings.declare(plugin.settings())));
             List<BrowserSettings.Section> sections = declared.get().sections();
             assertThat(sections).extracting(BrowserSettings.Section::title)
-                .containsExactly("General", "Link Opening", "Search Engine", "Privacy & Data", "Ad Blocking");
+                .containsExactly("General", "Link Opening", "Search Engine", "Privacy & Data", "Ad Blocking", "Proxy");
             assertThat(sections).extracting(section -> section.settings().stream().map(Setting::key).toList()).containsExactly(
                 List.of("start_page", "page_zoom"), List.of("open_links_from_terminal", "open_local_web_files"),
                 List.of("search_engine", "custom_search_url", "custom_suggestions_url"), List.of("devnull_mode"),
-                List.of("ad_blocking", "filter_list_url"));
+                List.of("ad_blocking", "filter_list_url"), List.of("http_proxy", "proxy_host", "proxy_port"));
             assertThat(BrowserSettings.SECTIONS).containsExactly("General", "Link Opening", "Search Engine", "Privacy & Data",
                 "Ad Blocking", "Proxy");
             assertThatThrownBy(() -> sections.getFirst().settings().clear()).as("a snapshot no caller changes")
@@ -237,6 +247,82 @@ class BrowserSettingsTest {
             assertThat(turned).containsExactly(true, false);
             assertThatThrownBy(() -> new BrowserSettings(BrowserSettings.WELCOME, 100, LinkOpening.ASK, LocalFileOpening.ASK, SearchEngine.GOOGLE,
                 "", "", false, true, URI.create("http://lists.example/list.json"))).isInstanceOf(IllegalArgumentException.class);
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /**
+     * Plan 6 Task 11: Proxy Server takes a host name or an IP address, an IPv6 one without brackets, and nothing else: no
+     * scheme, path, user info, port or space, as Chromium's {@code host:port} is made from it, and anything else is
+     * refused for the default. Proxy Port runs from 1 to 65535. The proxy server is empty while Enable HTTP Proxy is off,
+     * and otherwise {@code host:port}, an IPv6 address in brackets; its address is the same, unresolved, as no setting
+     * looks a name up. A change of what it gives is heard on the UI thread, once, and no other change is.
+     */
+    @Test void theProxyServerIsAHostNameOrAnIpAddressAndAPortAndIsHeardWhenWhatItGivesChanges() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var declared = new AtomicReference<BrowserSettings.Declared>();
+            host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(),
+                plugin -> declared.set(BrowserSettings.declare(plugin.settings())));
+            BrowserSettings.Declared settings = declared.get();
+            assertThat(settings.proxyServer()).as("off by default").isEmpty();
+            assertThat(settings.proxyAddress()).isEmpty();
+            var heard = new CopyOnWriteArrayList<String>();
+            settings.onProxyChanged(() -> heard.add(settings.proxyServer().orElse("off")
+                + (SwingUtilities.isEventDispatchThread() ? "" : " off the UI thread")));
+            host.setSetting(ID, "proxy_host", "proxy.local");
+            host.setSetting(ID, "proxy_port", 3128L);
+            assertThat(heard).as("off, the server changes nothing").isEmpty();
+            host.setSetting(ID, "http_proxy", true);
+            assertThat(settings.proxyServer()).contains("proxy.local:3128");
+            assertThat(settings.proxyAddress()).contains(java.net.InetSocketAddress.createUnresolved("proxy.local", 3128));
+            assertThat(settings.proxyAddress().orElseThrow().isUnresolved()).isTrue();
+            host.setSetting(ID, "proxy_port", 8118L);
+
+            Map<String, String> allowed = new LinkedHashMap<>();
+            allowed.put("127.0.0.1", "127.0.0.1:8118");
+            allowed.put("proxy.local", "proxy.local:8118");
+            allowed.put("::1", "[::1]:8118");
+            allowed.put("Proxy-1.Example.COM", "Proxy-1.Example.COM:8118");
+            allowed.put("localhost", "localhost:8118");
+            allowed.put("10.0.0.255", "10.0.0.255:8118");
+            allowed.put("2001:db8::8a2e:370:7334", "[2001:db8::8a2e:370:7334]:8118");
+            allowed.put("::ffff:192.0.2.1", "[::ffff:192.0.2.1]:8118");
+            for (var each : allowed.entrySet()) {
+                host.setSetting(ID, "proxy_host", each.getKey());
+                assertThat(host.settingsReports(ID)).as(each.getKey()).isEmpty();
+                assertThat(settings.proxyServer()).as(each.getKey()).contains(each.getValue());
+            }
+            assertThat(settings.proxyAddress()).as("an IPv6 address's host has no brackets")
+                .contains(java.net.InetSocketAddress.createUnresolved("::ffff:192.0.2.1", 8118));
+
+            String refused = "Enter a host name or IP address.";
+            for (String value : List.of("http://x", "a b", "", " proxy.local", "proxy.local ", "user@proxy.local", "user:secret@proxy.local",
+                    "proxy.local/path", "proxy.local:8118", "[::1]", "[::1]:8118", "fe80::1%en0", "1::2::3", ":::", "999.1.1.1", "1.2.3",
+                    "01.2.3.4", "1.2.3.4.5", "-proxy.local", "proxy-.local", "proxy..local", ".proxy.local", "proxy.local.", "proxy_1.local",
+                    "pr\u00f6xy.local", "a".repeat(64) + ".local", "proxy.123", "proxy.local\tx", "proxy.local?x", "proxy.local#x")) {
+                host.setSetting(ID, "proxy_host", value);
+                assertThat(host.settingsReports(ID)).as(value).containsExactly("proxy_host: " + refused);
+                assertThat(settings.proxyServer()).as(value + ": the default").contains("127.0.0.1:8118");
+            }
+            host.setSetting(ID, "proxy_host", "a".repeat(63) + ".local");
+            assertThat(host.settingsReports(ID)).as("a label of 63 characters").isEmpty();
+            for (long port : new long[] { 0, -1, 65536 }) {
+                host.setSetting(ID, "proxy_port", port);
+                assertThat(host.settingsReports(ID)).as(port + "").singleElement().asString().startsWith("proxy_port: ");
+                assertThat(settings.proxyServer()).as(port + ": the default").contains("a".repeat(63) + ".local:8118");
+            }
+            host.setSetting(ID, "proxy_port", 65535L);
+            host.setSetting(ID, "proxy_host", "::1");
+            host.setSetting(ID, "proxy_port", 1L);
+            assertThat(settings.proxyServer()).contains("[::1]:1");
+            host.setSetting(ID, "http_proxy", false);
+            assertThat(settings.proxyServer()).isEmpty();
+            assertThat(settings.proxyAddress()).isEmpty();
+            host.setSetting(ID, "proxy_host", "proxy.local");
+            assertThat(heard).as("each change of what it gives, once, and nothing else").containsExactly("proxy.local:3128", "proxy.local:8118",
+                "127.0.0.1:8118", "proxy.local:8118", "[::1]:8118", "Proxy-1.Example.COM:8118", "localhost:8118", "10.0.0.255:8118",
+                "[2001:db8::8a2e:370:7334]:8118", "[::ffff:192.0.2.1]:8118", "127.0.0.1:8118", "a".repeat(63) + ".local:8118",
+                "a".repeat(63) + ".local:65535", "[::1]:65535", "[::1]:1", "off");
             assertThat(host.failures()).isEmpty();
         } });
     }

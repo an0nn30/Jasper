@@ -4,6 +4,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.ConnectException;
+import java.net.InetSocketAddress;
+import java.net.ProxySelector;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpConnectTimeoutException;
@@ -28,8 +30,8 @@ import java.util.regex.Pattern;
 
 /**
  * A filter list's download (ruling F10): a GET of an https address, or an http one on this computer only
- * ({@link #fetches}), as TLS is the list's only integrity, with the client {@link #client()} makes, which connects within
- * 30 seconds and follows no redirect itself. The download follows at most 5 (ruling V38), each target resolved against
+ * ({@link #fetches}), as TLS is the list's only integrity, with the client {@link #client(Optional)} makes, which
+ * connects within 30 seconds and follows no redirect itself. The download follows at most 5 (ruling V38), each target resolved against
  * the address that answered, checked as the first address is and never from https to http, and only then asked, so a
  * target the list may not come from is never asked. Only a final 200 is read, at most 32 MiB of it, counted before it
  * is decoded, and one deadline covers the whole download, its redirects and body included ({@link #get}). Why a
@@ -54,13 +56,16 @@ public final class ListDownload {
 
     /**
      * The list's client: one that connects within 30 seconds and follows no redirect, which {@link #get} follows itself.
-     * It sends no cookie and no credentials, and uses the JDK's default proxy selector. The one place the list's client is
-     * made.
+     * It sends no cookie and no credentials, and goes through {@code proxy} (plan 6's F3). The one place the list's
+     * client is made.
      *
+     * @param proxy the HTTP proxy's address; empty for the JDK's default proxy selector
      * @return the client
      */
-    public static HttpClient client() {
-        return HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).followRedirects(HttpClient.Redirect.NEVER).build();
+    public static HttpClient client(Optional<InetSocketAddress> proxy) {
+        var builder = HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).followRedirects(HttpClient.Redirect.NEVER);
+        proxy.ifPresent(address -> builder.proxy(ProxySelector.of(address)));
+        return builder.build();
     }
 
     /**

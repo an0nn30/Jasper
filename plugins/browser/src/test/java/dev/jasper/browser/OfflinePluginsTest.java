@@ -23,7 +23,7 @@ class OfflinePluginsTest {
         Path classes = Path.of(OfflinePluginsTest.class.getProtectionDomain().getCodeSource().getLocation().toURI());
         assertThat(classes.resolve("dev/jasper/browser/BrowserPluginTest.class")).as("the scan sees the test classes").isRegularFile();
         assertThat(callers(classes, "()V")).isEmpty();
-        assertThat(callers(classes, "(Ljava/util/function/Supplier;Ljava/util/function/Function;)V")).as("the scan sees calls of the seam")
+        assertThat(callers(classes, "(Ljava/util/function/Function;Ljava/util/function/Function;)V")).as("the scan sees calls of the seam")
             .contains("dev/jasper/browser/OfflinePlugins.class");
     }
 

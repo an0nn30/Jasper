@@ -353,6 +353,44 @@ class FilterListTest {
         assertThat(hits("/list.json")).as("a closed list downloads nothing, hourly or asked").isZero();
     }
 
+    /**
+     * Plan 6 Task 11 and ruling F3: once its client has changed, as the proxy has, the list makes a new one for its next
+     * download. A download under way finishes on the old client, the redirect it follows by hand too, and the old client
+     * is then shut down; with none under way, it is shut down at once.
+     */
+    @Test void aChangedClientIsMadeAgainAndADownloadUnderWayFinishesOnTheOldOne() throws Exception {
+        server.handle("/late-moved", exchange -> {
+            try {
+                server.late.await(30, TimeUnit.SECONDS);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+            ListServer.redirect(exchange, "/list.json");
+        });
+        address.set(at("/late-moved"));
+        filters = list(this::client, Duration.ofHours(1), Duration.ofSeconds(30));
+        var download = filters.updateNow();
+        long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (hits("/late-moved") == 0 && System.nanoTime() < until) Thread.sleep(10);
+        filters.clientChanged();
+        server.late.countDown();
+        assertThat(download.get(20, TimeUnit.SECONDS)).as("finished on the old client, its redirect included")
+            .isEqualTo(new FilterList.Status(3, Optional.of(START), false, Optional.empty(), true));
+        assertThat(made).hasSize(1);
+        assertThat(made.getFirst().awaitTermination(Duration.ofSeconds(10))).as("then shut down").isTrue();
+
+        address.set(at("/list.json"));
+        filters.updateNow().get(10, TimeUnit.SECONDS);
+        assertThat(made).as("the next download makes a new client").hasSize(2);
+        filters.clientChanged();
+        assertThat(made.get(1).awaitTermination(Duration.ofSeconds(10))).as("none under way: shut down at once").isTrue();
+        assertThat(filters.updateNow().get(10, TimeUnit.SECONDS).error()).isEmpty();
+        assertThat(made).hasSize(3);
+        filters.close();
+        filters.clientChanged();
+        assertThat(made.get(2).awaitTermination(Duration.ofSeconds(10))).as("closed with the list").isTrue();
+    }
+
     /** Ruling V36: a list is read once its cache has been read, nothing cached included, or it has been downloaded. */
     @Test void theListIsReadOnceItsCacheIsReadOrItIsDownloaded() throws Exception {
         filters = list(this::client);
@@ -412,7 +450,7 @@ class FilterListTest {
 
     /** The list's client, as the plugin makes it, kept to be shut down. */
     private HttpClient client() {
-        HttpClient client = ListDownload.client();
+        HttpClient client = ListDownload.client(Optional.empty());
         made.add(client);
         return client;
     }

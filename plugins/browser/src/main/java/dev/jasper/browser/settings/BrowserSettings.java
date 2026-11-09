@@ -10,6 +10,8 @@ import dev.jasper.sdk.settings.PluginSettings;
 import dev.jasper.sdk.settings.Setting;
 import dev.jasper.sdk.settings.SettingKind;
 import dev.jasper.sdk.settings.SettingSpec;
+import java.net.Inet6Address;
+import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -18,8 +20,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 
 /**
  * Settings › Tools › Browser, as one snapshot (spec section 17). Each setting is declared under its section, which
@@ -51,7 +56,7 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
     static final String START_PAGE = "start_page", PAGE_ZOOM = "page_zoom", LINKS = "open_links_from_terminal",
         LOCAL_FILES = "open_local_web_files", SEARCH_ENGINE = "search_engine", CUSTOM_SEARCH = "custom_search_url",
         CUSTOM_SUGGESTIONS = "custom_suggestions_url", DEVNULL_MODE = "devnull_mode", AD_BLOCKING_ON = "ad_blocking",
-        FILTER_LIST_URL = "filter_list_url";
+        FILTER_LIST_URL = "filter_list_url", HTTP_PROXY = "http_proxy", PROXY_HOST = "proxy_host", PROXY_PORT = "proxy_port";
     static final String GENERAL = "General", LINK_OPENING = "Link Opening", SEARCH = "Search Engine", PRIVACY = "Privacy & Data",
         AD_BLOCKING = "Ad Blocking", PROXY = "Proxy";
     /** The sections, in the order the Settings page shows them. */
@@ -59,6 +64,13 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
     private static final String NO_TEMPLATE = "The URL must start with https:// or http:// and contain " + SearchEngine.TERMS;
     // Ruling F10: the list's only integrity is TLS, so http only from this computer.
     private static final String NO_LIST_ADDRESS = "Enter an https address, or an http address on this computer.";
+    private static final String NO_PROXY_HOST = "Enter a host name or IP address.";
+    // A host name's label: letters, digits and inner hyphens, at most 63 characters (RFC 1123); an IPv4 address's part,
+    // 0 to 255 with no leading zero; and what an IPv6 address is written with, which Inet6Address then reads.
+    private static final Pattern LABEL = Pattern.compile("[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?");
+    private static final String OCTET = "(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])";
+    private static final Pattern IPV4 = Pattern.compile(OCTET + "(?:\\." + OCTET + "){3}");
+    private static final Pattern IPV6 = Pattern.compile("[0-9A-Fa-f:.]*:[0-9A-Fa-f:.]*");
 
     /**
      * A section of the Settings page and its settings, in the order declared.
@@ -129,8 +141,9 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
      * Declares the Browser's settings, which Settings › Tools › Browser shows: Start page and Page zoom, a percent from 25
      * to 500, under General, Open Links From Terminal and Open Local Web Files under Link Opening, then Default Search
      * Engine, Custom Search URL and Custom Search Suggestions URL under Search Engine, each custom URL empty or an http or
-     * https address with {@code %s} in it, Use /dev/null mode under Privacy &amp; Data, and Enable Ad Blocking and Filter
-     * List URL, an https address or an http one on this computer, under Ad Blocking. Each is recorded under its section
+     * https address with {@code %s} in it, Use /dev/null mode under Privacy &amp; Data, Enable Ad Blocking and Filter
+     * List URL, an https address or an http one on this computer, under Ad Blocking, and Enable HTTP Proxy, Proxy Server,
+     * a host name or an IP address, and Proxy Port, from 1 to 65535, under Proxy. Each is recorded under its section
      * ({@link Declared#sections()}). UI thread, while the plugin starts.
      *
      * @param plugin the plugin's settings
@@ -191,8 +204,21 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
             .label("Filter List URL").section(AD_BLOCKING)
             .description("A content blocker list in WebKit's format, downloaded automatically every 24 hours.")
             .keywords("ad blocking", "filter", "list", "url", "easylist", "content blocker", "adblock"));
+        Setting<Boolean> proxy = settings.declare(SettingSpec.of(HTTP_PROXY, SettingKind.bool(), false)
+            .label("Enable HTTP Proxy").section(PROXY)
+            .description("Route browser traffic through a CONNECT proxy server.")
+            .keywords("proxy", "http proxy", "connect", "privoxy", "tor", "network", "privacy"));
+        Setting<String> proxyHost = settings.declare(SettingSpec.of(PROXY_HOST,
+                SettingKind.text(BrowserSettings::proxyHost, NO_PROXY_HOST), "127.0.0.1")
+            .label("Proxy Server").section(PROXY)
+            .description("The proxy server's host name or IP address. Write an IPv6 address without brackets.")
+            .keywords("proxy", "server", "host", "address", "network"));
+        Setting<Integer> proxyPort = settings.declare(SettingSpec.of(PROXY_PORT, SettingKind.integer(1, 65535), 8118)
+            .label("Proxy Port").section(PROXY)
+            .description("The proxy server's port, from 1 to 65535.")
+            .keywords("proxy", "port", "network"));
         return new Declared(startPage, pageZoom, links, localFiles, engine, customSearch, customSuggestions, devNull, adBlocking, filterList,
-            settings.sections());
+            proxy, proxyHost, proxyPort, settings.sections());
     }
 
     /** Declares each setting in the plugin's settings and records it under its section, one of {@link #SECTIONS}. */
@@ -226,6 +252,28 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
         }
     }
 
+    /**
+     * A proxy's host: a host name, its labels letters, digits and inner hyphens, at most 63 characters each and 253 in
+     * all, whose last label is not all digits; an IPv4 address, each part from 0 to 255 without a leading zero; or an IPv6
+     * address, without brackets or a zone. Nothing else, so no scheme, path, user info, port or space reaches Chromium's
+     * {@code host:port}. Reads no name server.
+     */
+    static boolean proxyHost(String value) {
+        if (IPV4.matcher(value).matches()) return true;
+        if (value.indexOf(':') >= 0) {
+            if (!IPV6.matcher(value).matches()) return false;
+            try {
+                Inet6Address.ofLiteral(value);
+                return true;
+            } catch (IllegalArgumentException unreadable) {
+                return false;
+            }
+        }
+        String[] labels = value.split("\\.", -1);
+        return value.length() <= 253 && !labels[labels.length - 1].chars().allMatch(Character::isDigit)
+            && Arrays.stream(labels).allMatch(label -> LABEL.matcher(label).matches());
+    }
+
     /** A custom URL: empty, or a {@link SearchEngine#template template}, an http or https address with {@code %s}. */
     private static boolean template(String value) {
         return value.isEmpty() || SearchEngine.template(value);
@@ -256,14 +304,15 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
         private final Setting<LocalFileOpening> localFiles;
         private final Setting<SearchEngine> engine;
         private final Setting<String> customSearch, customSuggestions;
-        private final Setting<Boolean> devNull, adBlocking;
-        private final Setting<String> filterList;
+        private final Setting<Boolean> devNull, adBlocking, proxy;
+        private final Setting<String> filterList, proxyHost;
+        private final Setting<Integer> proxyPort;
         private final List<Section> sections;
 
         private Declared(Setting<String> startPage, Setting<Integer> pageZoom, Setting<LinkOpening> links,
                          Setting<LocalFileOpening> localFiles, Setting<SearchEngine> engine, Setting<String> customSearch,
                          Setting<String> customSuggestions, Setting<Boolean> devNull, Setting<Boolean> adBlocking, Setting<String> filterList,
-                         List<Section> sections) {
+                         Setting<Boolean> proxy, Setting<String> proxyHost, Setting<Integer> proxyPort, List<Section> sections) {
             this.startPage = startPage;
             this.pageZoom = pageZoom;
             this.links = links;
@@ -274,6 +323,9 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
             this.devNull = devNull;
             this.adBlocking = adBlocking;
             this.filterList = filterList;
+            this.proxy = proxy;
+            this.proxyHost = proxyHost;
+            this.proxyPort = proxyPort;
             this.sections = List.copyOf(sections);
         }
 
@@ -331,6 +383,52 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
         public Subscription onFilterListUrlChanged(Consumer<URI> handler) {
             Objects.requireNonNull(handler, "handler");
             return filterList.onChanged(value -> handler.accept(address(value)));
+        }
+
+        /**
+         * The HTTP proxy, as Chromium is given it (plan 6's Task 11): {@code host:port}, an IPv6 address written in
+         * brackets, such as {@code [::1]:8118}. Any thread.
+         *
+         * @return the proxy; empty while Enable HTTP Proxy is off
+         */
+        public Optional<String> proxyServer() {
+            return proxyAddress().map(address -> {
+                String host = address.getHostString();
+                return (host.indexOf(':') >= 0 ? "[" + host + "]" : host) + ":" + address.getPort();
+            });
+        }
+
+        /**
+         * The HTTP proxy's address, as the plugin's own fetches go through it (F3): Proxy Server and Proxy Port,
+         * unresolved, as reading the settings looks no name up. Any thread.
+         *
+         * @return the address; empty while Enable HTTP Proxy is off
+         */
+        public Optional<InetSocketAddress> proxyAddress() {
+            return proxy.get() ? Optional.of(InetSocketAddress.createUnresolved(proxyHost.get(), proxyPort.get())) : Optional.empty();
+        }
+
+        /**
+         * Runs {@code handler} on the UI thread whenever {@link #proxyServer()} changes, once for each change: as Enable
+         * HTTP Proxy changes, or Proxy Server or Proxy Port while it is on.
+         *
+         * @param handler what to run; it reads the proxy itself
+         * @return the registration, which ends with the plugin
+         */
+        public Subscription onProxyChanged(Runnable handler) {
+            Objects.requireNonNull(handler, "handler");
+            var last = new AtomicReference<>(proxyServer());
+            Runnable changed = () -> {
+                Optional<String> now = proxyServer();
+                if (!now.equals(last.getAndSet(now))) handler.run();
+            };
+            Subscription on = proxy.onChanged(value -> changed.run()), host = proxyHost.onChanged(value -> changed.run()),
+                port = proxyPort.onChanged(value -> changed.run());
+            return () -> {
+                on.close();
+                host.close();
+                port.close();
+            };
         }
 
         /**

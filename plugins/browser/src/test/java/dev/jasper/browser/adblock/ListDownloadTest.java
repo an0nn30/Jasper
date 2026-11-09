@@ -6,6 +6,7 @@ import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -27,7 +28,7 @@ class ListDownloadTest {
 
     @BeforeEach void serve() throws Exception {
         server = new ListServer();
-        client = ListDownload.client();
+        client = ListDownload.client(Optional.empty());
     }
 
     @AfterEach void stop() {
@@ -38,6 +39,24 @@ class ListDownloadTest {
     @Test void aFinal200IsReadWhole() throws Exception {
         byte[] body = ListDownload.get(client, server.at("/list.json"), DEADLINE).get(10, TimeUnit.SECONDS);
         assertThat(new String(body, StandardCharsets.UTF_8)).isEqualTo(ListServer.LIST);
+    }
+
+    /**
+     * Plan 6 Task 11 and ruling F3: the list's client goes through the HTTP proxy it is given, which a loopback stand-in
+     * plays here: the request names the whole address, the answer is the proxy's, and the list's server is never asked.
+     */
+    @Test void theClientGoesThroughTheProxyItIsGiven() throws Exception {
+        try (var proxy = new dev.jasper.browser.http.StandIn()) {
+            HttpClient proxied = ListDownload.client(Optional.of(proxy.address()));
+            try {
+                byte[] body = ListDownload.get(proxied, server.at("/list.json"), DEADLINE).get(10, TimeUnit.SECONDS);
+                assertThat(proxy.next()).isEqualTo("GET " + server.at("/list.json") + " HTTP/1.1");
+                assertThat(new String(body, StandardCharsets.UTF_8)).as("the proxy's answer").isEqualTo(dev.jasper.browser.http.StandIn.BODY);
+                assertThat(server.hits("/list.json")).isZero();
+            } finally {
+                proxied.shutdownNow();
+            }
+        }
     }
 
     @Test void aRedirectIsFollowedToTheList() throws Exception {

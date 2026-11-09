@@ -9,3 +9,6 @@
 # devnull_mode = false                  # true: browser tabs, windows and panes opened afterwards keep cookies, history and all other data in memory only
 # ad_blocking = false                   # true: block ads and hide the parts of pages that show them, as the filter list below says
 # filter_list_url = "https://easylist-downloads.adblockplus.org/easylist_content_blocker.json"   # a WebKit content blocker list: an https address, or http on this computer; downloaded every 24 hours
+# http_proxy = false                    # true: route browser traffic through the proxy below, and the browser's own favicon, suggestion, View Source and filter list fetches too
+# proxy_host = "127.0.0.1"              # the proxy server's host name or IP address; an IPv6 address without brackets
+# proxy_port = 8118                     # the proxy server's port: 1 to 65535

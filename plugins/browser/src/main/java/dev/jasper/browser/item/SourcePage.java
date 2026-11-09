@@ -11,6 +11,7 @@ import dev.jasper.sdk.ui.SyntaxRole;
 import dev.jasper.sdk.ui.SyntaxStyle;
 import dev.jasper.sdk.ui.WorkspacePalette;
 import java.awt.EventQueue;
+import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
@@ -161,6 +162,15 @@ public final class SourcePage implements AutoCloseable {
         answer.whenComplete((response, failure) -> result.complete(failure == null ? response.map(SourcePage::decoded) : Optional.empty()));
         result.whenComplete((source, failure) -> answer.cancel(true));
         return result;
+    }
+
+    /**
+     * Has the fetches from now on go through {@code proxy}, as {@link WebFetch#useProxy} says.
+     *
+     * @param proxy the HTTP proxy's address; empty for the JDK's default proxy selector
+     */
+    public void useProxy(Optional<InetSocketAddress> proxy) {
+        web.useProxy(proxy);
     }
 
     /** The fetches under way end, and give nothing; later fetches give nothing at once. */

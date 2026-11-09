@@ -4,6 +4,7 @@ import dev.jasper.browser.adblock.FilterList;
 import dev.jasper.browser.api.MarkdownPreviews;
 import dev.jasper.browser.api.PreviewEvent;
 import dev.jasper.browser.engine.Chromium;
+import dev.jasper.browser.http.StandIn;
 import dev.jasper.browser.item.BrowserItems;
 import dev.jasper.browser.item.ItemTestAccess;
 import dev.jasper.browser.page.PageTestAccess;
@@ -105,7 +106,7 @@ class BrowserPluginTest {
      */
     @Test void turningAdBlockingOnFromTheSetupPageDownloadsOnlyThroughTheGivenClient(@TempDir Path root) throws Exception {
         var asked = new CopyOnWriteArrayList<String>();
-        var plugin = new BrowserPlugin(() -> {
+        var plugin = new BrowserPlugin(proxy -> {
             asked.add("a client");
             throw new IllegalStateException("no network in tests");
         }, settings -> LIST);
@@ -130,6 +131,71 @@ class BrowserPluginTest {
         } finally {
             SwingUtilities.invokeAndWait(() -> host.get().close());
         }
+    }
+
+    /**
+     * Plan 6 Task 11 and ruling F3: the filter list's client is made with the HTTP proxy while it is on, the JDK's
+     * default otherwise, and made again when the proxy changes, so the next download goes the new way. Here each proxy
+     * and the list's server are loopback stand-ins that answer what no list is, so nothing leaves this computer.
+     */
+    @Test void theFilterListsClientGoesThroughTheProxyAndIsMadeAgainWhenItChanges(@TempDir Path root) throws Exception {
+        try (var origin = new StandIn(); var first = new StandIn(); var second = new StandIn()) {
+            URI list = URI.create("http://127.0.0.1:" + origin.port() + "/list.json");
+            var plugin = new BrowserPlugin(dev.jasper.browser.adblock.ListDownload::client, settings -> list);
+            var host = new AtomicReference<FakePluginHost>();
+            SwingUtilities.invokeAndWait(() -> {
+                host.set(new FakePluginHost(root));
+                host.get().setSetting(ID, "http_proxy", true);
+                host.get().setSetting(ID, "proxy_port", (long) first.port());
+                host.get().start(INFO, Set.of(), Set.of(), plugin);
+            });
+            try {
+                download(plugin, host);
+                assertThat(first.next()).as("through the proxy, which names the whole address").isEqualTo("GET " + list + " HTTP/1.1");
+                SwingUtilities.invokeAndWait(() -> host.get().setSetting(ID, "proxy_port", (long) second.port()));
+                download(plugin, host);
+                assertThat(second.next()).as("a new client, through the new proxy").isEqualTo("GET " + list + " HTTP/1.1");
+                SwingUtilities.invokeAndWait(() -> host.get().setSetting(ID, "http_proxy", false));
+                download(plugin, host);
+                assertThat(origin.next()).as("off: the JDK's default, direct to this computer").isEqualTo("GET /list.json HTTP/1.1");
+                assertThat(first.asked() || second.asked() || origin.asked()).as("each download asked once").isFalse();
+                SwingUtilities.invokeAndWait(() -> assertThat(host.get().failures()).isEmpty());
+            } finally {
+                SwingUtilities.invokeAndWait(() -> host.get().close());
+            }
+        }
+    }
+
+    /** Update Now, its work run on the fake host's background executor until the download has ended. */
+    private static void download(BrowserPlugin plugin, AtomicReference<FakePluginHost> host) throws Exception {
+        var update = new AtomicReference<java.util.concurrent.CompletableFuture<FilterList.Status>>();
+        SwingUtilities.invokeAndWait(() -> {
+            update.set(plugin.filters().updateNow());
+            host.get().runBackground();
+        });
+        long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
+        while (!update.get().isDone() && System.nanoTime() < until) {
+            SwingUtilities.invokeAndWait(() -> host.get().runBackground());
+            Thread.sleep(10);
+        }
+        assertThat(update.get().get(1, TimeUnit.SECONDS).error()).as("what the stand-in answers is no list").isPresent();
+    }
+
+    /** Plan 6 Task 11: a proxy Chromium refuses goes to the plugin's log and, while the plugin runs, to one error. */
+    @Test void aProxyChromiumRefusesIsLoggedAndPostsOneErrorWhileThePluginRuns() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost(); var log = new CapturedLog("dev.jasper.plugins." + ID)) {
+            var plugin = plugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            plugin.proxyFailed("called on invalid thread");
+            assertThat(host.notifications().lines())
+                .containsExactly("dev.jasper.browser|ERROR|The proxy could not be set|called on invalid thread");
+            host.stopAll();
+            plugin.proxyFailed("late");
+            assertThat(host.notifications().lines()).as("a stopped plugin only logs").hasSize(1);
+            assertThat(log.records()).extracting(LogRecord::getLevel, LogRecord::getMessage).containsExactly(
+                tuple(Level.WARNING, "The proxy could not be set: called on invalid thread"), tuple(Level.WARNING, "The proxy could not be set: late"));
+            assertThat(host.failures()).isEmpty();
+        } });
     }
 
     @Test void aChromiumThatCannotStartPostsOneNotificationWithTheReasonWhileThePluginRuns() throws Exception {
@@ -340,7 +406,8 @@ class BrowserPluginTest {
             host.activateTerminalWindow(window);
             host.start(INFO, Set.of(), Set.of(), plugin());
             assertThat(host.declared(ID)).containsExactly("start_page", "page_zoom", "open_links_from_terminal", "open_local_web_files",
-                "search_engine", "custom_search_url", "custom_suggestions_url", "devnull_mode", "ad_blocking", "filter_list_url");
+                "search_engine", "custom_search_url", "custom_suggestions_url", "devnull_mode", "ad_blocking", "filter_list_url", "http_proxy",
+                "proxy_host", "proxy_port");
             assertThat(host.browserPlugin()).as("Jasper's web browser").contains(ID);
             assertThat(host.invoke(BrowserPlugin.NEW_TAB, window, null)).isTrue();
             var tab = host.contentTabs().getLast();

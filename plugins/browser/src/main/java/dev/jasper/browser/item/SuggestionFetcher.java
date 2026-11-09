@@ -2,6 +2,7 @@ package dev.jasper.browser.item;
 
 import dev.jasper.browser.http.WebFetch;
 import dev.jasper.browser.json.StrictJson;
+import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
@@ -60,6 +61,11 @@ final class SuggestionFetcher implements AutoCloseable {
             : List.of()));
         result.whenComplete((suggestions, failure) -> answer.cancel(true));
         return result;
+    }
+
+    /** Has the fetches from now on go through {@code proxy}, as {@link WebFetch#useProxy} says; empty for the JDK's default. */
+    void useProxy(Optional<InetSocketAddress> proxy) {
+        web.useProxy(proxy);
     }
 
     /** Ends the fetches under way, which then give none; later fetches give none at once. */

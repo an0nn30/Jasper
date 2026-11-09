@@ -60,7 +60,7 @@ class BrowserSettingsPanelTest {
             var page = (Nodes.Stack) view.spec().root();
             assertThat(page.role()).isEqualTo(Nodes.LayoutRole.SETTINGS_PAGE);
             assertThat(page.children()).extracting(node -> ((Nodes.Section) node).title())
-                .containsExactly("General", "Link Opening", "Search Engine", "Privacy & Data", "Ad Blocking");
+                .containsExactly("General", "Link Opening", "Search Engine", "Privacy & Data", "Ad Blocking", "Proxy");
             assertThat(rows(view, "browser.settings.general")).containsExactly("settings:start_page:row", "settings:page_zoom:row");
             assertThat(rows(view, "browser.settings.link-opening"))
                 .containsExactly("settings:open_links_from_terminal:row", "settings:open_local_web_files:row");
@@ -70,7 +70,10 @@ class BrowserSettingsPanelTest {
                 BrowserSettingsPanel.CLEAR_COOKIES + ":row", BrowserSettingsPanel.CLEAR_DATA + ":row", BrowserSettingsPanel.PERMISSIONS + ":row");
             assertThat(rows(view, "browser.settings.ad-blocking")).containsExactly("settings:ad_blocking:row", "settings:filter_list_url:row",
                 BrowserSettingsPanel.FILTERS + ":row");
-            for (String section : List.of("general", "link-opening", "search-engine", "privacy-data", "ad-blocking"))
+            // Plan 6 Task 11: the proxy's rows, in their own section.
+            assertThat(rows(view, "browser.settings.proxy")).containsExactly("settings:http_proxy:row", "settings:proxy_host:row",
+                "settings:proxy_port:row");
+            for (String section : List.of("general", "link-opening", "search-engine", "privacy-data", "ad-blocking", "proxy"))
                 assertThat(node(view, "browser.settings." + section + ".card", Nodes.Card.class).kind()).as(section).isEqualTo(Nodes.CardKind.SETTINGS);
 
             var cookiesRow = node(view, BrowserSettingsPanel.CLEAR_COOKIES + ":row", Nodes.SettingRow.class);

@@ -11,6 +11,7 @@ import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.ui.IconAsset;
 import dev.jasper.sdk.ui.TabPlacement;
+import java.net.InetSocketAddress;
 import java.net.URI;
 import java.time.Duration;
 import java.util.List;
@@ -52,6 +53,8 @@ public final class BrowserItems implements AutoCloseable {
     private Favicons favicons;
     // Made with the first suggestion request.
     private SuggestionFetcher suggestions;
+    // The HTTP proxy both fetchers go through, those made later too (plan 6's F3).
+    private Optional<InetSocketAddress> proxy = Optional.empty();
     // Made with the first item.
     private PageNotifications notifications;
     private boolean closed;
@@ -245,10 +248,23 @@ public final class BrowserItems implements AutoCloseable {
         if (suggestions != null) suggestions.close();
     }
 
+    /**
+     * Has the items' favicon and suggestion fetches from now on go through {@code proxy} (plan 6's F3), as
+     * {@code http}'s {@code WebFetch} says, the fetchers made later too.
+     *
+     * @param proxy the HTTP proxy's address; empty for the JDK's default proxy selector
+     */
+    public void useProxy(Optional<InetSocketAddress> proxy) {
+        this.proxy = Objects.requireNonNull(proxy, "proxy");
+        if (favicons != null) favicons.useProxy(proxy);
+        if (suggestions != null) suggestions.useProxy(proxy);
+    }
+
     /** The fetcher of the items' pages' favicons; one that fetches nothing once the plugin has stopped. */
     Favicons favicons() {
         if (favicons == null) {
             favicons = new Favicons(FaviconDecoder::toPng, context.background());
+            favicons.useProxy(proxy);
             if (closed) favicons.close();
         }
         return favicons;
@@ -294,6 +310,7 @@ public final class BrowserItems implements AutoCloseable {
     private CompletableFuture<List<String>> fetchSuggestions(URI request) {
         if (suggestions == null) {
             suggestions = new SuggestionFetcher(context.background());
+            suggestions.useProxy(proxy);
             if (closed) suggestions.close();
         }
         return suggestions.fetch(request);
