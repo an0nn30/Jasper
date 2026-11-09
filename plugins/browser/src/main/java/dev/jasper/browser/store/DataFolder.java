@@ -25,8 +25,9 @@ import java.util.function.Predicate;
  * marked them (ruling V25), so the database never opens them; a marked file that cannot be deleted is not to be used
  * for the run ({@link #databaseUsable()}, ruling V27). It runs on whichever thread needs the folder first: the
  * database's, before the file opens, or Chromium's worker, before Chromium writes there. Permissions that cannot be set
- * are logged once, as a warning, and the folder is used all the same. On Windows it does nothing. Making one does no
- * I/O.
+ * are logged once, as a warning, and the folder is used all the same. On a file system without POSIX permissions, as
+ * on Windows, only the permissions are left as they are: marked database files are deleted there too. Making one does
+ * no I/O.
  */
 public final class DataFolder {
     /** The history's and bookmarks' file in the folder. */

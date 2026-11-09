@@ -175,6 +175,7 @@ final class HostedNotifications implements Notifications {
             Handle newest = null;
             for (Handle handle : handles) {
                 if (handle.owner().closed) continue;
+                // By identity: the fold and restate store on the entry the very request a handle carries.
                 if (handle.carried == entry.request()) return;
                 newest = handle;
             }

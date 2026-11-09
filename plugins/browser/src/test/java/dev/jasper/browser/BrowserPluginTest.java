@@ -238,6 +238,7 @@ class BrowserPluginTest {
         var host = new AtomicReference<FakePluginHost>();
         SwingUtilities.invokeAndWait(() -> {
             host.set(new FakePluginHost());
+            host.get().setSetting(ID, "http_proxy", true);
             var plugin = plugin();
             host.get().start(INFO, Set.of(), Set.of(), plugin);
             EngineTestAccess.contextInitialized(plugin.chromium(), new RecordingContext(1).refusing("called on invalid thread"));
@@ -248,6 +249,31 @@ class BrowserPluginTest {
             assertThat(lines.get()).containsExactly("dev.jasper.browser|ERROR|" + Chromium.PROXY_REFUSED + "|called on invalid thread");
         } finally {
             SwingUtilities.invokeAndWait(() -> host.get().close());
+        }
+    }
+
+    /**
+     * Final review A's item 2: with the proxy off, the start gives Chromium the system's settings, and a refusal of them
+     * is logged, never posted.
+     */
+    @Test void aRefusalOfTheSystemsProxySettingsWhileTheProxyIsOffIsLoggedNotPosted() throws Exception {
+        var lines = new AtomicReference<List<String>>();
+        var host = new AtomicReference<FakePluginHost>();
+        try (var log = new CapturedLog("dev.jasper.browser.engine.NetworkPreferences")) {
+            SwingUtilities.invokeAndWait(() -> {
+                host.set(new FakePluginHost());
+                var plugin = plugin();
+                host.get().start(INFO, Set.of(), Set.of(), plugin);
+                EngineTestAccess.contextInitialized(plugin.chromium(), new RecordingContext(1).refusing("called on invalid thread"));
+            });
+            try {
+                SwingUtilities.invokeAndWait(() -> lines.set(host.get().notifications().lines()));
+                assertThat(lines.get()).as("nothing posted").isEmpty();
+                assertThat(log.records()).extracting(LogRecord::getLevel, LogRecord::getMessage)
+                    .containsExactly(tuple(Level.WARNING, "Chromium refused the system's proxy settings: called on invalid thread"));
+            } finally {
+                SwingUtilities.invokeAndWait(() -> host.get().close());
+            }
         }
     }
 
@@ -670,7 +696,7 @@ class BrowserPluginTest {
                 var refused = plugin.about().query("jasper-about:" + page, true, 63, plugin.about().secret(page).orElseThrow() + list);
                 assertThat(refused).as(page).isPresent();
                 assertThat(refused.get()).as(page + " from a browser no page has").failsWithin(10, TimeUnit.SECONDS)
-                    .withThrowableThat().withMessageContaining("Jasper could not answer this request.");
+                    .withThrowableThat().withMessageContaining(dev.jasper.browser.engine.AboutScheme.UNANSWERED);
             }
         } finally {
             SwingUtilities.invokeAndWait(() -> host.get().close());

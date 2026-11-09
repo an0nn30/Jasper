@@ -47,6 +47,11 @@ public final class AboutScheme {
     public static final String NAME = "jasper-about";
     /** The most characters a page's query may hold, its page's secret with it: 64 Ki. */
     public static final int LONGEST_REQUEST = 65_536;
+    /**
+     * What a page's script is told when Jasper could not answer its request: a query of Jasper's pages, or a request
+     * the {@code links} package's routers take from a page.
+     */
+    public static final String UNANSWERED = "Jasper could not answer this request.";
     private static final System.Logger LOG = System.getLogger(AboutScheme.class.getName());
     private static final Pattern PAGE = Pattern.compile("[a-z][a-z0-9-]*");
     // A page's secret: 128 random bits, as 32 lowercase hexadecimal digits.

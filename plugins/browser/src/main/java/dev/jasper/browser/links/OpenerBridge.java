@@ -1,5 +1,6 @@
 package dev.jasper.browser.links;
 
+import dev.jasper.browser.engine.AboutScheme;
 import dev.jasper.browser.http.WebFetch;
 import dev.jasper.browser.json.StrictJson;
 import dev.jasper.browser.links.Isolation.OpenerPolicy;
@@ -507,7 +508,7 @@ final class OpenerBridge {
      * @param reply told the answer
      */
     void answer(Party sender, boolean mainFrame, Sender from, String text, long nowMillis, Consumer<Answer> reply) {
-        Answer answer = new Answer(REFUSED, "Jasper could not answer this request.");
+        Answer answer = new Answer(REFUSED, AboutScheme.UNANSWERED);
         try {
             answer = request(sender, mainFrame, from, text, nowMillis);
         } catch (RuntimeException failure) {
@@ -843,7 +844,7 @@ final class OpenerBridge {
             } catch (RuntimeException failure) {
                 LOG.log(System.Logger.Level.WARNING, "The opener bridge could not take a page's request", failure);
                 if (admitted) bridge.settled(page, main);
-                reply(callback, new Answer(REFUSED, "Jasper could not answer this request."));
+                reply(callback, new Answer(REFUSED, AboutScheme.UNANSWERED));
                 return true;
             }
         }

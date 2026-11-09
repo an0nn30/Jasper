@@ -1,22 +1,18 @@
 package dev.jasper.browser.engine;
 
 import dev.jasper.browser.engine.ChromiumLife.Step;
-import dev.jasper.browser.engine.ProfileWipe.Mark;
 import java.awt.EventQueue;
-import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
@@ -53,7 +49,7 @@ import org.cef.network.CefRequest;
  * ({@link #clearCookies}, {@link #clearWebsiteData}): before any start the profile is no Chromium's, and is wiped at
  * once or marked for the start, and while Chromium starts or runs it is cleared live, the cookies and the sites' storage;
  * Clear Website Data also marks the profile for a wipe at the next start ({@link ProfileWipe}), which the start that
- * finds the marker does before JCEF opens the profile.
+ * finds the marker does before JCEF opens the profile. {@link ChromiumClearing} does that work.
  *
  * <p>Work for Chromium's own UI thread, which is not Swing's ({@link #onChromiumThread}), waits for Chromium's context to
  * initialize, and the in-memory request contexts of /dev/null pages are made there ({@link #inMemoryContext}); Chromium
@@ -80,12 +76,9 @@ public final class Chromium implements AutoCloseable {
 
     static final String ONCE = "Chromium can start once each time Jasper runs. Quit and reopen Jasper to use the browser again.";
     static final String SLOW = "Chromium did not start within 90 seconds";
-    static final String SLOW_CLEAR = "Chromium did not clear its data within 60 seconds";
     /** How a proxy Chromium refuses is told: the plugin's error's title, and the start of a failed context's reason. */
     public static final String PROXY_REFUSED = "The proxy could not be set";
     private static final Duration START_LIMIT = Duration.ofSeconds(90);
-    // F16: the bound of a whole clearing, the wait for a start under way included.
-    private static final Duration CLEAR_LIMIT = Duration.ofSeconds(60);
     private static final Duration STOP_LIMIT = Duration.ofSeconds(10);
     private static final System.Logger LOG = System.getLogger(Chromium.class.getName());
 
@@ -120,16 +113,8 @@ public final class Chromium implements AutoCloseable {
     private volatile Predicate<CefBrowser> pageBrowsers;
     // Given as a preview first asks for its client, before any preview's browser is made: each preview browser's token.
     private volatile Function<CefBrowser, String> previewTokens;
-    // Set by the worker as the start enters: cookies Clear Cookies marked wait to be deleted before the client is made.
-    private volatile boolean cookiesPending;
-    // A test's bound of a clearing, and its stand-ins for the live clearing; null for Chromium's own.
-    private volatile Duration clearLimit = CLEAR_LIMIT;
-    private volatile Supplier<CompletableFuture<Set<String>>> liveCookies;
-    private volatile Function<List<String>, CompletableFuture<Void>> liveStorage;
-    // How the start's wipe moves and deletes: the file system's own, or a test's that refuses.
-    private volatile ProfileWipe.Disk wipeDisk = ProfileWipe.Disk.REAL;
-    // Told, on the UI thread, why cookies a Clear Cookies left for the start could not be deleted.
-    private volatile Consumer<Throwable> clearFailed = cause -> { };
+    // Clear Cookies and Clear Website Data, for the global context.
+    private final ChromiumClearing clearing;
     // Plan 6 Task 11: the HTTP proxy every context is given (V46), and whether the start's giving of it has begun, after
     // which each change goes to Chromium's thread.
     private final NetworkPreferences network = new NetworkPreferences();
@@ -164,6 +149,7 @@ public final class Chromium implements AutoCloseable {
         this.startLimit = Objects.requireNonNull(startLimit, "startLimit");
         life = new ChromiumLife<>(Objects.requireNonNull(process, "process"));
         marker = new RunMarker(dataDir);
+        clearing = new ChromiumClearing(dataDir, restrictData, worker, life, () -> state() == State.RUNNING, () -> app);
         // Task 11: the first work for Chromium's thread, so its context's initialization gives the proxy before anything.
         onChromiumThread(() -> {
             proxyLive = true;
@@ -314,8 +300,8 @@ public final class Chromium implements AutoCloseable {
      * and, from then on, each change on Chromium's thread, to the global context and every in-memory context still kept,
      * whose connections then close. Until it is set, the system's proxy settings are given, as the profile may keep
      * another proxy from an earlier run. Before any page asks for Chromium it is only remembered, and starts nothing;
-     * once Chromium cannot serve pages, nothing native is touched. Each refusal is told to {@link #onProxyFailed}. Any
-     * thread.
+     * once Chromium cannot serve pages, nothing native is touched. Each refusal of a proxy server is told to
+     * {@link #onProxyFailed}, and one of the system's settings logged. Any thread.
      *
      * @param server the proxy as {@code host:port}, an IPv6 address in brackets; empty for the system's proxy settings
      */
@@ -326,14 +312,15 @@ public final class Chromium implements AutoCloseable {
         onChromiumThread(() -> network.give(keptContexts())).whenComplete((given, failure) -> {
             // A Chromium that cannot serve pages has nothing to give it to.
             if (failure != null && unavailable().isEmpty())
-                network.refused(Objects.requireNonNullElse(failure.getMessage(), failure.toString()));
+                network.refused(server, Objects.requireNonNullElse(failure.getMessage(), failure.toString()));
         });
     }
 
     /**
-     * Has {@code told} hear, on the UI thread, Chromium's reason whenever it refuses the proxy: once for each giving to
-     * the global context and the kept contexts, once for each in-memory context as it is made, and when Chromium's
-     * thread does not take a change.
+     * Has {@code told} hear, on the UI thread, Chromium's reason whenever it refuses a proxy server: once for each
+     * giving to the global context and the kept contexts, once for each in-memory context as it is made, and when
+     * Chromium's thread does not take a change. A refusal of the system's settings, while the proxy is off, is logged
+     * and told to no one.
      *
      * @param told told the reason
      */
@@ -491,7 +478,7 @@ public final class Chromium implements AutoCloseable {
      *     fails, or the clearing takes longer than 60 seconds
      */
     public CompletableFuture<Void> clearCookies() {
-        return clear(Mark.COOKIES, Set.of(), false);
+        return clearing.clearCookies();
     }
 
     /**
@@ -513,7 +500,7 @@ public final class Chromium implements AutoCloseable {
      *     clearing takes longer than 60 seconds
      */
     public CompletableFuture<Void> clearWebsiteData(Set<String> origins, boolean database) {
-        return clear(Mark.ALL, Set.copyOf(origins), database);
+        return clearing.clearWebsiteData(origins, database);
     }
 
     /**
@@ -523,186 +510,12 @@ public final class Chromium implements AutoCloseable {
      * @param told told the cause
      */
     public void onClearFailed(Consumer<Throwable> told) {
-        clearFailed = Objects.requireNonNull(told, "told");
+        clearing.onClearFailed(told);
     }
 
-    /** Has the start's wipe move and delete through {@code disk}: a test's that refuses. */
-    void wipesWith(ProfileWipe.Disk disk) {
-        wipeDisk = Objects.requireNonNull(disk, "disk");
-    }
-
-    /** A clearing of {@code mark}, on the worker, bounded as F16 has it; the caller gets a copy of its future. */
-    private CompletableFuture<Void> clear(Mark mark, Set<String> origins, boolean database) {
-        var done = new CompletableFuture<Void>();
-        CompletableFuture.delayedExecutor(clearLimit.toMillis(), TimeUnit.MILLISECONDS)
-            .execute(() -> done.completeExceptionally(new TimeoutException(SLOW_CLEAR)));
-        try {
-            worker.execute(() -> clearOnWorker(mark, origins, database, done));
-        } catch (RejectedExecutionException refused) {
-            done.completeExceptionally(refused);
-        }
-        return copy(done);
-    }
-
-    /**
-     * The clearing's work on the worker, which alone enters the start: a start not entered yet enters only after it.
-     * Worker.
-     */
-    private void clearOnWorker(Mark mark, Set<String> origins, boolean database, CompletableFuture<Void> done) {
-        if (done.isDone()) return;
-        try {
-            restrictData.run();
-            ProfileWipe.mark(dataDir, mark, database);
-            switch (life.clearing()) {
-                case BEFORE_START -> {
-                    if (mark == Mark.ALL && ProfileWipe.runIfMarked(dataDir, wipeDisk) == Mark.ALL)
-                        throw new IOException("Chromium's profile is in use and could not be cleared: " + dataDir.resolve(ProfileWipe.PROFILE));
-                    done.complete(null);
-                }
-                case MARK_ONLY -> done.complete(null);
-                case LIVE -> {
-                    CompletableFuture<CefClient> client = life.current();
-                    if (client == null) done.complete(null);
-                    // F16: a start that fails leaves the marker, which suffices.
-                    else whenSettled(client, failure -> {
-                        if (failure != null) done.complete(null);
-                        else onUiThread(() -> clearRunning(mark, origins, done));
-                    });
-                }
-            }
-        } catch (IOException | RuntimeException failure) {
-            done.completeExceptionally(failure);
-        }
-    }
-
-    /**
-     * The live clearing, once the client is made: the cookies, then for Clear Website Data the sites' storage. Each
-     * native step runs on the UI thread while Chromium runs; once it has closed, the marker waits for the next start and
-     * nothing native is touched (Task 2's A). UI thread.
-     */
-    private void clearRunning(Mark mark, Set<String> origins, CompletableFuture<Void> done) {
-        if (done.isDone()) return;
-        if (state() != State.RUNNING) {
-            done.complete(null);
-            return;
-        }
-        live(this::liveCookies).whenComplete((domains, failure) -> {
-            if (failure != null) {
-                done.completeExceptionally(failure);
-                return;
-            }
-            if (mark == Mark.COOKIES) {
-                takeBackCookies(() -> done.complete(null));
-                return;
-            }
-            var all = new LinkedHashSet<>(origins);
-            all.addAll(ProfileClearing.cookieOrigins(domains));
-            onUiThread(() -> {
-                if (done.isDone()) return;
-                if (state() != State.RUNNING) {
-                    done.complete(null);
-                    return;
-                }
-                CompletableFuture<Void> cleared = live(() -> liveStorage(List.copyOf(all)));
-                // Given up, as past the bound: no further call.
-                done.whenComplete((over, late) -> cleared.cancel(false));
-                cleared.whenComplete((over, late) -> {
-                    if (late == null) done.complete(null);
-                    else done.completeExceptionally(late);
-                });
-            });
-        });
-    }
-
-    /** The cookies are gone: their marker goes, on the worker, then {@code then} runs; a wipe marked stays. */
-    private void takeBackCookies(Runnable then) {
-        try {
-            worker.execute(() -> {
-                try {
-                    ProfileWipe.cookiesCleared(dataDir);
-                } catch (IOException | RuntimeException kept) {
-                    LOG.log(System.Logger.Level.WARNING, "The browser's clearing marker could not be deleted", kept);
-                }
-                then.run();
-            });
-        } catch (RejectedExecutionException stopped) {
-            // The plugin has stopped: the marker stays, and the next start deletes the cookies again.
-            then.run();
-        }
-    }
-
-    /** What a live step gives, or a failed future when it throws. */
-    private static <T> CompletableFuture<T> live(Supplier<CompletableFuture<T>> step) {
-        try {
-            return Objects.requireNonNull(step.get(), "the live clearing's future");
-        } catch (RuntimeException failure) {
-            return CompletableFuture.failedFuture(failure);
-        }
-    }
-
-    /**
-     * What the client waits for as Chromium initializes: the cookies a Clear Cookies before this start marked, or those
-     * of a profile whose wipe could not move it, are deleted first, so before any page, and a {@code cookies} mark then
-     * goes, on the worker. Cookies that cannot be deleted are logged and told ({@link #onClearFailed}), the profile is
-     * marked for the next start's wipe, and Chromium goes on. Chromium's thread.
-     *
-     * @param cookies deletes every cookie, answering their domains
-     * @return completes once nothing waits; never fails
-     */
-    CompletableFuture<Void> beforeClient(Supplier<CompletableFuture<Set<String>>> cookies) {
-        if (!cookiesPending) return CompletableFuture.completedFuture(null);
-        var open = new CompletableFuture<Void>();
-        live(cookies).whenComplete((domains, failure) -> {
-            if (failure == null) takeBackCookies(() -> { });
-            else cookiesStayed(failure);
-            open.complete(null);
-        });
-        return open;
-    }
-
-    /**
-     * Review round 1's item 8: the cookies the start was to delete stayed, so they are not left silently: the next start
-     * wipes the profile, marked on the worker, and the failure is told.
-     */
-    private void cookiesStayed(Throwable failure) {
-        Throwable cause = failure instanceof CompletionException && failure.getCause() != null ? failure.getCause() : failure;
-        LOG.log(System.Logger.Level.WARNING, "Chromium could not delete the cookies Clear Cookies left; the next start wipes its profile", cause);
-        try {
-            worker.execute(() -> {
-                try {
-                    ProfileWipe.mark(dataDir, Mark.ALL);
-                } catch (IOException | RuntimeException unmarked) {
-                    LOG.log(System.Logger.Level.WARNING, "The browser's clearing marker could not be written", unmarked);
-                }
-            });
-        } catch (RejectedExecutionException stopped) {
-            // The plugin has stopped: the cookies' marker stays for the next start.
-        }
-        Consumer<Throwable> told = clearFailed;
-        EventQueue.invokeLater(() -> told.accept(cause));
-    }
-
-    /** The live deletion of the cookies: a test's stand-in, or Chromium's own. */
-    private CompletableFuture<Set<String>> liveCookies() {
-        Supplier<CompletableFuture<Set<String>>> standIn = liveCookies;
-        return standIn != null ? standIn.get() : app.clearCookies();
-    }
-
-    /** The live clearing of the sites' storage: a test's stand-in, or Chromium's own. UI thread. */
-    private CompletableFuture<Void> liveStorage(List<String> origins) {
-        Function<List<String>, CompletableFuture<Void>> standIn = liveStorage;
-        return standIn != null ? standIn.apply(origins) : app.clearStorage(origins, () -> state() == State.RUNNING);
-    }
-
-    /** Has a clearing's live part done by {@code cookies} and {@code storage} instead of JCEF: a test's stand-ins. */
-    void clearLiveWith(Supplier<CompletableFuture<Set<String>>> cookies, Function<List<String>, CompletableFuture<Void>> storage) {
-        liveCookies = Objects.requireNonNull(cookies, "cookies");
-        liveStorage = Objects.requireNonNull(storage, "storage");
-    }
-
-    /** Bounds each clearing by {@code limit} instead of 60 seconds: a test's. */
-    void clearsWithin(Duration limit) {
-        clearLimit = Objects.requireNonNull(limit, "limit");
+    /** The clearing, whose seams the tests use. */
+    ChromiumClearing clearing() {
+        return clearing;
     }
 
     /** Has {@link #inMemoryContext} make its contexts with {@code made} instead of CEF: a test's stand-ins. */
@@ -813,22 +626,21 @@ public final class Chromium implements AutoCloseable {
             // From now on JCEF's cookie manager can hand work to Chromium's thread; it is got here, outside the work's lock.
             handOverWith(started.handOver());
             // Plan 6 Task 8: cookies Clear Cookies marked before this start go before the client is made, so before any page.
-            beforeClient(started::clearCookies).whenComplete((open, never) -> run(life.initialized()));
+            clearing.beforeClient(started::clearCookies).whenComplete((open, never) -> run(life.initialized()));
         });
     }
 
     /**
      * The worker begins the start: whether it may call JCEF, which it may only while the start is under way. When it may,
      * the data directory is made its owner's alone, then a profile Clear Website Data marked is wiped and cookies Clear
-     * Cookies marked wait for {@link #beforeClient} ({@link ProfileWipe}), then Chromium is marked, so a fatal error while
+     * Cookies marked wait for the client ({@link ChromiumClearing#entered}), then Chromium is marked, so a fatal error while
      * it initializes leaves the mark. A close that comes between the two leaves no mark: once closed, the marker is not
      * written. Worker.
      */
     boolean enter() {
         if (!life.enter()) return false;
         restrictData.run();
-        // Review round 1's item 5: a profile whose wipe could not move it still has its cookies deleted.
-        cookiesPending = ProfileWipe.runIfMarked(dataDir, wipeDisk) != Mark.NONE;
+        clearing.entered();
         marker.started();
         return true;
     }
@@ -864,11 +676,6 @@ public final class Chromium implements AutoCloseable {
         }
     }
 
-    /** Tells {@code then} how {@code future} ended: null once it completed; generic, so this class names no Chromium type here. */
-    private static <C> void whenSettled(CompletableFuture<C> future, Consumer<Throwable> then) {
-        future.whenComplete((value, failure) -> then.accept(failure));
-    }
-
     /** Hands the client to its future; generic, so this class casts nothing to a Chromium type. */
     private static <C> void complete(Step.Complete<C> done) { done.client().complete(done.value()); }
 
@@ -876,7 +683,7 @@ public final class Chromium implements AutoCloseable {
      * A future of the caller's own that completes as {@code shared} does, on the same thread: with its value, or failing
      * with the cause it failed with. Generic, so this class names no Chromium type here.
      */
-    private static <C> CompletableFuture<C> copy(CompletableFuture<C> shared) {
+    static <C> CompletableFuture<C> copy(CompletableFuture<C> shared) {
         var own = new CompletableFuture<C>();
         shared.whenComplete((value, failure) -> {
             if (failure == null) own.complete(value);
@@ -937,7 +744,8 @@ public final class Chromium implements AutoCloseable {
         }
     }
 
-    private static void onUiThread(Runnable task) {
+    /** Runs {@code task} now on the UI thread, or hands it there. */
+    static void onUiThread(Runnable task) {
         if (EventQueue.isDispatchThread()) task.run();
         else EventQueue.invokeLater(task);
     }

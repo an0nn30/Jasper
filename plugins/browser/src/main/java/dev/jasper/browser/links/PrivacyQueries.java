@@ -1,5 +1,6 @@
 package dev.jasper.browser.links;
 
+import dev.jasper.browser.engine.AboutScheme;
 import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.page.ChallengeFrames;
 import dev.jasper.browser.page.Page;
@@ -96,7 +97,7 @@ final class PrivacyQueries {
         NOT_ALLOWED = new Answer(REFUSED, "This site may not show notifications."),
         NOT_SHOWN = new Answer(REFUSED, "Jasper did not show the notification."),
         CHALLENGE = new Answer(REFUSED, "Jasper takes no report of sound from a challenge frame."),
-        UNANSWERED = new Answer(REFUSED, "Jasper could not answer this request.");
+        UNANSWERED = new Answer(REFUSED, AboutScheme.UNANSWERED);
     private static final System.Logger LOG = System.getLogger(PrivacyQueries.class.getName());
     /** The ops, which a router hands each request it takes. */
     PrivacyQueries() { }

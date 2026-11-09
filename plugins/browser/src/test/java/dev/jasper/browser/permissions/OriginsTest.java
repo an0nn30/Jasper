@@ -73,4 +73,22 @@ class OriginsTest {
             assertThat(Origins.secure(insecure)).as(insecure).isFalse();
         assertThat(Origins.of("HTTP://LOCALHOST:3000/a").map(Origins::secure)).contains(true);
     }
+
+    /**
+     * Final review A's item 3: an origin's host, which the challenge frames and the page notifications read: without
+     * the scheme and the port, an IPv6 host in its brackets, and a file's none; text with no scheme is read as a host and
+     * port.
+     */
+    @Test void anOriginsHostIsWithoutItsSchemeAndPort() {
+        assertThat(Origins.host("https://a.example")).isEqualTo("a.example");
+        assertThat(Origins.host("http://a.example:8080")).isEqualTo("a.example");
+        assertThat(Origins.host("https://a.example.")).as("a trailing dot is kept").isEqualTo("a.example.");
+        assertThat(Origins.host("http://[::1]:3000")).isEqualTo("[::1]");
+        assertThat(Origins.host("https://[::ffff:7f00:1]")).isEqualTo("[::ffff:7f00:1]");
+        assertThat(Origins.host("file://")).as("a file's").isEmpty();
+        assertThat(Origins.host("a.example:443")).as("no scheme").isEqualTo("a.example");
+        assertThat(Origins.host("a.example:")).as("an empty port").isEqualTo("a.example");
+        assertThat(Origins.host("https://[::1")).as("an unended bracket stays").isEqualTo("[::1");
+        assertThat(Origins.of("https://Example.com:8443/x").map(Origins::host)).contains("example.com");
+    }
 }

@@ -89,6 +89,7 @@ class NetworkPreferencesTest {
         var network = new NetworkPreferences();
         var toldOf = new CopyOnWriteArrayList<String>();
         network.onRefused(reason -> toldOf.add(reason + (EventQueue.isDispatchThread() ? " on the UI thread" : "")));
+        network.remember(Optional.of("127.0.0.1:8118"));
         network.globalContext(new RecordingContext(1).refusing("called on invalid thread"));
         var kept = new KeptContext(new RecordingContext(2).refusing("no request context"), CefRequestContext::dispose, () -> false);
         network.give(List.of(kept));
@@ -100,7 +101,8 @@ class NetworkPreferencesTest {
     /**
      * Ruling F4: a context just made is given the proxy before anything is made over it; while the proxy is on, one that
      * refuses it is disposed and fails, and while it is off, one that refuses it is the system's, as asked, and is given
-     * all the same. Each refusal is told.
+     * all the same. A refused proxy server is told; a refusal of the system's settings is only logged (final review A's
+     * item 2).
      */
     @Test void aContextJustMadeIsGivenTheProxyAndWhileOnOneThatRefusesItIsDisposedAndFails() throws Exception {
         var network = new NetworkPreferences();
@@ -117,10 +119,38 @@ class NetworkPreferencesTest {
         assertThat(disposed).containsExactly(refusing);
         network.remember(Optional.empty());
         var direct = new RecordingContext(3).refusing("no value to set");
-        assertThat(network.given(direct, disposed::add)).as("off: the system's, as asked").isSameAs(direct);
+        try (var log = new dev.jasper.browser.store.CapturedLog(NetworkPreferences.class.getName())) {
+            assertThat(network.given(direct, disposed::add)).as("off: the system's, as asked").isSameAs(direct);
+            assertThat(log.records()).extracting(java.util.logging.LogRecord::getLevel, java.util.logging.LogRecord::getMessage)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple(java.util.logging.Level.WARNING,
+                    "Chromium refused the system's proxy settings: no value to set"));
+        }
         assertThat(disposed).containsExactly(refusing);
         EventQueue.invokeAndWait(() -> { });
-        assertThat(toldOf).containsExactly("no request context", "no value to set");
+        assertThat(toldOf).containsExactly("no request context");
+    }
+
+    /**
+     * Final review A's item 2: while the proxy is off, Jasper gives the system's settings at every start, so Chromium's
+     * refusal of them is logged and told to no one; a refused proxy server is told.
+     */
+    @Test void aRefusalOfTheSystemsSettingsIsLoggedAndToldToNoOne() throws Exception {
+        var network = new NetworkPreferences();
+        var toldOf = new CopyOnWriteArrayList<String>();
+        network.onRefused(toldOf::add);
+        network.globalContext(new RecordingContext(1).refusing("called on invalid thread"));
+        try (var log = new dev.jasper.browser.store.CapturedLog(NetworkPreferences.class.getName())) {
+            network.give(List.of());
+            network.refused(Optional.empty(), "Chromium's thread did not take the work");
+            assertThat(log.records()).extracting(java.util.logging.LogRecord::getMessage).containsExactly(
+                "Chromium refused the system's proxy settings: called on invalid thread",
+                "Chromium refused the system's proxy settings: Chromium's thread did not take the work");
+        }
+        network.remember(Optional.of("127.0.0.1:8118"));
+        network.give(List.of());
+        network.refused(Optional.of("127.0.0.1:8118"), "Chromium's thread did not take the work");
+        EventQueue.invokeAndWait(() -> { });
+        assertThat(toldOf).containsExactly("called on invalid thread", "Chromium's thread did not take the work");
     }
 
     @Test void aRefusedProxyGivesChromiumsReasonAndClosesNothing() {

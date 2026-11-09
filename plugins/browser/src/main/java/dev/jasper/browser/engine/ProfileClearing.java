@@ -120,7 +120,7 @@ final class ProfileClearing {
     static CompletableFuture<Void> clearStorage(CefClient client, List<String> origins, BooleanSupplier running) {
         Helper helper;
         try {
-            helper = new Helper(client);
+            helper = new Helper(client, running);
         } catch (RuntimeException failure) {
             return CompletableFuture.failedFuture(failure);
         }
@@ -146,7 +146,7 @@ final class ProfileClearing {
             cleared.whenComplete((done, failure) -> calls.cancel(false));
         }));
         // Whether it ends, fails or is given up, the helper closes, on the UI thread, unless Chromium has stopped: its
-        // dispose closes every client's browsers then.
+        // dispose closes every client's browsers then, and a helper made after it closes as it is made.
         cleared.whenComplete((done, failure) -> EventQueue.invokeLater(() -> {
             if (running.getAsBoolean()) helper.close(true);
         }));
@@ -253,40 +253,69 @@ final class ProfileClearing {
     /**
      * The helper browser: off screen at {@code about:blank} in the global context, drawn into a 1 by 1 view nobody sees,
      * on the clearing client. Its close goes ahead at once, without JCEF's question to a window it has none of; one
-     * asked before Chromium has made it closes as it is made.
+     * asked before Chromium has made it closes as it is made, and so does one Chromium makes once it no longer runs
+     * ({@link HelperClose}).
      */
     private static final class Helper extends CefBrowserOsrWithHandler {
         private final CompletableFuture<Void> made = new CompletableFuture<>();
-        // Guarded by this.
-        private boolean closeAsked, created;
+        private final HelperClose closing;
 
-        Helper(CefClient client) {
+        Helper(CefClient client, BooleanSupplier running) {
             super(client, "about:blank", null, new OnePixel());
+            closing = new HelperClose(running);
         }
 
-        /** Chromium has made the native browser. Chromium's thread. */
+        /**
+         * Chromium has made the native browser: it closes now when its close was asked or Chromium no longer runs, and
+         * the clearing, told it is made, goes on or learns that Chromium has stopped. Chromium's thread.
+         */
         void made() {
-            boolean closeNow;
-            synchronized (this) {
-                created = true;
-                closeNow = closeAsked;
-            }
-            if (closeNow) super.close(true);
-            else made.complete(null);
+            if (closing.made()) super.close(true);
+            made.complete(null);
         }
 
         @Override public void close(boolean force) {
-            boolean closeNow;
-            synchronized (this) {
-                if (closeAsked) return;
-                closeAsked = true;
-                closeNow = created;
-            }
-            if (closeNow) super.close(force);
+            if (closing.closeAsked()) super.close(force);
         }
 
         @Override public boolean doClose() {
             return false;
+        }
+    }
+
+    /**
+     * When the helper browser closes: as soon as it is made and its close is asked, once; and as it is made once
+     * Chromium no longer runs, as Chromium's dispose closed only the browsers made by then (final review A's item 1).
+     */
+    static final class HelperClose {
+        private final BooleanSupplier running;
+        // Guarded by this.
+        private boolean closeAsked, created;
+
+        /** The decision for one helper, {@code running} saying whether Chromium still runs. */
+        HelperClose(BooleanSupplier running) {
+            this.running = Objects.requireNonNull(running, "running");
+        }
+
+        /**
+         * The browser is made: whether it closes now, as its close was asked before or Chromium no longer runs; it closes
+         * once. Chromium's thread.
+         */
+        boolean made() {
+            boolean stopped = !running.getAsBoolean();
+            synchronized (this) {
+                created = true;
+                if (closeAsked) return true;
+                closeAsked = stopped;
+                return stopped;
+            }
+        }
+
+        /** Its close is asked: whether it closes now, as it is made; false when its close was asked before. Any thread. */
+        synchronized boolean closeAsked() {
+            if (closeAsked) return false;
+            closeAsked = true;
+            return created;
         }
     }
 

@@ -1,7 +1,6 @@
 package dev.jasper.browser.page;
 
 import dev.jasper.browser.permissions.Origins;
-import java.util.Locale;
 import java.util.Optional;
 
 /**
@@ -32,12 +31,13 @@ public final class ChallengeFrames {
         return (host.equals("www.google.com") || host.equals("www.recaptcha.net")) && path(address).startsWith("/recaptcha/");
     }
 
-    /** The host of {@code origin}, an http or https one as {@link Origins#of} writes it, without a trailing dot. */
+    /**
+     * The host of {@code origin}, an http or https one as {@link Origins#of} writes it, in lower case, without a
+     * trailing dot.
+     */
     private static String host(String origin) {
-        String authority = origin.substring(origin.indexOf("://") + 3);
-        int port = authority.startsWith("[") ? authority.indexOf(']') + 1 : authority.lastIndexOf(':');
-        String host = port > 0 && port < authority.length() ? authority.substring(0, port) : authority;
-        return (host.endsWith(".") ? host.substring(0, host.length() - 1) : host).toLowerCase(Locale.ROOT);
+        String host = Origins.host(origin);
+        return host.endsWith(".") ? host.substring(0, host.length() - 1) : host;
     }
 
     /**

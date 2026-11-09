@@ -27,7 +27,6 @@ public final class WelcomePage {
     /** How many sites the page shows at most. */
     static final int TOP_SITES = 8;
     private static final String NOT_UNDERSTOOD = "Jasper does not understand this request.";
-    private static final String NO_HISTORY = "Jasper could not answer this request.";
 
     private WelcomePage() { }
 
@@ -47,7 +46,7 @@ public final class WelcomePage {
         Objects.requireNonNull(onboarding, "onboarding");
         about.register(NAME, () -> pages.render(NAME, Map.of()));
         about.registerQueries(NAME, (browser, request) -> history.apply(browser).map(found -> answer(found, request))
-            .orElseGet(() -> CompletableFuture.failedFuture(new IllegalStateException(NO_HISTORY))));
+            .orElseGet(() -> CompletableFuture.failedFuture(new IllegalStateException(AboutScheme.UNANSWERED))));
         about.redirect(NAME, () -> onboarding.finished() ? Optional.empty() : Optional.of(AboutScheme.NAME + ":" + OnboardingPages.INTRO_PAGE));
     }
 

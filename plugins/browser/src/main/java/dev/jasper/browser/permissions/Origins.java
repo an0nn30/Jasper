@@ -6,8 +6,8 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 
 /**
- * The site a permission is kept for: an address's origin, as Chromium writes one; and whether it is a secure context's,
- * where Chromium offers notifications.
+ * The site a permission is kept for: an address's origin, as Chromium writes one, and its host; and whether it is a
+ * secure context's, where Chromium offers notifications.
  */
 public final class Origins {
     /** The one origin of every {@code file:} address. */
@@ -35,6 +35,20 @@ public final class Origins {
         if (origin.startsWith("https://")) return true;
         if (!origin.startsWith("http://")) return false;
         return LOOPBACK.matcher(origin.substring("http://".length()).replaceFirst(":[0-9]+$", "")).matches();
+    }
+
+    /**
+     * The host of {@code origin}, as {@link #of} writes one: without its scheme and port, an IPv6 host in its brackets
+     * and a trailing dot kept; empty for a file's. Text with no scheme is read as a host and port.
+     *
+     * @param origin an origin
+     * @return its host
+     */
+    public static String host(String origin) {
+        int start = origin.indexOf("://");
+        String authority = start < 0 ? origin : origin.substring(start + 3);
+        int port = authority.startsWith("[") ? authority.indexOf(']') + 1 : authority.lastIndexOf(':');
+        return port > 0 && port < authority.length() ? authority.substring(0, port) : authority;
     }
 
     /**

@@ -55,12 +55,16 @@ class SitePermissionsTest {
     }
 
     @AfterEach void close() throws Exception {
-        if (host != null) onUi(() -> {
-            host.close();
-            return null;
-        });
-        memory.close();
-        unhurried.close();
+        // The prompts' clock is static: it goes back whatever the closing throws.
+        try {
+            if (host != null) onUi(() -> {
+                host.close();
+                return null;
+            });
+            memory.close();
+        } finally {
+            unhurried.close();
+        }
     }
 
     @Test void aStoredDecisionAnswersAtOnceWithoutAPrompt() throws Exception {

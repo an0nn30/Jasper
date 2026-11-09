@@ -15,8 +15,8 @@
  * - close() asks Jasper to take the notification away (op "notification.close") and fires close.
  *
  * The page function is the one found when this script runs, and so are the built-ins the stand-in calls, so a page
- * that changes them later breaks nothing of it; Jasper checks every request itself: a notification shows only when the
- * user allowed the site. Running it again in the same document does nothing.
+ * that changes them later can break at most its own calls to the stand-in; Jasper checks every request itself: a
+ * notification shows only when the user allowed the site. Running it again in the same document does nothing.
  */
 (function (permission) {
   'use strict';

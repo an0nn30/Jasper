@@ -1073,7 +1073,7 @@ class ChromiumStateTest {
     /** F16: the whole clearing is bounded, here for a start that never ends; past the bound it fails. */
     @Test void aClearingThatWaitsPastItsBoundFails() throws Exception {
         Chromium chromium = chromium(recording, LIMIT);
-        chromium.clearsWithin(Duration.ofMillis(100));
+        chromium.clearing().clearsWithin(Duration.ofMillis(100));
         live(chromium);
         startEntered(chromium);
         var cleared = chromium.clearWebsiteData(Set.of(), false);
@@ -1118,7 +1118,7 @@ class ChromiumStateTest {
     /** A live clearing that fails fails the clearing, and Clear Cookies' marker stays for the next start. */
     @Test void aLiveClearingThatFailsFailsAndLeavesTheMarker() throws Exception {
         Chromium chromium = chromium(recording, LIMIT);
-        chromium.clearLiveWith(() -> CompletableFuture.failedFuture(new IllegalStateException("Chromium could not delete its cookies")),
+        chromium.clearing().clearLiveWith(() -> CompletableFuture.failedFuture(new IllegalStateException("Chromium could not delete its cookies")),
             origins -> CompletableFuture.completedFuture(null));
         startEntered(chromium);
         EventQueue.invokeAndWait(() -> chromium.clientCreated(null));
@@ -1148,7 +1148,7 @@ class ChromiumStateTest {
         assertThat(clearMarker()).doesNotExist();
         assertThat(marker()).as("then the run marker").isRegularFile();
         var asked = new AtomicInteger();
-        assertThat(succeeded(wiped.beforeClient(() -> {
+        assertThat(succeeded(wiped.clearing().beforeClient(() -> {
             asked.incrementAndGet();
             return CompletableFuture.completedFuture(Set.of());
         }))).as("no cookies wait").isTrue();
@@ -1161,7 +1161,7 @@ class ChromiumStateTest {
         starts.clear();
         assertThat(later.enter()).isTrue();
         var deleting = new CompletableFuture<Set<String>>();
-        var gate = later.beforeClient(() -> {
+        var gate = later.clearing().beforeClient(() -> {
             asked.incrementAndGet();
             return deleting;
         });
@@ -1195,7 +1195,7 @@ class ChromiumStateTest {
             var toldOf = new CopyOnWriteArrayList<String>();
             chromium.onClearFailed(cause -> toldOf.add(cause.getMessage() + (EventQueue.isDispatchThread() ? " on the UI thread" : "")));
             startEntered(chromium);
-            var gate = chromium.beforeClient(() -> CompletableFuture.failedFuture(new IllegalStateException("refused")));
+            var gate = chromium.clearing().beforeClient(() -> CompletableFuture.failedFuture(new IllegalStateException("refused")));
             assertThat(succeeded(gate)).as("the start goes on").isTrue();
             runNext(); // the wipe marked, on the worker
             assertThat(Files.readString(clearMarker())).as("the next start wipes").isEqualTo("all");
@@ -1217,7 +1217,7 @@ class ChromiumStateTest {
         Path cookies = profile();
         ProfileWipe.mark(data, ProfileWipe.Mark.ALL);
         Chromium chromium = chromium(recording, LIMIT);
-        chromium.wipesWith(new ProfileWipe.Disk() {
+        chromium.clearing().wipesWith(new ProfileWipe.Disk() {
             @Override public void move(Path from, Path to) throws java.io.IOException {
                 throw new java.nio.file.FileSystemException(from.toString(), to.toString(), "in use");
             }
@@ -1232,7 +1232,7 @@ class ChromiumStateTest {
         }
         assertThat(cookies).as("kept whole").isRegularFile();
         var asked = new AtomicInteger();
-        var gate = chromium.beforeClient(() -> {
+        var gate = chromium.clearing().beforeClient(() -> {
             asked.incrementAndGet();
             return CompletableFuture.completedFuture(Set.of());
         });
@@ -1251,7 +1251,7 @@ class ChromiumStateTest {
         Chromium chromium = chromium(recording, LIMIT);
         var deleting = new CompletableFuture<Set<String>>();
         var storage = new AtomicInteger();
-        chromium.clearLiveWith(() -> deleting, origins -> {
+        chromium.clearing().clearLiveWith(() -> deleting, origins -> {
             storage.incrementAndGet();
             return CompletableFuture.completedFuture(null);
         });
@@ -1302,7 +1302,7 @@ class ChromiumStateTest {
      */
     private List<String> live(Chromium chromium) {
         var live = new CopyOnWriteArrayList<String>();
-        chromium.clearLiveWith(() -> {
+        chromium.clearing().clearLiveWith(() -> {
             live.add("cookies " + thread());
             return CompletableFuture.completedFuture(Set.of(".b.example", "C.example"));
         }, origins -> {

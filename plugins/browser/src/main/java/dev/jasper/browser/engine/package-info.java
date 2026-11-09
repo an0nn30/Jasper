@@ -17,7 +17,8 @@
  * browser's context object as the browser closes. It serves {@code jasper-about:} to such a context's pages through
  * their request handler, as its scheme handler factory serves the global context alone. {@code NetworkPreferences}
  * gives the global context and each in-memory one the HTTP proxy there, as Chromium's {@code proxy} preference.
- * Clear Cookies and Clear Website Data clear the global context, the persistent store's:
+ * Clear Cookies and Clear Website Data clear the global context, the persistent store's, through
+ * {@code ChromiumClearing}, which loads with Chromium and calls JCEF only once Chromium runs:
  * {@link dev.jasper.browser.engine.ProfileWipe}, plain Java, keeps the marker by which the next start, on Chromium's
  * worker before JCEF opens the profile, wipes the profile or has its cookies deleted, and by which the data folder's
  * first use deletes a database that ran in memory and could not erase its file, and {@code ProfileClearing}, which

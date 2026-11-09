@@ -1,5 +1,6 @@
 package dev.jasper.browser.item;
 
+import dev.jasper.browser.engine.AboutScheme;
 import dev.jasper.browser.page.PageContext;
 import dev.jasper.browser.permissions.PermissionStore;
 import dev.jasper.browser.store.BrowserDatabase;
@@ -29,8 +30,6 @@ import java.util.function.Supplier;
  * queries from the asking browser's store. UI thread, except where a method says otherwise.
  */
 public final class DataStores implements AutoCloseable {
-    /** Why a query from a browser with no open store fails. */
-    static final String NO_STORE = "Jasper could not answer this request.";
     private final Stores plugins;
     private final Supplier<Stores> memory;
     private final Supplier<PageContext> contexts;
@@ -145,7 +144,7 @@ public final class DataStores implements AutoCloseable {
      */
     public <T> CompletableFuture<T> answer(int browser, Function<DataStore, CompletableFuture<T>> answer) {
         Objects.requireNonNull(answer, "answer");
-        return forBrowser(browser).map(answer).orElseGet(() -> CompletableFuture.failedFuture(new IllegalStateException(NO_STORE)));
+        return forBrowser(browser).map(answer).orElseGet(() -> CompletableFuture.failedFuture(new IllegalStateException(AboutScheme.UNANSWERED)));
     }
 
     /**

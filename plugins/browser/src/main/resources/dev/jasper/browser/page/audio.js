@@ -20,7 +20,7 @@
  * The muting is cooperative: the page's own scripts can call setMuted too, and an AudioContext made before this ran is
  * not tracked, nor is an element's autoplay in a shadow root made before this ran, or one the parser made from a
  * declarative shadow root. The page function is the one found when this runs, and so are the built-ins it calls, so a
- * page that changes them later breaks none of it. Running it again in the same document does nothing.
+ * page that changes them later can break at most its own muting. Running it again in the same document does nothing.
  */
 (function (mode) {
   'use strict';

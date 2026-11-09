@@ -1,6 +1,7 @@
 package dev.jasper.browser.item;
 
 import dev.jasper.browser.page.Page;
+import dev.jasper.browser.permissions.Origins;
 import dev.jasper.sdk.notifications.DisplayMode;
 import dev.jasper.sdk.notifications.GroupSpec;
 import dev.jasper.sdk.notifications.NotificationGroup;
@@ -180,12 +181,12 @@ public final class PageNotifications {
         return ELLIPSIS + tail;
     }
 
-    /** The host of {@code origin}, without its scheme and port; an origin with none, as a file's, is itself. */
+    /**
+     * The host of {@code origin}, without its scheme and port ({@link Origins#host}); an origin with none, as a file's,
+     * is itself.
+     */
     static String host(String origin) {
-        int start = origin.indexOf("://");
-        String authority = start < 0 ? origin : origin.substring(start + 3);
-        int port = authority.startsWith("[") ? authority.indexOf(']') + 1 : authority.lastIndexOf(':');
-        String host = port > 0 && port < authority.length() ? authority.substring(0, port) : authority;
+        String host = Origins.host(origin);
         return visible(host) ? host : origin;
     }
 

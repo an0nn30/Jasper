@@ -15,7 +15,8 @@ import org.cef.browser.CefRequestContext;
  * over one. JCEF's {@code setPreference} hands a Java {@link Map} to CEF as a dictionary, its strings as strings
  * ({@code GetCefValueFromJNIObject} in {@code libjcef}), and answers null once the preference is set, or Chromium's
  * reason: {@code "called on invalid thread"} off Chromium's UI thread, among others. What Chromium then reads back is
- * logged at DEBUG (F38). Each refusal is told on the UI thread. {@link Chromium} decides when the proxy is given.
+ * logged at DEBUG (F38). Each refusal of a proxy server is told on the UI thread; one of the system's settings, which every
+ * start gives while the proxy is off, is logged. {@link Chromium} decides when the proxy is given.
  */
 final class NetworkPreferences {
     /** The preference's name. */
@@ -37,7 +38,7 @@ final class NetworkPreferences {
     }
 
     /**
-     * Has {@code told} hear, on the UI thread, Chromium's reason whenever it refuses the proxy.
+     * Has {@code told} hear, on the UI thread, Chromium's reason whenever it refuses a proxy server.
      *
      * @param told told the reason
      */
@@ -57,25 +58,26 @@ final class NetworkPreferences {
 
     /**
      * Gives the proxy to the global context, once it is known, and to each of {@code kept} still kept, under its record's
-     * lock (V12), and closes their connections; the first refusal is told. Chromium's thread.
+     * lock (V12), and closes their connections; the first refusal is told, as {@link #refused} says. Chromium's thread.
      *
      * @param kept the in-memory contexts Chromium keeps, disposed ones among them
      */
     void give(List<KeptContext> kept) {
-        Map<String, Object> value = proxy(server);
+        Optional<String> on = server;
+        Map<String, Object> value = proxy(on);
         CefRequestContext started = global;
         Optional<String> refused = started == null ? Optional.empty() : apply(started, value);
         for (KeptContext each : kept) {
             Optional<String> refusal = each.ifKept(context -> apply(context, value)).flatMap(reason -> reason);
             if (refused.isEmpty()) refused = refusal;
         }
-        refused.ifPresent(this::refused);
+        refused.ifPresent(reason -> refused(on, reason));
     }
 
     /**
      * {@code made}, an in-memory context just made, given the proxy before anything is made over it. A refusal is told,
-     * and while the proxy is on, the context is disposed and fails (F4), so no page of its group goes direct; while it is
-     * off, the context has the system's settings, as asked. Chromium's thread.
+     * as {@link #refused} says, and while the proxy is on, the context is disposed and fails (F4), so no page of its group
+     * goes direct; while it is off, the context has the system's settings, as asked. Chromium's thread.
      *
      * @param made the context
      * @param dispose disposes a context that is not kept
@@ -86,18 +88,25 @@ final class NetworkPreferences {
         Optional<String> on = server;
         Optional<String> refused = apply(made, proxy(on));
         if (refused.isEmpty()) return made;
-        refused(refused.get());
+        refused(on, refused.get());
         if (on.isEmpty()) return made;
         dispose.accept(made);
         throw new IllegalStateException(Chromium.PROXY_REFUSED + ": " + refused.get());
     }
 
     /**
-     * Tells, on the UI thread, Chromium's reason for refusing the proxy. Any thread.
+     * Tells, on the UI thread, Chromium's reason for refusing the proxy {@code server}; a refusal of the system's
+     * settings, while the proxy is off, is logged as a warning instead and told to no one (final review A's item 2). Any
+     * thread.
      *
+     * @param server the proxy refused, as {@link #remember} takes it; empty for the system's settings
      * @param reason the reason
      */
-    void refused(String reason) {
+    void refused(Optional<String> server, String reason) {
+        if (server.isEmpty()) {
+            LOG.log(System.Logger.Level.WARNING, "Chromium refused the system's proxy settings: " + reason);
+            return;
+        }
         Consumer<String> hearing = told;
         EventQueue.invokeLater(() -> hearing.accept(reason));
     }

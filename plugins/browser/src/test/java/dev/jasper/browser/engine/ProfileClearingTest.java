@@ -170,6 +170,29 @@ class ProfileClearingTest {
         assertThat(none).isCompletedExceptionally();
     }
 
+    /**
+     * Final review A's item 1: the helper browser closes once it is made and its close is asked, once; and one Chromium
+     * makes after it stopped running closes as it is made, as Chromium's dispose closed only the browsers made by then.
+     * The decision is the helper's, which cannot be made without Chromium.
+     */
+    @Test void theHelperClosesOnceMadeAndAskedAndAtOnceWhenMadeAfterChromiumStopped() {
+        var running = new AtomicBoolean(true);
+        var askedFirst = new ProfileClearing.HelperClose(running::get);
+        assertThat(askedFirst.closeAsked()).as("not made yet: it closes as it is made").isFalse();
+        assertThat(askedFirst.made()).isTrue();
+        assertThat(askedFirst.closeAsked()).as("once").isFalse();
+
+        var madeFirst = new ProfileClearing.HelperClose(running::get);
+        assertThat(madeFirst.made()).as("Chromium runs: it stays open for the clearing").isFalse();
+        assertThat(madeFirst.closeAsked()).isTrue();
+        assertThat(madeFirst.closeAsked()).as("once").isFalse();
+
+        var late = new ProfileClearing.HelperClose(running::get);
+        running.set(false);
+        assertThat(late.made()).as("made once Chromium no longer runs: it closes itself").isTrue();
+        assertThat(late.closeAsked()).as("closed already").isFalse();
+    }
+
     @Test void aCookiesDomainIsItsSitesHttpsAndHttpOrigins() {
         assertThat(ProfileClearing.cookieOrigins(List.of(".a.example", "B.Example", "a.example", "localhost", "192.168.1.10", "my_host.local")))
             .containsExactlyInAnyOrder("https://a.example", "http://a.example", "https://b.example", "http://b.example",
