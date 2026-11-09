@@ -56,6 +56,20 @@ public final class StrictJson {
     }
 
     /**
+     * How many characters {@link #quote} writes for {@code c}: 2 for a quote, a backslash and the escapes JSON names, 6
+     * for any other character it escapes, and 1 for the rest. A script can so be bounded before it is quoted.
+     *
+     * @param c a character
+     * @return the length {@link #quote} writes it in
+     */
+    public static int quotedLength(char c) {
+        return switch (c) {
+            case '"', '\\', '\n', '\r', '\t', '\b', '\f' -> 2;
+            default -> c < 0x20 || c == 0x7F || c == 0x2028 || c == 0x2029 || Character.isSurrogate(c) ? 6 : 1;
+        };
+    }
+
+    /**
      * {@code value} as compact JSON: a map as an object of its entries in the map's order, a list as an array, a string as
      * {@link #quote} writes it, a {@link Long} as a decimal integer, a {@link Boolean} as {@code true} or {@code false}, and
      * {@link #NULL} as {@code null}. Every string reads back, through JSON or JavaScript, as it was.

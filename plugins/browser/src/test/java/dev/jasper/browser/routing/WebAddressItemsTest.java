@@ -1,6 +1,6 @@
 package dev.jasper.browser.routing;
 
-import dev.jasper.browser.BrowserPlugin;
+import dev.jasper.browser.OfflinePlugins;
 import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.item.BrowserItem;
 import dev.jasper.browser.item.BrowserItems;
@@ -48,7 +48,7 @@ class WebAddressItemsTest {
 
     @Test void theItemsAreThereWhileLinksMayOpenInJasperAndGoWhileTheyGoToTheDefaultBrowser() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
-            host.start(INFO, Set.of(), Set.of(), new BrowserPlugin());
+            host.start(INFO, Set.of(), Set.of(), OfflinePlugins.plugin());
             assertThat(host.actions()).contains(RIGHT + "|Open URL in Split Right|true", DOWN + "|Open URL in Split Down|true");
             assertThat(host.menu("context")).as("Always Ask, the default").containsExactlyElementsOf(SHOWN);
             host.setSetting(ID, LINKS, "default");
@@ -63,7 +63,7 @@ class WebAddressItemsTest {
         } });
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
             host.setSetting(ID, LINKS, "default");
-            host.start(INFO, Set.of(), Set.of(), new BrowserPlugin());
+            host.start(INFO, Set.of(), Set.of(), OfflinePlugins.plugin());
             assertThat(host.menu("context")).as("absent from the start").isEmpty();
             host.setSetting(ID, LINKS, "ask");
             assertThat(host.menu("context")).containsExactlyElementsOf(SHOWN);
@@ -79,7 +79,7 @@ class WebAddressItemsTest {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
             host.setSetting(ID, LINKS, "default");
             host.setDefaultBrowser(true);
-            host.start(INFO, Set.of(), Set.of(), new BrowserPlugin());
+            host.start(INFO, Set.of(), Set.of(), OfflinePlugins.plugin());
             assertThat(host.menu("context")).as("Jasper is the default from the start").containsExactlyElementsOf(SHOWN);
             host.setDefaultBrowser(false);
             assertThat(host.menu("context")).as("another browser became the default").isEmpty();

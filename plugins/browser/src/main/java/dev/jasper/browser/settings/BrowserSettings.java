@@ -1,6 +1,6 @@
 package dev.jasper.browser.settings;
 
-import dev.jasper.browser.adblock.FilterList;
+import dev.jasper.browser.adblock.ListDownload;
 import dev.jasper.browser.item.AddressInput;
 import dev.jasper.browser.item.SearchEngine;
 import dev.jasper.browser.item.Zoom;
@@ -111,7 +111,7 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
     /**
      * Requires every value, Page zoom from {@link Zoom#MIN} to {@link Zoom#MAX}, each custom URL empty or a
      * {@link SearchEngine#template template}, and a filter list address the list may come from
-     * ({@link FilterList#fetches}).
+     * ({@link ListDownload#fetches}).
      */
     public BrowserSettings {
         Objects.requireNonNull(startPage, "startPage");
@@ -122,7 +122,7 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
         Objects.requireNonNull(customSearchUrl, "customSearchUrl");
         Objects.requireNonNull(customSuggestionsUrl, "customSuggestionsUrl");
         if (!template(customSearchUrl) || !template(customSuggestionsUrl)) throw new IllegalArgumentException(NO_TEMPLATE);
-        if (!FilterList.fetches(Objects.requireNonNull(filterListUrl, "filterListUrl"))) throw new IllegalArgumentException(NO_LIST_ADDRESS);
+        if (!ListDownload.fetches(Objects.requireNonNull(filterListUrl, "filterListUrl"))) throw new IllegalArgumentException(NO_LIST_ADDRESS);
     }
 
     /**
@@ -217,10 +217,10 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
         }
     }
 
-    /** A filter list's address: one the list may come from ({@link FilterList#fetches}). */
+    /** A filter list's address: one the list may come from ({@link ListDownload#fetches}). */
     private static boolean listAddress(String value) {
         try {
-            return FilterList.fetches(new URI(value));
+            return ListDownload.fetches(new URI(value));
         } catch (URISyntaxException unreadable) {
             return false;
         }

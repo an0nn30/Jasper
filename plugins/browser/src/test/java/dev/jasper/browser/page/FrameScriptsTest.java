@@ -36,6 +36,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class FrameScriptsTest {
     private static final String SITE = "https://chat.example";
+    /** No hiding: no rule set is ever active. */
+    private static final FrameScripts.Hiding NONE = new FrameScripts.Hiding(Optional::empty);
+    private static final String HIDDEN = "{display:none!important}";
 
     @Test void theStateIsQuotedIntoTheScriptAndAnyOtherBecomesDenied() {
         for (String state : List.of("granted", "denied", "default"))
@@ -85,7 +88,7 @@ class FrameScriptsTest {
             Page page = page(new HashMap<>(Map.of(SITE, Decision.ALLOWED)), new HashMap<>(), asked, PageContext.memory());
             assertThat(FrameScripts.state(SITE + "/room", page)).isEqualTo("denied");
             var ran = new ArrayList<String>();
-            FrameScripts.loadStarting(PageTestAccess.pageBrowser(page), frame(true, SITE + "/room", ran, new ArrayList<>()), FrameScripts.Hiding.NONE);
+            FrameScripts.loadStarting(PageTestAccess.pageBrowser(page), frame(true, SITE + "/room", ran, new ArrayList<>()), NONE);
             assertThat(ran).containsExactly("jasper-about:notifications.js " + FrameScripts.notifications("denied"),
                 "jasper-about:audio.js " + FrameScripts.audio(AudioMode.ASK));
             assertThat(asked).as("its notifications are not asked of the store; its audio is its own store's (ruling V20)")
@@ -140,13 +143,13 @@ class FrameScriptsTest {
 
             var ran = new ArrayList<String>();
             PageBrowser browser = PageTestAccess.pageBrowser(page);
-            FrameScripts.loadStarting(browser, frame(true, SITE + "/room", ran, new ArrayList<>()), FrameScripts.Hiding.NONE);
+            FrameScripts.loadStarting(browser, frame(true, SITE + "/room", ran, new ArrayList<>()), NONE);
             assertThat(ran).containsExactly("jasper-about:notifications.js " + FrameScripts.notifications("default"),
                 "jasper-about:audio.js " + FrameScripts.audio(AudioMode.BLOCK));
             assertThat(page.privacy().audioMode()).as("the page's current mode").isEqualTo(AudioMode.BLOCK);
             audio.clear();
             ran.clear();
-            FrameScripts.loadStarting(browser, frame(true, SITE + "/next", ran, new ArrayList<>()), FrameScripts.Hiding.NONE);
+            FrameScripts.loadStarting(browser, frame(true, SITE + "/next", ran, new ArrayList<>()), NONE);
             assertThat(ran).last().isEqualTo("jasper-about:audio.js " + FrameScripts.audio(AudioMode.ASK));
             assertThat(page.privacy().audioMode()).isEqualTo(AudioMode.ASK);
         });
@@ -162,21 +165,21 @@ class FrameScriptsTest {
             Page page = page(new HashMap<>(), audio, new ArrayList<>(), PageContext.persistent());
             PageBrowser browser = PageTestAccess.pageBrowser(page);
             var ran = new ArrayList<String>();
-            FrameScripts.loadStarting(browser, frame(true, SITE + "/room", ran, new ArrayList<>()), FrameScripts.Hiding.NONE);
+            FrameScripts.loadStarting(browser, frame(true, SITE + "/room", ran, new ArrayList<>()), NONE);
             PageTestAccess.loadStarted(page, SITE + "/room");
             ran.clear();
             audio.put("https://player.example", Decision.ALLOWED);
-            FrameScripts.loadStarting(browser, frame(false, "https://player.example/embed", ran, new ArrayList<>()), FrameScripts.Hiding.NONE);
+            FrameScripts.loadStarting(browser, frame(false, "https://player.example/embed", ran, new ArrayList<>()), NONE);
             assertThat(ran).as("the top-level site's, not its own").containsExactly("jasper-about:audio.js " + FrameScripts.audio(AudioMode.BLOCK));
             page.privacy().mute(false);
-            FrameScripts.loadStarting(browser, frame(false, "https://player.example/next", ran, new ArrayList<>()), FrameScripts.Hiding.NONE);
+            FrameScripts.loadStarting(browser, frame(false, "https://player.example/next", ran, new ArrayList<>()), NONE);
             page.privacy().mute(true);
-            FrameScripts.loadStarting(browser, frame(false, "https://player.example/again", ran, new ArrayList<>()), FrameScripts.Hiding.NONE);
+            FrameScripts.loadStarting(browser, frame(false, "https://player.example/again", ran, new ArrayList<>()), NONE);
             assertThat(ran).containsExactly("jasper-about:audio.js " + FrameScripts.audio(AudioMode.BLOCK),
                 "jasper-about:audio.js " + FrameScripts.audio(AudioMode.ALLOW), "jasper-about:audio.js " + FrameScripts.audio(AudioMode.BLOCK));
             ran.clear();
-            FrameScripts.loadStarting(browser, frame(false, "https://challenges.cloudflare.com/turnstile", ran, new ArrayList<>()), FrameScripts.Hiding.NONE);
-            FrameScripts.loadStarting(browser, frame(false, "https://newassets.hcaptcha.com/captcha/v1/audio", ran, new ArrayList<>()), FrameScripts.Hiding.NONE);
+            FrameScripts.loadStarting(browser, frame(false, "https://challenges.cloudflare.com/turnstile", ran, new ArrayList<>()), NONE);
+            FrameScripts.loadStarting(browser, frame(false, "https://newassets.hcaptcha.com/captcha/v1/audio", ran, new ArrayList<>()), NONE);
             assertThat(ran).as("challenge frames").isEmpty();
         });
     }
@@ -192,23 +195,23 @@ class FrameScriptsTest {
             PageBrowser browser = PageTestAccess.pageBrowser(page);
             var ran = new ArrayList<String>();
             var read = new ArrayList<String>();
-            FrameScripts.loadStarting(browser, frame(true, SITE + "/room", ran, read), FrameScripts.Hiding.NONE);
+            FrameScripts.loadStarting(browser, frame(true, SITE + "/room", ran, read), NONE);
             assertThat(ran).containsExactly("jasper-about:notifications.js " + FrameScripts.notifications("granted"),
                 "jasper-about:audio.js " + FrameScripts.audio(AudioMode.ASK));
             assertThat(read).containsExactly(SITE + "/room");
             ran.clear();
             read.clear();
-            FrameScripts.loadStarting(browser, frame(false, SITE + "/frame", ran, read), FrameScripts.Hiding.NONE);
+            FrameScripts.loadStarting(browser, frame(false, SITE + "/frame", ran, read), NONE);
             assertThat(ran).as("a sub-frame").containsExactly("jasper-about:audio.js " + FrameScripts.audio(AudioMode.ASK));
             assertThat(read).as("read once, to tell a challenge frame").containsExactly(SITE + "/frame");
             ran.clear();
-            FrameScripts.loadStarting(browser, frame(false, "https://challenges.cloudflare.com/turnstile", ran, read), FrameScripts.Hiding.NONE);
-            FrameScripts.loadStarting(browser, frame(true, "https://challenges.cloudflare.com/turnstile", ran, read), FrameScripts.Hiding.NONE);
-            FrameScripts.loadStarting(browser, frame(true, "https://www.google.com/recaptcha/api2/anchor", ran, read), FrameScripts.Hiding.NONE);
+            FrameScripts.loadStarting(browser, frame(false, "https://challenges.cloudflare.com/turnstile", ran, read), NONE);
+            FrameScripts.loadStarting(browser, frame(true, "https://challenges.cloudflare.com/turnstile", ran, read), NONE);
+            FrameScripts.loadStarting(browser, frame(true, "https://www.google.com/recaptcha/api2/anchor", ran, read), NONE);
             assertThat(ran).as("challenge frames").isEmpty();
-            FrameScripts.loadStarting(PageTestAccess.devToolsBrowser(PageTestAccess.devTools(page, new Point())), frame(true, SITE + "/", ran, read), FrameScripts.Hiding.NONE);
+            FrameScripts.loadStarting(PageTestAccess.devToolsBrowser(PageTestAccess.devTools(page, new Point())), frame(true, SITE + "/", ran, read), NONE);
             assertThat(ran).as("a page's DevTools").isEmpty();
-            FrameScripts.loadStarting(browser, frame(true, "about:blank", ran, read), FrameScripts.Hiding.NONE);
+            FrameScripts.loadStarting(browser, frame(true, "about:blank", ran, read), NONE);
             assertThat(ran).as("a document without a site is denied and muted").containsExactly("jasper-about:notifications.js "
                 + FrameScripts.notifications("denied"), "jasper-about:audio.js " + FrameScripts.audio(AudioMode.BLOCK));
         });
@@ -359,6 +362,49 @@ class FrameScriptsTest {
         assertThat(first.url()).isEqualTo("jasper-about:hide-elements.js");
         assertThat(hiding.script(true, "https://a.example/").orElseThrow().text()).isEqualTo(first.text());
         assertThat(hiding.script(false, "jasper-about:welcome")).isEmpty();
+    }
+
+    /**
+     * Ruling V39: a frame's script is at most 4 MiB, its sheet cut at a line to fit before it is quoted, which hides
+     * less, never more: a hostile list's selectors of emoji, each surrogate written as a six-character escape, would
+     * otherwise make three times their sheet's length.
+     */
+    @Test void aFramesScriptIsAtMostFourMibOfWholeLines() {
+        String emoji = new String(Character.toChars(0x1F600)).repeat(100);
+        var sheet = new StringBuilder();
+        for (int at = 0; sheet.length() < 2 * 1024 * 1024; at++) sheet.append(".a").append(at).append(emoji).append(HIDDEN).append('\n');
+        String script = FrameScripts.hideElements(sheet.toString());
+        assertThat(FrameScripts.SCRIPT_LIMIT).isEqualTo(4 * 1024 * 1024);
+        assertThat(script.length()).isLessThanOrEqualTo(FrameScripts.SCRIPT_LIMIT);
+        String prefix = FrameScripts.HIDE_ELEMENTS + "\n(";
+        assertThat(script).startsWith(prefix).endsWith(");");
+        String kept = (String) StrictJson.array("[" + script.substring(prefix.length(), script.length() - 2) + "]", 1).orElseThrow().getFirst();
+        assertThat(kept).as("whole lines from the sheet's start").isNotEmpty().endsWith(HIDDEN + "\n");
+        assertThat(sheet.toString()).startsWith(kept);
+        assertThat(kept.length()).isLessThan(sheet.length());
+        String next = sheet.substring(kept.length(), sheet.indexOf("\n", kept.length()) + 1);
+        assertThat(prefix.length() + StrictJson.quote(kept + next).length() + 2).as("the sheet's next line does not fit")
+            .isGreaterThan(FrameScripts.SCRIPT_LIMIT);
+        String small = ".a" + HIDDEN + "\n.b" + HIDDEN + "\n";
+        assertThat(FrameScripts.hideElements(small)).as("a sheet that fits is whole").isEqualTo(prefix + StrictJson.quote(small) + ");");
+    }
+
+    /**
+     * Ruling V39: a main frame whose sheet is the generic sheet a sub-frame was given, as a page with no rules of its own
+     * hides, reuses that script: the sheet is quoted once.
+     */
+    @Test void aMainFrameWhoseSheetIsTheGenericOneReusesItsScript() {
+        RuleSet rules = rules("[{\"trigger\": {\"url-filter\": \".*\"}, \"action\": {\"type\": \"css-display-none\", \"selector\": \".ad\"}}]");
+        var quoted = new ArrayList<String>();
+        var hiding = new FrameScripts.Hiding(() -> Optional.of(rules), sheet -> {
+            quoted.add(sheet);
+            return FrameScripts.hideElements(sheet);
+        });
+        String generic = hiding.script(false, "https://a.example/frame").orElseThrow().text();
+        String main = hiding.script(true, "https://a.example/").orElseThrow().text();
+        assertThat(main).isSameAs(generic);
+        assertThat(hiding.script(false, "https://b.example/frame").orElseThrow().text()).isSameAs(generic);
+        assertThat(quoted).as("quoted once").containsExactly(".ad" + HIDDEN + "\n");
     }
 
     private static RuleSet rules(String list) {

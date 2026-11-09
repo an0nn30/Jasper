@@ -40,7 +40,7 @@ class BrowserSettingsPanelTest {
     private final List<Prompt> prompts = new CopyOnWriteArrayList<>();
     private final List<String> ran = new CopyOnWriteArrayList<>();
     private volatile CompletableFuture<Void> cookies = new CompletableFuture<>(), data = new CompletableFuture<>();
-    private volatile FilterList.Status filterStatus = new FilterList.Status(0, Optional.empty(), false, Optional.empty());
+    private volatile FilterList.Status filterStatus = new FilterList.Status(0, Optional.empty(), false, Optional.empty(), false);
     private volatile OptionalInt stale = OptionalInt.empty();
     private volatile CompletableFuture<FilterList.Status> update = new CompletableFuture<>();
     private FakePluginHost host;
@@ -233,7 +233,7 @@ class BrowserSettingsPanelTest {
     @Test void theFilterStatisticsSayTheCountAndTheUpdateOrThatItUpdatesOrWhyItFailed() throws Exception {
         Instant updated = Instant.parse("2026-11-09T10:15:00Z");
         String when = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.ROOT).withZone(ZoneId.systemDefault()).format(updated);
-        filterStatus = new FilterList.Status(12_345, Optional.of(updated), false, Optional.empty());
+        filterStatus = new FilterList.Status(12_345, Optional.of(updated), false, Optional.empty(), true);
         onUi(() -> {
             FakeKitView view = page();
             var row = node(view, BrowserSettingsPanel.FILTERS + ":row", Nodes.SettingRow.class);
@@ -243,10 +243,10 @@ class BrowserSettingsPanelTest {
             assertThat(button(view, BrowserSettingsPanel.FILTERS).state()).isEqualTo(ControlState.READY);
         });
         for (var shown : List.of(
-                java.util.Map.entry(new FilterList.Status(1, Optional.empty(), false, Optional.empty()), "1 rule"),
-                java.util.Map.entry(new FilterList.Status(0, Optional.empty(), false, Optional.empty()), "0 rules"),
-                java.util.Map.entry(new FilterList.Status(12_345, Optional.of(updated), true, Optional.empty()), "Updating…"),
-                java.util.Map.entry(new FilterList.Status(12_345, Optional.of(updated), false, Optional.of("the server answered HTTP 500")),
+                java.util.Map.entry(new FilterList.Status(1, Optional.empty(), false, Optional.empty(), true), "1 rule"),
+                java.util.Map.entry(new FilterList.Status(0, Optional.empty(), false, Optional.empty(), true), "0 rules"),
+                java.util.Map.entry(new FilterList.Status(12_345, Optional.of(updated), true, Optional.empty(), true), "Updating…"),
+                java.util.Map.entry(new FilterList.Status(12_345, Optional.of(updated), false, Optional.of("the server answered HTTP 500"), true),
                     "Could not update the filter list: the server answered HTTP 500"))) {
             filterStatus = shown.getKey();
             panel.filtersChanged();
@@ -256,7 +256,7 @@ class BrowserSettingsPanelTest {
         }
         onUi(() -> assertThat(button(host.settingsPanelView(ID).orElseThrow(), BrowserSettingsPanel.FILTERS).state().busy())
             .as("a list that is not updating").isFalse());
-        filterStatus = new FilterList.Status(3, Optional.of(updated), true, Optional.empty());
+        filterStatus = new FilterList.Status(3, Optional.of(updated), true, Optional.empty(), true);
         panel.filtersChanged();
         flushUi();
         onUi(() -> assertThat(button(host.settingsPanelView(ID).orElseThrow(), BrowserSettingsPanel.FILTERS).state())
@@ -264,9 +264,30 @@ class BrowserSettingsPanelTest {
         assertThat(host.failures()).isEmpty();
     }
 
+    /**
+     * Ruling V36: until this run has read the list or downloaded it, which waits for the first browser page (F8), the
+     * row says so; "0 rules" would claim the list has none. An update under way, or one that failed, says that instead.
+     */
+    @Test void beforeTheListIsReadTheRowSaysItLoadsWithTheFirstBrowserPage() throws Exception {
+        onUi(() -> assertThat(node(page(), BrowserSettingsPanel.FILTERS + ":row", Nodes.SettingRow.class).description())
+            .isEqualTo("Loads with the first browser page"));
+        for (var shown : List.of(
+                java.util.Map.entry(new FilterList.Status(0, Optional.empty(), true, Optional.empty(), false), "Updating…"),
+                java.util.Map.entry(new FilterList.Status(0, Optional.empty(), false, Optional.of("the server answered HTTP 500"), false),
+                    "Could not update the filter list: the server answered HTTP 500"),
+                java.util.Map.entry(new FilterList.Status(0, Optional.empty(), false, Optional.empty(), true), "0 rules"),
+                java.util.Map.entry(new FilterList.Status(4, Optional.empty(), false, Optional.empty(), true), "4 rules"))) {
+            filterStatus = shown.getKey();
+            panel.filtersChanged();
+            flushUi();
+            onUi(() -> assertThat(node(host.settingsPanelView(ID).orElseThrow(), BrowserSettingsPanel.FILTERS + ":row", Nodes.SettingRow.class)
+                .description()).as(shown.getKey().toString()).isEqualTo(shown.getValue()));
+        }
+    }
+
     /** A list that has gone 7 days or more without an update adds a warning, iTerm2's text completed, in the card. */
     @Test void aStaleListAddsAWarning() throws Exception {
-        filterStatus = new FilterList.Status(3, Optional.of(Instant.parse("2026-10-01T00:00:00Z")), false, Optional.empty());
+        filterStatus = new FilterList.Status(3, Optional.of(Instant.parse("2026-10-01T00:00:00Z")), false, Optional.empty(), true);
         onUi(() -> {
             FakeKitView view = page();
             assertThat(find(view.spec().root(), BrowserSettingsPanel.STALE)).as("not stale").isNull();
@@ -302,7 +323,7 @@ class BrowserSettingsPanelTest {
             view.emit(new UiEvent.Action(BrowserSettingsPanel.FILTERS));
             assertThat(ran).as("a second press while it runs").containsExactly("update");
         });
-        filterStatus = new FilterList.Status(7, Optional.of(Instant.parse("2026-11-09T10:15:00Z")), false, Optional.empty());
+        filterStatus = new FilterList.Status(7, Optional.of(Instant.parse("2026-11-09T10:15:00Z")), false, Optional.empty(), true);
         update.complete(filterStatus);
         flushUi();
         onUi(() -> {

@@ -1,6 +1,7 @@
 package dev.jasper.browser;
 
 import dev.jasper.browser.adblock.FilterList;
+import dev.jasper.browser.adblock.ListDownload;
 import dev.jasper.browser.api.MarkdownPreviews;
 import dev.jasper.browser.dialogs.PageDialogs;
 import dev.jasper.browser.engine.AboutQueries;
@@ -113,7 +114,7 @@ public class BrowserPlugin implements Plugin {
 
     /** Created by the runtime. */
     public BrowserPlugin() {
-        this(FilterList::client, BrowserSettings::filterListUrl);
+        this(ListDownload::client, BrowserSettings::filterListUrl);
     }
 
     /**

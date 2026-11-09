@@ -36,6 +36,8 @@ class AdBlockRequestsTest {
         expected.put(ResourceType.RT_MAIN_FRAME, Set.of());
         expected.put(ResourceType.RT_NAVIGATION_PRELOAD_MAIN_FRAME, Set.of());
         expected.put(ResourceType.RT_SUB_FRAME, Set.of(ResourceKind.DOCUMENT));
+        // Ruling V40: a preloaded sub-frame is a sub-frame's document.
+        expected.put(ResourceType.RT_NAVIGATION_PRELOAD_SUB_FRAME, Set.of(ResourceKind.DOCUMENT));
         expected.put(ResourceType.RT_IMAGE, Set.of(ResourceKind.IMAGE));
         expected.put(ResourceType.RT_FAVICON, Set.of(ResourceKind.IMAGE));
         expected.put(ResourceType.RT_STYLESHEET, Set.of(ResourceKind.STYLE_SHEET));
@@ -49,7 +51,7 @@ class AdBlockRequestsTest {
         expected.put(ResourceType.RT_PING, Set.of(ResourceKind.PING));
         expected.put(ResourceType.RT_CSP_REPORT, Set.of(ResourceKind.PING));
         for (ResourceType other : List.of(ResourceType.RT_SUB_RESOURCE, ResourceType.RT_OBJECT, ResourceType.RT_PREFETCH,
-                ResourceType.RT_PLUGIN_RESOURCE, ResourceType.RT_NAVIGATION_PRELOAD_SUB_FRAME, ResourceType.RT_NUM_VALUES))
+                ResourceType.RT_PLUGIN_RESOURCE, ResourceType.RT_NUM_VALUES))
             expected.put(other, Set.of(ResourceKind.RAW, ResourceKind.OTHER));
         assertThat(expected.keySet()).as("every type Chromium names").containsExactlyInAnyOrder(ResourceType.values());
         for (Map.Entry<ResourceType, Set<ResourceKind>> type : expected.entrySet())
@@ -81,8 +83,32 @@ class AdBlockRequestsTest {
             .as("a script rule does not block an image").isFalse();
         assertThat(blocking.onBeforeResourceLoad(news, null, new Request("https://cdn.example/app.js", ResourceType.RT_SCRIPT))).isFalse();
         assertThat(blocking.onBeforeResourceLoad(news, null, new Request("wss://ads.example/socket", ResourceType.RT_SUB_RESOURCE)))
-            .as("a WebSocket's address is the web's").isTrue();
+            .as("a WebSocket's address is the web's, and a rule of every type blocks it").isTrue();
         assertThat(pages).as("the page's address is read from its browser").containsOnly("https://news.example/today");
+    }
+
+    /**
+     * Ruling V40: a ws or wss request is a {@code websocket}'s and a {@code raw} one, as WebKit names them, whatever type
+     * Chromium gives it; it is never an {@code other}.
+     */
+    @Test void aWebSocketIsAWebSocketAndARawRequest() {
+        RuleSet rules = RuleSet.of(ContentRules.compile(BlockerJson.read("""
+            [{"trigger": {"url-filter": "socket.example/", "resource-type": ["websocket"]}, "action": {"type": "block"}},
+             {"trigger": {"url-filter": "raw.example/", "resource-type": ["raw"]}, "action": {"type": "block"}},
+             {"trigger": {"url-filter": "other.example/", "resource-type": ["other"]}, "action": {"type": "block"}}]
+            """)).rules());
+        var blocking = new AdBlockRequests(rules);
+        CefBrowser page = browser("https://news.example/");
+        for (ResourceType type : List.of(ResourceType.RT_SUB_RESOURCE, ResourceType.RT_XHR, ResourceType.RT_OBJECT)) {
+            assertThat(blocking.onBeforeResourceLoad(page, null, new Request("wss://socket.example/feed", type))).as("websocket " + type).isTrue();
+            assertThat(blocking.onBeforeResourceLoad(page, null, new Request("WS://socket.example/feed", type))).as("ws " + type).isTrue();
+            assertThat(blocking.onBeforeResourceLoad(page, null, new Request("wss://raw.example/feed", type))).as("raw " + type).isTrue();
+            assertThat(blocking.onBeforeResourceLoad(page, null, new Request("wss://other.example/feed", type))).as("not other " + type).isFalse();
+        }
+        assertThat(blocking.onBeforeResourceLoad(page, null, new Request("https://socket.example/poll", ResourceType.RT_XHR)))
+            .as("an https request is no WebSocket").isFalse();
+        assertThat(blocking.onBeforeResourceLoad(page, null, new Request("wss://socket.example/feed", ResourceType.RT_MAIN_FRAME)))
+            .as("a main frame is never blocked").isFalse();
     }
 
     /** A Jasper page's requests, and those of no web address, are never blocked, and the rules are not asked. */

@@ -15,6 +15,7 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.WeakHashMap;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import org.cef.CefClient;
 import org.cef.browser.CefBrowser;
@@ -56,6 +57,8 @@ final class FrameScripts {
     static final String AUDIO = PageEvents.script("audio.js");
     /** The element hiding: a function of the document's sheet. */
     static final String HIDE_ELEMENTS = PageEvents.script("hide-elements.js");
+    /** How many characters a frame's element hiding script has at most (ruling V39). */
+    static final int SCRIPT_LIMIT = 4 * 1024 * 1024;
     /** The permission a document is given: Allowed, Blocked or none stored. */
     static final String GRANTED = "granted", DENIED = "denied", DEFAULT = "default";
     // The names the scripts go by in a page's console and stack traces.
@@ -85,13 +88,27 @@ final class FrameScripts {
 
     /**
      * The element hiding, called with {@code sheet} quoted: a string literal, as {@link StrictJson#quote} writes it, so no
-     * selector can end the literal or the call, and nothing is written as HTML.
+     * selector can end the literal or the call, and nothing is written as HTML. The script is at most
+     * {@value #SCRIPT_LIMIT} characters (ruling V39): a sheet whose quoted form would not fit is cut first after its last
+     * whole line that does, so it hides less and never more, however many escapes a hostile list's selectors need.
      *
      * @param sheet the lines to hide, {@code selector{display:none!important}} each, as a {@link RuleSet} gives them
      * @return the script
      */
     static String hideElements(String sheet) {
-        return HIDE_ELEMENTS + "\n(" + StrictJson.quote(sheet) + ");";
+        return HIDE_ELEMENTS + "\n(" + StrictJson.quote(fitted(sheet)) + ");";
+    }
+
+    /** The longest start of {@code sheet}, in whole lines, whose quoted form leaves the script within its limit. */
+    private static String fitted(String sheet) {
+        int room = SCRIPT_LIMIT - HIDE_ELEMENTS.length() - "\n(\"\");".length(), used = 0, lines = 0;
+        for (int at = 0; at < sheet.length(); at++) {
+            char c = sheet.charAt(at);
+            used += StrictJson.quotedLength(c);
+            if (used > room) return sheet.substring(0, lines);
+            if (c == '\n') lines = at + 1;
+        }
+        return sheet;
     }
 
     /**
@@ -99,13 +116,13 @@ final class FrameScripts {
      * the filter list's rule set active then gives its sheet. A main frame hides what its own document's sheet names,
      * the generic lines and its site's ({@link RuleSet#stylesheet}); a sub-frame hides the generic lines alone
      * ({@link RuleSet#genericStylesheet}), which its list shares with every sub-frame (F34), so their script is made once
-     * and kept for the next. The rule set indexes its rules and bounds its work, so no sheet scans every rule. No
-     * script for a Jasper page ({@code jasper-about:}), nor for a sheet that is empty. Chromium's thread.
+     * and kept for the next, and a main frame whose sheet is that one, as a page with no rules of its own hides, is
+     * given that script too (ruling V39). The rule set indexes its rules and bounds its work, so no sheet scans every
+     * rule. No script for a Jasper page ({@code jasper-about:}), nor for a sheet that is empty. Chromium's thread.
      */
     static final class Hiding {
-        /** No hiding: no rule set is ever active. */
-        static final Hiding NONE = new Hiding(Optional::empty);
         private final Supplier<Optional<RuleSet>> rules;
+        private final Function<String, String> scripts;
         // The last sub-frame's sheet and its script, which the next sub-frame most likely shares; guarded by this.
         private String sheet = "", script = "";
 
@@ -115,7 +132,13 @@ final class FrameScripts {
          * @param rules the rule set active, read as each document starts: the filter list's
          */
         Hiding(Supplier<Optional<RuleSet>> rules) {
+            this(rules, FrameScripts::hideElements);
+        }
+
+        /** As {@link #Hiding(Supplier)}, each sheet's script made by {@code scripts}: a test's counting seam. */
+        Hiding(Supplier<Optional<RuleSet>> rules, Function<String, String> scripts) {
             this.rules = rules;
+            this.scripts = scripts;
         }
 
         /**
@@ -129,19 +152,20 @@ final class FrameScripts {
             Optional<RuleSet> active = rules.get();
             if (active.isEmpty() || address == null || address.regionMatches(true, 0, JASPER_ABOUT, 0, JASPER_ABOUT.length()))
                 return Optional.empty();
-            if (mainFrame) {
-                String own = active.get().stylesheet(address);
-                return own.isEmpty() ? Optional.empty() : Optional.of(new Script(HIDE_URL, hideElements(own)));
-            }
-            String generic = active.get().genericStylesheet(address);
-            if (generic.isEmpty()) return Optional.empty();
+            String hidden = mainFrame ? active.get().stylesheet(address) : active.get().genericStylesheet(address);
+            if (hidden.isEmpty()) return Optional.empty();
             synchronized (this) {
-                if (!generic.equals(sheet)) {
-                    sheet = generic;
-                    script = hideElements(generic);
-                }
-                return Optional.of(new Script(HIDE_URL, script));
+                if (hidden.equals(sheet)) return Optional.of(new Script(HIDE_URL, script));
             }
+            String made = scripts.apply(hidden);
+            // A page's own sheet is its own; a sub-frame's generic one the next sub-frame most likely shares.
+            if (!mainFrame) {
+                synchronized (this) {
+                    sheet = hidden;
+                    script = made;
+                }
+            }
+            return Optional.of(new Script(HIDE_URL, made));
         }
     }
 

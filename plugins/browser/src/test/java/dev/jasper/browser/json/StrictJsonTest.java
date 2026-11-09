@@ -15,6 +15,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * And the one writer of the answers Jasper's own pages read, whose every string reads back as it was written.
  */
 class StrictJsonTest {
+    /** What {@code quote} writes of each character, counted without writing it, so a script can be bounded before it is quoted. */
+    @Test void theQuotedLengthOfEachCharacterIsWhatQuoteWrites() {
+        for (int c = 0; c <= 0xFFFF; c++) {
+            String one = String.valueOf((char) c);
+            assertThat(StrictJson.quotedLength((char) c)).as("U+%04X", c).isEqualTo(StrictJson.quote(one).length() - 2);
+        }
+    }
+
     @Test void readsEveryKindOfValue() {
         String text = " { \"s\" : \"x\" , \"t\" : true , \"f\" : false , \"n\" : null , \"i\" : -12 , \"z\" : -0 , "
             + "\"big\" : 123456789012345678 , \"bigger\" : 1234567890123456789 , \"d\" : 2.5e3 , \"e\" : -0.1E-2 , "

@@ -52,19 +52,15 @@ class BrowserPluginTest {
     private static final String ID = "dev.jasper.browser";
     private static final PluginInfo INFO = new PluginInfo(ID, "Browser", "0.1.0", Set.of("browser.provide", "palette.contribute"));
     /** The filter list's address in these tests, a reserved name. */
-    private static final URI LIST = URI.create("https://filters.test/list.json");
-    private final List<String> clientsAsked = new CopyOnWriteArrayList<>();
+    private static final URI LIST = OfflinePlugins.LIST;
 
     /** F9: a plugin whose filter list fails the test if it asks for a client. */
-    private BrowserPlugin plugin() {
-        return new BrowserPlugin(() -> {
-            clientsAsked.add("a client");
-            throw new AssertionError("A test must not download a filter list");
-        }, settings -> LIST);
+    private static BrowserPlugin plugin() {
+        return OfflinePlugins.plugin();
     }
 
     @AfterEach void noTestDownloadedAFilterList() {
-        assertThat(clientsAsked).as("F9: no filter list downloaded").isEmpty();
+        assertThat(OfflinePlugins.clientsAsked()).as("F9: no filter list downloaded").isZero();
     }
 
     /**
@@ -86,7 +82,7 @@ class BrowserPluginTest {
         });
         try {
             assertThat(plugin.filters().active()).as("nothing read at the start").isEmpty();
-            assertThat(plugin.filters().status()).isEqualTo(new FilterList.Status(0, Optional.empty(), false, Optional.empty()));
+            assertThat(plugin.filters().status()).isEqualTo(new FilterList.Status(0, Optional.empty(), false, Optional.empty(), false));
             SwingUtilities.invokeAndWait(() -> {
                 host.get().setSetting(ID, "ad_blocking", false);
                 host.get().setSetting(ID, "ad_blocking", true);
@@ -127,7 +123,7 @@ class BrowserPluginTest {
                 host.get().runBackground();
             });
             assertThat(asked).as("the given client alone, asked once").containsExactly("a client");
-            assertThat(plugin.filters().status()).isEqualTo(new FilterList.Status(0, Optional.empty(), false, Optional.of("no network in tests")));
+            assertThat(plugin.filters().status()).isEqualTo(new FilterList.Status(0, Optional.empty(), false, Optional.of("no network in tests"), true));
             assertThat(plugin.filters().active()).isEmpty();
             assertThat(root.resolve(ID).resolve("data").resolve("adblock").resolve("rules.json")).doesNotExist();
             SwingUtilities.invokeAndWait(() -> assertThat(host.get().failures()).isEmpty());

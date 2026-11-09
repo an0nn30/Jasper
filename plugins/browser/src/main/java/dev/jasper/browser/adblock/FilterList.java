@@ -1,70 +1,45 @@
 package dev.jasper.browser.adblock;
 
-import dev.jasper.browser.json.StrictJson;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.math.BigDecimal;
-import java.net.ConnectException;
 import java.net.URI;
 import java.net.http.HttpClient;
-import java.net.http.HttpConnectTimeoutException;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.net.http.HttpTimeoutException;
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayDeque;
-import java.util.LinkedHashMap;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
-import java.util.concurrent.CancellationException;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
-import java.util.concurrent.Flow;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
-import java.util.regex.Pattern;
 
 /**
- * Ad blocking's filter list (spec section 12): a WebKit content-blocker list from the web, downloaded, compiled into a
- * {@link RuleSet} and cached in the plugin's data folder, under {@code adblock/}: {@code rules.json}, the compiled list
- * as {@link ContentRules#encode} writes it, and {@code state.json}, its address ({@code url}), when it was downloaded
- * ({@code updated}) and how many rules it kept ({@code rules}) and skipped ({@code skipped}). Each file is written to a
- * temporary file of its owner's alone beside it, then moved over the old one at once, so no reader sees half of one,
- * and the data folder is made its owner's alone before the list first reads or writes there (plan 5's H37). Clear
- * Website Data leaves the folder alone.
+ * Ad blocking's filter list (spec section 12): a WebKit content-blocker list from the web, downloaded
+ * ({@link ListDownload}), compiled into a {@link RuleSet} and cached in the plugin's data folder ({@link ListCache}).
  *
  * <p>Making one does no I/O and makes no HTTP client (spec section 19): the list reads its cache and checks for an
  * update only once it has {@link #start started}, which a page's first start or the user's turning ad blocking on
  * does, and only while it is {@link #enabled on}. A check downloads the list when an update is due: when 24 hours have
  * passed since the last update, when nothing is cached, or when the cache came from another address, so a new address
- * downloads at its next check. Once started and on, the list checks every hour, the first check at once. A download is
- * a GET of an https address, or an http one on this computer only ({@link #fetches}), as TLS is the list's only
- * integrity; its client, which the given supplier makes on the background executor at the first download, follows
- * redirects within http and https and connects within 30 seconds. Only a final 200 is read, at most 32 MiB of it,
- * counted before it is decoded, and the whole download, its body included, must end within 120 seconds. The list read
- * ({@link BlockerJson#read}) and compiled ({@link ContentRules#compile}) is cached, then replaces the one applied;
- * anything that fails keeps the old list, and the failure is what {@link #status()} reports until the next update
- * succeeds. {@link #updateNow()} downloads at once, on or off.
+ * downloads at its next check. Once started and on, the list checks every hour, the first check at once, on a daemon
+ * thread of its own, which it makes only once a check is scheduled and ends at its close (ruling V37). Its client,
+ * which the given supplier makes on the background executor at the first download, is {@link ListDownload#client()}'s.
+ * The list read ({@link BlockerJson#read}) and compiled ({@link ContentRules#compile}) is cached, then replaces the one
+ * applied; anything that fails keeps the old list, and the failure is what {@link #status()} reports until the next
+ * update succeeds. {@link #updateNow()} downloads at once, on or off.
  *
  * <p>Its work runs on the background executor given, one task at a time, so a list's compiling, which may take seconds
  * on a large list, never runs on Chromium's threads or the UI thread; the list applied is published through a volatile
@@ -72,23 +47,16 @@ import java.util.regex.Pattern;
  * under way and the client. Any thread.
  */
 public final class FilterList implements AutoCloseable {
-    /** How long a connection to the list's server may take. */
-    static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(30);
-    /** How long a download may take in all, its body included (ruling F10). */
-    static final Duration DOWNLOAD_TIMEOUT = Duration.ofSeconds(120);
     /** How often a started list checks whether an update is due. */
     static final Duration CHECK_EVERY = Duration.ofHours(1);
     /** How long after an update the next one is due. */
     static final Duration UPDATE_AFTER = Duration.ofHours(24);
     /** From how many whole days without an update the list counts as stale. */
     static final int STALE_DAYS = 7;
-    /** How many bytes of a list are read at most, before they are decoded. */
-    static final int MAX_BYTES = 32 * 1024 * 1024;
-    /** The list's folder in the data folder, and its two files there. */
-    static final String FOLDER = "adblock", RULES = "rules.json", STATE = "state.json";
-    private static final int STATE_LIMIT = 64 * 1024;
-    private static final String REFUSED_ADDRESS = "the filter list's address is not an https address, or an http one on this computer";
-    private static final Pattern LOOPBACK = Pattern.compile("localhost|127(?:\\.[0-9]{1,3}){3}|\\[::1\\]");
+    /** The name of the thread a list's hourly checks run on. */
+    static final String CHECK_THREAD = "jasper-browser-filter-list";
+    /** How many failures' reasons are logged with their stack traces at most. */
+    private static final int TRACED = 64;
     private static final System.Logger LOG = System.getLogger(FilterList.class.getName());
 
     /**
@@ -98,8 +66,10 @@ public final class FilterList implements AutoCloseable {
      * @param updated when the list cached was downloaded; empty when none is known
      * @param updating whether a download is under way
      * @param error why the last update failed; empty once one succeeds
+     * @param read whether this run has read the list's cache, nothing cached included, or downloaded the list: before,
+     *     neither the count nor the update is known (ruling V36)
      */
-    public record Status(int rules, Optional<Instant> updated, boolean updating, Optional<String> error) {
+    public record Status(int rules, Optional<Instant> updated, boolean updating, Optional<String> error, boolean read) {
         /** Requires every part. */
         public Status {
             Objects.requireNonNull(updated, "updated");
@@ -107,8 +77,9 @@ public final class FilterList implements AutoCloseable {
         }
     }
 
-    private final Path folder;
-    private final Runnable restrict;
+    private final ListCache cache;
+    // Where the hourly checks wait: the list's own, one daemon thread, made only once a check is scheduled (V37).
+    private final ScheduledExecutorService scheduler;
     private final Executor background;
     private final Supplier<HttpClient> clients;
     private final Clock clock;
@@ -124,15 +95,18 @@ public final class FilterList implements AutoCloseable {
     // The cache is in memory as the rule set applied: read since the list was last turned on, or downloaded while on.
     private boolean loaded;
     private int count;
-    private Cached cached;
+    // Whether this run has read the cache or downloaded the list.
+    private boolean read;
+    private ListCache.Cached cached;
     private Optional<String> error = Optional.empty();
     private CompletableFuture<Status> downloading;
     private CompletableFuture<?> exchange;
-    private CompletableFuture<Void> nextCheck;
+    private ScheduledFuture<?> nextCheck;
+    // The number of the hourly check scheduled last; a check of any other has been replaced or cancelled.
+    private long checkNumber;
+    // The reasons whose failures were logged with their stack traces.
+    private final Set<String> traced = new HashSet<>();
     private HttpClient client;
-
-    /** What {@code state.json} records of the list cached: its address and when it was downloaded. */
-    private record Cached(String url, Instant updated) { }
 
     /**
      * The list of the plugin's data folder, which does nothing yet.
@@ -140,19 +114,25 @@ public final class FilterList implements AutoCloseable {
      * @param dataDir the plugin's data folder, which holds the list's folder
      * @param restrict makes the data folder its owner's alone; run before the list's first read or write there
      * @param background where the list's work runs: the plugin's background executor
-     * @param http makes the list's client, on the background executor at the first download: {@link #client()}
+     * @param http makes the list's client, on the background executor at the first download: {@link ListDownload#client()}
      * @param clock the time of an update, and of a check
      * @param url the list's address, read at each check: the Filter List URL setting
      */
     public FilterList(Path dataDir, Runnable restrict, Executor background, Supplier<HttpClient> http, Clock clock, Supplier<URI> url) {
-        this(dataDir, restrict, background, http, clock, url, CHECK_EVERY, DOWNLOAD_TIMEOUT);
+        this(dataDir, restrict, background, http, clock, url, CHECK_EVERY, ListDownload.DOWNLOAD_TIMEOUT);
     }
 
     /** As the public constructor, checking every {@code every} and giving each download {@code deadline} in all. */
     FilterList(Path dataDir, Runnable restrict, Executor background, Supplier<HttpClient> http, Clock clock, Supplier<URI> url,
                Duration every, Duration deadline) {
-        folder = Objects.requireNonNull(dataDir, "dataDir").resolve(FOLDER);
-        this.restrict = Objects.requireNonNull(restrict, "restrict");
+        this(dataDir, restrict, background, http, clock, url, every, deadline, scheduler());
+    }
+
+    /** As the public constructor, checking every {@code every} on {@code scheduler}, which the list owns from now on. */
+    FilterList(Path dataDir, Runnable restrict, Executor background, Supplier<HttpClient> http, Clock clock, Supplier<URI> url,
+               Duration every, Duration deadline, ScheduledExecutorService scheduler) {
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        cache = new ListCache(dataDir, restrict);
         this.background = Objects.requireNonNull(background, "background");
         clients = Objects.requireNonNull(http, "http");
         this.clock = Objects.requireNonNull(clock, "clock");
@@ -162,26 +142,15 @@ public final class FilterList implements AutoCloseable {
     }
 
     /**
-     * A client for the list: one that connects within 30 seconds and follows redirects, except from https to http. It
-     * sends no cookie and no credentials, and uses the JDK's default proxy selector.
+     * A scheduler of hourly checks as the list owns one: one daemon thread, {@value #CHECK_THREAD}, made only once a
+     * check is scheduled, which a cancel takes out of its queue at once.
      *
-     * @return the client
+     * @return the scheduler
      */
-    public static HttpClient client() {
-        return HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).followRedirects(HttpClient.Redirect.NORMAL).build();
-    }
-
-    /**
-     * Whether the list may come from {@code address} (ruling F10): an https address with a host, or an http one whose
-     * host is this computer ({@code localhost}, {@code 127.0.0.0/8} or {@code [::1]}), without a user name or password.
-     *
-     * @param address an address
-     * @return whether it may
-     */
-    public static boolean fetches(URI address) {
-        if (address == null || address.getScheme() == null || address.getHost() == null || address.getRawUserInfo() != null) return false;
-        String scheme = address.getScheme().toLowerCase(Locale.ROOT);
-        return scheme.equals("https") || scheme.equals("http") && LOOPBACK.matcher(address.getHost().toLowerCase(Locale.ROOT)).matches();
+    static ScheduledExecutorService scheduler() {
+        var scheduler = new ScheduledThreadPoolExecutor(1, Thread.ofPlatform().daemon().name(CHECK_THREAD).factory());
+        scheduler.setRemoveOnCancelPolicy(true);
+        return scheduler;
     }
 
     /**
@@ -209,8 +178,7 @@ public final class FilterList implements AutoCloseable {
             if (!on) {
                 active = Optional.empty();
                 loaded = false;
-                if (nextCheck != null) nextCheck.cancel(false);
-                nextCheck = null;
+                stopChecks();
             }
         }
         if (check) checks();
@@ -254,7 +222,7 @@ public final class FilterList implements AutoCloseable {
      * @return the status
      */
     public synchronized Status status() {
-        return new Status(count, Optional.ofNullable(cached).map(Cached::updated), downloading != null, error);
+        return new Status(count, Optional.ofNullable(cached).map(ListCache.Cached::updated), downloading != null, error, read);
     }
 
     /**
@@ -291,8 +259,7 @@ public final class FilterList implements AutoCloseable {
             closed = true;
             active = Optional.empty();
             loaded = false;
-            if (nextCheck != null) nextCheck.cancel(false);
-            nextCheck = null;
+            stopChecks();
             ended = downloading;
             downloading = null;
             ending = exchange;
@@ -300,6 +267,7 @@ public final class FilterList implements AutoCloseable {
             made = client;
             client = null;
         }
+        scheduler.shutdownNow();
         if (ending != null) ending.cancel(true);
         if (made != null) made.shutdownNow();
         // Its listeners, which end with the plugin, are told nothing more.
@@ -310,29 +278,45 @@ public final class FilterList implements AutoCloseable {
     private void checks() {
         synchronized (this) {
             if (closed || !on) return;
-            if (nextCheck != null) nextCheck.cancel(false);
-            nextCheck = null;
+            stopChecks();
         }
         later(this::refresh);
         schedule();
     }
 
-    /** The next hourly check, unless the list is closed or off. */
+    /**
+     * No hourly check is scheduled from now on: the one scheduled is cancelled, out of the scheduler's queue, and any of
+     * an earlier number does nothing. Holds the lock.
+     */
+    private void stopChecks() {
+        checkNumber++;
+        if (nextCheck != null) nextCheck.cancel(false);
+        nextCheck = null;
+    }
+
+    /**
+     * The next hourly check, unless the list is closed or off. Each check knows its number before it is scheduled, so a
+     * check the scheduler runs before {@code schedule} has returned its future is still the current one (V37).
+     */
     private void schedule() {
         synchronized (this) {
             if (closed || !on || !started) return;
-            Executor delayed = CompletableFuture.delayedExecutor(every.toNanos(), TimeUnit.NANOSECONDS, background);
-            // The check runs no sooner than this lock is let go, by when it knows itself.
-            var scheduled = new AtomicReference<CompletableFuture<Void>>();
-            scheduled.set(CompletableFuture.runAsync(() -> tick(scheduled.get()), delayed));
-            nextCheck = scheduled.get();
+            long number = ++checkNumber;
+            ScheduledFuture<?> scheduled;
+            try {
+                scheduled = scheduler.schedule(() -> tick(number), every.toNanos(), TimeUnit.NANOSECONDS);
+            } catch (RejectedExecutionException stopped) {
+                return;
+            }
+            // A check that ran at once has scheduled the next, whose future it recorded.
+            if (checkNumber == number) nextCheck = scheduled;
         }
     }
 
-    /** The hourly check {@code scheduled} is due: it checks, and schedules the next, unless the checks have changed. */
-    private void tick(CompletableFuture<Void> scheduled) {
+    /** The hourly check {@code number} is due: it checks, and schedules the next, unless the checks have changed since. */
+    private void tick(long number) {
         synchronized (this) {
-            if (nextCheck != scheduled) return;
+            if (closed || !on || !started || checkNumber != number) return;
             nextCheck = null;
         }
         later(this::refresh);
@@ -369,53 +353,32 @@ public final class FilterList implements AutoCloseable {
 
     /** Reads the cache, and applies its rule set while the list is on; a cache that cannot be read is none. Background executor. */
     private void load() {
-        Cached state = null;
+        ListCache.Cached state = null;
         RuleSet rules = null;
         int kept = 0;
         try {
-            restrict.run();
-            Optional<Cached> read = readState();
+            Optional<ListCache.Contents> read = cache.read();
             if (read.isPresent()) {
-                ContentRules.Compiled compiled = ContentRules.compile(BlockerJson.read(readRules()));
+                ContentRules.Compiled compiled = ContentRules.compile(BlockerJson.read(read.get().rules()));
                 rules = RuleSet.of(compiled.rules());
                 kept = compiled.rules().size();
-                state = read.get();
+                state = read.get().state();
             }
         } catch (NoSuchFileException missing) {
             // Nothing cached.
         } catch (IOException | RuntimeException unreadable) {
-            LOG.log(System.Logger.Level.WARNING, "The ad blocking filter list's cache could not be read, so the list downloads again: "
-                + folder, unreadable);
+            LOG.log(System.Logger.Level.WARNING, "The ad blocking filter list's cache could not be read, so the list downloads again",
+                unreadable);
         }
         synchronized (this) {
             if (closed) return;
             cached = state;
             count = state == null ? count : kept;
+            read = true;
             loaded = on;
             if (on) active = Optional.ofNullable(rules);
         }
         changed();
-    }
-
-    private Optional<Cached> readState() throws IOException {
-        Path file = folder.resolve(STATE);
-        if (!Files.exists(file)) return Optional.empty();
-        if (Files.size(file) > STATE_LIMIT) throw new IOException("The filter list's state is larger than " + STATE_LIMIT + " bytes");
-        Map<String, Object> state = StrictJson.object(Files.readString(file, StandardCharsets.UTF_8), 1)
-            .orElseThrow(() -> new IOException("The filter list's state is not a JSON object"));
-        if (!(state.get("url") instanceof String address) || !(state.get("updated") instanceof String updated))
-            throw new IOException("The filter list's state has no url or updated");
-        try {
-            return Optional.of(new Cached(address, Instant.parse(updated)));
-        } catch (DateTimeParseException unreadable) {
-            throw new IOException("The filter list's state has no time it was updated", unreadable);
-        }
-    }
-
-    private String readRules() throws IOException {
-        Path file = folder.resolve(RULES);
-        if (Files.size(file) > 4L * MAX_BYTES) throw new IOException("The filter list's cache is larger than " + 4 * (MAX_BYTES >> 20) + " MiB");
-        return Files.readString(file, StandardCharsets.UTF_8);
     }
 
     /** The download under way, or a new one, unless the list is closed. */
@@ -433,33 +396,26 @@ public final class FilterList implements AutoCloseable {
     }
 
     /**
-     * Sends the request for the list, with one deadline on the whole download, and hands the answer to
-     * {@link #install} on the background executor. Background executor.
+     * Starts the download of the list, at an address the list may come from, and hands its answer to {@link #install}
+     * on the background executor. An address the list may not come from asks for no client. Background executor.
      */
     private void fetch(CompletableFuture<Status> result) {
         URI address = url.get();
-        if (!fetches(address)) {
-            failed(result, address, new Refused(REFUSED_ADDRESS));
+        if (!ListDownload.fetches(address)) {
+            failed(result, address, new ListDownload.Refused(ListDownload.REFUSED_ADDRESS));
             return;
         }
-        Body body = new Body();
-        CompletableFuture<HttpResponse<byte[]>> sent;
+        CompletableFuture<byte[]> answer;
         try {
             HttpClient http = madeClient();
             if (http == null) return; // closed: the close told the result
-            sent = http.sendAsync(HttpRequest.newBuilder(address).timeout(deadline).header("Accept", "application/json").GET().build(), body);
+            answer = ListDownload.get(http, address, deadline);
         } catch (RuntimeException | Error refused) {
             failed(result, address, refused);
             // An error, such as a test's client that must not be asked for, is the executor's to report too.
             if (refused instanceof Error error) throw error;
             return;
         }
-        CompletableFuture<HttpResponse<byte[]>> answer = sent.copy().orTimeout(deadline.toNanos(), TimeUnit.NANOSECONDS);
-        // However the answer ends, by the deadline or the close, the exchange and its body end with it.
-        answer.whenComplete((response, failure) -> {
-            sent.cancel(true);
-            body.stop();
-        });
         synchronized (this) {
             if (closed) {
                 answer.cancel(true);
@@ -467,7 +423,7 @@ public final class FilterList implements AutoCloseable {
             }
             exchange = answer;
         }
-        answer.whenComplete((response, failure) -> later(() -> install(result, address, response, failure)));
+        answer.whenComplete((body, failure) -> later(() -> install(result, address, body, failure)));
     }
 
     /** The client, made on the first download; null once closed. Background executor. */
@@ -490,26 +446,25 @@ public final class FilterList implements AutoCloseable {
      * The download has ended: a list read, compiled and cached replaces the one applied, while the list is on; anything
      * else keeps it and records why. Background executor.
      */
-    private void install(CompletableFuture<Status> result, URI address, HttpResponse<byte[]> response, Throwable failure) {
+    private void install(CompletableFuture<Status> result, URI address, byte[] body, Throwable failure) {
         synchronized (this) {
             if (closed || downloading != result) return;
             exchange = null;
         }
         try {
             if (failure != null) throw failure;
-            if (response.statusCode() != 200) throw new Refused("the server answered HTTP " + response.statusCode());
-            if (!fetches(response.uri())) throw new Refused("the filter list was redirected to an address that is not https");
-            ContentRules.Compiled compiled = ContentRules.compile(BlockerJson.read(new String(response.body(), StandardCharsets.UTF_8)));
+            ContentRules.Compiled compiled = ContentRules.compile(BlockerJson.read(new String(body, StandardCharsets.UTF_8)));
             RuleSet rules = RuleSet.of(compiled.rules());
             Instant updated = clock.instant();
             synchronized (this) {
                 if (closed) return;
             }
-            write(address, updated, compiled);
+            cache.write(address, updated, compiled);
             synchronized (this) {
                 if (closed) return;
-                cached = new Cached(address.toString(), updated);
+                cached = new ListCache.Cached(address.toString(), updated);
                 count = compiled.rules().size();
+                read = true;
                 error = Optional.empty();
                 downloading = null;
                 loaded = on;
@@ -522,70 +477,25 @@ public final class FilterList implements AutoCloseable {
         }
     }
 
-    /** The download {@code result} of {@code address} failed: the old list stays, and the failure is recorded, logged and told. */
+    /**
+     * The download {@code result} of {@code address} failed: the old list stays, and the failure is recorded, logged and
+     * told. The log has one line for each failure, and the stack trace the first time a reason is seen, so a machine that
+     * is offline logs no trace every hour.
+     */
     private void failed(CompletableFuture<Status> result, URI address, Throwable failure) {
-        String reason = reason(failure, address);
+        String reason = ListDownload.reason(failure, address, deadline);
+        boolean trace;
         synchronized (this) {
             if (closed || downloading != result) return;
             downloading = null;
             exchange = null;
             error = Optional.of(reason);
+            // A refusal's reason is all there is to it; another's trace is logged the first time its reason is seen.
+            trace = !(failure instanceof ListDownload.Refused) && traced.size() < TRACED && traced.add(reason);
         }
-        LOG.log(System.Logger.Level.WARNING, "The ad blocking filter list could not be updated: " + reason,
-            failure instanceof Refused ? null : failure);
+        LOG.log(System.Logger.Level.WARNING, "The ad blocking filter list could not be updated: " + reason, trace ? failure : null);
         changed();
         result.complete(status());
-    }
-
-    /**
-     * Caches the list: its compiled rules, then its state, each through a temporary file of its owner's alone. A list
-     * whose rules would not read back within {@link BlockerJson}'s bound, as escapes can lengthen a hostile list's
-     * selectors, is refused.
-     */
-    private void write(URI address, Instant updated, ContentRules.Compiled compiled) throws IOException {
-        String rules = BlockerJson.write(ContentRules.encode(compiled.rules()));
-        if (rules.length() > BlockerJson.MAX_LENGTH) throw new TooLarge();
-        restrict.run();
-        Files.createDirectories(folder);
-        replace(RULES, rules);
-        var state = new LinkedHashMap<String, Object>();
-        state.put("url", address.toString());
-        state.put("updated", updated.toString());
-        state.put("rules", (long) compiled.rules().size());
-        state.put("skipped", (long) compiled.skipped());
-        replace(STATE, StrictJson.write(state));
-    }
-
-    /** Writes {@code text} as the list's file {@code name}, through a temporary file moved over it at once. */
-    private void replace(String name, String text) throws IOException {
-        // POSIX file systems make a temporary file rw-------.
-        Path temporary = Files.createTempFile(folder, name, ".tmp");
-        try {
-            Files.writeString(temporary, text, StandardCharsets.UTF_8);
-            Files.move(temporary, folder.resolve(name), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-        } finally {
-            Files.deleteIfExists(temporary);
-        }
-    }
-
-    /** Why a download failed, in words Settings shows after "Could not update the filter list: ". */
-    private String reason(Throwable failure, URI address) {
-        Throwable cause = failure;
-        while ((cause instanceof CompletionException || cause instanceof ExecutionException) && cause.getCause() != null) cause = cause.getCause();
-        for (Throwable link = cause; link != null; link = link.getCause()) if (link instanceof TooLarge) return link.getMessage();
-        return switch (cause) {
-            case Refused refused -> refused.getMessage();
-            case HttpConnectTimeoutException late -> "the server did not answer within " + seconds(CONNECT_TIMEOUT);
-            case TimeoutException late -> "the download took longer than " + seconds(deadline);
-            case HttpTimeoutException late -> "the download took longer than " + seconds(deadline);
-            case CancellationException cancelled -> "the download was cancelled";
-            case ConnectException refused -> "could not connect to " + (address == null ? "its server" : address.getHost());
-            default -> cause.getMessage() == null || cause.getMessage().isBlank() ? cause.getClass().getSimpleName() : cause.getMessage();
-        };
-    }
-
-    private static String seconds(Duration duration) {
-        return BigDecimal.valueOf(duration.toMillis(), 3).stripTrailingZeros().toPlainString() + " seconds";
     }
 
     /** Runs {@code task} on the background executor after the list's tasks before it; nothing once the executor refuses. */
@@ -650,102 +560,6 @@ public final class FilterList implements AutoCloseable {
             } catch (RuntimeException failure) {
                 LOG.log(System.Logger.Level.WARNING, "A listener of the ad blocking filter list failed", failure);
             }
-        }
-    }
-
-    /** A download Jasper refuses, with the reason Settings shows. Carries no stack. */
-    private static final class Refused extends IOException {
-        Refused(String reason) {
-            super(reason, null);
-        }
-
-        @Override public synchronized Throwable fillInStackTrace() {
-            return this;
-        }
-    }
-
-    /** A list over 32 MiB. Carries no stack. */
-    private static final class TooLarge extends IOException {
-        TooLarge() {
-            super("the list is larger than " + (MAX_BYTES >> 20) + " MiB");
-        }
-
-        @Override public synchronized Throwable fillInStackTrace() {
-            return this;
-        }
-    }
-
-    /**
-     * The answer's body: for a 200 that does not announce more than 32 MiB, at most 32 MiB of bytes, counted as they
-     * come; for any other answer, nothing is read. The client calls it on one thread at a time.
-     */
-    private static final class Body implements HttpResponse.BodyHandler<byte[]> {
-        private volatile Reading reading;
-
-        @Override public HttpResponse.BodySubscriber<byte[]> apply(HttpResponse.ResponseInfo answer) {
-            long length = answer.headers().firstValueAsLong("Content-Length").orElse(-1);
-            Reading next = new Reading(answer.statusCode() != 200, length > MAX_BYTES);
-            reading = next;
-            return next;
-        }
-
-        /** Stops reading the body. */
-        void stop() {
-            Reading now = reading;
-            if (now != null) now.end(null);
-        }
-    }
-
-    private static final class Reading implements HttpResponse.BodySubscriber<byte[]> {
-        private final CompletableFuture<byte[]> body = new CompletableFuture<>();
-        private final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        private final boolean unread, tooLarge;
-        private volatile Flow.Subscription subscription;
-
-        Reading(boolean unread, boolean tooLarge) {
-            this.unread = unread;
-            this.tooLarge = tooLarge;
-        }
-
-        @Override public CompletionStage<byte[]> getBody() {
-            return body;
-        }
-
-        @Override public void onSubscribe(Flow.Subscription given) {
-            subscription = given;
-            if (unread) end(new byte[0]);
-            else if (tooLarge) end(new TooLarge());
-            else if (body.isDone()) given.cancel();
-            else given.request(Long.MAX_VALUE);
-        }
-
-        @Override public void onNext(List<ByteBuffer> buffers) {
-            for (ByteBuffer buffer : buffers) {
-                if (body.isDone()) return;
-                if (buffer.remaining() > MAX_BYTES - bytes.size()) {
-                    end(new TooLarge());
-                    return;
-                }
-                byte[] chunk = new byte[buffer.remaining()];
-                buffer.get(chunk);
-                bytes.writeBytes(chunk);
-            }
-        }
-
-        @Override public void onError(Throwable failure) {
-            body.completeExceptionally(failure);
-        }
-
-        @Override public void onComplete() {
-            body.complete(bytes.toByteArray());
-        }
-
-        /** Ends the reading: with {@code ending}, a body or a failure, or, null, as cancelled. */
-        void end(Object ending) {
-            Flow.Subscription now = subscription;
-            if (now != null) now.cancel();
-            if (ending instanceof byte[] read) body.complete(read);
-            else body.completeExceptionally(ending instanceof Throwable failure ? failure : new CancellationException());
         }
     }
 }
