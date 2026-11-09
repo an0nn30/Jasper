@@ -25,6 +25,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
@@ -35,10 +36,11 @@ import java.util.function.Supplier;
  * update only once it has {@link #start started}, which a page's first start or the user's turning ad blocking on
  * does, and only while it is {@link #enabled on}. A check downloads the list when an update is due: when 24 hours have
  * passed since the last update, when nothing is cached, or when the cache came from another address, so a new address
- * downloads at its next check. Once started and on, the list checks every hour, the first check at once, on a daemon
- * thread of its own, which it makes only once a check is scheduled and ends at its close (ruling V37). Its client,
- * which the given supplier makes on the background executor at the first download, is
- * {@link ListDownload#client(Optional)}'s, made again for the next download once it has changed ({@link #clientChanged}).
+ * downloads at its next check; one that changed while a download was under way is checked once that download ends
+ * (ruling V51). Once started and on, the list checks every hour, the first check at once, on a daemon thread of its
+ * own, which it makes only once a check is scheduled and ends at its close (ruling V37). Its client, which the given
+ * supplier makes on the background executor at the first download, is {@link ListDownload#client(Optional)}'s, made
+ * again for the next download once it has changed ({@link #clientChanged}).
  * The list read ({@link BlockerJson#read}) and compiled ({@link ContentRules#compile}) is cached, then replaces the one
  * applied; anything that fails keeps the old list, and the failure is what {@link #status()} reports until the next
  * update succeeds. {@link #updateNow()} downloads at once, on or off.
@@ -86,7 +88,9 @@ public final class FilterList implements AutoCloseable {
     private final Supplier<HttpClient> clients;
     private final Clock clock;
     private final Supplier<URI> url;
-    private final Duration every, deadline;
+    private final Duration every;
+    // How long the download of an address may take in all.
+    private final Function<URI, Duration> deadline;
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
     // The list's work, run one task at a time on the background executor; guarded by itself.
     private final ArrayDeque<Runnable> tasks = new ArrayDeque<>();
@@ -126,18 +130,21 @@ public final class FilterList implements AutoCloseable {
      * @param url the list's address, read at each check: the Filter List URL setting
      */
     public FilterList(Path dataDir, Runnable restrict, Executor background, Supplier<HttpClient> http, Clock clock, Supplier<URI> url) {
-        this(dataDir, restrict, background, http, clock, url, CHECK_EVERY, ListDownload.DOWNLOAD_TIMEOUT);
+        this(dataDir, restrict, background, http, clock, url, CHECK_EVERY, address -> ListDownload.DOWNLOAD_TIMEOUT);
     }
 
-    /** As the public constructor, checking every {@code every} and giving each download {@code deadline} in all. */
+    /**
+     * As the public constructor, checking every {@code every} and giving the download of each address the time
+     * {@code deadline} gives it in all: a test's, which gives one that never ends a short one and the others more.
+     */
     FilterList(Path dataDir, Runnable restrict, Executor background, Supplier<HttpClient> http, Clock clock, Supplier<URI> url,
-               Duration every, Duration deadline) {
+               Duration every, Function<URI, Duration> deadline) {
         this(dataDir, restrict, background, http, clock, url, every, deadline, scheduler());
     }
 
     /** As the public constructor, checking every {@code every} on {@code scheduler}, which the list owns from now on. */
     FilterList(Path dataDir, Runnable restrict, Executor background, Supplier<HttpClient> http, Clock clock, Supplier<URI> url,
-               Duration every, Duration deadline, ScheduledExecutorService scheduler) {
+               Duration every, Function<URI, Duration> deadline, ScheduledExecutorService scheduler) {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         cache = new ListCache(dataDir, restrict);
         this.background = Objects.requireNonNull(background, "background");
@@ -246,8 +253,9 @@ public final class FilterList implements AutoCloseable {
 
     /**
      * The client the list's supplier makes has changed, as the HTTP proxy has (plan 6's F3): the next download makes a new
-     * one. A download under way finishes on the old client, which is shut down once it has ended; with none under way,
-     * the old client is shut down at once. Any thread.
+     * one. A download under way finishes its exchange under way on the old client but asks it for no further redirect,
+     * so it fails if redirected (ruling V51), and the old client is shut down once the download has ended; with none
+     * under way, the old client is shut down at once. Any thread.
      */
     public void clientChanged() {
         HttpClient old;
@@ -437,7 +445,7 @@ public final class FilterList implements AutoCloseable {
         try {
             HttpClient http = madeClient();
             if (http == null) return; // closed: the close told the result
-            answer = ListDownload.get(http, address, deadline);
+            answer = ListDownload.get(http, address, deadline.apply(address), () -> current(http));
         } catch (RuntimeException | Error refused) {
             failed(result, address, refused);
             // An error, such as a test's client that must not be asked for, is the executor's to report too.
@@ -474,6 +482,19 @@ public final class FilterList implements AutoCloseable {
             }
             made.shutdownNow();
         }
+    }
+
+    /** Whether {@code http} is the list's client still: not once it has changed (V51), nor once the list has closed. */
+    private synchronized boolean current(HttpClient http) {
+        return client == http;
+    }
+
+    /**
+     * The download of {@code address} has ended: when the list's address has changed since, as its change's check found
+     * the download under way, it is checked now (V51). Background executor.
+     */
+    private void recheck(URI address) {
+        if (!Objects.equals(address, url.get())) later(this::refresh);
     }
 
     /** Shuts down the clients changed while a download was under way, which has ended, or the list has closed. */
@@ -517,6 +538,7 @@ public final class FilterList implements AutoCloseable {
             shutDownRetired();
             changed();
             result.complete(status());
+            recheck(address);
         } catch (Throwable thrown) {
             failed(result, address, thrown);
         }
@@ -528,7 +550,7 @@ public final class FilterList implements AutoCloseable {
      * is offline logs no trace every hour.
      */
     private void failed(CompletableFuture<Status> result, URI address, Throwable failure) {
-        String reason = ListDownload.reason(failure, address, deadline);
+        String reason = ListDownload.reason(failure, address, deadline.apply(address));
         boolean trace;
         synchronized (this) {
             if (closed || downloading != result) return;
@@ -542,6 +564,7 @@ public final class FilterList implements AutoCloseable {
         LOG.log(System.Logger.Level.WARNING, "The ad blocking filter list could not be updated: " + reason, trace ? failure : null);
         changed();
         result.complete(status());
+        recheck(address);
     }
 
     /** Runs {@code task} on the background executor after the list's tasks before it; nothing once the executor refuses. */

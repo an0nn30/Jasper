@@ -268,12 +268,13 @@ class BrowserSettingsPanelTest {
     }
 
     /**
-     * Ruling V36: until this run has read the list or downloaded it, which waits for the first browser page (F8), the
-     * row says so; "0 rules" would claim the list has none. An update under way, or one that failed, says that instead.
+     * Ruling V36: until this run has read the list or downloaded it, which waits for ad blocking to be on and a browser
+     * page to open (F8), the row says so; "0 rules" would claim the list has none. V52: in words true whether ad
+     * blocking is on or off. An update under way, or one that failed, says that instead.
      */
-    @Test void beforeTheListIsReadTheRowSaysItLoadsWithTheFirstBrowserPage() throws Exception {
+    @Test void beforeTheListIsReadTheRowSaysWhenItLoads() throws Exception {
         onUi(() -> assertThat(node(page(), BrowserSettingsPanel.FILTERS + ":row", Nodes.SettingRow.class).description())
-            .isEqualTo("Loads with the first browser page"));
+            .isEqualTo("Loads when ad blocking is on and a browser page opens"));
         for (var shown : List.of(
                 java.util.Map.entry(new FilterList.Status(0, Optional.empty(), true, Optional.empty(), false), "Updating…"),
                 java.util.Map.entry(new FilterList.Status(0, Optional.empty(), false, Optional.of("the server answered HTTP 500"), false),

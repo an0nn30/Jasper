@@ -10,8 +10,10 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -38,20 +40,24 @@ final class ListServer implements AutoCloseable {
         """;
     /** Lets {@code /hold} and {@code /announced} end, and {@code /late} answer. */
     final CountDownLatch release = new CountDownLatch(1), late = new CountDownLatch(1);
+    /** Hold the answers of {@code /list.json} and {@code /other.json} while shut; both start open. */
+    final Gate list, other;
     private final Map<String, AtomicInteger> hits = new ConcurrentHashMap<>();
+    private final List<Gate> gates = new CopyOnWriteArrayList<>();
     private final HttpServer server;
 
     /**
-     * The server, started, with its paths: {@code /list.json} and {@code /other.json}, the lists; {@code /error}, a 500;
-     * {@code /text}, a 200 that is no JSON; {@code /moved}, a 302 to {@code /list.json}; {@code /huge}, a body of more
-     * than 32 MiB of no announced length; {@code /announced}, one announced as more than 32 MiB; {@code /hold}, headers
-     * and then a body that trickles until {@link #release}; and {@code /late}, the list once {@link #late} lets it come.
+     * The server, started, with its paths: {@code /list.json} and {@code /other.json}, the lists, each through its
+     * gate; {@code /error}, a 500; {@code /text}, a 200 that is no JSON; {@code /moved}, a 302 to {@code /list.json};
+     * {@code /huge}, a body of more than 32 MiB of no announced length; {@code /announced}, one announced as more than
+     * 32 MiB; {@code /hold}, headers and then a body that trickles until {@link #release}; and {@code /late}, the list
+     * once {@link #late} lets it come.
      */
     ListServer() throws IOException {
         server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.setExecutor(Executors.newCachedThreadPool());
-        handle("/list.json", exchange -> answer(exchange, 200, LIST));
-        handle("/other.json", exchange -> answer(exchange, 200, OTHER));
+        list = gated("/list.json", LIST);
+        other = gated("/other.json", OTHER);
         handle("/error", exchange -> answer(exchange, 500, "broken"));
         handle("/text", exchange -> answer(exchange, 200, "this is not json"));
         handle("/moved", exchange -> redirect(exchange, "/list.json"));
@@ -119,6 +125,21 @@ final class ListServer implements AutoCloseable {
         });
     }
 
+    /** Answers {@code path} with a 200 of {@code body}, once its gate, which starts open, lets it. */
+    Gate gated(String path, String body) {
+        var gate = new Gate();
+        gates.add(gate);
+        handle(path, exchange -> {
+            try {
+                gate.pass();
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+            answer(exchange, 200, body);
+        });
+        return gate;
+    }
+
     /** Answers with a 302 to {@code location}, as written. */
     static void redirect(HttpExchange exchange, String location) throws IOException {
         exchange.getResponseHeaders().add("Location", location);
@@ -137,7 +158,30 @@ final class ListServer implements AutoCloseable {
     @Override public void close() {
         release.countDown();
         late.countDown();
+        for (Gate gate : gates) gate.open();
         server.stop(0);
         ((ExecutorService) server.getExecutor()).shutdownNow();
+    }
+
+    /**
+     * Holds a path's answers while shut, so a test sees a download under way for as long as it needs (ruling V53),
+     * whatever the machine's load.
+     */
+    static final class Gate {
+        private volatile CountDownLatch open = new CountDownLatch(0);
+
+        /** From now on, the path's answers wait until {@link #open}. */
+        void shut() {
+            open = new CountDownLatch(1);
+        }
+
+        /** Lets the answers waiting go, and those after. */
+        void open() {
+            open.countDown();
+        }
+
+        private void pass() throws InterruptedException {
+            open.await(30, TimeUnit.SECONDS);
+        }
     }
 }

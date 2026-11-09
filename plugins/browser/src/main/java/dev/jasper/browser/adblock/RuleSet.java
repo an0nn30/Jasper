@@ -32,10 +32,14 @@ import java.util.function.Predicate;
  * rules of {@code .*} with an {@code unless-domain}, each a few lookups of the page's host. No rule's expression runs
  * on an address that lacks its literal. The hide rules that cover every page's document are joined once, as the sheet
  * every page shares, and so are those that cover every http and https page's, for those pages alone. A request's and
- * a page's address are read to their first 8 KiB, and each call is charged at most 2,000,000 for its rules' work: a
- * read of a character at its filter's charge ({@link UrlFilter}), and a check of a literal 1 and 1 more for each 32
- * characters of the address. Past that, a request is not blocked and a page hides only what the rules already read
- * proved. A rule set is immutable, and safe on any thread.
+ * a page's address are read to their first 8 KiB, and each call is charged at most 2,000,000 for its rules' work: 1
+ * for each rule it examines, whether or not its trigger fits (ruling V50); a read of a character at its filter's
+ * charge ({@link UrlFilter}); a check of a literal 1 and 1 more for each 32 characters of the address; and the compile
+ * of an expression its {@link PatternCache} does not hold, by the size of the filter's source or expression, the
+ * longer (V48). Past that, a request is not blocked and a page hides only what the rules already read proved. A rule whose match runs past its own 100,000, or
+ * past the stack, counts as matching when it is an ignore rule and as not matching otherwise, so that both bounds err
+ * toward allowing the request and hiding less (V50). A rule set is immutable but for its cache of compiled
+ * expressions, and safe on any thread.
  */
 public final class RuleSet {
     private static final Set<ResourceKind> PAGE = Collections.unmodifiableSet(EnumSet.of(ResourceKind.DOCUMENT));
@@ -58,6 +62,8 @@ public final class RuleSet {
     // The sheet every page shares: what every page hides, and what every http and https page hides, by the case rule
     // that reads its scheme.
     private final Shared everyPage, webPage, lowerCaseWebPage;
+    // The compiled expressions of the rules' filters (V48).
+    private final PatternCache patterns = new PatternCache();
     private final AtomicBoolean logged = new AtomicBoolean();
 
     private RuleSet(List<Rule> rules, Consumer<Rule> examined, BiConsumer<UrlFilter, String> ran) {
@@ -100,6 +106,11 @@ public final class RuleSet {
         return entries.length;
     }
 
+    /** The compiled expressions the set keeps. */
+    PatternCache patterns() {
+        return patterns;
+    }
+
     /**
      * Whether the request is blocked.
      *
@@ -108,7 +119,8 @@ public final class RuleSet {
      * @param pageUrl the address of the page that makes it; null or one with no host, such as {@code about:blank}, fits
      *     no {@code if-domain}, every {@code unless-domain}, and no first party
      * @return whether its last matching rule that blocks or ignores the earlier rules is one that blocks; false when
-     *     the rules ran past the call's charge first
+     *     the rules ran past the call's charge first, and when the last such rule is an ignore rule that ran past its
+     *     own
      */
     public boolean blocks(String url, Set<ResourceKind> kinds, String pageUrl) {
         return blocks(url, kinds, pageUrl, new UrlFilter.Reads(CALL_READS));
@@ -122,7 +134,7 @@ public final class RuleSet {
         try {
             for (int at = candidates.length - 1; at >= 0; at--) {
                 Entry entry = entries[candidates[at]];
-                examined.accept(entry.rule());
+                examine(entry, reads);
                 if (matches(entry, request, reads)) return entry.rule().action() == Action.BLOCK;
             }
             return false;
@@ -141,7 +153,7 @@ public final class RuleSet {
         int lastBlock = -1, lastIgnore = -1;
         for (int at = 0; at < entries.length; at++) {
             Action action = entries[at].rule().action();
-            if (action == Action.HIDE || !fits(entries[at], request) || !entries[at].rule().filter().matches(request.url())) continue;
+            if (action == Action.HIDE || !fits(entries[at], request) || !scanned(entries[at], request)) continue;
             if (action == Action.BLOCK) lastBlock = at;
             else lastIgnore = at;
         }
@@ -152,7 +164,8 @@ public final class RuleSet {
      * What the page hides: one {@code selector{display:none!important}} line for each selector of each hide rule that
      * matches the page's own document and comes after the last ignore rule that does, the shared sheet's lines first,
      * at most 2 MiB of them in all. When the rules run past the call's charge, the sheet keeps the lines of the rules
-     * after the one being read, which no ignore rule unread can drop.
+     * after the one being read, which no ignore rule unread can drop; an ignore rule that ran past its own counts as
+     * matching.
      *
      * @param pageUrl the page's address
      * @return the lines, each ended by a line feed; empty when it hides nothing
@@ -188,7 +201,7 @@ public final class RuleSet {
         var sheet = new StringBuilder();
         for (Entry entry : entries) {
             Action action = entry.rule().action();
-            if (action == Action.BLOCK || !fits(entry, page) || !entry.rule().filter().matches(page.url())) continue;
+            if (action == Action.BLOCK || !fits(entry, page) || !scanned(entry, page)) continue;
             if (action == Action.IGNORE_PREVIOUS) sheet.setLength(0);
             else for (String part : ContentRules.parts(entry.rule().selector())) sheet.append(part).append(HIDDEN);
         }
@@ -203,7 +216,7 @@ public final class RuleSet {
         try {
             for (; at >= 0; at--) {
                 Entry entry = entries[candidates[at]];
-                examined.accept(entry.rule());
+                examine(entry, reads);
                 boolean ignore = entry.rule().action() == Action.IGNORE_PREVIOUS;
                 if (!(ignore || own) || !matches(entry, page, reads)) continue;
                 if (ignore) {
@@ -237,7 +250,16 @@ public final class RuleSet {
         return scheme.startsWith("http://") || scheme.startsWith("https://");
     }
 
-    /** Whether the rule matches the request: its trigger fits, and the address holds its literal and matches it. */
+    /** A call examines the rule: its seam is told, and the call is charged 1 (V50), whether or not the rule fits. */
+    private void examine(Entry entry, UrlFilter.Reads reads) {
+        examined.accept(entry.rule());
+        reads.charge(1);
+    }
+
+    /**
+     * Whether the rule counts as matching the request: its trigger fits, the address holds its literal, and its filter
+     * matches the address, or ran past its own charge or the stack and the rule ignores the earlier rules.
+     */
     private boolean matches(Entry entry, Request request, UrlFilter.Reads reads) {
         if (!fits(entry, request)) return false;
         UrlFilter filter = entry.rule().filter();
@@ -247,7 +269,24 @@ public final class RuleSet {
             if (!(filter.caseSensitive() ? request.url() : request.folded()).contains(literal)) return false;
         }
         ran.accept(filter, request.url());
-        return filter.matches(request.url(), reads);
+        return counts(entry, filter.match(request.url(), reads, patterns));
+    }
+
+    /** Whether a scan counts the rule, whose trigger fits, as matching: as {@link #matches} does, without its charge. */
+    private boolean scanned(Entry entry, Request request) {
+        return counts(entry, entry.rule().filter().match(request.url(), new UrlFilter.Reads(Integer.MAX_VALUE), patterns));
+    }
+
+    /**
+     * Whether a match that came to {@code outcome} counts as one: when it matched, and when it overran and the rule
+     * ignores the earlier rules, which errs toward allowing the request and hiding less (V50).
+     */
+    private static boolean counts(Entry entry, UrlFilter.Outcome outcome) {
+        return switch (outcome) {
+            case MATCHED -> true;
+            case UNMATCHED -> false;
+            case OVERRAN -> entry.rule().action() == Action.IGNORE_PREVIOUS;
+        };
     }
 
     private void spent() {
@@ -257,7 +296,7 @@ public final class RuleSet {
 
     private void overran(UrlFilter filter) {
         log("A content blocker rule ran past the 100,000 one match may be charged for its reads, or past the stack, which "
-            + "counts as no match: url-filter " + filter.source());
+            + "counts as a match for an ignore rule and as none for any other: url-filter " + filter.source());
     }
 
     private void log(String message) {

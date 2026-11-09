@@ -54,4 +54,37 @@ class ProxyRouteTest {
         assertThatThrownBy(() -> route.select(null)).isInstanceOf(IllegalArgumentException.class);
         route.connectFailed(URI.create("http://example.com/"), PROXY, new java.io.IOException("refused"));
     }
+
+    /**
+     * Final review B (V51): with the proxy off, this computer goes direct however its address is written, and every
+     * other address as the JDK's default selector routes it at the time, direct when there is none.
+     */
+    @Test void withTheProxyOffThisComputerGoesDirectAndTheRestAsTheJdksDefaultSelectorRoutesIt() {
+        ProxySelector before = ProxySelector.getDefault();
+        List<Proxy> direct = List.of(Proxy.NO_PROXY), proxied = List.of(new Proxy(Proxy.Type.HTTP, PROXY));
+        var asked = new java.util.ArrayList<URI>();
+        try {
+            ProxySelector.setDefault(new ProxySelector() {
+                @Override public List<Proxy> select(URI uri) {
+                    asked.add(uri);
+                    return proxied;
+                }
+
+                @Override public void connectFailed(URI uri, java.net.SocketAddress address, java.io.IOException failure) { }
+            });
+            ProxySelector route = ProxyRoute.byDefault();
+            for (String local : List.of("http://localhost:8080/", "http://127.0.0.1/", "http://[::1]/", "http://[0:0:0:0:0:0:0:1]:9/",
+                    "http://[::ffff:127.0.0.1]:9/", "https://127.9.9.9/"))
+                assertThat(route.select(URI.create(local))).as(local).isEqualTo(direct);
+            assertThat(asked).isEmpty();
+            for (String other : List.of("https://lists.example/", "http://a.localhost/", "http://169.254.1.1/"))
+                assertThat(route.select(URI.create(other))).as(other).isEqualTo(proxied);
+            assertThat(asked).hasSize(3);
+            ProxySelector.setDefault(null);
+            assertThat(route.select(URI.create("https://lists.example/"))).as("no default selector").isEqualTo(direct);
+            assertThatThrownBy(() -> route.select(null)).isInstanceOf(IllegalArgumentException.class);
+        } finally {
+            ProxySelector.setDefault(before);
+        }
+    }
 }

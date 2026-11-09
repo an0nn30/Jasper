@@ -111,6 +111,56 @@ class UrlFilterTest {
         assertThat(filter("[-a]", false).matches("-")).isTrue();
     }
 
+    /** Final review B (V48): a class of one member is written as its character, which Java keeps without a bitmap. */
+    @Test void aClassOfOneMemberIsWrittenAsItsCharacter() {
+        assertThat(filter("[a]b[\\/][.]", false).expression()).isEqualTo("ab\\/\\.");
+        assertThat(filter("[a]+x", true).expression()).isEqualTo("a+x");
+        assertThat(filter("[aa]", false).expression()).as("one member, written twice").isEqualTo("a");
+        assertThat(filter("[a-a]", false).expression()).isEqualTo("a");
+        assertThat(filter("[^a]", false).expression()).as("a negated class has many members").isEqualTo("[^a]");
+        assertThat(literal("x[a]yz")).as("the class still ends a run of the literal").contains("yz");
+        assertThat(filter("[a]", false).matches("A")).isTrue();
+        assertThat(filter("[a]", true).matches("A")).isFalse();
+        assertThat(filter("[a]".repeat(682), false).weight()).as("no bitmap").isEqualTo(filter("a".repeat(682), false).weight());
+    }
+
+    /**
+     * Final review B (V48): what a filter's compiled expression keeps is estimated from its parse: its text, each of
+     * its nodes, each class's bitmap, and the table Java builds for a case-sensitive expression that begins with a run
+     * of 4 characters or more.
+     */
+    @Test void theWeightOfACompiledExpressionIsEstimatedFromItsParse() {
+        int node = UrlFilter.NODE_BYTES, base = UrlFilter.PATTERN_BYTES;
+        assertThat(filter("ab", false).weight()).isEqualTo(base + 2 + 2 * node);
+        assertThat(filter("a.b", false).weight()).isEqualTo(base + 3 + 3 * node);
+        assertThat(filter("[^a]", false).weight()).isEqualTo(base + 4 + node + UrlFilter.CLASS_BYTES);
+        assertThat(filter("(a)?", false).weight()).as("(?:a)?: a group's two ends, its atom and the ?").isEqualTo(base + 6 + 4 * node);
+        assertThat(filter("^a$", false).weight()).as("^a\\z").isEqualTo(base + 4 + 3 * node);
+        assertThat(filter(".*ads.*", false).weight()).isEqualTo(filter("ads", false).weight());
+        assertThat(filter("/ads/", false).weight()).isEqualTo(base + 7 + 5 * node);
+        assertThat(filter("/ads/", true).weight()).as("Java's Boyer-Moore table").isEqualTo(base + 7 + 5 * node + UrlFilter.TABLE_BYTES + 4 * 5);
+        for (String noTable : List.of("abc", "abcd*", "^abcd", ".abcd", "ab[cd]ef"))
+            assertThat(filter(noTable, true).weight()).as(noTable).isEqualTo(filter(noTable, false).weight());
+    }
+
+    /**
+     * Final review B (V48): a compile is charged by the size of what it reads, its source parsed again and its
+     * expression, the longer of the two, as its time grows, and for a case-sensitive run of 4 characters or more at
+     * the expression's start by the square of the run, as Java's table for it does.
+     */
+    @Test void aCompileIsChargedByTheLongerOfItsSourceAndExpression() {
+        int each = UrlFilter.COMPILE_CHARGE, base = UrlFilter.COMPILE_BASE;
+        assertThat(filter("ab", false).compileCost()).isEqualTo(base + 2 * each);
+        assertThat(filter("[ -~]", false).compileCost()).as("130 characters written out").isEqualTo(base + 130 * each);
+        assertThat(filter("[a]".repeat(682), false).compileCost()).as("a source written out shorter").isEqualTo(base + 2_046 * each);
+        assertThat(filter("[" + "a".repeat(2_046) + "]", false).compileCost()).isEqualTo(base + 2_048 * each);
+        assertThat(filter(".*ads.*", false).compileCost()).isEqualTo(base + 7 * each);
+        assertThat(filter("a".repeat(2_048), false).compileCost()).isEqualTo(base + 2_048 * each);
+        assertThat(filter("a".repeat(2_048), true).compileCost()).isEqualTo(base + 2_048 * each + 2_048 * 2_048 / UrlFilter.RUN_SQUARE);
+        assertThat(filter("x?" + "a".repeat(2_046), true).compileCost()).as("no run at the start").isEqualTo(base + 2_048 * each);
+        assertThat(filter("abc", true).compileCost()).isEqualTo(base + 3 * each);
+    }
+
     @Test void onlyPrintableAsciiAndPunctuationEscapes() {
         assertThat(UrlFilter.of("caf" + (char) 0xE9, false)).isEmpty();
         assertThat(UrlFilter.of("a" + (char) 0x09 + "b", false)).isEmpty();

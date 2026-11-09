@@ -24,11 +24,14 @@ import java.util.regex.PatternSyntaxException;
  * quantified by {@code *} or {@code ?}, each of which may run a step of the match without a read; a match charged past
  * 100,000 gives up, which counts as no match, and the charge also counts against the budget of the call the match is
  * part of, which a {@link RuleSet} gives each request and page.
- * Character classes are written out as their member characters, so that a read costs the same whatever the class.
+ * Character classes are written out as their member characters, so that a read costs the same whatever the class,
+ * and a class of one member as that character.
  *
  * <p>Each filter has its literal, the longest run of characters every match holds, by which the rule set's index
- * finds the rules an address may match. The expression is compiled on a filter's first match, and is safe to match
- * from any thread.
+ * finds the rules an address may match. A rule set keeps its filters' compiled expressions in a {@link PatternCache}
+ * (ruling V48), which charges each compile to the call that needs it ({@link #compileCost()}) and keeps them within a
+ * weight each filter's parse estimates ({@link #weight()}). A filter is immutable but for its record of an overflowed
+ * stack, and safe to match from any thread.
  */
 public final class UrlFilter {
     /** How many characters a filter has at most. */
@@ -43,6 +46,38 @@ public final class UrlFilter {
     static final int URL_LIMIT = 8 * 1024;
     /** How many times a match may read a character of the address. */
     static final int STEPS = 100_000;
+    /**
+     * What a compiled expression is estimated to keep for each of its nodes (V48): a character, {@code .}, a class, a
+     * quantifier, an anchor, and each end of a group. Measured on Java 25: 48 bytes for a character Java keeps apart
+     * from its neighbours, matched in either case, and at most 40 a node across a filter, for {@code a?b} repeated.
+     */
+    static final int NODE_BYTES = 48;
+    /**
+     * What it keeps for each character class besides its node: the 256-entry bitmap Java keeps it as, 288 bytes with
+     * its object, and the predicate around it; measured at most 288 a class.
+     */
+    static final int CLASS_BYTES = 320;
+    /** What it keeps whatever its nodes: the pattern, its first node and its place in the cache; measured at about 250. */
+    static final int PATTERN_BYTES = 256;
+    /**
+     * What it keeps for the table Java builds for a case-sensitive expression that begins with a run of 4 characters
+     * or more, besides 4 bytes for each character of the run.
+     */
+    static final int TABLE_BYTES = 576;
+    /**
+     * What a compile is charged for each character of what it reads (V48), its source parsed again or its expression,
+     * the longer: calibrated on this Mac so that a call's 2,000,000 pays for about 10 ms of compiles, the slowest a
+     * character measured being 37 ns, for classes of two members, case-sensitive.
+     */
+    static final int COMPILE_CHARGE = 8;
+    /** What a compile is charged whatever its expression's length, for the pattern it makes: 150 to 300 ns measured. */
+    static final int COMPILE_BASE = 50;
+    /**
+     * A compile of a case-sensitive expression that begins with a run of 4 characters or more is charged the square of
+     * the run divided by this, as Java's table for the run takes time that grows with its square: up to 0.45 ns for
+     * each, measured, before the JIT has made that code fast.
+     */
+    static final int RUN_SQUARE = 8;
     private static final String PUNCTUATION = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
     // The characters that mean something in a filter, or are refused there; each stands for itself only escaped.
     private static final String SPECIAL = "\\.[]()*+?^$|{}";
@@ -53,16 +88,20 @@ public final class UrlFilter {
     private final boolean everything, web;
     // What one read of a character is charged: 1, and 1 for each atom quantified by * or ? in the expression.
     private final int cost;
-    private volatile Pattern pattern;
+    // What the compiled expression is estimated to keep, in bytes, and what its compile is charged (V48).
+    private final int weight, compileCost;
     private volatile boolean overflowed;
 
-    private UrlFilter(String source, boolean caseSensitive, String literal, boolean everything, boolean web, int cost) {
+    private UrlFilter(String source, boolean caseSensitive, String literal, boolean everything, boolean web, int cost, int weight,
+                      int compileCost) {
         this.source = source;
         this.caseSensitive = caseSensitive;
         this.literal = literal;
         this.everything = everything;
         this.web = web;
         this.cost = cost;
+        this.weight = weight;
+        this.compileCost = compileCost;
     }
 
     /**
@@ -77,8 +116,12 @@ public final class UrlFilter {
         if (source == null || source.isEmpty() || source.length() > MAX_LENGTH) return Optional.empty();
         try {
             Parsed parsed = new Parser(source).parse();
+            int length = parsed.expression().length(), run = caseSensitive && parsed.run() >= 4 ? parsed.run() : 0;
+            int weight = PATTERN_BYTES + length + NODE_BYTES * parsed.nodes() + CLASS_BYTES * parsed.classes()
+                + (run == 0 ? 0 : TABLE_BYTES + 4 * run);
+            int compileCost = COMPILE_BASE + COMPILE_CHARGE * Math.max(source.length(), length) + run * run / RUN_SQUARE;
             return Optional.of(new UrlFilter(source, caseSensitive, caseSensitive ? parsed.literal() : fold(parsed.literal()),
-                parsed.everything(), caseSensitive ? parsed.lowerCaseWeb() : parsed.web(), 1 + parsed.optional()));
+                parsed.everything(), caseSensitive ? parsed.lowerCaseWeb() : parsed.web(), 1 + parsed.optional(), weight, compileCost));
         } catch (Refused refused) {
             return Optional.empty();
         }
@@ -142,10 +185,33 @@ public final class UrlFilter {
         }
     }
 
+    /** The filter's expression, compiled anew: what a {@link PatternCache} keeps. */
+    Pattern compile() {
+        return Pattern.compile(expression(), Pattern.DOTALL | (caseSensitive ? 0 : Pattern.CASE_INSENSITIVE));
+    }
+
+    /**
+     * What the compiled expression is estimated to keep, in bytes (V48): its text, {@link #NODE_BYTES} for each node,
+     * {@link #CLASS_BYTES} more for each character class, {@link #PATTERN_BYTES}, and, for a case-sensitive expression
+     * that begins with a run of 4 characters or more, {@link #TABLE_BYTES} and 4 a character of the run.
+     */
+    int weight() {
+        return weight;
+    }
+
+    /**
+     * What its compile is charged (V48): {@link #COMPILE_BASE}, {@link #COMPILE_CHARGE} for each character of the
+     * source, which the compile parses again, or of the expression, the longer, and, for a case-sensitive expression
+     * that begins with a run of 4 characters or more, the square of the run divided by {@link #RUN_SQUARE}.
+     */
+    int compileCost() {
+        return compileCost;
+    }
+
     /**
      * Whether the filter matches somewhere in the address's first 8 KiB, in either case unless it is case-sensitive.
-     * A match charged past 100,000 for its reads counts as no match. A filter whose expression overflows the thread's
-     * stack, compiling or matching, matches nothing from then on.
+     * Its expression is compiled for the match. A match charged past 100,000 for its reads counts as no match. A
+     * filter whose expression overflows the thread's stack, compiling or matching, matches nothing from then on.
      *
      * @param url the address
      * @return whether it matches
@@ -155,35 +221,49 @@ public final class UrlFilter {
     }
 
     /**
-     * {@link #matches(String)}, its reads charged to {@code reads}: one past them ends the call, and a match past its
-     * own 100,000 or past the stack is recorded there.
+     * {@link #matches(String)}, its reads charged to {@code reads}, and its compile not: one past them ends the call,
+     * and a match past its own 100,000 or past the stack is recorded there.
      *
      * @throws Reads.Exhausted when the call's reads are spent
      */
     boolean matches(String url, Reads reads) {
+        return match(url, reads, null) == Outcome.MATCHED;
+    }
+
+    /**
+     * What a match of the address comes to, its reads charged to {@code reads}, its expression from {@code patterns},
+     * which charges a compile there, or, null, compiled anew uncharged. A match past its own 100,000 or past the stack is
+     * recorded there and comes to {@link Outcome#OVERRAN}, as every match does once the stack has overflowed.
+     *
+     * @throws Reads.Exhausted when the call's reads are spent, or cannot pay for the compile, which is then not started
+     */
+    Outcome match(String url, Reads reads, PatternCache patterns) {
         Objects.requireNonNull(url, "url");
-        if (everything) return true;
-        if (overflowed) return false;
+        if (everything) return Outcome.MATCHED;
+        if (overflowed) return Outcome.OVERRAN;
         try {
-            return compiled().matcher(new Budget(url, reads, cost)).find();
+            Pattern pattern = patterns == null ? compile() : patterns.pattern(this, reads);
+            return pattern.matcher(new Budget(url, reads, cost)).find() ? Outcome.MATCHED : Outcome.UNMATCHED;
         } catch (Budget.Spent spent) {
             reads.overrun(this);
-            return false;
+            return Outcome.OVERRAN;
         } catch (StackOverflowError | PatternSyntaxException overflow) {
             // Java's expressions recurse once a node, compiling and matching, and Java reports a stack it overflowed
             // compiling as a syntax error; on a thread with a small stack, a long filter can overflow it.
             overflowed = true;
             reads.overrun(this);
-            return false;
+            return Outcome.OVERRAN;
         }
     }
 
-    // Compiled on first use; two threads may each compile it once, and either expression serves.
-    private Pattern compiled() {
-        Pattern compiled = pattern;
-        if (compiled == null)
-            pattern = compiled = Pattern.compile(expression(), Pattern.DOTALL | (caseSensitive ? 0 : Pattern.CASE_INSENSITIVE));
-        return compiled;
+    /** What a match comes to. */
+    enum Outcome {
+        /** The filter matches the address. */
+        MATCHED,
+        /** It does not. */
+        UNMATCHED,
+        /** The match ran past its own 100,000 or past the stack, so whether it matches is not known. */
+        OVERRAN
     }
 
     /** {@code text} with its ASCII capital letters made small, as a filter's letters match in either case. */
@@ -293,8 +373,13 @@ public final class UrlFilter {
      * @param web whether it is {@code ^https?://}, its letters in either case, with nothing after but {@code .*}
      * @param lowerCaseWeb whether it is that with its letters in small letters
      * @param optional how many atoms the expression quantifies by {@code *} or {@code ?}, in groups too
+     * @param nodes how many nodes the expression has: its characters, dots, classes, quantifiers and anchors, and two
+     *     for each group, its ends
+     * @param classes how many character classes it has
+     * @param run how many characters it begins with that Java reads as one run
      */
-    private record Parsed(String literal, String expression, boolean everything, boolean web, boolean lowerCaseWeb, int optional) { }
+    private record Parsed(String literal, String expression, boolean everything, boolean web, boolean lowerCaseWeb, int optional,
+        int nodes, int classes, int run) { }
 
     /**
      * One top-level term of a filter, or of a group's.
@@ -307,11 +392,14 @@ public final class UrlFilter {
      *     whose every term can
      * @param optional how many atoms the term quantifies by {@code *} or {@code ?}, itself and those in its group
      * @param quantifier the {@code *}, {@code +} or {@code ?} after the atom; 0 when none
+     * @param nodes how many nodes the term has, as {@link Parsed#nodes()} counts them
+     * @param classes how many character classes it has
      */
     private record Piece(String expression, int literal, boolean dot, boolean holdsQuantifier, boolean nullable, int optional,
-        char quantifier) {
+        char quantifier, int nodes, int classes) {
         Piece quantified(char by) {
-            return new Piece(expression + by, literal, dot, holdsQuantifier, nullable || by != '+', optional + (by == '+' ? 0 : 1), by);
+            return new Piece(expression + by, literal, dot, holdsQuantifier, nullable || by != '+', optional + (by == '+' ? 0 : 1), by,
+                nodes + 1, classes);
         }
 
         boolean anything() {
@@ -341,15 +429,35 @@ public final class UrlFilter {
             for (; last > first && pieces.get(last - 1).anything(); last--) end = false;
             List<Piece> kept = pieces.subList(first, last);
             var expression = new StringBuilder(start ? "^" : "");
-            int optional = 0;
+            int optional = 0, nodes = (start ? 1 : 0) + (end ? 1 : 0), classes = 0;
             for (Piece piece : kept) {
                 expression.append(piece.expression());
                 optional += piece.optional();
+                nodes += piece.nodes();
+                classes += piece.classes();
             }
             if (end) expression.append("\\z");
             boolean anchored = start && !end;
             return new Parsed(literal, expression.toString(), kept.isEmpty() && !(start && end), anchored && web(kept, false),
-                anchored && web(kept, true), optional);
+                anchored && web(kept, true), optional, nodes, classes, run(expression));
+        }
+
+        /**
+         * How many characters the expression begins with that Java reads as one run: letters, digits and escaped
+         * punctuation, up to the first other character or the one a quantifier follows, which Java reads apart.
+         */
+        private static int run(CharSequence expression) {
+            int at = 0, run = 0;
+            while (at < expression.length()) {
+                char c = expression.charAt(at);
+                boolean escaped = c == '\\' && at + 1 < expression.length() && PUNCTUATION.indexOf(expression.charAt(at + 1)) >= 0;
+                if (!escaped && !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9')) break;
+                int next = at + (escaped ? 2 : 1);
+                if (next < expression.length() && "*+?".indexOf(expression.charAt(next)) >= 0) break;
+                run++;
+                at = next;
+            }
+            return run;
         }
 
         /** Whether the terms are {@code https?://}, its letters in either case or, {@code small}, in small ones. */
@@ -385,7 +493,7 @@ public final class UrlFilter {
         private Piece atom() throws Refused {
             char c = source.charAt(at++);
             return switch (c) {
-                case '.' -> new Piece(".", -1, true, false, false, 0, (char) 0);
+                case '.' -> new Piece(".", -1, true, false, false, 0, (char) 0, 1, 0);
                 case '[' -> characterClass();
                 case '(' -> group();
                 case '\\' -> character(escape());
@@ -397,7 +505,7 @@ public final class UrlFilter {
         }
 
         private static Piece character(char c) {
-            return new Piece(escaped(c), c, false, false, false, 0, (char) 0);
+            return new Piece(escaped(c), c, false, false, false, 0, (char) 0, 1, 0);
         }
 
         /** The ASCII punctuation after a backslash. */
@@ -417,16 +525,22 @@ public final class UrlFilter {
             if (inner.isEmpty()) throw Refused.REFUSED;
             var expression = new StringBuilder("(?:");
             boolean nullable = true;
-            int optional = 0;
+            int optional = 0, nodes = 2, classes = 0;
             for (Piece piece : inner) {
                 expression.append(piece.expression());
                 nullable &= piece.nullable();
                 optional += piece.optional();
+                nodes += piece.nodes();
+                classes += piece.classes();
             }
-            return new Piece(expression.append(')').toString(), -1, false, quantifiers > before, nullable, optional, (char) 0);
+            return new Piece(expression.append(')').toString(), -1, false, quantifiers > before, nullable, optional, (char) 0, nodes,
+                classes);
         }
 
-        /** The class whose bracket was read, written out as its members, so that Java reads it in one step. */
+        /**
+         * The class whose bracket was read, written out as its members, so that Java reads it in one step; one of one
+         * member as that character, which Java keeps without a bitmap (V48). Either ends a run of the literal.
+         */
         private Piece characterClass() throws Refused {
             boolean negated = at < source.length() && source.charAt(at) == '^';
             if (negated) at++;
@@ -436,9 +550,15 @@ public final class UrlFilter {
                 if (source.charAt(at) == ']') {
                     if (items == 0) throw Refused.REFUSED;
                     at++;
-                    var expression = new StringBuilder(negated ? "[^" : "[");
-                    for (char c = 0x20; c < 0x7F; c++) if (members[c]) expression.append(escaped(c));
-                    return new Piece(expression.append(']').toString(), -1, false, false, false, 0, (char) 0);
+                    var written = new StringBuilder();
+                    int count = 0;
+                    for (char c = 0x20; c < 0x7F; c++) {
+                        if (!members[c]) continue;
+                        written.append(escaped(c));
+                        count++;
+                    }
+                    if (count == 1 && !negated) return new Piece(written.toString(), -1, false, false, false, 0, (char) 0, 1, 0);
+                    return new Piece((negated ? "[^" : "[") + written + "]", -1, false, false, false, 0, (char) 0, 1, 1);
                 }
                 char low = classCharacter(), high = low;
                 if (at + 1 < source.length() && source.charAt(at) == '-' && source.charAt(at + 1) != ']') {

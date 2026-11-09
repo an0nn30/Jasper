@@ -19,19 +19,22 @@ import java.util.regex.Pattern;
  * The route of the plugin's own fetches while the HTTP proxy is on (plan 6's V43), the one Chromium gives its pages'
  * requests: direct for the hosts Chromium's implicit bypass rules name, which are {@code localhost} and
  * {@code *.localhost}, {@code 127.0.0.0/8} and {@code [::1]}, {@code 169.254.0.0/16} and {@code [fe80::]/10}, and
- * through the proxy for every other http or https address. A host is matched as the address writes it, an IP address
- * read as text, so no name is ever looked up. {@link #loopback} is the part of those hosts that is this computer, which
- * the filter list's download shares for its http rule (ruling F10). Any thread.
+ * through the proxy for every other http or https address. While the proxy is off, the filter list's client routes
+ * {@link #byDefault() by the JDK's default selector} but for this computer, which goes direct (ruling V51). A host is
+ * matched as the address writes it, an IP address read as text, so no name is ever looked up. {@link #loopback} is the
+ * part of those hosts that is this computer, which the filter list's download shares for its http rule (ruling F10).
+ * Any thread.
  */
 public final class ProxyRoute extends ProxySelector {
     private static final List<Proxy> DIRECT = List.of(Proxy.NO_PROXY);
     // An IPv4 address as a URI writes it, and an IPv6 one's characters, which Inet4Address and Inet6Address then read.
     private static final Pattern DOTTED = Pattern.compile("[0-9]{1,3}(?:\\.[0-9]{1,3}){3}");
     private static final Pattern HEX = Pattern.compile("[0-9a-f:.]*:[0-9a-f:.]*");
+    // The HTTP proxy; empty for the JDK's default selector, read at each address.
     private final List<Proxy> proxy;
 
-    private ProxyRoute(InetSocketAddress proxy) {
-        this.proxy = List.of(new Proxy(Proxy.Type.HTTP, proxy));
+    private ProxyRoute(List<Proxy> proxy) {
+        this.proxy = proxy;
     }
 
     /**
@@ -41,12 +44,25 @@ public final class ProxyRoute extends ProxySelector {
      * @return the selector
      */
     public static ProxySelector through(InetSocketAddress proxy) {
-        return new ProxyRoute(Objects.requireNonNull(proxy, "proxy"));
+        return new ProxyRoute(List.of(new Proxy(Proxy.Type.HTTP, Objects.requireNonNull(proxy, "proxy"))));
+    }
+
+    /**
+     * The selector of a client while the HTTP proxy is off (ruling V51): an address whose host is this computer
+     * ({@link #loopback}) goes direct, however it is written, so an http list there never leaves it whatever proxy the
+     * JVM is given; every other address as the JDK's default selector, read at each address, routes it, or direct when
+     * there is none.
+     *
+     * @return the selector
+     */
+    public static ProxySelector byDefault() {
+        return new ProxyRoute(List.of());
     }
 
     /**
      * The proxy for {@code uri}: none for an address that is not http or https, has no host or names a host
-     * {@link #bypassed} names; the HTTP proxy otherwise.
+     * {@link #bypassed} names; the HTTP proxy otherwise. While the proxy is off, none for this computer, and what the
+     * JDK's default selector gives for every other address.
      *
      * @param uri the address the client is about to ask
      * @return the proxy, or {@link Proxy#NO_PROXY}
@@ -55,11 +71,21 @@ public final class ProxyRoute extends ProxySelector {
         if (uri == null) throw new IllegalArgumentException("No address");
         String scheme = uri.getScheme(), host = uri.getHost();
         boolean web = "http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme);
+        if (proxy.isEmpty()) {
+            ProxySelector system = ProxySelector.getDefault();
+            return web && host != null && loopback(host) || system == null ? DIRECT : system.select(uri);
+        }
         return web && host != null && !bypassed(host) ? proxy : DIRECT;
     }
 
-    /** Nothing: a proxy that cannot be reached fails the fetch, which is never sent direct instead. */
-    @Override public void connectFailed(URI uri, SocketAddress address, IOException failure) { }
+    /**
+     * Nothing while the proxy is on: a proxy that cannot be reached fails the fetch, which is never sent direct
+     * instead. While it is off, the JDK's default selector is told.
+     */
+    @Override public void connectFailed(URI uri, SocketAddress address, IOException failure) {
+        ProxySelector system = proxy.isEmpty() ? ProxySelector.getDefault() : null;
+        if (system != null) system.connectFailed(uri, address, failure);
+    }
 
     /**
      * Whether Chromium sends a request for {@code host} direct whatever proxy it is given: {@code localhost} and the

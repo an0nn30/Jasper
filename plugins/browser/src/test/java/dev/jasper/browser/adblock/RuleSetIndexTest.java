@@ -145,6 +145,24 @@ class RuleSetIndexTest {
         assertThat(mostForAMatch).as("the most a match was charged").isPositive().isLessThanOrEqualTo(UrlFilter.STEPS / 10);
     }
 
+    /** Final review B (V48): over the fixture, whose filters the cache holds, each filter's expression compiles once. */
+    @Test void eachFilterOfTheFixtureCompilesOnce() {
+        var ran = new HashSet<UrlFilter>();
+        RuleSet set = RuleSet.of(rules, rule -> { }, (filter, url) -> ran.add(filter));
+        for (int round = 0; round < 2; round++) {
+            for (String url : urls)
+                for (Set<ResourceKind> kinds : KINDS)
+                    for (String page : PAGES) set.blocks(url, kinds, page);
+            for (String page : urls) set.stylesheet(page);
+            for (String page : PAGES) set.stylesheet(page);
+        }
+        long compiled = ran.stream().filter(filter -> !filter.matchesEverything()).count();
+        assertThat(compiled).as("filters run").isGreaterThan(20);
+        assertThat(set.patterns().compiles()).as("each once").isEqualTo(compiled);
+        assertThat(set.patterns().size()).isEqualTo((int) compiled);
+        assertThat(set.patterns().weight()).isPositive().isLessThan(PatternCache.WEIGHT / 100);
+    }
+
     /** Review M2: a page's sheet examines a few of the list's hide rules, not every one. */
     @Test void aPagesSheetExaminesFewOfTheHideRules() {
         var list = new ArrayList<Map<String, Object>>();

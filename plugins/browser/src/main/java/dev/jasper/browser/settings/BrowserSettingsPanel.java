@@ -32,9 +32,9 @@ import java.util.function.Supplier;
  * fails is told by the clearing itself. Each clearing runs once at a time: while it runs, its button is busy and asks
  * nothing. Manage Permissions opens the persistent store's site permissions page. In Ad Blocking, after its settings,
  * Filter Statistics says how many rules the filter list has and when it was updated, that it is updating, why it
- * could not be updated, or, before the list has been read, that it loads with the first browser page, with Update Now,
- * which downloads the list at once without asking and is busy while the list updates; a list 7 days or more without an
- * update adds a warning (spec section 12). UI thread.
+ * could not be updated, or, before the list has been read, that it loads when ad blocking is on and a browser page
+ * opens, with Update Now, which downloads the list at once without asking and is busy while the list updates; a list 7
+ * days or more without an update adds a warning (spec section 12). UI thread.
  */
 public final class BrowserSettingsPanel implements SettingsPanel {
     static final String PAGE = "browser.settings", CLEAR_COOKIES = "browser.settings.clear-cookies",
@@ -255,14 +255,14 @@ public final class BrowserSettingsPanel implements SettingsPanel {
     }
 
     /**
-     * What Filter Statistics says of the list: that it is updating; why its last update failed; that it loads with the
-     * first browser page, before this run has read it (ruling V36); or how many rules it has, and when it was updated,
-     * in this computer's time zone.
+     * What Filter Statistics says of the list: that it is updating; why its last update failed; that it loads when ad
+     * blocking is on and a browser page opens, before this run has read it (rulings V36 and V52), which is true whether
+     * ad blocking is on or off; or how many rules it has, and when it was updated, in this computer's time zone.
      */
     private static String statistics(FilterList.Status status) {
         if (status.updating()) return "Updating…";
         if (status.error().isPresent()) return "Could not update the filter list: " + status.error().get();
-        if (!status.read()) return "Loads with the first browser page";
+        if (!status.read()) return "Loads when ad blocking is on and a browser page opens";
         String rules = String.format(Locale.ROOT, "%,d %s", status.rules(), status.rules() == 1 ? "rule" : "rules");
         return status.updated().map(updated -> rules + " · Updated " + UPDATED.format(updated)).orElse(rules);
     }

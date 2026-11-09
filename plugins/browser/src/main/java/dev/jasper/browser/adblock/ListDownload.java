@@ -26,15 +26,17 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Flow;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.BooleanSupplier;
 
 /**
  * A filter list's download (ruling F10): a GET of an https address, or an http one on this computer only
  * ({@link #fetches}), as TLS is the list's only integrity, with the client {@link #client(Optional)} makes, which
  * connects within 30 seconds and follows no redirect itself. The download follows at most 5 (ruling V38), each target
  * resolved against the address that answered, checked as the first address is and never from https to http, and only
- * then asked, so a target the list may not come from is never asked. Only a final 200 is read, at most 32 MiB of it,
- * counted before it is decoded, and one deadline covers the whole download, its redirects and body included
- * ({@link #get}). Why a download failed is told in words Settings shows ({@link #reason}). Any thread.
+ * then asked, so a target the list may not come from is never asked; nor is one once the client has been retired, as
+ * the proxy changed (ruling V51). Only a final 200 is read, at most 32 MiB of it, counted before it is decoded, and one
+ * deadline covers the whole download, its redirects and body included ({@link #get}). Why a download failed is told in
+ * words Settings shows ({@link #reason}). Any thread.
  */
 public final class ListDownload {
     /** How long a connection to the list's server may take. */
@@ -48,22 +50,24 @@ public final class ListDownload {
     /** How many redirects a download follows at most. */
     static final int MAX_REDIRECTS = 5;
     private static final String REDIRECTED = "the filter list was redirected to an address that is not https";
+    private static final String UNREADABLE = "the filter list was redirected to an address that cannot be read";
+    private static final String RETIRED = "the HTTP proxy changed during the download";
     private static final Set<Integer> REDIRECTS = Set.of(301, 302, 303, 307, 308);
 
     private ListDownload() { }
 
     /**
      * The list's client: one that connects within 30 seconds and follows no redirect, which {@link #get} follows itself.
-     * It sends no cookie and no credentials, and goes through {@code proxy} as Chromium would (plan 6's F3 and V43): a
-     * list on this computer goes direct, so an http one never leaves it. The one place the list's client is made.
+     * It sends no cookie and no credentials, and goes through {@code proxy} as Chromium would (plan 6's F3 and V43), or,
+     * with none, as the JDK's default proxy selector routes it (V51); either way a list on this computer goes direct, so
+     * an http one never leaves it. The one place the list's client is made.
      *
      * @param proxy the HTTP proxy's address; empty for the JDK's default proxy selector
      * @return the client
      */
     public static HttpClient client(Optional<InetSocketAddress> proxy) {
-        var builder = HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).followRedirects(HttpClient.Redirect.NEVER);
-        proxy.ifPresent(address -> builder.proxy(ProxyRoute.through(address)));
-        return builder.build();
+        return HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).followRedirects(HttpClient.Redirect.NEVER)
+            .proxy(proxy.map(ProxyRoute::through).orElseGet(ProxyRoute::byDefault)).build();
     }
 
     /**
@@ -88,11 +92,13 @@ public final class ListDownload {
      * @param client the list's client, which follows no redirect itself
      * @param address the list's address
      * @param deadline how long the whole download may take, its redirects and body included
+     * @param current whether the client may still be asked: false once it has been retired, which asks no redirect more
      * @return the body; it fails with a {@link Refused} for an address {@link #fetches} refuses, a redirect to one, from
-     *     https to http, or past the fifth, and any other status, a {@link TooLarge} for a body over 32 MiB, a
-     *     {@link TimeoutException} once the deadline has passed, and with what the client failed with
+     *     https to http, to an address that cannot be read, past the fifth, or once the client is no longer current, and
+     *     any other status, a {@link TooLarge} for a body over 32 MiB, a {@link TimeoutException} once the deadline has
+     *     passed, and with what the client failed with
      */
-    static CompletableFuture<byte[]> get(HttpClient client, URI address, Duration deadline) {
+    static CompletableFuture<byte[]> get(HttpClient client, URI address, Duration deadline, BooleanSupplier current) {
         var result = new CompletableFuture<byte[]>();
         if (!fetches(address)) {
             result.completeExceptionally(new Refused(REFUSED_ADDRESS));
@@ -102,13 +108,13 @@ public final class ListDownload {
         result.orTimeout(deadline.toNanos(), TimeUnit.NANOSECONDS);
         // However the download ends, by its answer, the deadline or a cancel, the exchange under way and its body end with it.
         result.whenComplete((bytes, failure) -> exchange.end());
-        ask(client, address, deadline, 0, result, exchange);
+        ask(client, address, deadline, current, 0, result, exchange);
         return result;
     }
 
     /** Asks {@code address}, the target of {@code redirects} redirects so far, and follows its answer. */
-    private static void ask(HttpClient client, URI address, Duration deadline, int redirects, CompletableFuture<byte[]> result,
-                            Exchange exchange) {
+    private static void ask(HttpClient client, URI address, Duration deadline, BooleanSupplier current, int redirects,
+                            CompletableFuture<byte[]> result, Exchange exchange) {
         Body body = new Body();
         CompletableFuture<HttpResponse<byte[]>> sent;
         try {
@@ -137,27 +143,36 @@ public final class ListDownload {
                 result.completeExceptionally(new Refused("the filter list was redirected more than " + MAX_REDIRECTS + " times"));
                 return;
             }
-            Optional<URI> next = target(address, location.get());
+            Optional<URI> next = resolved(address, location.get());
             if (next.isEmpty()) {
+                result.completeExceptionally(new Refused(UNREADABLE));
+                return;
+            }
+            if (!allowed(address, next.get())) {
                 result.completeExceptionally(new Refused(REDIRECTED));
                 return;
             }
-            if (!result.isDone()) ask(client, next.get(), deadline, redirects + 1, result, exchange);
+            if (!current.getAsBoolean()) {
+                result.completeExceptionally(new Refused(RETIRED));
+                return;
+            }
+            if (!result.isDone()) ask(client, next.get(), deadline, current, redirects + 1, result, exchange);
         });
     }
 
-    /**
-     * Where a redirect from {@code from} to {@code location} goes: the location resolved against {@code from}, when the
-     * list may come from there ({@link #fetches}) and it does not leave https for http; empty otherwise.
-     */
-    static Optional<URI> target(URI from, String location) {
+    /** The {@code location} a redirect from {@code from} gives, resolved against it; empty when it cannot be read. */
+    private static Optional<URI> resolved(URI from, String location) {
         try {
-            URI next = from.resolve(location.strip());
-            boolean downgrade = from.getScheme().equalsIgnoreCase("https") && !"https".equalsIgnoreCase(next.getScheme());
-            return fetches(next) && !downgrade ? Optional.of(next) : Optional.empty();
+            return Optional.of(from.resolve(location.strip()));
         } catch (IllegalArgumentException unreadable) {
             return Optional.empty();
         }
+    }
+
+    /** Whether a redirect from {@code from} may go to {@code next}: the list may come from there, and not from https to http. */
+    private static boolean allowed(URI from, URI next) {
+        boolean downgrade = from.getScheme().equalsIgnoreCase("https") && !"https".equalsIgnoreCase(next.getScheme());
+        return fetches(next) && !downgrade;
     }
 
     /**

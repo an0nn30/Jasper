@@ -279,19 +279,80 @@ class RuleSetTest {
             assertThat(reads.characters()).as("no expression ran").isZero();
             var brief = new UrlFilter.Reads(RuleSet.CALL_READS);
             assertThat(rules.blocks("https://a.test/x.js", SCRIPT, PAGE, brief)).isFalse();
-            assertThat(brief.used()).as("a short address: 1 a check").isEqualTo(ContentRules.MAX_RULES);
+            assertThat(brief.used()).as("a short address: 1 to examine a rule and 1 a check").isEqualTo(2 * ContentRules.MAX_RULES);
             assertThat(log.records()).hasSize(1);
         }
     }
 
-    /** Review I1 (V30): one rule past its own budget counts as no match, and the call goes on to the next. */
-    @Test void aRuleOverItsOwnBudgetCountsAsNoMatchAndTheCallGoesOn() {
-        RuleSet rules = rules(List.of(rule(trigger("url-filter", "/ads/"), block()), rule(trigger("url-filter", "z.*.*.*.*q"), ignore())));
-        try (var log = new CapturedLog(RuleSet.class.getName())) {
-            assertThat(rules.blocks("https://a.test/ads/" + "z".repeat(8 * 1024), SCRIPT, PAGE)).isTrue();
-            assertThat(rules.blocks("https://a.test/ads/" + "z".repeat(8 * 1024), SCRIPT, PAGE)).isTrue();
-            assertThat(log.records()).singleElement().satisfies(record -> assertThat(record.getMessage()).contains("z.*.*.*.*q"));
+    /**
+     * Final review B (V50): each rule a call examines is charged 1, those whose trigger does not fit too, so a list of
+     * rules that each fail at once is charged as its size; and each call returns the answer the rules give.
+     */
+    @Test void eachRuleACallExaminesIsChargedThoseThatDoNotFitToo() {
+        var byType = new ArrayList<Map<String, Object>>(ContentRules.MAX_RULES);
+        var byDomain = new ArrayList<Map<String, Object>>(ContentRules.MAX_RULES);
+        var hiding = new ArrayList<Map<String, Object>>(ContentRules.MAX_RULES);
+        for (int at = 0; at < ContentRules.MAX_RULES; at++) {
+            byType.add(rule(trigger("url-filter", "ad", "resource-type", List.of("image")), block()));
+            byDomain.add(rule(trigger("url-filter", "ad", "unless-domain", List.of("news.test")), block()));
+            hiding.add(rule(trigger("url-filter", ".*", "unless-domain", List.of("news.test")), hide(".h" + at)));
         }
+        String url = "https://ads.test/ad.js";
+        assertTimeoutPreemptively(Duration.ofSeconds(30), () -> {
+            var reads = new UrlFilter.Reads(RuleSet.CALL_READS);
+            assertThat(rules(byType).blocks(url, SCRIPT, "https://news.test/", reads)).as("no rule fits a script").isFalse();
+            assertThat(reads.used()).as("1 for each rule examined").isEqualTo(ContentRules.MAX_RULES);
+            var unless = new UrlFilter.Reads(RuleSet.CALL_READS);
+            assertThat(rules(byDomain).blocks(url, SCRIPT, "https://news.test/", unless)).as("no rule fits the page").isFalse();
+            assertThat(unless.used()).isEqualTo(ContentRules.MAX_RULES);
+            RuleSet hides = rules(hiding);
+            var page = new UrlFilter.Reads(RuleSet.CALL_READS);
+            assertThat(hides.stylesheet("https://news.test/", page)).as("no rule fits the page").isEmpty();
+            assertThat(page.used()).isEqualTo(ContentRules.MAX_RULES);
+            var other = new UrlFilter.Reads(RuleSet.CALL_READS);
+            assertThat(hides.stylesheet("https://other.test/", other).length()).as("every rule fits: the sheet's bound")
+                .isGreaterThan(RuleSet.SHEET_LIMIT - 1_100).isLessThanOrEqualTo(RuleSet.SHEET_LIMIT);
+            assertThat(other.used()).as("no expression: .* matches every page").isEqualTo(ContentRules.MAX_RULES);
+        });
+    }
+
+    /**
+     * Review I1 (V30) and final review B (V50): a rule past its own budget, or the stack, counts as a match when it is
+     * an ignore rule and as none otherwise, so the request is allowed and the page hides less; the call goes on.
+     */
+    @Test void aRuleOverItsOwnBudgetErrsTowardAllowingTheRequestAndHidingLess() {
+        String heavy = "z.*.*.*.*q", url = "https://a.test/ads/" + "z".repeat(8 * 1024);
+        RuleSet ignoring = rules(List.of(rule(trigger("url-filter", "/ads/"), block()), rule(trigger("url-filter", heavy), ignore())));
+        RuleSet unblocked = rules(List.of(rule(trigger("url-filter", "/ads/"), ignore()), rule(trigger("url-filter", heavy), block())));
+        RuleSet goesOn = rules(List.of(rule(trigger("url-filter", "/ads/"), block()), rule(trigger("url-filter", heavy), block())));
+        RuleSet hiding = rules(List.of(rule(trigger("url-filter", ".*"), hide(".before")), rule(trigger("url-filter", heavy), ignore()),
+            rule(trigger("url-filter", ".*"), hide(".after")), rule(trigger("url-filter", heavy), hide(".heavy"))));
+        try (var log = new CapturedLog(RuleSet.class.getName())) {
+            assertThat(ignoring.blocks(url, SCRIPT, PAGE)).as("an ignore rule past its budget counts as a match").isFalse();
+            assertThat(ignoring.blocks(url, SCRIPT, PAGE)).isFalse();
+            assertThat(unblocked.blocks(url, SCRIPT, PAGE)).as("a block rule past its budget counts as none").isFalse();
+            assertThat(goesOn.blocks(url, SCRIPT, PAGE)).as("and the call goes on").isTrue();
+            assertThat(lines(hiding.stylesheet(url))).as("the ignore rule counts, the hide rule does not").containsExactly(".after");
+            assertThat(lines(hiding.genericStylesheet(url))).containsExactly(".after");
+            assertThat(log.records()).as("once a list").hasSize(4)
+                .allSatisfy(record -> assertThat(record.getMessage()).contains("z.*.*.*.*q"));
+        }
+    }
+
+    /** Final review B (V48): a filter's compile is charged to the first call that runs it, by its expression's size. */
+    @Test void aFiltersCompileIsChargedToTheFirstCallThatRunsIt() {
+        List<Rule> compiled = ContentRules.compile(List.of(rule(trigger("url-filter", "ads[0-9]x"), block()))).rules();
+        RuleSet rules = RuleSet.of(compiled);
+        UrlFilter filter = compiled.getFirst().filter();
+        String url = "https://a.test/ads1x.js";
+        var first = new UrlFilter.Reads(RuleSet.CALL_READS);
+        assertThat(rules.blocks(url, SCRIPT, PAGE, first)).isTrue();
+        var second = new UrlFilter.Reads(RuleSet.CALL_READS);
+        assertThat(rules.blocks(url, SCRIPT, PAGE, second)).isTrue();
+        int examined = 1, check = 1 + url.length() / 32;
+        assertThat(second.used()).as("a cached filter: its reads").isEqualTo(examined + check + second.characters());
+        assertThat(first.used()).as("and its compile, once").isEqualTo(second.used() + filter.compileCost());
+        assertThat(rules.patterns().compiles()).isEqualTo(1);
     }
 
     @Test void theRulesAreTakenInTheOrderOfTheirIndexes() {

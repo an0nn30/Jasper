@@ -20,9 +20,11 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,7 +43,9 @@ import static org.assertj.core.api.Assertions.tuple;
  */
 class FilterListTest {
     private static final Instant START = Instant.parse("2026-11-09T10:00:00Z");
-    private static final Duration DEADLINE = Duration.ofMillis(700);
+    /** V53: only {@code /hold}, whose body trickles, has a short deadline; every other download a generous one. */
+    private static final Duration HOLD = Duration.ofMillis(700), GENEROUS = Duration.ofSeconds(30);
+    private static final Function<URI, Duration> DEADLINE = address -> address != null && "/hold".equals(address.getPath()) ? HOLD : GENEROUS;
     @TempDir Path data;
     private final MutableClock clock = new MutableClock(START);
     private final AtomicReference<URI> address = new AtomicReference<>();
@@ -63,8 +67,11 @@ class FilterListTest {
     @Test void theListIsDownloadedCompiledAndCachedWithItsCount() throws Exception {
         filters = list(this::client);
         filters.enabled(true);
+        server.list.shut();
         filters.start();
-        FilterList.Status status = filters.updateNow().get(10, TimeUnit.SECONDS);
+        var update = filters.updateNow();
+        server.list.open();
+        FilterList.Status status = update.get(10, TimeUnit.SECONDS);
         assertThat(status).isEqualTo(new FilterList.Status(3, Optional.of(START), false, Optional.empty(), true));
         assertThat(filters.status()).isEqualTo(status);
         assertThat(hits("/list.json")).as("one download, which Update Now joined").isEqualTo(1);
@@ -100,7 +107,7 @@ class FilterListTest {
     }
 
     @Test void aFailedUpdateKeepsTheOldListAndRecordsWhy() throws Exception {
-        filters = list(this::client, Duration.ofHours(1), DEADLINE);
+        filters = list(this::client);
         filters.enabled(true);
         filters.start();
         filters.updateNow().get(10, TimeUnit.SECONDS);
@@ -179,26 +186,58 @@ class FilterListTest {
         }
     }
 
+    /** Ruling V53: each download whose {@code updating()} a test reads is held on the server until it has read it. */
     @Test void anUpdateIsDueAfter24HoursOrFromAnotherAddress() throws Exception {
         filters = list(this::client);
         filters.enabled(true);
+        server.list.shut();
         filters.start();
-        filters.updateNow().get(10, TimeUnit.SECONDS);
+        var first = filters.updateNow();
+        server.list.open();
+        first.get(10, TimeUnit.SECONDS);
         assertThat(hits("/list.json")).isEqualTo(1);
         clock.advance(Duration.ofHours(23));
         filters.checkNow();
         assertThat(filters.status().updating()).as("not due at 23 hours").isFalse();
         assertThat(hits("/list.json")).isEqualTo(1);
         clock.advance(Duration.ofHours(1));
+        server.list.shut();
         filters.checkNow();
         assertThat(filters.status().updating()).as("due at 24 hours").isTrue();
-        assertThat(filters.updateNow().get(10, TimeUnit.SECONDS).updated()).contains(START.plus(Duration.ofHours(24)));
+        var due = filters.updateNow();
+        server.list.open();
+        assertThat(due.get(10, TimeUnit.SECONDS).updated()).contains(START.plus(Duration.ofHours(24)));
         assertThat(hits("/list.json")).isEqualTo(2);
+        server.other.shut();
         address.set(at("/other.json"));
         filters.checkNow();
         assertThat(filters.status().updating()).as("due at once from another address").isTrue();
-        assertThat(filters.updateNow().get(10, TimeUnit.SECONDS).rules()).isEqualTo(2);
+        var moved = filters.updateNow();
+        server.other.open();
+        assertThat(moved.get(10, TimeUnit.SECONDS).rules()).isEqualTo(2);
         assertThat(hits("/other.json")).isEqualTo(1);
+    }
+
+    /**
+     * Final review B (V51): an address changed while a download is under way, which the change's check finds busy, is
+     * checked again once that download ends, so the new address is downloaded at once and not an hour later.
+     */
+    @Test void anAddressChangedDuringADownloadIsCheckedOnceTheDownloadEnds() throws Exception {
+        address.set(at("/late"));
+        filters = list(this::client);
+        filters.enabled(true);
+        filters.start();
+        assertThat(filters.status().updating()).as("held until the server lets it go").isTrue();
+        address.set(at("/other.json"));
+        filters.checkNow();
+        assertThat(hits("/other.json")).as("the download under way stays").isZero();
+        server.late.countDown();
+        long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while ((hits("/other.json") == 0 || filters.status().updating()) && System.nanoTime() < until) Thread.sleep(10);
+        assertThat(hits("/other.json")).as("the new address, once the old download ended").isEqualTo(1);
+        assertThat(filters.status()).isEqualTo(new FilterList.Status(2, Optional.of(START), false, Optional.empty(), true));
+        assertThat(filters.active().orElseThrow().size()).isEqualTo(2);
+        assertThat(hits("/late")).isEqualTo(1);
     }
 
     @Test void nothingIsCheckedBeforeItStartsOrWhileTurnedOff() throws Exception {
@@ -212,17 +251,24 @@ class FilterListTest {
         assertThat(filters.status().updating()).as("turned off").isFalse();
         assertThat(hits("/list.json")).isZero();
         assertThat(made).isEmpty();
+        server.list.shut();
         filters.enabled(true);
         assertThat(filters.status().updating()).as("turned on once started: nothing is cached, so it downloads").isTrue();
-        filters.updateNow().get(10, TimeUnit.SECONDS);
+        var update = filters.updateNow();
+        server.list.open();
+        update.get(10, TimeUnit.SECONDS);
         assertThat(hits("/list.json")).isEqualTo(1);
     }
 
     @Test void theHourlyCheckRunsByItself() throws Exception {
         filters = list(this::client, Duration.ofMillis(20), DEADLINE);
         filters.enabled(true);
+        server.list.shut();
         filters.start();
-        filters.updateNow().get(10, TimeUnit.SECONDS);
+        var first = filters.updateNow();
+        server.list.open();
+        first.get(10, TimeUnit.SECONDS);
+        assertThat(hits("/list.json")).isEqualTo(1);
         clock.advance(Duration.ofHours(25));
         long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (hits("/list.json") < 2 && System.nanoTime() < until) Thread.sleep(10);
@@ -231,19 +277,30 @@ class FilterListTest {
 
     /**
      * Ruling V37: the hourly check runs on a thread the list owns, one named daemon thread, made only once a check is
-     * scheduled, which its close ends; a stopped list leaves nothing scheduled to hold it.
+     * scheduled, which its close ends; a stopped list leaves nothing scheduled to hold it. V53: the threads read are
+     * those the list's own scheduler made, not every thread of that name another test's list may still be ending.
      */
     @Test void theChecksRunOnTheListsOwnDaemonThreadWhichTheCloseEnds() throws Exception {
-        awaitNoCheckThread();
-        filters = list(this::client);
+        var scheduler = (ScheduledThreadPoolExecutor) FilterList.scheduler();
+        ThreadFactory makes = scheduler.getThreadFactory();
+        var threads = new CopyOnWriteArrayList<Thread>();
+        scheduler.setThreadFactory(task -> {
+            Thread thread = makes.newThread(task);
+            threads.add(thread);
+            return thread;
+        });
+        filters = list(this::client, Duration.ofHours(1), DEADLINE, scheduler);
         filters.enabled(true);
-        assertThat(checkThreads()).as("none before a check is scheduled").isEmpty();
+        assertThat(threads).as("none before a check is scheduled").isEmpty();
         filters.start();
         filters.updateNow().get(10, TimeUnit.SECONDS);
-        assertThat(checkThreads()).singleElement().satisfies(thread -> assertThat(thread.isDaemon()).isTrue());
+        assertThat(threads).singleElement().satisfies(thread -> {
+            assertThat(thread.isDaemon()).isTrue();
+            assertThat(thread.getName()).isEqualTo(FilterList.CHECK_THREAD);
+            assertThat(thread.isAlive()).isTrue();
+        });
         filters.close();
-        awaitNoCheckThread();
-        assertThat(checkThreads()).as("the close ends it").isEmpty();
+        assertThat(threads.getFirst().join(Duration.ofSeconds(10))).as("the close ends it").isTrue();
     }
 
     /** Ruling V37: turning off and closing leave no check scheduled, and the close ends the list's scheduler. */
@@ -304,8 +361,11 @@ class FilterListTest {
     @Test void turnedOffTheListIsAppliedNoMore() throws Exception {
         filters = list(this::client);
         filters.enabled(true);
+        server.list.shut();
         filters.start();
-        filters.updateNow().get(10, TimeUnit.SECONDS);
+        var first = filters.updateNow();
+        server.list.open();
+        first.get(10, TimeUnit.SECONDS);
         assertThat(filters.active()).isPresent();
         var told = new AtomicInteger();
         filters.onChanged(told::incrementAndGet);
@@ -329,7 +389,7 @@ class FilterListTest {
 
     @Test void closingEndsTheChecksTheDownloadAndTheClient() throws Exception {
         address.set(at("/hold"));
-        filters = list(this::client, Duration.ofMillis(20), Duration.ofSeconds(30));
+        filters = list(this::client, Duration.ofMillis(20), any -> GENEROUS);
         filters.enabled(true);
         filters.start();
         var download = filters.updateNow();
@@ -355,10 +415,11 @@ class FilterListTest {
 
     /**
      * Plan 6 Task 11 and ruling F3: once its client has changed, as the proxy has, the list makes a new one for its next
-     * download. A download under way finishes on the old client, the redirect it follows by hand too, and the old client
-     * is then shut down; with none under way, it is shut down at once.
+     * download, and the old one is shut down; with no download under way, at once. Final review B (V51): a download
+     * under way asks the old client for no further redirect, so the proxy's change takes effect at once: it fails with
+     * its reason, the redirect's target is never asked, and the old client is then shut down.
      */
-    @Test void aChangedClientIsMadeAgainAndADownloadUnderWayFinishesOnTheOldOne() throws Exception {
+    @Test void aChangedClientIsMadeAgainAndADownloadUnderWayFollowsNoRedirectOnTheOldOne() throws Exception {
         server.handle("/late-moved", exchange -> {
             try {
                 server.late.await(30, TimeUnit.SECONDS);
@@ -368,19 +429,21 @@ class FilterListTest {
             ListServer.redirect(exchange, "/list.json");
         });
         address.set(at("/late-moved"));
-        filters = list(this::client, Duration.ofHours(1), Duration.ofSeconds(30));
+        filters = list(this::client);
         var download = filters.updateNow();
         long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (hits("/late-moved") == 0 && System.nanoTime() < until) Thread.sleep(10);
         filters.clientChanged();
         server.late.countDown();
-        assertThat(download.get(20, TimeUnit.SECONDS)).as("finished on the old client, its redirect included")
-            .isEqualTo(new FilterList.Status(3, Optional.of(START), false, Optional.empty(), true));
+        assertThat(download.get(20, TimeUnit.SECONDS)).as("no redirect on the old client")
+            .isEqualTo(new FilterList.Status(0, Optional.empty(), false, Optional.of("the HTTP proxy changed during the download"), false));
+        assertThat(hits("/list.json")).as("the redirect's target, never asked").isZero();
         assertThat(made).hasSize(1);
         assertThat(made.getFirst().awaitTermination(Duration.ofSeconds(10))).as("then shut down").isTrue();
 
         address.set(at("/list.json"));
-        filters.updateNow().get(10, TimeUnit.SECONDS);
+        assertThat(filters.updateNow().get(10, TimeUnit.SECONDS)).as("the next download, on a new client")
+            .isEqualTo(new FilterList.Status(3, Optional.of(START), false, Optional.empty(), true));
         assertThat(made).as("the next download makes a new client").hasSize(2);
         filters.clientChanged();
         assertThat(made.get(1).awaitTermination(Duration.ofSeconds(10))).as("none under way: shut down at once").isTrue();
@@ -439,32 +502,24 @@ class FilterListTest {
         Files.writeString(data.resolve("adblock/rules.json"), "[");
         filters = list(this::client);
         filters.enabled(true);
+        server.list.shut();
         filters.start();
         assertThat(filters.status().updating()).isTrue();
-        assertThat(filters.updateNow().get(10, TimeUnit.SECONDS).rules()).isEqualTo(3);
+        var update = filters.updateNow();
+        server.list.open();
+        assertThat(update.get(10, TimeUnit.SECONDS).rules()).isEqualTo(3);
     }
 
     private FilterList list(Supplier<HttpClient> clients) {
         return list(clients, Duration.ofHours(1), DEADLINE);
     }
 
-    private FilterList list(Supplier<HttpClient> clients, Duration every, Duration deadline) {
+    private FilterList list(Supplier<HttpClient> clients, Duration every, Function<URI, Duration> deadline) {
         return new FilterList(data, () -> { }, Runnable::run, clients, clock, address::get, every, deadline);
     }
 
-    private FilterList list(Supplier<HttpClient> clients, Duration every, Duration deadline, ScheduledExecutorService scheduler) {
+    private FilterList list(Supplier<HttpClient> clients, Duration every, Function<URI, Duration> deadline, ScheduledExecutorService scheduler) {
         return new FilterList(data, () -> { }, Runnable::run, clients, clock, address::get, every, deadline, scheduler);
-    }
-
-    /** Waits until no list's check thread lives, as another test's closed list's may still be ending. */
-    private static void awaitNoCheckThread() throws InterruptedException {
-        long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
-        while (!checkThreads().isEmpty() && System.nanoTime() < until) Thread.sleep(10);
-    }
-
-    /** The live threads named as the list's check thread. */
-    private static List<Thread> checkThreads() {
-        return Thread.getAllStackTraces().keySet().stream().filter(thread -> thread.isAlive() && thread.getName().equals(FilterList.CHECK_THREAD)).toList();
     }
 
     /** The list's client, as the plugin makes it, kept to be shut down. */
