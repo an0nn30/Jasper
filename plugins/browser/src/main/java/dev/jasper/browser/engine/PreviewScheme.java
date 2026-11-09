@@ -9,7 +9,10 @@ import java.util.HexFormat;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
@@ -19,7 +22,8 @@ import java.util.regex.Pattern;
  * the bundled Mermaid, the preview's latest document and its current images, and nothing else. Every answer goes out
  * under {@link #POLICY}. This registry is plain Java, so the plugin's start holds it without loading Chromium, and it
  * reads nothing and makes no random source until it is first used; {@link PreviewSchemeFactory} is Chromium's side of
- * the scheme and loads only once Chromium starts.
+ * the scheme and loads only once Chromium starts. The plugin's files are read on an executor of their own, never on
+ * Chromium's IO thread, which asks for them: Mermaid is about 3.5 MB (plan 9's Task 4 minor).
  */
 public final class PreviewScheme {
     /** The scheme's name. */
@@ -46,24 +50,31 @@ public final class PreviewScheme {
         "/preview.js", new File("preview/preview.js", "text/javascript"),
         "/mermaid.min.js", new File("third_party/mermaid.min.js", "text/javascript"));
     private final Function<String, byte[]> resources;
+    private final Executor reading;
     private final Map<String, Origin> origins = new ConcurrentHashMap<>();
-    // Each file read on its first request, then held, absent or not.
-    private final Map<String, Optional<byte[]>> held = new ConcurrentHashMap<>();
+    // Each file read on reading at its first request, then held, absent or not.
+    private final Map<String, CompletableFuture<Optional<byte[]>>> held = new ConcurrentHashMap<>();
     // Made on the first open: the plugin's start makes none.
     private SecureRandom random;
 
-    /** The previews' origins, serving the plugin's own files. */
-    public PreviewScheme() {
-        this(PreviewScheme::resource);
+    /**
+     * The previews' origins, serving the plugin's own files.
+     *
+     * @param reading where each of the plugin's files is read, once, at its first request
+     */
+    public PreviewScheme(Executor reading) {
+        this(PreviewScheme::resource, reading);
     }
 
     /**
      * As the public constructor, with the plugin's files read from {@code resources}.
      *
      * @param resources a file's bytes by its resource name under {@code dev/jasper/browser/}; null when there is none
+     * @param reading where {@code resources} is asked, once for each file, at its first request
      */
-    PreviewScheme(Function<String, byte[]> resources) {
+    PreviewScheme(Function<String, byte[]> resources, Executor reading) {
         this.resources = Objects.requireNonNull(resources, "resources");
+        this.reading = Objects.requireNonNull(reading, "reading");
     }
 
     /**
@@ -93,22 +104,30 @@ public final class PreviewScheme {
     /**
      * What a request gets: the shell at {@code /}, the plugin's {@code /preview.css}, {@code /preview.js} and
      * {@code /mermaid.min.js}, the origin's latest document at {@code /document/<revision>} and its current images at
-     * {@code /image/<key>.png}, each with 200 and its type. Anything else, an origin not open, and a method other than
-     * GET get {@link #NOT_FOUND}. Chromium writes the address as {@code jasper-preview://<token>/<path>}, the scheme being
-     * standard. Chromium's IO thread.
+     * {@code /image/<key>.png}, each with 200 and its type. Anything else, an origin not open, a method other than GET,
+     * and a file of the plugin's it lacks or whose read fails get {@link #NOT_FOUND}. Chromium writes the address as
+     * {@code jasper-preview://<token>/<path>}, the scheme being standard. Chromium's IO thread, which this never holds:
+     * the answer is complete at once but for a file of the plugin's still being read, which completes on the reading
+     * executor once read. Each call gives a future of its own, so cancelling one cancels no read.
      *
      * @param method the request's method
      * @param url the request's address
      * @return the answer
      */
-    public Answer answer(String method, String url) {
+    public CompletableFuture<Answer> answer(String method, String url) {
         String token = token(url);
         Origin origin = token == null ? null : origins.get(token);
-        if (!"GET".equals(method) || origin == null) return NOT_FOUND;
+        if (!"GET".equals(method) || origin == null) return CompletableFuture.completedFuture(NOT_FOUND);
         String path = url.substring(PREFIX.length() + token.length());
-        if (path.equals("/")) return new Answer(200, "text/html", SHELL);
         File file = FILES.get(path);
-        if (file != null) return held(file.resource()).map(body -> new Answer(200, file.mimeType(), body)).orElse(NOT_FOUND);
+        if (file != null) return held(file.resource())
+            .handle((body, failure) -> body != null && body.isPresent() ? new Answer(200, file.mimeType(), body.get()) : NOT_FOUND);
+        return CompletableFuture.completedFuture(answer(origin, path));
+    }
+
+    /** What {@code path} on {@code origin} gets, but for the plugin's files. */
+    private static Answer answer(Origin origin, String path) {
+        if (path.equals("/")) return new Answer(200, "text/html", SHELL);
         if (path.startsWith("/document/")) return origin.document(number(path.substring("/document/".length())));
         if (path.startsWith("/image/") && path.endsWith(".png"))
             return origin.image(number(path.substring("/image/".length(), path.length() - ".png".length())));
@@ -122,8 +141,25 @@ public final class PreviewScheme {
         return HexFormat.of().formatHex(bytes);
     }
 
-    private Optional<byte[]> held(String resource) {
-        return held.computeIfAbsent(resource, name -> Optional.ofNullable(resources.apply(name)));
+    /**
+     * The file's read, begun on its first request; a read that fails is a file absent. A read the executor refuses, as
+     * the plugin's background executor does once the plugin stops, is answered absent and not held.
+     */
+    private CompletableFuture<Optional<byte[]>> held(String resource) {
+        try {
+            return held.computeIfAbsent(resource, name -> CompletableFuture.supplyAsync(() -> read(name), reading));
+        } catch (RejectedExecutionException stopped) {
+            return CompletableFuture.completedFuture(Optional.empty());
+        }
+    }
+
+    private Optional<byte[]> read(String name) {
+        try {
+            return Optional.ofNullable(resources.apply(name));
+        } catch (RuntimeException failure) {
+            LOG.log(System.Logger.Level.WARNING, "The Markdown preview's " + name + " could not be read", failure);
+            return Optional.empty();
+        }
     }
 
     /** The token of an address on some origin of the scheme, as {@link #allows} reads it; null for any other address. */

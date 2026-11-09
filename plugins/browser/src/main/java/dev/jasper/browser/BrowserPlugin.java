@@ -146,8 +146,9 @@ public class BrowserPlugin implements Plugin {
         worker = Executors.newSingleThreadExecutor(Thread.ofPlatform().daemon().name("jasper-browser-chromium").factory());
         var about = new AboutScheme();
         this.about = about;
-        // The Markdown previews' origins, which read nothing and make no random source until a preview is first made.
-        var origins = new PreviewScheme();
+        // The Markdown previews' origins, which read nothing and make no random source until a preview is first made. Each
+        // of their files is read at its first request on the background executor, off Chromium's IO thread.
+        var origins = new PreviewScheme(context.background());
         // H37: the data folder holds the history and Chromium's cookies, so it is made its owner's alone, with no I/O
         // now: on the database's thread before it opens, or on Chromium's worker before Chromium writes there.
         // Plan 6's V25: a database file a Clear Website Data could not reach goes at the folder's first use, before it opens.

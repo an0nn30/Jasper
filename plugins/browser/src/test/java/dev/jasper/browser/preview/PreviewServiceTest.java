@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class PreviewServiceTest {
     @TempDir Path data;
-    private final PreviewScheme scheme = new PreviewScheme();
+    private final PreviewScheme scheme = new PreviewScheme(Runnable::run);
     private final List<PreviewService.Wiring> pages = new ArrayList<>();
     private final List<String> ran = new ArrayList<>();
     private final List<Duration> delays = new ArrayList<>();
@@ -45,7 +45,7 @@ class PreviewServiceTest {
             made.add(service.create(second::add));
         });
         assertThat(pages).hasSize(2);
-        assertThat(scheme.answer("GET", pages.get(0).shell().toString()).status()).as("each page's shell is its open origin's").isEqualTo(200);
+        assertThat(scheme.answer("GET", pages.get(0).shell().toString()).join().status()).as("each page's shell is its open origin's").isEqualTo(200);
         assertThat(pages.get(0).shell()).isNotEqualTo(pages.get(1).shell());
         // Each request is read here, off the UI thread, as on Chromium's, and what it tells runs on the UI thread.
         Runnable ready = pages.get(0).received("{\"op\":\"ready\"}").orElseThrow();

@@ -300,7 +300,7 @@ class ChromiumStateTest {
     /** A marker that cannot be written fails neither the start nor the close, and is a warning. */
     @Test void aMarkerThatCannotBeWrittenFailsNothing() throws Exception {
         Path notADirectory = Files.createFile(data.resolve("file"));
-        Chromium chromium = new Chromium(notADirectory, () -> { }, recording, new AboutScheme(), new PreviewScheme(),
+        Chromium chromium = new Chromium(notADirectory, () -> { }, recording, new AboutScheme(), new PreviewScheme(Runnable::run),
             cause -> tellings.incrementAndGet(), process, LIMIT);
         var client = chromium.client();
         assertThat(chromium.enter()).isTrue();
@@ -640,7 +640,7 @@ class ChromiumStateTest {
         chromium.terminated();
 
         // Another process's Chromium, as one Chromium starts once in each.
-        Chromium late = new Chromium(data, () -> { }, recording, new AboutScheme(), new PreviewScheme(), cause -> { }, new StartOnce(), LIMIT);
+        Chromium late = new Chromium(data, () -> { }, recording, new AboutScheme(), new PreviewScheme(Runnable::run), cause -> { }, new StartOnce(), LIMIT);
         var after = new RecordingContext(4);
         late.makeContextsWith(() -> after);
         late.client();
@@ -748,7 +748,7 @@ class ChromiumStateTest {
         assertThat(global.connectionsClosed()).as("set once: the value remembered last").isEqualTo(1);
         end(chromium);
 
-        Chromium unset = new Chromium(data, () -> { }, recording, new AboutScheme(), new PreviewScheme(), cause -> { }, new StartOnce(), LIMIT);
+        Chromium unset = new Chromium(data, () -> { }, recording, new AboutScheme(), new PreviewScheme(Runnable::run), cause -> { }, new StartOnce(), LIMIT);
         var another = new RecordingContext(101);
         unset.client();
         assertThat(unset.enter()).isTrue();
@@ -1139,7 +1139,7 @@ class ChromiumStateTest {
         ProfileWipe.mark(data, ProfileWipe.Mark.ALL);
         var seen = new CopyOnWriteArrayList<String>();
         Chromium wiped = new Chromium(data, () -> seen.add(Files.exists(cookies) ? "profile there" : "profile gone"), recording,
-            new AboutScheme(), new PreviewScheme(), cause -> { }, process, LIMIT);
+            new AboutScheme(), new PreviewScheme(Runnable::run), cause -> { }, process, LIMIT);
         wiped.client();
         starts.clear();
         assertThat(wiped.enter()).isTrue();
@@ -1155,7 +1155,7 @@ class ChromiumStateTest {
         assertThat(asked).hasValue(0);
         end(wiped);
 
-        Chromium later = new Chromium(data, () -> { }, recording, new AboutScheme(), new PreviewScheme(), cause -> { }, new StartOnce(), LIMIT);
+        Chromium later = new Chromium(data, () -> { }, recording, new AboutScheme(), new PreviewScheme(Runnable::run), cause -> { }, new StartOnce(), LIMIT);
         ProfileWipe.mark(data, ProfileWipe.Mark.COOKIES);
         later.client();
         starts.clear();
@@ -1384,7 +1384,7 @@ class ChromiumStateTest {
 
     private Chromium chromium(Executor worker, Duration limit) {
         return new Chromium(data, () -> restricted.add(Files.exists(marker()) ? "after the marker" : "before the marker"), worker,
-            new AboutScheme(), new PreviewScheme(), cause -> {
+            new AboutScheme(), new PreviewScheme(Runnable::run), cause -> {
             tellings.incrementAndGet();
             toldOnUi.set(EventQueue.isDispatchThread());
             told.complete(cause);

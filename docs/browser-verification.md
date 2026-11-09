@@ -281,8 +281,8 @@ The user has no Linux host yet; CI's `linux-packages` job has not run (the Actio
   `.claude/worktrees/browser-4b-4c-e6deab`), on JBR 25.0.4.1 b635.75 with JCEF, with **Markdown preview** at Chromium,
   the default. Most lines use `plugins/editor/src/test/resources/markdown/github-features.md`, which holds every
   construct the preview draws.
-- Mermaid is not bundled yet (slice 1b waits for the user's approval of its download), so its parts wait for 1b; until
-  then each `mermaid` fence shows as a plain code block.
+- Mermaid 11.17.2 is bundled by slice 1b, on `claude/browser-mermaid` (worktree `.claude/worktrees/browser-mermaid`)
+  until it merges: the Mermaid lines (2, 5's diagrams, 9's Mermaid node, and the slice 1b lines) run from there.
 - Each line is recorded pass or fail. Every line is pending.
 
 #### First: what only the GUI can show (ruling N-F38)
@@ -298,17 +298,16 @@ The user has no Linux host yet; CI's `linux-packages` job has not run (the Actio
 
 1. **The look:** the fixture in Preview shows GitHub's layout in the theme's colours. Switching light and dark changes
    it in place and keeps the scroll. Cmd+= and Cmd+- change its size. Pending.
-2. **Mermaid:** waits for slice 1b. Then: flowchart, sequence, class, state, ER, gantt, pie, gitGraph and mindmap draw;
-   a broken diagram shows its error and its source; if a type needs `'unsafe-eval'`, stop and ask, and do not add it.
-   Until then: each `mermaid` fence shows as a plain code block. Pending.
+2. **Mermaid:** flowchart, sequence, class, state, ER, gantt, pie, gitGraph and mindmap draw; a broken diagram shows
+   its error and its source; if a type needs `'unsafe-eval'`, stop and ask, and do not add it. In Basic, each `mermaid`
+   fence shows as a code block. Pending.
 3. **Code:** Java, Python and YAML blocks take the colours the source pane gives them. Pending.
 4. **GitHub's features:** pending.
    - the five alert kinds;
    - a footnote reference goes to its note, and ↩ comes back;
    - autolinks, task lists and aligned tables;
    - wide code scrolls sideways.
-5. **Scroll sync:** both ways in Split, including after images load (and diagrams, with 1b). Turning it off works.
-   Pending.
+5. **Scroll sync:** both ways in Split, including after images and diagrams load. Turning it off works. Pending.
 6. **Find:** pending.
    - Match Case, Whole Word and Regular Expression work, and the count follows edits;
    - Enter and Shift+Enter move between matches;
@@ -319,8 +318,8 @@ The user has no Linux host yet; CI's `linux-packages` job has not run (the Actio
    - Tab and Shift+Tab leave the preview at its ends, and Enter follows the focused link.
 8. **Images:** a relative image shows. A web image shows only after **Load external images**. A failure shows its
    reason, and **Retry images** works. Pending.
-9. **A hostile file** (the plan's Review Focus 1, with a raw `<img src="http://127.0.0.1:8000/x">`, and with 1b a
-   Mermaid image node pointing at that address), watched by `python3 -m http.server 8000`: pending.
+9. **A hostile file** (the plan's Review Focus 1, with a raw `<img src="http://127.0.0.1:8000/x">` and a Mermaid image
+   node pointing at that address), watched by `python3 -m http.server 8000`: pending.
    - nothing runs or navigates;
    - neither address is ever requested, before **Load external images** or after;
    - a Markdown image `![](http://127.0.0.1:8000/y)` is requested only after **Load external images**, once, by
@@ -366,6 +365,19 @@ Each is pending.
   settings; digits, `#` and `*` in a code block are drawn in the code font, not as emoji.
 - **Switching tabs near the end (R1, ruling N23):** with Synchronize scrolling on in Split, switch to another tab and
   back while the preview is near the end of a document with images; the source does not move.
+
+#### Lines slice 1b added
+
+Each is pending.
+
+- **A loosening diagram (Review Focus 1):** a flowchart whose first line is
+  `%%{init: {"securityLevel": "loose"}}%%`, with `click A call alert(1)` and `click B "javascript:alert(2)"`, draws,
+  and clicking A and B runs no script and goes nowhere: no alert, and the preview stays on its document.
+- **A diagram's link to the network (Review Focus 1):** with `python3 -m http.server 8000` running, a flowchart with
+  `click C href "http://127.0.0.1:8000/z"` draws, and neither its drawing nor a click on C makes any request to that
+  server.
+- **Mermaid's first load:** the first diagram of a run draws (Mermaid's file is read off Chromium's IO thread, and its
+  request goes on once read), and browser pages stay responsive meanwhile.
 
 ### Plan 9 on Windows and Linux (not run)
 

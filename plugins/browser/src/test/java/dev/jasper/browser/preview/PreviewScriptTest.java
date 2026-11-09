@@ -38,6 +38,11 @@ class PreviewScriptTest {
         assertThat(script).as("Mermaid's secure list stays its default").doesNotContainPattern("\\bsecure\\s*[:=]")
             .doesNotContainPattern("['\"]secure['\"]").doesNotContainPattern("\\.secure\\b");
         assertThat(script).contains("Mermaid could not draw this diagram: ").contains("'/mermaid.min.js'");
+        // Slice 1b: nothing loosens it, no diagram's functions are bound, Mermaid draws only through render, and its
+        // HTML labels stay its default, which strict sanitises.
+        assertThat(script).doesNotContain("loose").doesNotContain("sandbox").doesNotContain("bindFunctions")
+            .doesNotContain("htmlLabels").doesNotContainPattern("mermaid\\.(?:run|init|contentLoaded|parse)\\b");
+        assertThat(Pattern.compile("mermaid\\.render\\(").matcher(script).results().count()).as("one render call").isEqualTo(1);
     }
 
     @Test void neitherScriptUsesAForbiddenCall() throws IOException {
@@ -67,7 +72,7 @@ class PreviewScriptTest {
 
     /** Every {@code jasperPreview.<function>} the preview calls, through each of its calls, is one the script defines. */
     @Test void everyFunctionThePreviewCallsIsDefined() throws Exception {
-        var scheme = new PreviewScheme();
+        var scheme = new PreviewScheme(Runnable::run);
         var ran = new ArrayList<String>();
         var preview = new PagePreview(scheme.open(), new PagePreview.Hooks(new JComponent() { }, ran::add, color -> { }, () -> { },
             () -> { }, () -> { }, () -> { }), Runnable::run, event -> { });

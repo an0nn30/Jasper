@@ -1,6 +1,7 @@
 package dev.jasper.browser.engine;
 
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.BiPredicate;
 import org.cef.browser.CefBrowser;
 import org.cef.browser.CefFrame;
@@ -58,24 +59,45 @@ final class PreviewSchemeFactory implements CefSchemeHandlerFactory {
     /** The handler of a {@code method} request for {@code url} from {@code browser}, as the class says. IO thread. */
     Resource handler(CefBrowser browser, String method, String url) {
         boolean answered = browser != null && previewBrowser.test(browser, url);
-        return new Resource(answered ? origins.answer(method, url) : PreviewScheme.NOT_FOUND);
+        return new Resource(answered ? origins.answer(method, url) : CompletableFuture.completedFuture(PreviewScheme.NOT_FOUND));
     }
 
-    /** One request, answered at once: the status and headers, then the body. */
+    /**
+     * One request: the status and headers, then the body. An answer that is ready when Chromium opens the request, as
+     * all are but a file of the plugin's on its first read, is handled at once; one still to come lets {@code open}
+     * return, so Chromium's IO thread goes on, and continues the request once it comes, off that thread, unless Chromium
+     * cancelled the request meanwhile, which cancels the answer but not the file's read (as
+     * {@link AboutSchemeFactory.Page} answers a page that comes later).
+     */
     static final class Resource extends CefResourceHandlerAdapter {
-        private final PreviewScheme.Answer answer;
+        private final CompletableFuture<PreviewScheme.Answer> later;
+        // Set before Chromium is told to go on, read on its thread after.
+        private volatile PreviewScheme.Answer answer = PreviewScheme.NOT_FOUND;
+        private volatile boolean cancelled;
         private int sent;
 
-        Resource(PreviewScheme.Answer answer) {
-            this.answer = answer;
+        Resource(CompletableFuture<PreviewScheme.Answer> later) {
+            this.later = later;
         }
 
         @Override public boolean open(CefRequest request, BoolRef handleRequest, CefCallback callback) {
-            handleRequest.set(true);
+            if (later.isDone()) {
+                take(later.isCompletedExceptionally() ? PreviewScheme.NOT_FOUND : later.join());
+                handleRequest.set(true);
+                return true;
+            }
+            // Decided later: Chromium waits for the callback. Continued from another thread, so never from within this
+            // call, even when the answer comes while it runs.
+            handleRequest.set(false);
+            later.whenCompleteAsync((answered, failure) -> {
+                take(failure == null ? answered : PreviewScheme.NOT_FOUND);
+                if (!cancelled) callback.Continue();
+            });
             return true;
         }
 
         @Override public void getResponseHeaders(CefResponse response, IntRef responseLength, StringRef redirectUrl) {
+            PreviewScheme.Answer answer = this.answer;
             response.setStatus(answer.status());
             response.setStatusText(answer.status() == 200 ? "OK" : "Not Found");
             response.setMimeType(answer.mimeType());
@@ -100,6 +122,16 @@ final class PreviewSchemeFactory implements CefSchemeHandlerFactory {
             sent += count;
             bytesRead.set(count);
             return true;
+        }
+
+        /** Chromium ends the request: one still waiting is never continued, and its answer is cancelled. */
+        @Override public void cancel() {
+            cancelled = true;
+            later.cancel(true);
+        }
+
+        private void take(PreviewScheme.Answer answered) {
+            answer = answered == null ? PreviewScheme.NOT_FOUND : answered;
         }
     }
 }

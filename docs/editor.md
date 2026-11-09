@@ -344,11 +344,11 @@ Markdown default view". When **Language…** changes a tab to another language, 
 source; changing it back to Markdown brings back the tab's last view.
 
 **Markdown preview** (`markdown_preview`) chooses what draws the preview: **Chromium** (the default), which the
-[Browser](browser.md#markdown-preview) plugin runs, in GitHub's layout, or **Basic**, the Editor's own preview, which
-screen readers can read. The Chromium preview gives a screen reader only its name, "Markdown preview", and the
-description "Screen readers cannot read this preview. Set Markdown preview to Basic in the Editor's settings to read
-it." A change applies to open tabs at once, and each keeps its view, divider and Synchronize scrolling. Chromium starts
-the first time a Chromium preview, or a browser page, shows.
+[Browser](browser.md#markdown-preview) plugin runs, in GitHub's layout with Mermaid diagrams, or **Basic**, the Editor's
+own preview, which screen readers can read. The Chromium preview gives a screen reader only its name, "Markdown
+preview", and the description "Screen readers cannot read this preview. Set Markdown preview to Basic in the Editor's
+settings to read it." A change applies to open tabs at once, and each keeps its view, divider and Synchronize
+scrolling. Chromium starts the first time a Chromium preview, or a browser page, shows.
 
 Every preview is Basic without the Browser plugin, and for the rest of Jasper's run once Chromium could not start or
 has stopped; a Chromium that could not start also posts "The browser could not start". A tab whose Chromium page did
@@ -375,6 +375,11 @@ sideways, and in Chromium's that code block or table does.
   shows a reference as a raised number, and Basic as `[1]`.
 - **Autolinks:** an address written in the text, such as `https://example.com` or `www.example.org` (which links to
   `http://www.example.org`), and an email address are links.
+- **Mermaid diagrams:** a fenced code block whose info string's first word is `mermaid`, in any case, shows in Chromium
+  as the diagram Mermaid draws from it, in the theme's colours, and in Basic as code. A diagram Mermaid cannot draw
+  shows "Mermaid could not draw this diagram:" and Mermaid's message above its source. Mermaid draws in its strict
+  security level, which a diagram's own `%%{init}%%` directive cannot change: a diagram's `click` callbacks and links
+  do nothing.
 
 Text is in the interface font's family at the tab's font size, with larger headings; code is in the Editor's font,
 with its fallback fonts and ligatures. Chromium draws only the fonts installed on the computer: in its preview, text in

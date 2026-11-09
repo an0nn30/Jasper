@@ -2,11 +2,16 @@ package dev.jasper.browser.engine;
 
 import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.cef.browser.CefBrowser;
+import org.cef.callback.CefCallback;
 import org.cef.handler.CefLoadHandler;
 import org.cef.misc.BoolRef;
 import org.cef.misc.IntRef;
@@ -32,7 +37,7 @@ class PreviewSchemeFactoryTest {
     }
 
     @Test void everyAnswerCarriesThePolicyAndTheSafetyHeaders() {
-        var scheme = new PreviewScheme();
+        var scheme = new PreviewScheme(Runnable::run);
         var origin = scheme.open();
         origin.image(1, new byte[] {1, 2, 3});
         CefBrowser preview = browser();
@@ -65,7 +70,7 @@ class PreviewSchemeFactoryTest {
      * preview's browser only on its own origin.
      */
     @Test void onlyAPreviewsBrowserIsAnswered() {
-        var scheme = new PreviewScheme();
+        var scheme = new PreviewScheme(Runnable::run);
         var origin = scheme.open();
         String shell = origin.shell().toString(), elsewhereShell = scheme.open().shell().toString();
         CefBrowser preview = browser(), page = browser();
@@ -87,11 +92,69 @@ class PreviewSchemeFactoryTest {
         assertThat(posted.status).as("N-F11: a method other than GET").isEqualTo(404);
     }
 
+    /**
+     * Plan 9's Task 4 minor, as {@code jasper-about:} answers a later page: a file still being read lets {@code open}
+     * return, so Chromium's IO thread goes on, and the request is continued once the file is read, off that thread.
+     */
+    @Test void aFileStillBeingReadLetsOpenReturnAndContinuesTheRequestOnceRead() throws Exception {
+        var queued = new ArrayDeque<Runnable>();
+        var scheme = new PreviewScheme(name -> name.equals("third_party/mermaid.min.js") ? "mermaid();".getBytes(StandardCharsets.UTF_8) : null,
+            queued::add);
+        var origin = scheme.open();
+        CefBrowser preview = browser();
+        var factory = new PreviewSchemeFactory(scheme, (browser, url) -> browser == preview);
+        var handler = factory.handler(preview, "GET", origin.shell() + "mermaid.min.js");
+        var handle = new BoolRef(true);
+        var continued = new Calls();
+        assertThat(handler.open(null, handle, continued)).isTrue();
+        assertThat(handle.get()).as("decided later").isFalse();
+        assertThat(continued.count()).isZero();
+        queued.removeFirst().run();
+        assertThat(continued.continuedWithin(10)).isTrue();
+        var response = new Response();
+        assertThat(headersAndBody(handler, response)).isEqualTo("mermaid();");
+        assertThat(response.status).isEqualTo(200);
+        assertThat(response.length).isEqualTo(10);
+        assertThat(response.headers).containsEntry("Content-Type", "text/javascript; charset=utf-8")
+            .containsEntry("Content-Security-Policy", PreviewScheme.POLICY).containsEntry("X-Content-Type-Options", "nosniff");
+        assertThat(continued.count()).as("once").isEqualTo(1);
+        var held = new Response();
+        assertThat(body(factory.handler(preview, "GET", origin.shell() + "mermaid.min.js"), held)).as("then at once").isEqualTo("mermaid();");
+    }
+
+    /** A request Chromium cancels while its file is read is never continued, and the read still serves the next one. */
+    @Test void aRequestCancelledWhileItsFileIsReadIsNeverContinued() throws Exception {
+        var queued = new ArrayDeque<Runnable>();
+        var scheme = new PreviewScheme(name -> name.equals("third_party/mermaid.min.js") ? "mermaid();".getBytes(StandardCharsets.UTF_8) : null,
+            queued::add);
+        var origin = scheme.open();
+        CefBrowser preview = browser();
+        var factory = new PreviewSchemeFactory(scheme, (browser, url) -> browser == preview);
+        var cancelled = factory.handler(preview, "GET", origin.shell() + "mermaid.min.js");
+        var never = new Calls();
+        assertThat(cancelled.open(null, new BoolRef(), never)).isTrue();
+        var waiting = factory.handler(preview, "GET", origin.shell() + "mermaid.min.js");
+        var continued = new Calls();
+        assertThat(waiting.open(null, new BoolRef(), continued)).isTrue();
+        cancelled.cancel();
+        queued.removeFirst().run();
+        assertThat(continued.continuedWithin(10)).isTrue();
+        assertThat(headersAndBody(waiting, new Response())).isEqualTo("mermaid();");
+        // Its answer completed when it was cancelled, before the read: a second is ample for a Continue that must not come.
+        assertThat(never.continuedWithin(1)).as("never continued").isFalse();
+        assertThat(queued).as("one read").isEmpty();
+    }
+
     /** Opens the request, reads its headers, then its body a few bytes at a time, as Chromium does. */
     private static String body(PreviewSchemeFactory.Resource handler, Response response) {
         var handle = new BoolRef();
         assertThat(handler.open(null, handle, null)).isTrue();
         assertThat(handle.get()).as("handled at once").isTrue();
+        return headersAndBody(handler, response);
+    }
+
+    /** Reads an opened request's headers, then its body a few bytes at a time, as Chromium does. */
+    private static String headersAndBody(PreviewSchemeFactory.Resource handler, Response response) {
         var length = new IntRef();
         handler.getResponseHeaders(response, length, new StringRef());
         response.length = length.get();
@@ -114,6 +177,30 @@ class PreviewSchemeFactoryTest {
                 case "hashCode" -> System.identityHashCode(proxy);
                 default -> throw new UnsupportedOperationException(method.getName());
             });
+    }
+
+    /** Chromium's callback for a request decided later, counting its Continues. */
+    private static final class Calls implements CefCallback {
+        private final AtomicInteger continues = new AtomicInteger();
+        private final CountDownLatch continued = new CountDownLatch(1);
+
+        @Override public void Continue() {
+            continues.incrementAndGet();
+            continued.countDown();
+        }
+
+        @Override public void cancel() {
+            throw new AssertionError("Jasper cancels no request itself");
+        }
+
+        int count() {
+            return continues.get();
+        }
+
+        /** Whether the request was continued within {@code seconds}. */
+        boolean continuedWithin(long seconds) throws InterruptedException {
+            return continued.await(seconds, TimeUnit.SECONDS);
+        }
     }
 
     /** The response Chromium hands the handler, recording what it is given. */

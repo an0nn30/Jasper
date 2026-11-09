@@ -212,6 +212,6 @@ class PageContextTest {
     /** A Chromium that never starts: nothing here asks for its client. */
     private Chromium chromium() {
         return new Chromium(data, () -> { }, task -> { throw new AssertionError("Chromium was started"); }, new AboutScheme(),
-            new PreviewScheme(), cause -> { });
+            new PreviewScheme(Runnable::run), cause -> { });
     }
 }
