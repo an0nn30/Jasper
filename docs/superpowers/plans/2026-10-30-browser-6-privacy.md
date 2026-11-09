@@ -3,6 +3,282 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or
 > superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Execution status (2026-11-09): Tasks 1-11 executed and reviewed (Task 1 as 1a and 1b, ruling V6), and Task 12, the
+docs; Task 13, the user's GUI check on macOS, is pending** (branch `claude/browser-privacy`, worktree
+`.claude/worktrees/browser-4b-4c-e6deab`, cut from local `main` `ef3347601`, which has plans 4a, 4b, 4c, 9 and 5
+merged; the plan `daa19c574`, then commits `827ac12ba` to `03af74d75`, local `main` `67653bbf6` (Mermaid, plan 9's
+slice 1b) merged in as `965c11432`, and the docs; not merged or pushed; see `docs/STATUS.md`). Executed with per-task
+subagents and reviews, each task's fix rounds until a re-review found every finding addressed. The pre-flight scan's
+findings F1-F44 were adopted as rulings (V0, cited V-F*n*) except where V1-V6 decide otherwise, and the controller's
+further rulings are V7-V46; plan 4a's R0-R48 and the banners of 4b, 4c, 9 and 5 bind. On 2026-11-06 the user chose V1
+("Clear now + wipe") and V3 ("Match Chrome"), which are no longer interim, and asked for no change to V2. The task
+reviews recorded these deviations from the plan's text, each with its ruling:
+- **Versions:** `JasperSdk.VERSION` 0.29.0 to 0.30.0, every bundled range `>=0.30.0, <0.31` (Task 1a). New SDK
+  members, each `@since 0.30.0`: `NotificationHandle.remove()`, `ContentTab.setSavedTitle(Optional<String>)` (V-F2),
+  and the testkit's `FakeNotifications.Post.count()` and `removed()` and `FakePluginHost.savedTitle`. **The Browser
+  stays 0.2.0** (V-F30): `dev.jasper.browser.api` is unchanged. Nothing new ships, so `notices.toml` is unchanged; the
+  filter list is downloaded at run time.
+- **Task 1a** (`827ac12ba` "SDK: 0.30.0"): `0ddd79162`'s 39 files (V6).
+- **Task 1b** (`85ea0c386` "SDK: a plugin can remove its notification, and a tab can choose the title it is saved
+  with"; fix round `bed21d9d1` "SDK: a removed notification's links stop working"): the fake folds same-text posts
+  within 60 s, as the host does (V-F24), so `BrowserPluginTest` and `VaultServiceTest` assert one post with a count
+  (V7); a plain post removed before it lands is never made, and `remove()` after the plugin stops still takes the entry
+  out of history; V8 (`NotificationCenter.restate`); V9, one hold count per `PluginHost`, and a stopping plugin's entry
+  that another running plugin holds stays live with that plugin's links; the fake folds at exactly 60 s, with a
+  package-private clock; "less than a minute" reads "at most a minute".
+- **Task 2** (`16d02c130` "Browser: one data store per browsing group"; fix rounds `8fb14e137` "Browser: each browser
+  has a request context of its own", `baf7b8f2a` "Browser: a group's context outlives its last browser" and `2b0b55240`
+  "Browser: nothing native after the sweep, and a page closed before its browser exists closes it"):
+  - `DataStore` and `DataStores` in `item` (V-F12); `PageContext.memory()` for the brief's static `inMemory()`;
+    `Page.makeAfter(ready)` as V-F15's gate; the browser id filled by a new life span handler, `PageEvents.Lives`, as
+    `onAfterCreated` is `CefLifeSpanHandler`'s (V-F13); `ChromiumThread` hands work over only after both
+    `onContextInitialized` and JCEF's `onInitialization`, under `close()`'s lock; `DataStores.answer` routes Jasper's
+    pages' queries; `live()` lists the persistent store only once its database opened;
+  - V10: JBR's `jcef` has no share-storage creation (javap: only `createContext(handler)`), so `engine/BrowserContext`
+    carries the kept context's native handle with a no-op dispose; V11; V12: `engine/KeptContext` counts the objects
+    handed out, and DevTools browsers get counted objects of their own (`Chromium.anotherContext`); after the sweep only
+    JCEF's `onBeforeClose` disposes natively (`Chromium.handBack`), and a disposed record refuses to hand out; V13:
+    `page/BrowserClosing`.
+- **Task 3** (`7b56fd68d` "Browser: /dev/null mode"; fix round `e8007b96c` "Kit: a click on an open popover's anchor
+  closes it"): one public `DataStores(Stores, BooleanSupplier)`; the 4-argument open uses `forNewItem`;
+  `BrowserRestore.state`'s fourth parameter, `devNull`, saves `devnull = "true"` and no `url`, and the item calls
+  `setSavedTitle(TabTitle.UNTITLED)` in the turn `openTab` ran (V-F2); each restored /dev/null item comes back in a
+  store of its own (V-F42); `workspace.toml`'s writes are debounced
+  by 1 s, so none falls between the two; the popover's and `devnull_mode`'s copy name Settings › Tools › Browser ›
+  Privacy & Data (V-F28); V14: `HostedPopover.dismissed` consumes a press on the popover's own anchor, for every
+  anchored popover (the Vault's credential picker and the Edit Bookmark panel too), and the plugin's 300 ms guard goes.
+- **Task 4** (`fe1d07f4e` "Browser: site permissions, their page and the menu's resets"; fix round `9052f678a` "Browser:
+  site permissions' review fixes"): `PermissionsPage.answer(PermissionStore, Consumer<Set<String>>, String)` (V-F12);
+  the `permissions` table in `BrowserDatabase`'s schema, `user_version` still 1 (V-F32); Permissions after Settings in
+  the Quick Actions (V-F29); a write its closed store refuses is dropped at DEBUG (V-F33,
+  `store/DatabaseClosedException`); `DataStores.onPermissionsUnsaved`; `revoke`, `clearSite` and `clearAll` always
+  queue their `DELETE`; the `Page.useReloader` test seam; test-only `store/DatabaseFixtures`; `PrivacyMenu` an instance
+  per item; the fix round also escapes Task 3's raw `&` in `BrowserSettings`' Javadoc; V15; V17, amended by V18.
+- **Task 5** (`9c0b54be0` "Browser: camera and microphone permissions"; fix round `42e5ed553` "Browser: a page cannot
+  time a click onto Allow"): a browser that is no page's gets `Cancel()` and true (V-F26); V16's top-level origin is
+  read from `getMainFrame().getURL()` on Chromium's thread, as the committed address lags on Swing's; unknown media
+  flags are refused, as screen capture is; Enter presses nothing on the prompt; one `DialogFlood` per page, shared by
+  prompts and script dialogs (V-F25); the plugin's stop dismisses the prompts (V-F43); `packageApp` and
+  `verifyPackage`, without AOT and headless, read back the two usage strings; V19: `PageModal` takes a gate, the
+  prompt's waiting out the interval from its show and from another of the page's modals closing
+  (`DialogFlood.lastClosed()`), `ScriptDialog`'s holding alerts and confirms while a prompt shows or waits; a
+  main-frame request whose origin is not the main frame's is cancelled; `MediaAccess` on the preview client too; a
+  volatile static test clock (`PermissionPrompt.useClock`, through `DialogsTestAccess`).
+- **Task 6** (`d78230539` "Browser: page notifications as Jasper notifications"; fix round `15c125a04` "Browser: page
+  notifications only from secure, persistent pages"): a challenge address gets no polyfill, even as a main frame; at
+  most 16 router queries wait per page; "default" and "denied" are read from the store after the boolean answer; the
+  content is cut to 4,000 characters; V20, V21 and V22 as one rule (no site that may: denied, no prompt, nothing
+  shown), `Origins.secure` shared with `Isolation.secure`; the router installed from `PageNavigation`'s installer with
+  the client's `OpenerBridge`, reading the bridge's sender in `onQuery` (`PrivacyQueries.prepare` gone); titles on one
+  line, bodies with at most two blank lines in a row; V22's polyfill state is the router's alone, so a sandboxed
+  document's polyfill may read "granted" while each show fires `error`.
+- **Task 7** (`7ccd85ca6` "Browser: audio muting, its bar and Unmute Current Page"; fix round `9d14ea65d` "Browser:
+  audio muting's review fixes"): V23; one wrapper per prototype (a `WeakMap`) serves `AudioContext` and
+  `webkitAudioContext`; a stored Block runs `mute(true)`; `PagePrivacy` keeps an atomic (document, mode) pair, whose
+  compare-and-set refuses a `mute()` once another document started; `attachShadow` wrapped; `PrivacyMenu` registers in
+  `follows()`; a `StartLoadsNoChromiumTest` regression (`Page` loaded `CefBrowser`) found and fixed.
+- **Task 8** (`00b7ea4e6` "Browser: its settings page, and clearing data"; fix rounds `4a89ad081` "Browser: clearing
+  data's review fixes" and `807b7eb86` "Browser: a cleared database never comes back"): `WebsiteData` in `item` (a
+  store and permissions cycle otherwise); `HistoryStore.origins(limit)`; the live set as V-F20 has it; the start-time
+  wipe in `Chromium.enter()`, on the worker after the restriction; cookies left for the start deleted in a
+  `beforeClient` gate, as the cookie manager works only after `onInitialization`; the profile renamed, then deleted, on
+  every platform (V-F18); Clear Cookies also waits for a starting Chromium (V-F16); `persistent()` made at the plugin's
+  start, opening nothing; V24; V25: the data folder's first use deletes a marked database (`DataFolder` hands it to
+  `ProfileWipe.wipeMarkedDatabase`, public for it), the marker reading `all database` then `database`, and
+  `PermissionStore.clearAll()` returns `Cleared(sites, written)`; V26 (`Chromium.onClearFailed`); V27: the hook before
+  any chmod, `DataFolder.databaseUsable()`, and the database erased first with the `database` mark whenever the erase
+  or the compaction does not complete.
+- **Task 9** (`d3cba7f8f` "Browser: compile WebKit content-blocker lists"; fix rounds `9daf9123a` "Browser: the
+  content-blocker compiler's review fixes" and `9348006d4` "Browser: the content blocker charges what a read costs"):
+  `BlockerJson` reuses 4b's `StrictJson` with 32 MiB and depth 8; at most 8 nested groups, as `Pattern.compile`
+  overflowed a cold stack; a `StackOverflowError` catch in `matches`, a last resort reported through the list's one
+  log line; strict keys on rule and action objects; a `null` anywhere refuses the list; `if-domain` rules keyed by host
+  ahead of the 4-gram; `genericStylesheet(pageUrl)` for sub-frames (V-F34); V28 and its detail, V29-V33; `(xy)?`
+  repeated 400 times is 401 quantified atoms, so the test takes 255 (256 atoms) and 256 is refused; a case-sensitive
+  `^https?://` stays generic, in a shared part of its own for pages starting exactly `http://` or `https://`, as
+  EasyList's generic rules are case-sensitive; V34 recorded.
+- **Task 10** (`2612259e9` "Browser: ad blocking from a content-blocker list"; fix round `5b3407b83` "Browser: ad
+  blocking's review fixes"): the validator's text, "Enter an https address, or an http address on this computer.", as
+  V-F10 makes the brief's untrue; the constructor's `Runnable restrict` and `Supplier<HttpClient>` (V-F11, V-F8); V35;
+  `insertRule` on an adopted sheet for the plan's `<style>` (V-F5); a package-private `BrowserPlugin` seam for the
+  list's client and address (V-F9), which the tests share through `OfflinePlugins`; http loopback is `localhost`,
+  `127.0.0.0/8` and `[::1]`, not `*.localhost`; DevTools browsers get no ad blocking; `checkNow()` at a new address;
+  V36; V37; V38; V39 (`StrictJson.quotedLength`); V40; V41: `FilterList`'s 751 lines split into `ListDownload` (315),
+  `ListCache` (128) and `FilterList` (565); a failed check logs its stack trace once per reason.
+- **Task 11** (`9871d6617` "Browser: the HTTP proxy"; fix round `03af74d75` "Browser: the proxy's review fixes"):
+  V-F38 by javap and otool (AGENTS.md's Verified JCEF behaviour); a DEBUG read-back of `getPreference("proxy")`; a
+  refused /dev/null context leaves its tab blank, with "The proxy could not be set" (V-F4, V44); strict hosts refuse
+  underscores, Unicode names and a trailing dot (V45); Jasper's fetches under way end at a change, while the filter
+  list's download finishes on its old client; the settings' unresolved `Optional<InetSocketAddress>` for the JDK side;
+  `onProxyChanged` fires only on a real change; V43: `http/ProxyRoute` (102 lines) matches Chromium's implicit bypass
+  as text, and `ListDownload`'s http rule uses its stricter `loopback()`; V46: `NetworkPreferences` 55 to 140 lines,
+  `Chromium` 1,014 to 984; `EngineTestAccess` plays Chromium's initialization for tests; `setProxy` given right after
+  `Chromium` is made; "The proxy could not be set" is one constant.
+- **The merge** (`965c11432`): local `main` `67653bbf6`; one conflict, in `BrowserPlugin.java`, both sides kept; four
+  test calls to `PreviewScheme()` given `Runnable::run`.
+- **Task 12**, the docs: the Browser guide (/dev/null mode, site permissions, page notifications, audio, clearing data,
+  ad blocking, the HTTP proxy, and the toolbar, the welcome page, History, certificate errors, Restore, Jasper's own
+  requests, Settings and Files), the configuration guide's plugin table, AGENTS.md's Verified JCEF behaviour (V-F38 and
+  V10), this banner and STATUS. `docs/packaging.md`'s camera and microphone section came with Task 5. Before the docs,
+  at `965c11432`, `./gradlew check` (JBR 25.0.4.1 b635.75 jcef, 13m 54s) gave **15,518 tests, 0 failures, 0 errors,
+  103 skipped** (1,388 classes in the 16 build folders, without the example plugin's: jasper-app 5,291 with 90
+  skipped, Editor 5,387 with 4 skipped, Browser 1,324 with 1 skipped, jasper-ui 1,020, Remote 659, jasper-sdk 135,
+  jasper-sdk-testkit 310), the 15,086 of plan 5 and slice 1b and plan 6's 432; the example external plugin's `check
+  pluginZip` against `build/sdk-release` passes (1 test). The full checks after each task: 15,078 (Task 1a), 15,088
+  (1b), 15,139 (2), 15,181 (4), 15,208 (5), 15,279 (7), 15,328 (8), 15,421 and 15,424 (9), 15,454 and 15,477 (10),
+  15,494 and 15,510 (11), each with 0 failures, 0 errors and 103 skipped.
+- **Task 13**, the checklist: pending.
+
+The controller's rulings, one line each:
+- V0: every ruling the pre-flight scan proposed (F1-F44) is adopted and cited as V-F*n*, except where V1-V6 decide
+  otherwise.
+- V1: F18, the user's choice ("Clear now + wipe", 2026-11-06): Clear Website Data clears live and wipes
+  `<data>/chromium` at the next start, and the confirmation and the docs say that sign-ins made before the next start
+  are lost too.
+- V2: F23: a page notification's content begins with the page's host ("example.com — BODY"), as Chrome and macOS name
+  the site.
+- V3: F39, the user's choice ("Match Chrome", 2026-11-06): no extra WebRTC or DNS-prediction preferences while the
+  proxy is on, as Chrome; the Browser guide records the 407, DNS-prediction and WebRTC STUN leaks.
+- V4: F35: no benchmarks now; Task 13 records a start-up and memory batch, ad blocking off and on, as pending for the
+  benchmark sitting.
+- V5: F1: no GUI launch; F1's `jasper-about:` in /dev/null tabs is the first pending GUI line.
+- V6: F30: Task 1 splits into 1a (the SDK 0.30.0 bump alone, over `0ddd79162`'s file list) and 1b
+  (`NotificationHandle.remove()` and F2's saved-title member), each reviewed.
+- V7: Task 1b's additions are accepted (`Post.count()`, a plain post removed before it lands never made, `remove()`
+  after the stop still removing); Task 6's "11th post in 60 s" case uses distinct texts or `count()`.
+- V8: each handle keeps its own request; a partial removal puts the newest remaining handle's request back on the
+  entry (the host's center call swaps the request, keeping count and read state; the fake keeps handles per post).
+- V9: the host counts handles per center entry across plugins, as the fake does; the group-id overlap itself is
+  recorded.
+- V10: each browser gets a disposable `CefRequestContext` object of its own over the group's shared storage: CEF's
+  share-storage creation if JCEF exposes it, else an engine subclass with a no-op dispose over the kept native handle;
+  the kept context is Jasper's alone, released once.
+- V11: in-memory databases set `PRAGMA temp_store = MEMORY`.
+- V12: the kept context is disposed only when its group has closed and every `BrowserContext` handed out over it has
+  been disposed by JCEF; each handed-out dispose decrements and zeroes its own ref; DevTools browsers get counted
+  objects of their own; the sweep follows the same rule after JCEF's browsers close.
+- V13: Task 2 fixes the pre-existing deferred-close gap: Jasper's own `onAfterCreated` closes a browser whose page
+  closed first, or a never-created `PageBrowser` hands back at close.
+- V14: the host consumes a press that dismisses an anchored popover and lands on its own anchor, for every anchored
+  popover; the plugin's timer guard goes.
+- V15: the unavailable notice reads "Browser history, bookmarks and site permissions are unavailable".
+- V16: camera and microphone grants are keyed by the page's top-level origin, not CEF's requesting frame origin, and
+  the prompt names it.
+- V17: ☰'s Reset revokes the origin the menu was rendered for, even after a navigation.
+- V18: amends V17: the item remembers, per permission, the site the menu last offered that Reset for, and revokes it
+  there.
+- V19: the prompt ignores both answers until the double-click interval (`awt.multiClickInterval`, else 500 ms) has
+  passed since it showed or since another modal of the page closed, and a page's script dialogs wait while its prompt
+  shows.
+- V20: as Chrome's Incognito, a /dev/null item denies page notifications: the polyfill reports "denied",
+  `requestPermission` resolves "denied" without a prompt, and the router refuses a /dev/null browser's posts.
+- V21: notifications need a secure context, as in Chromium: https or loopback http; `file:` is denied.
+- V22: a sandboxed (opaque-origin) main-frame document is denied, judged by the opener bridge's current
+  `Document.origin()`.
+- V23: Task 7's calls are accepted: a document with no site is muted with no bar, ☰'s Unmute plays it and nothing is
+  stored; one `audio.playing` per page per main-frame document; the bar's answers count only while it shows;
+  `audio.js` wraps the `muted` accessor, so a player's own mute survives Allow Once, and leaves the volume alone.
+- V24: Clear All Data keeps deleting bookmarks, and the confirmation names everything it deletes (history, bookmarks,
+  site permissions, cookies, cache and local storage) with V1's warning.
+- V25: a file-backed database running in memory makes Clear Website Data fail with a cause, and marks the
+  `browser.sqlite*` files for deletion at the next start.
+- V26: a failed or late per-origin storage call is logged and left to the wipe; the cache, the cookies and the marker
+  still fail the run; the database rows are erased even when the live part fails, and the failure is reported.
+- V27: the marked-database hook runs before, and regardless of, the chmod; a marked file that cannot be deleted makes
+  the database run in memory for that run and keeps the mark; the marker gains `database` whenever the erase does not
+  complete, and the database is erased first.
+- V28: a `css-display-none` selector list is split at top-level commas (outside `()`, `[]` and quotes), each part at
+  most 1,024 characters and refused on `{`, `}`, `;`, `@` or `<`, at most 5,000 parts a rule, the page's sheet still
+  2 MiB; a `url-filter` of `.*` or `^https?://` (with or without a trailing `.*`) counts as generic for the
+  precomputed sheet.
+- V28's detail: a `\`-escaped character never splits a part; `Rule` keeps its selector as written, and one splitter
+  serves `ContentRules`' check and `RuleSet`'s lines; the generic place search is a lower bound; `^https?://` generic
+  rules form an http(s)-only part of the generic sheet, chosen by the page's scheme, and the index agrees with
+  `scanStylesheet` on `file:`, `data:`, `about:` and upper-case schemes.
+- V29: a quantified group whose content can match the empty string is refused, and a filter has at most 256
+  quantified atoms.
+- V30: each `blocks` and each `stylesheet` call has one budget of 2,000,000 reads shared across the rules it runs (the
+  per-match 100,000 stays); past it, `blocks` answers not blocked and `stylesheet` keeps only what the walk has
+  proved; an overrun logs once per list, and no filter is disabled.
+- V31: a class is written out as its member characters (printable ASCII only, so at most 95), which Java compiles into
+  one bitmap.
+- V32: a list holds at most 500,000 domain entries in all (rules past that are skipped and counted), and a literal's
+  rarity is counted and chosen over its first 64 4-grams only.
+- V33: a read is charged 1 plus the filter's count of `*`- and `?`-quantified atoms, and a literal pre-check 1 plus the
+  address length / 32 (of the capped address), both against the match budget and the call's.
+- V34: a list's compile (`ContentRules.compile`, `RuleSet.of`) stays on the background executor; a hostile 30 MiB list
+  may take seconds and a transient heap peak there, recorded as a known gap.
+- V35: `SetupSwitch.set` returning the save's future is accepted, a plan 5 signature change.
+- V36: before the list has been read, the status reads "Loads with the first browser page" instead of "0 rules".
+- V37: the hourly check runs on a `ScheduledExecutorService` the list owns (one named daemon thread), shut down in
+  `close()`, and the tick reads its own future under the lock.
+- V38: redirects are followed by hand (`Redirect.NEVER`, at most 5, each target checked by `fetches` before it is
+  requested, within http and https), so a refused target is never asked.
+- V39: a frame's quoted script is capped at 4 MiB, the sheet cut at a line boundary to fit, and a main frame whose
+  sheet equals the cached generic sheet reuses the cached quoted script; `StrictJson.quote` stays as it is.
+- V40: ws and wss requests get `websocket` and `raw`, and `RT_NAVIGATION_PRELOAD_SUB_FRAME` gets what `RT_SUB_FRAME`
+  gets.
+- V41: `FilterList` is split along the reviewer's seams: `ListDownload`, `ListCache` and `FilterList`.
+- V42: with the proxy off, Chromium uses the system's settings and Jasper's own fetches the JDK's default selector,
+  which follows the system only when the JVM runs with `-Djava.net.useSystemProxies=true`; the docs say so, naming
+  Settings' custom VM options as the way, and the Browser sets no process-wide property.
+- V43: Jasper's own fetches go direct for Chromium's implicit bypass hosts (`localhost`, `*.localhost`,
+  `127.0.0.0/8`, `[::1]`, `169.254.0.0/16`, `[fe80::]/10`) and through the proxy otherwise, by one selector in `http`
+  whose loopback rule `ListDownload` shares.
+- V44: a refused /dev/null context keeps failing closed, with a blank item and the notification, which names the
+  cause; `PageContext` drops a failed future, so the group's next item asks again.
+- V45: a kept context that refuses a change keeps its old route, with the error posted, recorded as a known gap;
+  underscores stay refused.
+- V46: the proxy state moves into `NetworkPreferences` now, `Chromium` keeping the `proxyLive` hand-off and a delegate;
+  splitting the clearing out of `Chromium` goes to the final wave.
+
+Known gaps:
+- V34: a hostile 30 MiB list's compile may take seconds and a transient heap peak, on the background executor, once
+  per list change.
+- On an 8 KiB address the literal-check charge reaches the call budget after about 7,800 checks, so only a list that
+  large is cut short there, in the safe direction (a 200-character address allows about 285,000).
+- Task 10's M9: a hidden element's suppressed lazy load is a side channel a list author could use with
+  `:has(input[value^=…])`, as with WebKit's content blockers, which softens V-F5's "neither load nor exfiltrate".
+- V42: with the proxy off, Jasper's own fetches ignore a proxy the system alone names, unless the JVM runs with
+  `-Djava.net.useSystemProxies=true`.
+- V3's leaks: a proxy that answers 407 fails the page with no prompt until plan 8; DNS prediction and WebRTC STUN go
+  around an HTTP proxy.
+- Task 11: a Jasper fetch of a `*.localhost` name goes direct but may be looked up by the system resolver; a
+  non-decimal IPv4 spelling (`0177.0.0.1`), a trailing-dot IP (`127.0.0.1.`) and a zone-id link-local address go
+  through the proxy where Chromium bypasses them (the safe direction); V45: a kept context that refuses a change keeps
+  its old route, with the error posted.
+- Recorded minors: `PageBrowser.close`, `created()` and `Lives`' wiring is untested headless (a GUI line); `contexts`
+  keeps every record for the run (negligible); a creation CEF never completes keeps its group's in-memory context until
+  quit (RAM only) (Task 2); a stop while the erase is pending plus a failed `DELETE` may leave no database mark (it
+  needs both); `BEFORE_START` ignores `StartOnce`; a clearing timed out before the worker writes no marker (Task 8); the
+  fake attributes a failing link on a shared post to its first poster (Task 1b).
+
+Deferred minors, by task (the final wave may still close some):
+- Task 1b: `NotificationCenter.restate` has no direct unit test (the expired entry it ignores, its
+  `IllegalArgumentException`); `Holds.carry` and the fake's carry compare requests by identity, so a comment should say
+  that `restate` and the fold store the same object.
+- Task 5: `SitePermissionsTest.close()` restores the static clock last (try/finally); a held-then-dismissed script
+  dialog restarts a prompt's interval (errs safe).
+- Task 6: the polyfill's capture of its built-ins (the review's M3) is not airtight against a patched
+  `Promise.prototype.constructor` or `Symbol.species` (a page breaks only its own callbacks; reword
+  `notifications.js`'s "breaks nothing of it"); `SitePermissions.ask`
+  applies only V20, not V21 or V22, on Chromium's native path, where Chromium refuses insecure contexts itself.
+- Task 7: the method-shorthand wrappers report `length` 0 where the natives report 1 (fingerprintable; `audio.js:335`);
+  `PrivacyMenu.close()` leaves a no-op handler.
+- Task 10: `FilterListTest`'s daemon-thread test counts a process-global thread name (it could flake beside another
+  live list); an unparsable `Location` reads "redirected to an address that is not https"; an unreadable cache shows "0
+  rules", as `read` is set.
+- Task 11 (V46): splitting the clearing out of `Chromium`.
+
+Not run:
+- **Task 13**, the user's GUI check on macOS, with their OK for each batch: pending, V-F1's `jasper-about:` pages in
+  a /dev/null tab first (V5), then the plan's eight groups with the task reviews' lines, and the question for the user
+  whether Manage Permissions may open its tab behind Settings.
+- **Benchmarks** (V4): the start-up and memory batch, with ad blocking off and on, waits for the benchmark sitting.
+- **Windows and Linux** (no hosts), and **packaging with AOT**, whose training needs the user's OK.
+- **No JavaScript runs in a test:** `notifications.js`, `audio.js`, `hide-elements.js` and `permissions.js` are checked
+  as text, with `node --check` and with throwaway node harnesses in the scratchpad (V-F41); no test starts Chromium.
+
 **Goal:** Give the Browser iTerm2's privacy features:
 - /dev/null mode, with its toolbar indicator and its restore at the start page;
 - site permissions for the camera, the microphone, notifications and audio playback, with the prompt, the

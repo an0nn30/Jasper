@@ -45,6 +45,8 @@ Start with [`docs/STATUS.md`](docs/STATUS.md): current state, open items, deferr
 ## Verified JCEF behaviour (JBR 25.0.4.1 b635.75; do not re-derive; test if in doubt)
 
 - `CefRequest.TransitionType` is one shared enum constant per source, on every client, and `addQualifiers` ORs each load's qualifiers into its value without ever clearing them. The Browser's `PageEvents.Load.onLoadStart` and the preview client's `PreviewHandlers.Loads` therefore read `getSource()` and `getQualifiers()` first and clear the six named `TransitionFlags` before any return. Chromium's unnamed qualifier bits (`0x02000000`, `0x04000000`, `0x08000000` and others) cannot be cleared and stay on the constants, so only the named flags may be tested, never `getValue()`. No other code may take a `TransitionType`, `CefRequest.getTransitionType()` included. A source JCEF does not map arrives as a null transition.
+- `CefRequestContext.setPreference(String, Object)` answers null once the preference is set, and otherwise Chromium's reason, such as "called on invalid thread" off Chromium's UI thread (not Swing's). A Java `Map` crosses as a CEF dictionary, its strings as strings (`GetCefValueFromJNIObject` in `libjcef`), so the Browser's `NetworkPreferences` sets the `proxy` dictionary as a `Map`, on Chromium's UI thread.
+- JCEF has no request context that shares another's storage (`createContext(CefRequestContextHandler)` is the only maker), and `CefBrowser_N.onBeforeClose` disposes the closing browser's context object. So each /dev/null browser gets a disposable `BrowserContext` of its own over its group's kept in-memory context (`KeptContext`), which is disposed only once its group has closed and every such object is back.
 
 ## Source hygiene
 
