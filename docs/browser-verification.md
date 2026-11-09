@@ -498,3 +498,205 @@ The user has no Windows or Linux host yet. Every line above waits for each of th
 Narrator or NVDA, and Orca, in place of VoiceOver. On both, Ctrl+H deletes nothing in Settings' text fields or in Edit
 Bookmark's Tags (H17), and in a terminal pane's find bar it deletes the character before the caret. On Linux, the data
 folder line holds too; on Windows the folder keeps its permissions.
+
+## Plan 6: privacy
+
+### Batch 1: the user's check on macOS (pending)
+
+- **How to run it:** with the user's OK for each batch, `./gradlew :jasper-app:run` from `claude/browser-privacy`
+  (worktree `.claude/worktrees/browser-4b-4c-e6deab`), on JBR 25.0.4.1 b635.75 with JCEF. The camera and microphone
+  lines need the packaged `Jasper.app` (`./gradlew :jasper-app:packageApp`, without `-Pjasper.aot=true`), whose
+  `Info.plist` has the usage descriptions ([macOS camera and microphone](packaging.md#macos-camera-and-microphone)).
+  The notification lines need a page served by `python3 -m http.server`, and the proxy lines a local proxy on port 8118
+  (`privoxy`, or `mitmproxy -p 8118`). Where a line reads Jasper's data, it is in `plugins/dev.jasper.browser/data/` in
+  Jasper home.
+- Each line is recorded pass or fail. Every line is pending.
+
+#### First: what only the GUI can show
+
+1. **Jasper's pages in a /dev/null tab (V5, V-F1):** with Use /dev/null mode on, a new tab's welcome page, and in it
+   `jasper-about:history`, `jasper-about:bookmarks`, `jasper-about:permissions`, View Source's page and an error page,
+   load and answer their queries. Chromium's scheme handler serves only its global context, so Jasper answers an
+   in-memory context's main-frame `jasper-about:` requests itself; if that fails, no /dev/null tab can show Jasper's
+   pages. Pending.
+
+#### The plan's checklist
+
+1. **/dev/null:** pending.
+   - with the setting on, a new tab shows the indicator and its popover;
+   - a site signed into there is signed out in a new /dev/null tab and in a persistent tab;
+   - a popup shares its opener's sign-in;
+   - Web › History shows only that group's visits, and ☰ has no bookmark items;
+   - after a relaunch, the tab comes back at the start page with the indicator.
+
+   From the task reviews:
+   - **Task 1b:** after a /dev/null session, `~/Library/Saved Application State/` holds no /dev/null page's title (the
+     macOS window title may reach it).
+   - **Task 2:** popup B from /dev/null tab A; close A; a link from B opened in a new tab C stays in the group: signed in
+     to the group's sites, signed out of the persistent ones, and `data/chromium` unchanged. The same after Inspect
+     Element and closing DevTools. Open a /dev/null tab and close it at once; open one and quit at once (no crash);
+     open DevTools in a /dev/null tab, then close both. Open any tab and close it at once: no page keeps loading, the
+     life span trace shows it closed, and quitting shows no 10 s stop warning.
+   - **Task 3:** the popover's copy; Escape, a click outside and a second click on the indicator each close the popover
+     without opening it again; a slow click on an open anchored popover's anchor (the /dev/null indicator, the Edit
+     Bookmark panel, the Vault's credential picker) closes it and does not reopen it, and after Escape a quick click
+     opens it (V14, Swing's dispatch order); a restored /dev/null tab comes back empty at the start page, with
+     `workspace.toml`'s title "Web Browser", `devnull = "true"` and no `url`; turning the setting off changes no open
+     tab, and the next new tab is persistent.
+2. **Camera and microphone** (the packaged app): pending.
+   - [the WebRTC sample](https://webrtc.github.io/samples/src/content/getusermedia/gum/) shows
+     "Allow Camera";
+   - Block is remembered;
+   - ☰ shows "Reset Camera Permission (Blocked)";
+   - the permissions page lists the grant, and × reloads the tab;
+   - screen sharing is refused without a prompt;
+   - `navigator.geolocation` fails without a prompt.
+
+   From the task reviews:
+   - **Task 4:** the permissions page lists the grants by site; a site's Clear, a permission's × (after "Revoke X
+     permission for ORIGIN?") and Clear All Permissions remove them, and the group's tabs that show the site reload.
+     ☰'s Reset items show only for a site with a permission, between History (at the top in a /dev/null tab) and
+     Settings, with one separator each side, and choosing one removes it and reloads the site's tabs. A /dev/null tab's
+     permissions page shows only its group's, and its changes do not reach the persistent tabs (V-F1). The Quick
+     Actions read Bookmarks, History, Settings and Permissions, and Permissions opens the page; the onboarding's
+     features page lists "Site permissions".
+   - **Task 5:**
+     - under `:jasper-app:run`, with the user's OK, what TCC does when a page opens the microphone, then the camera: a
+       prompt, a silent denial or the process ending, as JBR's `java` has no usage descriptions (V-F44);
+     - on the packaged `Jasper.app`, macOS's first prompts show the two descriptions, and an allowed `getUserMedia`
+       captures: JBR's `jcef Helper.app` is hardened without camera and audio entitlements, so a `NotReadableError`
+       means a packaging follow-up;
+     - `getUserMedia({audio: true})` shows "Allow Microphone" and "The website ORIGIN wants to use your microphone.":
+       Allow starts the microphone and ☰ shows "Reset Microphone Permission (Allowed)"; Block refuses
+       (`NotAllowedError`) and ☰ shows "Reset Microphone Permission (Blocked)"; Escape refuses and keeps nothing;
+       `{video: true, audio: true}` shows "Allow Camera and Microphone";
+     - Enter allows nothing, nor does Space with nothing focused; a quick double-click lure and an alert stacked over
+       the prompt cannot allow the camera, and a deliberate click after a moment can (V19);
+     - a dismissed prompt does not come back on a repeated `getUserMedia` until a reload, after which it asks again; a
+       third quick modal is refused (an alert then two prompts, or three prompts each closed at once); a prompt in a
+       tab that is not shown waits until its tab is; leaving or closing the page while a prompt shows takes it away,
+       and the page's promise rejects; two `getUserMedia` calls at once show one prompt;
+     - ☰'s Reset revokes a live camera: the page reloads and the camera's light goes off; a cross-origin frame with
+       `allow="camera"` is asked in the top-level site's name, and the grant is that site's (V16), while without
+       `allow=` Chromium's permissions policy refuses the frame before Jasper is asked;
+     - `getDisplayMedia` and a `getUserMedia` from DevTools' console are refused without a prompt; a /dev/null tab's
+       Allow is gone once its group closes, and never on the persistent permissions page;
+     - quitting while a prompt shows: no crash, no 10 s stop warning, and the page is not answered once Chromium has
+       stopped.
+3. **Notifications:** a `python3 -m http.server` page calls `Notification.requestPermission()`, then
+   `new Notification("Hi", {body: "There"})`. That gives a card, and `close()` takes it out of history. Pending.
+
+   From the task reviews (**Task 6**):
+   - the card reads "localhost — There" under the title "Hi" (V2), and its click shows its tab;
+   - Allow, Block and Escape on `requestPermission()`; the 11th notification in a minute is dropped; closing one of two
+     identical notifications keeps the other clickable;
+   - a challenge frame gets no stand-in; a service worker's notification does not appear; a /dev/null tab is denied;
+     an `http` site other than this computer is denied, while `localhost` asks; a sandboxed document shows nothing; a
+     Cloudflare-managed site passes its interstitial;
+   - a fenced frame does not count as the main frame (`isMain()`), and the stand-in is in place when the page's own
+     scripts run (its injection at `OnLoadStart`).
+4. **Audio:** pending.
+   - a page with `<audio autoplay>`, and a YouTube embed, are muted with the bar;
+   - each of the four answers works;
+   - Unmute Current Page works.
+
+   From the task reviews (**Task 7**):
+   - the bar shows at the first sound; an embedded player is muted with its page; an early `<audio autoplay>` is
+     muted; a /dev/null tab's choice stays out of the persistent store;
+   - in the JBR console, `webkitAudioContext === AudioContext`, and a page that uses `new webkitAudioContext()` is
+     muted under a kept Block and gets the bar otherwise;
+   - a web component's `<audio>` autoplaying in a shadow root it attaches at run time is muted, with the bar;
+   - with Deny Always kept for a site, a page whose embedded player starts at once is muted from its first sound, even
+     after answering another tab's bar or a quick reload.
+5. **Clearing:** pending.
+   - with pages open, Clear Cookies signs out;
+   - Clear All Data also clears a test page's `localStorage`, the history, the bookmarks and the permissions;
+   - after a relaunch, nothing comes back.
+
+   From the task reviews (**Task 8**):
+   - Clear Cookies and Clear All Data show their sheet over the active window, in front of Settings; Cancel, Escape and
+     closing the sheet run nothing; Clear Website Data's confirmation names history, bookmarks, site permissions,
+     cookies, cache and local storage, with the sign-out warning (V1, V24);
+   - Clear Cookies signs you out of a site live; clicked before any page has shown, the next start's first page is
+     signed out too, and `chromium-clear` is gone afterwards;
+   - Clear Website Data clears a site's local storage live, and "All website data has been cleared successfully!"
+     shows only once it is done; after a restart, `data/chromium` is new, neither `chromium-clear` nor a
+     `chromium-cleared-` folder remains, and `chromium.log` is empty; a /dev/null tab's session survives both
+     clearings;
+   - a clearing while Chromium is starting waits, then clears live, its success within 60 s; the Clear All Data button
+     stays busy while it runs; the helper browser shows nothing; quitting right after a clearing ends without the 10 s
+     stop warning or a crash; Chromium's log shows no `Storage.clearDataForOrigin` error for the cleared sites;
+   - after a Clear Website Data while `browser.sqlite` could not be used, the next start opens a fresh
+     `browser.sqlite`; on a network home where chmod fails, a marked database is still deleted.
+6. **Ad blocking:** pending.
+   - Update Now shows the rule count;
+   - an ad test page shows blocked requests and hidden elements;
+   - turning it off and reloading brings them back.
+
+   From the task reviews (**Task 10**):
+   - with EasyList on, a news page's ad requests fail (`ERR_BLOCKED_BY_CLIENT` in DevTools' Network) and its ad slots
+     are hidden, in a /dev/null tab too; a first-party resource on `www.cnn.com` is not blocked (V-F7);
+   - Update Now is busy and reads "Updating…", then "*n* rules · Updated *date*"; a bad or unreachable address reads
+     "Could not update the filter list: …"; a second press while it updates does nothing;
+   - after a restart, Filter Statistics reads "Loads with the first browser page" (V36), then, once a page shows, the
+     cached count without a download; `data/adblock/rules.json` and `state.json` are `rw-------` in a `rwx------`
+     data folder;
+   - the onboarding's setup page shows the Ad Blocker and its Settings note; the switch saves `ad_blocking`, which
+     Settings › Tools › Browser shows, and stays as set (V35);
+   - a hostile list served from `http://127.0.0.1`, whose selectors try `input[value^="a"]` with a `background:url(…)`
+     and a `}` injection: those lines are dropped, the attacker's host gets no request, and the well-formed lines still
+     hide;
+   - a page with `style-src 'self'` still hides elements, with no content security policy error from Jasper in its
+     console; changing Filter List URL downloads the new list at once; with `state.json`'s `updated` set 8 days back, a
+     restart shows "Ad block rules haven't been updated for 8 days";
+   - Jasper's own pages (welcome, history, permissions) are unaffected; quitting during a download from a slow local
+     server neither hangs nor shows the 10 s stop warning; a page with many iframes loads without visible stalls;
+   - a list at a local `http` address that redirects to a LAN host reads "…redirected to an address that is not https",
+     and the LAN host gets no request (V38);
+   - while the list is on, `jstack` shows one daemon thread, `jasper-browser-filter-list`, which is gone once the
+     Browser is turned off (V37).
+7. **The proxy:** pending.
+   - with a local proxy on 8118 (`privoxy` or `mitmproxy -p 8118`), pages load through it, /dev/null tabs included;
+   - with the proxy stopped, they fail;
+   - turning the setting off loads them directly;
+   - Chromium's log shows no `setPreference` error, and Jasper posts no "The proxy could not be set".
+
+   From the task reviews (**Task 11**):
+   - favicons and search suggestions go through the proxy too, while a `localhost` dev server's page and favicon go
+     directly (V43); turning the proxy off returns to the system's settings;
+   - a refused preference shows "The proxy could not be set" and the /dev/null tab stays blank, and once the proxy is
+     off a new tab in that group loads (V44);
+   - `proxy_host = "::1"` with a proxy on `[::1]:8118` works, and the log reads `server=[::1]:8118`;
+   - with DEBUG logging for `dev.jasper.browser.engine.NetworkPreferences`, "Chromium's proxy preference reads
+     {mode=fixed_servers, server=127.0.0.1:8118}" (or `{mode=system}` when off), for the global context and each
+     /dev/null context (V-F38);
+   - a change closes the kept-alive connections (`CloseAllConnections`): the next request opens a new one through the
+     new route;
+   - with the proxy on, quit, set `http_proxy = false` in the plugin's settings file and start again: the first page
+     goes directly, as the start overrides what the profile kept.
+8. **Settings:** Manage Permissions opens the permissions page in a new tab behind Settings, which stays in front.
+   **A question for the user:** is that acceptable? Pending.
+
+   From the task reviews:
+   - **Task 8:** Settings › Tools › Browser lists General, Link Opening, Search Engine, Privacy & Data, Ad Blocking and
+     Proxy; Privacy & Data ends with Clear All Cookies, Clear Website Data and Manage Site Permissions, each declared
+     row edits and applies as before, and a search marks the three rows; Manage Permissions opens the persistent
+     store's page, with /dev/null mode on too.
+   - **Task 11:** the Proxy section shows Enable HTTP Proxy, Proxy Server and Proxy Port, and `http://x` or `a b` in
+     Proxy Server shows "Enter a host name or IP address.".
+
+### Batch 2: start-up and memory (pending, V4)
+
+At the benchmark sitting, with the user's OK: the start-up and memory batch (`tools/benchmarks/run-macos.sh`), once
+with ad blocking off and once with it on (V-F35), a page with many iframes among the pages (V-F34). Pending.
+
+### Plan 6 on Windows and Linux (not run)
+
+The user has no Windows or Linux host yet. Every line above waits for each of them too, with Ctrl in place of Cmd.
+
+- **Windows:** with the camera privacy switch (Settings › Privacy › Camera) off, Allow gives the page a
+  `NotAllowedError` or `NotReadableError` and Jasper stays up; Clear Website Data's wipe moves `chromium` aside as
+  `chromium-cleared-` and a number and deletes it, and while a profile file is held open, the profile stays whole with
+  its marker until a later start; while another program holds `browser.sqlite` after a marked clear, the next start
+  runs history in memory with the "unavailable" notice, and the start after that deletes the file.
+- **Linux:** the camera through PipeWire or V4L2: Allow opens it.

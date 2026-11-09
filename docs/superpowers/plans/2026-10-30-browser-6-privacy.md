@@ -127,7 +127,7 @@ reviews recorded these deviations from the plan's text, each with its ruling:
   pluginZip` against `build/sdk-release` passes (1 test). The full checks after each task: 15,078 (Task 1a), 15,088
   (1b), 15,139 (2), 15,181 (4), 15,208 (5), 15,279 (7), 15,328 (8), 15,421 and 15,424 (9), 15,454 and 15,477 (10),
   15,494 and 15,510 (11), each with 0 failures, 0 errors and 103 skipped.
-- **Task 13**, the checklist: pending.
+- **Task 13**, the checklist: [Plan 6: privacy](../../browser-verification.md#plan-6-privacy), every line pending.
 
 The controller's rulings, one line each:
 - V0: every ruling the pre-flight scan proposed (F1-F44) is adopted and cited as V-F*n*, except where V1-V6 decide
@@ -271,9 +271,10 @@ Deferred minors, by task (the final wave may still close some):
 - Task 11 (V46): splitting the clearing out of `Chromium`.
 
 Not run:
-- **Task 13**, the user's GUI check on macOS, with their OK for each batch: pending, V-F1's `jasper-about:` pages in
-  a /dev/null tab first (V5), then the plan's eight groups with the task reviews' lines, and the question for the user
-  whether Manage Permissions may open its tab behind Settings.
+- **Task 13**, the user's GUI check on macOS, with their OK for each batch: pending
+  ([checklist](../../browser-verification.md#plan-6-privacy)), V-F1's `jasper-about:` pages in a /dev/null tab first
+  (V5), then the plan's eight groups with the task reviews' lines, and the question for the user whether Manage
+  Permissions may open its tab behind Settings.
 - **Benchmarks** (V4): the start-up and memory batch, with ad blocking off and on, waits for the benchmark sitting.
 - **Windows and Linux** (no hosts), and **packaging with AOT**, whose training needs the user's OK.
 - **No JavaScript runs in a test:** `notifications.js`, `audio.js`, `hide-elements.js` and `permissions.js` are checked

@@ -166,8 +166,9 @@ non-decimal, trailing-dot or zone-id loopback or link-local address goes through
 the next start after Clear Website Data, open pages keep their Back and Forward lists and `:visited` (V-F40); the
 clearing's split out of `Chromium` waits for the final wave (V46). Task 13 (the user's check on macOS, with their OK):
 pending, V-F1's `jasper-about:` pages in a /dev/null tab first (V5), then the plan's eight groups and the task reviews'
-lines, and a question for the user: may Manage Permissions open its tab behind Settings? Windows and Linux are not run;
-the start-up and memory batch, with ad blocking off and on, waits for the benchmark sitting (V4).
+lines, and a question for the user: may Manage Permissions open its tab behind Settings?
+([checklist](browser-verification.md#plan-6-privacy)). Windows and Linux are not run; the start-up and memory batch,
+with ad blocking off and on, waits for the benchmark sitting (V4).
 
 **Browser plan 5: history, bookmarks and Jasper integrations — 2026-11-06** (`claude/browser-history-bookmarks`,
 worktree `.claude/worktrees/browser-4b-4c-e6deab`, from local `main` `68265a983`, which has plans 4a, 4b, 4c and 9
