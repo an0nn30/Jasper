@@ -578,10 +578,9 @@ https://example.com wants to use your camera.", with **Block** and **Allow**.
   showing, until the page next loads. Leaving or closing the page takes its prompt away, refused.
 - A permission is kept for the site of the page's address, its scheme, host and port: a frame inside the page asks in
   the page's site's name, and gets what that site was allowed. Every `file:` page is one site, `file://`.
-- A page's request to share the screen or a window is refused without asking, and so is a request for your location:
-  Jasper's Chromium has no location provider.
-- On macOS, the first page you allow the camera or the microphone also brings macOS's own question for Jasper
-  ([macOS camera and microphone](packaging.md#macos-camera-and-microphone)).
+- A page's request to share the screen or a window is refused without asking, and so is a request for your location.
+- In the packaged Jasper.app on macOS, the first page you allow the camera or the microphone also brings macOS's own
+  question for Jasper ([macOS camera and microphone](packaging.md#macos-camera-and-microphone)).
 
 Permissions are kept in `browser.sqlite` ([Files](#files)), and a [/dev/null](#devnull-mode) group's in memory. When one
 cannot be saved, Jasper posts "Site permissions could not be saved" with the reason, and keeps it until it quits.
@@ -619,7 +618,7 @@ notification in the page's window, and a click on it shows the page's tab.
   it, `127.0.0.0/8` and `[::1]`). Any other `http` page, a `file:` page, a page in a [/dev/null](#devnull-mode) tab and
   a document a sandbox gave an opaque origin are denied, without a prompt.
 - **Only the page's top frame** gets Jasper's notifications. A frame inside the page, a page script that ran before
-  Jasper's and a service worker get Chromium's own, which show nothing. `navigator.permissions.query()` reports
+  Jasper's and a service worker get Chromium's own, which Jasper does not show. `navigator.permissions.query()` reports
   Chromium's answer, which can differ from `Notification.permission`, and a page can tell that it runs in Jasper.
 
 ## Audio
@@ -661,7 +660,8 @@ group or the [filter list](#ad-blocking).
   run, Jasper deletes Chromium's whole profile, `data/chromium`, before Chromium opens it, with what was left and every
   sign-in since, and empties `chromium.log`, whose lines can name sites. "All website data has been cleared
   successfully!" says when it is done.
-- Until then, open pages keep their Back and Forward lists, and Chromium still shows links you visited as visited.
+- Until Chromium next starts, open pages keep their Back and Forward lists, and Chromium still shows links you visited
+  as visited.
 
 Before Chromium has started in the run, Clear Cookies leaves the cookies for Chromium to delete as it starts, before any
 page, and Clear All Data deletes the profile at once. While Chromium starts, each waits for it, and when Chromium could
@@ -680,8 +680,8 @@ With **Enable Ad Blocking** on (`ad_blocking`, off by default; the onboarding's 
 browser page, /dev/null ones included. Jasper's own `jasper-about:` pages and DevTools are left alone.
 
 - **Blocked:** a page's requests for frames, images, style sheets, scripts, fonts, media, `fetch()` and
-  `XMLHttpRequest`, WebSockets, pings and its other sub-resources, at `http`, `https`, `ws` and `wss` addresses, fail,
-  as `ERR_BLOCKED_BY_CLIENT` in DevTools. The page's own load, the address you open, is never blocked.
+  `XMLHttpRequest`, WebSockets, pings and its other sub-resources, at `http`, `https`, `ws` and `wss` addresses, fail.
+  The page's own load, the address you open, is never blocked.
 - **Hidden:** the elements a rule's selectors select, by a style sheet of Jasper's that the page adopts, so that a
   page's content security policy does not stop it. A frame inside a page hides only what the list hides on every page.
   The page's scripts can take the sheet away, and elements in shadow roots are not hidden.
@@ -696,14 +696,15 @@ by default EasyList's, `https://easylist-downloads.adblockplus.org/easylist_cont
 - **When:** Jasper reads its copy of the list, and checks for an update, only once the first browser page shows or you
   turn ad blocking on, and from then on every hour while ad blocking is on. It downloads the list when 24 hours have
   passed since the last update, when it has none, or when its copy came from another address, so a new Filter List URL
-  downloads at once. **Update Now** downloads it at once, with ad blocking on or off.
+  downloads at once, or as soon as a download under way ends. **Update Now** downloads it at once, with ad blocking on
+  or off.
 - A list that cannot be downloaded or read leaves the one Jasper had in place. The copy is kept in `data/adblock/`
   ([Files](#files)).
 
 **Filter Statistics**, after the two settings, says how many rules the list has and when it was updated ("*n* rules ·
 Updated *date and time*"), "Updating…" while it downloads, why its last update failed ("Could not update the filter
-list: …"), or, before Jasper has read the list in the run, "Loads with the first browser page". From the seventh day
-without an update it adds "Ad block rules haven't been updated for *n* days".
+list: …"), or, before Jasper has read the list in the run, "Loads when ad blocking is on and a browser page opens".
+From the seventh day without an update it adds "Ad block rules haven't been updated for *n* days".
 
 **The rules Jasper applies** are those whose trigger has a `url-filter` and no keys but `url-filter`,
 `url-filter-is-case-sensitive`, `resource-type`, `load-type` and one of `if-domain` and `unless-domain`, and whose
@@ -720,7 +721,8 @@ bounds:
   three under a two-letter country code with a common second level, such as `co.uk`, `com.au` or `gob.mx`, so
   `www.cnn.com` and `edition.cnn.com` are one site. Jasper has no public suffix list: all of `github.io` is one site
   too.
-- A list has at most 32 MiB and 8 levels of nesting. Jasper keeps its first 250,000 rules, at most 1,024 hosts in a
+- A list has at most 32 MiB, 8 levels of nesting and 2,000,000 values: its objects, arrays, strings, numbers, `true`,
+  `false` and `null`, not counting its members' names. Jasper keeps its first 250,000 rules, at most 1,024 hosts in a
   rule's `if-domain` or `unless-domain` and 500,000 in all, and at most 5,000 selectors in a rule, each of at most 1,024
   characters, with no `{`, `}`, `;`, `@` or `<`. A page hides at most 2 MiB of selectors.
 - Each request, and each page's hiding, has a bound on the matching work its rules take; past it, the request goes

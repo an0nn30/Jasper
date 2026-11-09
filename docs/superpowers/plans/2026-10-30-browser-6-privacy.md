@@ -4,15 +4,17 @@
 > superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Execution status (2026-11-09): Tasks 1-11 executed and reviewed (Task 1 as 1a and 1b, ruling V6), and Task 12, the
-docs; Task 13, the user's GUI check on macOS, is pending** (branch `claude/browser-privacy`, worktree
+docs; the final reviews passed the branch "With fixes" and the docs "Approved with fixes", and the fix wave that
+followed is done; Task 13, the user's GUI check on macOS, is pending** (branch `claude/browser-privacy`, worktree
 `.claude/worktrees/browser-4b-4c-e6deab`, cut from local `main` `ef3347601`, which has plans 4a, 4b, 4c, 9 and 5
 merged; the plan `daa19c574`, then commits `827ac12ba` to `03af74d75`, local `main` `67653bbf6` (Mermaid, plan 9's
-slice 1b) merged in as `965c11432`, and the docs, `7ad704159` and `51b74b627`; not merged or pushed; see
-`docs/STATUS.md`). Executed with per-task subagents and reviews, each task's fix rounds until a re-review found every
-finding addressed. The pre-flight scan's findings F1-F44 were adopted as rulings (V0, cited V-F*n*) except where V1-V6
-decide otherwise, and the controller's further rulings are V7-V46; plan 4a's R0-R48 and the banners of 4b, 4c, 9 and 5
-bind. On 2026-11-06 the user chose V1 ("Clear now + wipe") and V3 ("Match Chrome"), which are no longer interim, and
-asked for no change to V2. The task reviews recorded these deviations from the plan's text, each with its ruling:
+slice 1b) merged in as `965c11432`, the docs, `7ad704159`, `51b74b627` and `1092ada75`, and the fix wave, `c7be4d2ed`
+and `5125f2ba0`, and its docs; not merged or pushed; see `docs/STATUS.md`). Executed with per-task subagents and
+reviews, each task's fix rounds until a re-review found every finding addressed. The pre-flight scan's findings F1-F44
+were adopted as rulings (V0, cited V-F*n*) except where V1-V6 decide otherwise, and the controller's further rulings
+are V7-V56; plan 4a's R0-R48 and the banners of 4b, 4c, 9 and 5 bind. On 2026-11-06 the user chose V1 ("Clear now +
+wipe") and V3 ("Match Chrome"), which are no longer interim, and asked for no change to V2. The task reviews recorded
+these deviations from the plan's text, each with its ruling:
 - **Versions:** `JasperSdk.VERSION` 0.29.0 to 0.30.0, every bundled range `>=0.30.0, <0.31` (Task 1a). New SDK
   members, each `@since 0.30.0`: `NotificationHandle.remove()`, `ContentTab.setSavedTitle(Optional<String>)` (V-F2),
   and the testkit's `FakeNotifications.Post.count()` and `removed()` and `FakePluginHost.savedTitle`. **The Browser
@@ -116,7 +118,8 @@ asked for no change to V2. The task reviews recorded these deviations from the p
   `Chromium` is made; "The proxy could not be set" is one constant.
 - **The merge** (`965c11432`): local `main` `67653bbf6`; one conflict, in `BrowserPlugin.java`, both sides kept; four
   test calls to `PreviewScheme()` given `Runnable::run`.
-- **Task 12** (`7ad704159` "Docs: the browser's privacy features"), the docs: the Browser guide (/dev/null mode, site
+- **Task 12** (`7ad704159` "Docs: the browser's privacy features", and `1092ada75` "Docs: plan 6's counts after the
+  docs"), the docs: the Browser guide (/dev/null mode, site
   permissions, page notifications, audio, clearing data, ad blocking, the HTTP proxy, and the toolbar, the welcome
   page, History, certificate errors, Restore, Jasper's own requests, Settings and Files), the configuration guide's
   plugin table, AGENTS.md's Verified JCEF behaviour (V-F38 and V10), this banner and STATUS. `docs/packaging.md`'s
@@ -132,6 +135,46 @@ asked for no change to V2. The task reviews recorded these deviations from the p
   errors and 103 skipped. No GUI was launched.
 - **Task 13** (`51b74b627` "Docs: plan 6's GUI check, pending"), the checklist:
   [Plan 6: privacy](../../browser-verification.md#plan-6-privacy), every line pending.
+- **The final fix wave** (after the final reviews of `67653bbf6..1092ada75`: A, Tasks 1-8 and the engine and page
+  wiring of 10 and 11, and B, Tasks 9-11, each "With fixes", and C, the docs, "Approved with fixes"; rulings V47-V56):
+  - `c7be4d2ed` "Browser: the content blocker's final fixes" (W1, V48-V53, V56): compiled patterns live in one
+    `PatternCache` per `RuleSet`, least recently used out first, within an estimated 32 MiB (256 bytes a pattern and
+    its text, 48 a node, 320 a class, and 576 plus 4 a character for the table of a case-sensitive leading run of 4 or
+    more), and none compiles under its lock; a compile is charged 50 plus 8 a character of the longer of its source
+    and expression, plus such a run's square over 8, so a full budget of compiles takes at most 8.8 ms median (9.4 ms
+    at most) on this Mac, warm, and one the budget cannot pay is not started; a one-member class is written as its
+    character; the review's probe at 32 MiB under `-Xmx2048m`, which ran out of memory, retains 1 MB, its first calls
+    10 to 16 ms (V48). `BlockerJson` counts the values outside strings, members' names left out, and refuses a list of
+    more than 2,000,000 before it parses, "Not a content blocker list: more than 2,000,000 values" (V49). Each rule a
+    call examines is charged 1, those that do not fit too, and an ignore rule whose match overruns counts as matched
+    (V50). The filter list's client always has a selector, `ProxyRoute.byDefault()` while the proxy is off (this
+    computer directly, the rest as the JDK's default selector routes it); a retired client follows no redirect ("the
+    HTTP proxy changed during the download"), and an address changed during a download is checked once it ends (V51).
+    Filter Statistics' "Loads when ad blocking is on and a browser page opens" (V52). The `updating()` assertions hold
+    the test server on a gate, successes get 30 s and only `/hold` 700 ms, the daemon-thread test reads the list's own
+    scheduler's threads, and an unparsable `Location` reads "the filter list was redirected to an address that cannot
+    be read" (V53);
+  - `5125f2ba0` "Browser: the final review's fixes" (W2, V54): a clearing helper Chromium makes once it no longer runs
+    closes as it is made (`ProfileClearing.HelperClose`); a refusal of the system's proxy settings while the proxy is
+    off is logged, not posted; one `Origins.host` serves `ChallengeFrames` and `PageNotifications`; one constant,
+    `AboutScheme.UNANSWERED`, holds "Jasper could not answer this request.", for all six of its copies, the opener
+    bridge's and `AboutQueries`' among them; `DataFolder`'s Javadoc says only the permissions are left alone on
+    Windows; Task 1b's direct `restate` test and the identity comment in `HostedNotifications`, Task 5's clock restored
+    in a `finally`, and Task 6's script comments softened, in `notifications.js` and `audio.js`; Chromium's clearing
+    moved, as a pure move, into the package-private `ChromiumClearing` (282 lines; `Chromium` 984 to 792; V46), whose
+    seams the tests reach through `Chromium.clearing()`. The `CompletionException` unwrap is not shared: its copies
+    are in `engine`, `item` and `permissions`, and `engine` and `permissions` share no package but `json`;
+  - the docs (V47, V55 and this banner): the Browser guide (blocked requests "fail", the four softened sentences, the
+    list's 2,000,000 values, an address changed during a download, Filter Statistics' new text), the checklist (its
+    blocked-requests and Filter Statistics lines, and three lines the wave added), the notifications guide's Bookmarks
+    and Page notifications groups, the README's, Plugins' and the docs index's Browser descriptions, and STATUS;
+  - Verification: W1's RED and GREEN are in its commit. W2's tests came first (the compile failed on the missing
+    `HelperClose`, `Origins.host`, `AboutScheme.UNANSWERED` and two-argument `refused`); reverting each change alone
+    then failed its tests: the stopped Chromium's helper 1, the refused system settings 3, `restate`'s expired entry 1
+    and its other text 1. The move kept `ChromiumStateTest`'s 57 tests passing, changed only in reaching the clearing's
+    seams; `:jasper-plugin-browser:check`, the Javadoc and `verifyPluginArchitecture` pass; `ThemeMigrationCoverageTest`
+    asked for `ChromiumClearing`'s row in `migration.csv`; `sdkReference` changed nothing; source hygiene is clean, and
+    no file the wave touched holds a raw U+00A0, U+2028 or U+2029. No GUI was launched.
 
 The controller's rulings, one line each:
 - V0: every ruling the pre-flight scan proposed (F1-F44) is adopted and cited as V-F*n*, except where V1-V6 decide
@@ -211,7 +254,10 @@ The controller's rulings, one line each:
 - V33: a read is charged 1 plus the filter's count of `*`- and `?`-quantified atoms, and a literal pre-check 1 plus the
   address length / 32 (of the capped address), both against the match budget and the call's.
 - V34: a list's compile (`ContentRules.compile`, `RuleSet.of`) stays on the background executor; a hostile 30 MiB list
-  may take seconds and a transient heap peak there, recorded as a known gap.
+  may take seconds and a transient heap peak there, recorded as a known gap. Amended by V49 and V56: at the cap of
+  2,000,000 values a list's parse and compile peak at about 404 MB for 2,000,000 empty objects (286 ms; it completes
+  in a 256 MiB heap) and about 600 MB for 250,000 real-looking rules (436 ms; it needs about 400 MiB), both under half
+  of `-Xmx2048m`, and a list one value past it is refused in 12 to 26 ms.
 - V35: `SetupSwitch.set` returning the save's future is accepted, a plan 5 signature change.
 - V36: before the list has been read, the status reads "Loads with the first browser page" instead of "0 rules".
 - V37: the hourly check runs on a `ScheduledExecutorService` the list owns (one named daemon thread), shut down in
@@ -235,10 +281,43 @@ The controller's rulings, one line each:
   underscores stay refused.
 - V46: the proxy state moves into `NetworkPreferences` now, `Chromium` keeping the `proxyLive` hand-off and a delegate;
   splitting the clearing out of `Chromium` goes to the final wave.
+- V47: the README's and `docs/plugins.md`'s Browser descriptions name plan 6's features (/dev/null mode, site
+  permissions, page notifications, audio muting, clearing data, ad blocking, an HTTP proxy) in their own style, in the
+  final fix wave.
+- V48: compiled patterns live in one cache per `RuleSet`, least recently used out first, within an estimated weight of
+  32 MiB; a filter's compile is charged to the call's budget, calibrated so the 2,000,000 budget bounds a call's
+  compiles to about 10 ms on this Mac; a compile the budget cannot pay is not started; a one-member class is written as
+  its character.
+- V49: `BlockerJson` counts the JSON values outside strings in one linear pre-scan and refuses a list of more than
+  2,000,000 before it parses; V34 is amended with the peak measured at that cap.
+- V50: each candidate a call examines is charged 1 against the call's budget, and an ignore rule whose match overruns
+  counts as matched, so both budgets err toward allowing the request and hiding less.
+- V51: the filter list's client always has a selector (`ProxyRoute.loopback` hosts directly, everything else through
+  the proxy when it is on and `ProxySelector.getDefault()` when it is off); a retired client refuses further redirect
+  hops; a `filter_list_url` change during a download checks again once it ends.
+- V52: amends V36: the status reads "Loads when ad blocking is on and a browser page opens".
+- V53: the fix wave fixes the timing-sensitive tests (the `updating()` assertions hold the server on a latch, only
+  `/hold` has the short deadline, the daemon-thread test reads the list's own scheduler's threads) and the unparsable
+  `Location`'s reason.
+- V54: part A's fixes in the wave: a clearing helper made after Chromium stopped running closes at once, with a GUI
+  line; a refused `{mode: system}` while the proxy is off is logged, not posted; one `Origins.host`; one constant for
+  "Jasper could not answer this request."; `DataFolder`'s Windows Javadoc; Task 1b's `restate` test and identity
+  comment, Task 5's clock in `try/finally`, Task 6's softened script comments; Chromium's clearing moved, as a pure
+  move, into a package-private engine class.
+- V55: part C's docs fixes and V47 in the wave: "fail" for `ERR_BLOCKED_BY_CLIENT` in the guide and the checklist; the
+  notifications guide's Page notifications and Bookmarks groups; the four softened sentences; `1092ada75` and
+  `BrowserItem`'s size in the banner and STATUS; the README's, Plugins' and the docs index's Browser lines.
+- V56: W1's calls are accepted: the compile charge counts the source and a case-sensitive leading run as well as the
+  expression, as the 10 ms bound needs; a hostile list's first call may take about 30 ms while the JIT is cold;
+  gathering the always bucket's candidates stays uncharged (1 to 7 ms, bounded by the 250,000 rules); V34 is amended
+  with the measured 404 MB parse peak at the cap.
 
 Known gaps:
-- V34: a hostile 30 MiB list's compile may take seconds and a transient heap peak, on the background executor, once
-  per list change.
+- V34, as V49 and V56 amend it: a list's parse and compile, on the background executor once per list change, peak at
+  about 404 MB for 2,000,000 empty objects and about 600 MB for 250,000 real-looking rules.
+- V56: a hostile list's first call may take about 30 ms while the JIT is cold (5 to 9 ms once warm); gathering the
+  always bucket's candidates is not charged (1 to 7 ms at 250,000 rules); a filter of long literals is estimated at 5
+  to 10 times its weight, so the cache holds fewer of them than 32 MiB would.
 - On an 8 KiB address the literal-check charge reaches the call budget after about 7,800 checks, so only a list that
   large is cut short there, in the safe direction (a 200-character address allows about 285,000).
 - Task 10's M9: a hidden element's suppressed lazy load is a side channel a list author could use with
@@ -257,28 +336,24 @@ Known gaps:
   needs both); `BEFORE_START` ignores `StartOnce`; a clearing timed out before the worker writes no marker (Task 8); the
   fake attributes a failing link on a shared post to its first poster (Task 1b).
 
-Deferred minors, by task (the final wave may still close some):
-- Task 1b: `NotificationCenter.restate` has no direct unit test (the expired entry it ignores, its
-  `IllegalArgumentException`); `Holds.carry` and the fake's carry compare requests by identity, so a comment should say
-  that `restate` and the fold store the same object.
-- Task 5: `SitePermissionsTest.close()` restores the static clock last (try/finally); a held-then-dismissed script
-  dialog restarts a prompt's interval (errs safe).
-- Task 6: the polyfill's capture of its built-ins (the review's M3) is not airtight against a patched
-  `Promise.prototype.constructor` or `Symbol.species` (a page breaks only its own callbacks; reword
-  `notifications.js`'s "breaks nothing of it"); `SitePermissions.ask`
-  applies only V20, not V21 or V22, on Chromium's native path, where Chromium refuses insecure contexts itself.
+Deferred minors, by task, less those the fix wave fixed; the final reviews kept the rest:
+- Task 5: a held-then-dismissed script dialog restarts a prompt's interval (errs safe).
+- Task 6: `SitePermissions.ask` applies only V20, not V21 or V22, on Chromium's native path, where Chromium refuses
+  insecure contexts itself.
 - Task 7: the method-shorthand wrappers report `length` 0 where the natives report 1 (fingerprintable; `audio.js:335`);
   `PrivacyMenu.close()` leaves a no-op handler.
-- Task 10: `FilterListTest`'s daemon-thread test counts a process-global thread name (it could flake beside another
-  live list); an unparsable `Location` reads "redirected to an address that is not https"; an unreadable cache shows "0
-  rules", as `read` is set.
-- Task 11 (V46): splitting the clearing out of `Chromium`.
+- Task 10: an unreadable cache shows "0 rules", as `read` is set.
+- `BrowserItem` grew from 907 to 1,030 lines in this plan; final review A kept it whole.
+- Final review B's minor 8: `EditorPluginTest` and `BundledSamplePluginTest` start the real plugin (acceptable).
+- Final review A declined to judge: an OSC 8 link's target and zoom for a /dev/null tab; `Holds` keeping stopped
+  handles (it could carry null in `Holds.stopped`); Chromium's UI thread on Linux; `chromium.log`'s console lines;
+  plans 4a's and 4b's own items; the Web menu's History in a /dev/null tab showing the group's own.
 
 Not run:
 - **Task 13**, the user's GUI check on macOS, with their OK for each batch: pending
   ([checklist](../../browser-verification.md#plan-6-privacy)), V-F1's `jasper-about:` pages in a /dev/null tab first
-  (V5), then the plan's eight groups with the task reviews' lines, and the question for the user whether Manage
-  Permissions may open its tab behind Settings.
+  (V5), then the plan's eight groups with the task reviews' lines and the fix wave's, and the question for the user
+  whether Manage Permissions may open its tab behind Settings.
 - **Benchmarks** (V4): the start-up and memory batch, with ad blocking off and on, waits for the benchmark sitting.
 - **Windows and Linux** (no hosts), and **packaging with AOT**, whose training needs the user's OK.
 - **No JavaScript runs in a test:** `notifications.js`, `audio.js`, `hide-elements.js` and `permissions.js` are checked

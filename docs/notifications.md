@@ -80,6 +80,8 @@ a group named after it and an activities group, and may declare more.
 | Vault copies | `dev.jasper.vault.copies` | what the Credential Vault copied, such as "Copied the password for …" | card |
 | Project indexing | `dev.jasper.indexer.prompts` | Project Index's questions, such as whether to index a project | sticky card |
 | Index results | `dev.jasper.indexer.results` | finished indexing, such as "Indexed <name>" | history only |
+| Bookmarks | `dev.jasper.browser.bookmarks` | the Browser's "Bookmark Removed" and "Bookmark Deleted" | card |
+| Page notifications | `dev.jasper.browser.pages` | the notifications browser pages show ([Page notifications](browser.md#page-notifications)) | card |
 
 A configuration notification is titled "config.toml has errors" or "config.toml has warnings", or "The configuration
 has …" when any problem lies in another file, such as a plugin settings or theme file. It shows the first problem and

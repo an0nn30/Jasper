@@ -634,13 +634,13 @@ folder line holds too; on Windows the folder keeps its permissions.
    - turning it off and reloading brings them back.
 
    From the task reviews (**Task 10**):
-   - with EasyList on, a news page's ad requests fail (`ERR_BLOCKED_BY_CLIENT` in DevTools' Network) and its ad slots
-     are hidden, in a /dev/null tab too; a first-party resource on `www.cnn.com` is not blocked (V-F7);
+   - with EasyList on, a news page's ad requests fail (DevTools' Network shows them as failed) and its ad slots are
+     hidden, in a /dev/null tab too; a first-party resource on `www.cnn.com` is not blocked (V-F7);
    - Update Now is busy and reads "Updating…", then "*n* rules · Updated *date*"; a bad or unreachable address reads
      "Could not update the filter list: …"; a second press while it updates does nothing;
-   - after a restart, Filter Statistics reads "Loads with the first browser page" (V36), then, once a page shows, the
-     cached count without a download; `data/adblock/rules.json` and `state.json` are `rw-------` in a `rwx------`
-     data folder;
+   - after a restart, Filter Statistics reads "Loads when ad blocking is on and a browser page opens" (V52), then, once
+     a page shows, the cached count without a download; `data/adblock/rules.json` and `state.json` are `rw-------` in a
+     `rwx------` data folder;
    - the onboarding's setup page shows the Ad Blocker and its Settings note; the switch saves `ad_blocking`, which
      Settings › Tools › Browser shows, and stays as set (V35);
    - a hostile list served from `http://127.0.0.1`, whose selectors try `input[value^="a"]` with a `background:url(…)`
@@ -684,6 +684,17 @@ folder line holds too; on Windows the folder keeps its permissions.
      store's page, with /dev/null mode on too.
    - **Task 11:** the Proxy section shows Enable HTTP Proxy, Proxy Server and Proxy Port, and `http://x` or `a b` in
      Proxy Server shows "Enter a host name or IP address.".
+
+#### Lines the final review's fix wave added
+
+Each is pending.
+
+- **Quitting during a clearing (V54):** quit within a second of Clear Website Data's OK: Jasper ends without the 10 s
+  stop warning or a crash.
+- **The proxy off (V54):** on a run with Enable HTTP Proxy off, Jasper posts no "The proxy could not be set".
+- **An http filter list on this computer (V51):** with `-Dhttp.proxyHost` and `-Dhttp.proxyPort` naming a proxy in
+  Jasper's [custom VM options](configuration.md#custom-vm-options) and Enable HTTP Proxy off, a filter list at
+  `http://127.0.0.1:PORT/` or `http://[::ffff:127.0.0.1]:PORT/` downloads directly: that proxy gets no request.
 
 ### Batch 2: start-up and memory (pending, V4)
 

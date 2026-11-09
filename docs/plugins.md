@@ -142,9 +142,12 @@ fields, or edit the file that holds them, `plugins/dev.jasper.snippets/data/snip
 Web pages in workspace tabs and panes, drawn by Chromium, which comes with Jasper's runtime: a toolbar with Back,
 Forward, Reload and the address field, a Web menu whose keys win in browser tabs, links that open in a new tab or a
 split, popups that keep a working `window.opener`, and history and tagged bookmarks, which the address field and the
-command palette search. It is Jasper's web browser: links you click in a terminal and Jasper's own web links can open
-here, by default after asking "Open in Jasper?", and `jasper URL...` opens here without asking. It also draws the
-Editor's Markdown preview. Chromium starts the first time a browser page or a Markdown preview shows.
+command palette search. For privacy it has a /dev/null mode, whose tabs keep their cookies, history and other site
+data in memory only; site permissions for the camera, the microphone and notifications; page notifications, shown as
+Jasper's; audio muting, until you allow a site's sound; Clear Cookies and Clear Website Data; ad blocking from a
+content-blocker list; and an HTTP proxy. It is Jasper's web browser: links you click in a terminal and Jasper's own web
+links can open here, by default after asking "Open in Jasper?", and `jasper URL...` opens here without asking. It also
+draws the Editor's Markdown preview. Chromium starts the first time a browser page or a Markdown preview shows.
 
 - **Start with** File › New Browser Tab.
 - **Capabilities** `browser.provide`, `palette.contribute`.
