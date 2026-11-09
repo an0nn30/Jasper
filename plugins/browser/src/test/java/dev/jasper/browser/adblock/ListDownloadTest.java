@@ -42,17 +42,22 @@ class ListDownloadTest {
     }
 
     /**
-     * Plan 6 Task 11 and ruling F3: the list's client goes through the HTTP proxy it is given, which a loopback stand-in
-     * plays here: the request names the whole address, the answer is the proxy's, and the list's server is never asked.
+     * Plan 6 Task 11 and rulings F3 and V43: the list's client goes through the HTTP proxy it is given, which a loopback
+     * stand-in plays here: an https list through its tunnel, named and never looked up. A list on this computer goes
+     * direct, as Chromium sends loopback, so its bytes never leave the computer (F10), and the proxy is never asked.
      */
-    @Test void theClientGoesThroughTheProxyItIsGiven() throws Exception {
+    @Test void theClientGoesThroughTheProxyItIsGivenButALoopbackListGoesDirect() throws Exception {
         try (var proxy = new dev.jasper.browser.http.StandIn()) {
             HttpClient proxied = ListDownload.client(Optional.of(proxy.address()));
             try {
+                Throwable failed = catchThrowable(() -> ListDownload.get(proxied, URI.create("https://list.invalid/list.json"), DEADLINE)
+                    .get(10, TimeUnit.SECONDS));
+                assertThat(proxy.next()).isEqualTo("CONNECT list.invalid:443 HTTP/1.1");
+                assertThat(failed).as("no TLS from a stand-in").isInstanceOf(ExecutionException.class);
                 byte[] body = ListDownload.get(proxied, server.at("/list.json"), DEADLINE).get(10, TimeUnit.SECONDS);
-                assertThat(proxy.next()).isEqualTo("GET " + server.at("/list.json") + " HTTP/1.1");
-                assertThat(new String(body, StandardCharsets.UTF_8)).as("the proxy's answer").isEqualTo(dev.jasper.browser.http.StandIn.BODY);
-                assertThat(server.hits("/list.json")).isZero();
+                assertThat(new String(body, StandardCharsets.UTF_8)).isEqualTo(ListServer.LIST);
+                assertThat(server.hits("/list.json")).as("direct to this computer").isEqualTo(1);
+                assertThat(proxy.asked()).as("the proxy, never").isFalse();
             } finally {
                 proxied.shutdownNow();
             }

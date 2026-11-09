@@ -98,6 +98,20 @@ class FaviconsTest {
         ((ExecutorService) server.getExecutor()).shutdownNow();
     }
 
+    /**
+     * Plan 6's F3 and the review's M4: the fetches go through the HTTP proxy given, a loopback stand-in here, which a
+     * name under {@code .invalid} reaches without being looked up.
+     */
+    @Test void theFetchesGoThroughTheProxyGiven() throws Exception {
+        try (var proxy = new dev.jasper.browser.http.StandIn()) {
+            favicons = new Favicons(bytes -> Optional.empty(), STARTS, TIMEOUT);
+            favicons.useProxy(Optional.of(proxy.address()));
+            assertThat(favicons.fetch(URI.create("http://page.invalid/favicon.ico"), URI.create("http://page.invalid/")).get(5, TimeUnit.SECONDS))
+                .as("the stand-in's answer is no image").isEmpty();
+            assertThat(proxy.next()).isEqualTo("GET http://page.invalid/favicon.ico HTTP/1.1");
+        }
+    }
+
     @Test void aFaviconIsFetchedFollowingRedirectsAndDecoded() throws Exception {
         favicons = new Favicons(FaviconDecoder::toPng, STARTS, TIMEOUT);
         Optional<PixelImage> fetched = favicons.fetch(at("/favicon.ico"), at("/page")).get(5, TimeUnit.SECONDS);

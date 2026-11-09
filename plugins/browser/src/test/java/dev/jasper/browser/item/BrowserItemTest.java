@@ -1340,31 +1340,41 @@ class BrowserItemTest {
     }
 
     /**
-     * Plan 6 Task 11 and ruling F3: the items' engine suggestions go through the HTTP proxy the items are given, whether
-     * their fetcher is made after it was given or before, and the JDK's default once it is off. Loopback stand-ins play
-     * the proxy and the engine, so nothing leaves this computer.
+     * Plan 6 Task 11 and rulings F3 and V43: the items' engine suggestions and favicons go through the HTTP proxy the
+     * items are given, whether their fetcher is made after it was given or before, and follow each change; an engine on
+     * this computer goes direct. Loopback stand-ins play the proxies and the engine; names under {@code .invalid} reach a
+     * proxy without being looked up, so nothing leaves this computer.
      */
-    @Test void theItemsSuggestionsGoThroughTheProxyTheyAreGivenWhenTheirFetcherIsMadeAndAfter() throws Exception {
-        try (var engine = new dev.jasper.browser.http.StandIn(); var proxy = new dev.jasper.browser.http.StandIn()) {
-            URI suggest = URI.create("http://127.0.0.1:" + engine.port() + "/suggest?q=a");
+    @Test void theItemsFetchesGoThroughTheProxyTheyAreGivenWhenTheirFetcherIsMadeAndAfter() throws Exception {
+        try (var engine = new dev.jasper.browser.http.StandIn(); var first = new dev.jasper.browser.http.StandIn();
+             var second = new dev.jasper.browser.http.StandIn()) {
+            URI suggest = URI.create("http://suggest.invalid/suggest?q=a"), local = URI.create("http://127.0.0.1:" + engine.port() + "/suggest?q=a");
+            URI icon = URI.create("http://page.invalid/favicon.ico"), page = URI.create("http://page.invalid/");
             var host = new AtomicReference<FakePluginHost>();
             var items = new AtomicReference<BrowserItems>();
             SwingUtilities.invokeAndWait(() -> {
                 host.set(new FakePluginHost());
-                items.set(items(host.get(), page -> { }, new Later(), null));
-                items.get().useProxy(Optional.of(proxy.address()));
+                items.set(items(host.get(), started -> { }, new Later(), null));
+                items.get().favicons();
+                items.get().useProxy(Optional.of(first.address()));
                 items.get().suggest(suggest);
+                items.get().favicons().fetch(icon, page);
                 host.get().runBackground();
             });
             try {
-                assertThat(proxy.next()).as("a fetcher made after the proxy was given").isEqualTo("GET " + suggest + " HTTP/1.1");
+                assertThat(List.of(first.next(), first.next())).as("the suggestion fetcher made after, the favicons' before")
+                    .containsExactlyInAnyOrder("GET " + suggest + " HTTP/1.1", "GET " + icon + " HTTP/1.1");
                 SwingUtilities.invokeAndWait(() -> {
-                    items.get().useProxy(Optional.empty());
+                    items.get().useProxy(Optional.of(second.address()));
                     items.get().suggest(suggest);
+                    items.get().favicons().fetch(icon, page);
+                    items.get().suggest(local);
                     host.get().runBackground();
                 });
-                assertThat(engine.next()).as("the fetcher made already, now with the JDK's default").isEqualTo("GET /suggest?q=a HTTP/1.1");
-                assertThat(engine.asked() || proxy.asked()).as("each fetch asked once").isFalse();
+                assertThat(List.of(second.next(), second.next())).as("both fetchers follow the change")
+                    .containsExactlyInAnyOrder("GET " + suggest + " HTTP/1.1", "GET " + icon + " HTTP/1.1");
+                assertThat(engine.next()).as("V43: an engine on this computer, direct").isEqualTo("GET /suggest?q=a HTTP/1.1");
+                assertThat(engine.asked() || first.asked() || second.asked()).as("each fetch asked once").isFalse();
             } finally {
                 SwingUtilities.invokeAndWait(() -> {
                     items.get().close();

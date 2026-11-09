@@ -56,7 +56,8 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
     static final String START_PAGE = "start_page", PAGE_ZOOM = "page_zoom", LINKS = "open_links_from_terminal",
         LOCAL_FILES = "open_local_web_files", SEARCH_ENGINE = "search_engine", CUSTOM_SEARCH = "custom_search_url",
         CUSTOM_SUGGESTIONS = "custom_suggestions_url", DEVNULL_MODE = "devnull_mode", AD_BLOCKING_ON = "ad_blocking",
-        FILTER_LIST_URL = "filter_list_url", HTTP_PROXY = "http_proxy", PROXY_HOST = "proxy_host", PROXY_PORT = "proxy_port";
+        FILTER_LIST_URL = "filter_list_url", HTTP_PROXY = "http_proxy", PROXY_HOST = "proxy_host",
+        PROXY_PORT = "proxy_port";
     static final String GENERAL = "General", LINK_OPENING = "Link Opening", SEARCH = "Search Engine", PRIVACY = "Privacy & Data",
         AD_BLOCKING = "Ad Blocking", PROXY = "Proxy";
     /** The sections, in the order the Settings page shows them. */
@@ -312,7 +313,8 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
         private Declared(Setting<String> startPage, Setting<Integer> pageZoom, Setting<LinkOpening> links,
                          Setting<LocalFileOpening> localFiles, Setting<SearchEngine> engine, Setting<String> customSearch,
                          Setting<String> customSuggestions, Setting<Boolean> devNull, Setting<Boolean> adBlocking, Setting<String> filterList,
-                         Setting<Boolean> proxy, Setting<String> proxyHost, Setting<Integer> proxyPort, List<Section> sections) {
+                         Setting<Boolean> proxy, Setting<String> proxyHost, Setting<Integer> proxyPort,
+                         List<Section> sections) {
             this.startPage = startPage;
             this.pageZoom = pageZoom;
             this.links = links;
@@ -405,7 +407,8 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
          * @return the address; empty while Enable HTTP Proxy is off
          */
         public Optional<InetSocketAddress> proxyAddress() {
-            return proxy.get() ? Optional.of(InetSocketAddress.createUnresolved(proxyHost.get(), proxyPort.get())) : Optional.empty();
+            if (!proxy.get()) return Optional.empty();
+            return Optional.of(InetSocketAddress.createUnresolved(proxyHost.get(), proxyPort.get()));
         }
 
         /**

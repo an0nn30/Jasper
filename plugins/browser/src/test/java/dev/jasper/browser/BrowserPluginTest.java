@@ -4,6 +4,8 @@ import dev.jasper.browser.adblock.FilterList;
 import dev.jasper.browser.api.MarkdownPreviews;
 import dev.jasper.browser.api.PreviewEvent;
 import dev.jasper.browser.engine.Chromium;
+import dev.jasper.browser.engine.EngineTestAccess;
+import dev.jasper.browser.engine.RecordingContext;
 import dev.jasper.browser.http.StandIn;
 import dev.jasper.browser.item.BrowserItems;
 import dev.jasper.browser.item.ItemTestAccess;
@@ -134,14 +136,16 @@ class BrowserPluginTest {
     }
 
     /**
-     * Plan 6 Task 11 and ruling F3: the filter list's client is made with the HTTP proxy while it is on, the JDK's
-     * default otherwise, and made again when the proxy changes, so the next download goes the new way. Here each proxy
-     * and the list's server are loopback stand-ins that answer what no list is, so nothing leaves this computer.
+     * Plan 6 Task 11 and rulings F3 and V43: the filter list's client is made with the HTTP proxy while it is on, the
+     * JDK's default otherwise, and made again when the proxy changes, so the next download goes the new way; a list on
+     * this computer goes direct all the same. The proxies and the list's server are loopback stand-ins that answer what
+     * no list is, and the list's https address, under {@code .invalid}, reaches a proxy without being looked up.
      */
     @Test void theFilterListsClientGoesThroughTheProxyAndIsMadeAgainWhenItChanges(@TempDir Path root) throws Exception {
         try (var origin = new StandIn(); var first = new StandIn(); var second = new StandIn()) {
-            URI list = URI.create("http://127.0.0.1:" + origin.port() + "/list.json");
-            var plugin = new BrowserPlugin(dev.jasper.browser.adblock.ListDownload::client, settings -> list);
+            URI remote = URI.create("https://list.invalid/list.json"), local = URI.create("http://127.0.0.1:" + origin.port() + "/list.json");
+            var list = new AtomicReference<>(remote);
+            var plugin = new BrowserPlugin(dev.jasper.browser.adblock.ListDownload::client, settings -> list.get());
             var host = new AtomicReference<FakePluginHost>();
             SwingUtilities.invokeAndWait(() -> {
                 host.set(new FakePluginHost(root));
@@ -151,18 +155,99 @@ class BrowserPluginTest {
             });
             try {
                 download(plugin, host);
-                assertThat(first.next()).as("through the proxy, which names the whole address").isEqualTo("GET " + list + " HTTP/1.1");
+                assertThat(first.next()).as("through the proxy's tunnel").isEqualTo("CONNECT list.invalid:443 HTTP/1.1");
                 SwingUtilities.invokeAndWait(() -> host.get().setSetting(ID, "proxy_port", (long) second.port()));
                 download(plugin, host);
-                assertThat(second.next()).as("a new client, through the new proxy").isEqualTo("GET " + list + " HTTP/1.1");
+                assertThat(second.next()).as("a new client, through the new proxy").isEqualTo("CONNECT list.invalid:443 HTTP/1.1");
+                list.set(local);
+                download(plugin, host);
+                assertThat(origin.next()).as("V43: a list on this computer goes direct").isEqualTo("GET /list.json HTTP/1.1");
                 SwingUtilities.invokeAndWait(() -> host.get().setSetting(ID, "http_proxy", false));
                 download(plugin, host);
-                assertThat(origin.next()).as("off: the JDK's default, direct to this computer").isEqualTo("GET /list.json HTTP/1.1");
+                assertThat(origin.next()).as("off: the JDK's default").isEqualTo("GET /list.json HTTP/1.1");
                 assertThat(first.asked() || second.asked() || origin.asked()).as("each download asked once").isFalse();
                 SwingUtilities.invokeAndWait(() -> assertThat(host.get().failures()).isEmpty());
             } finally {
                 SwingUtilities.invokeAndWait(() -> host.get().close());
             }
+        }
+    }
+
+    /**
+     * The review's M4: the plugin gives the HTTP proxy to its items' suggestion and favicon fetches and to View Source's,
+     * at its start and at each change. Loopback stand-ins play the proxies; names under {@code .invalid} reach them
+     * without being looked up.
+     */
+    @Test void theItemsAndViewSourceFetchThroughTheProxyFromTheStartAndAfterEachChange(@TempDir Path root) throws Exception {
+        try (var first = new StandIn(); var second = new StandIn()) {
+            var plugin = plugin();
+            var host = new AtomicReference<FakePluginHost>();
+            URI suggest = URI.create("http://suggest.invalid/q?a"), page = URI.create("http://page.invalid/"),
+                icon = URI.create("http://page.invalid/favicon.ico");
+            SwingUtilities.invokeAndWait(() -> {
+                host.set(new FakePluginHost(root));
+                host.get().setSetting(ID, "http_proxy", true);
+                host.get().setSetting(ID, "proxy_port", (long) first.port());
+                host.get().start(INFO, Set.of(), Set.of(), plugin);
+            });
+            try {
+                for (StandIn proxy : List.of(first, second)) {
+                    if (proxy == second) SwingUtilities.invokeAndWait(() -> host.get().setSetting(ID, "proxy_port", (long) second.port()));
+                    SwingUtilities.invokeAndWait(() -> {
+                        ItemTestAccess.suggest(plugin.items(), suggest);
+                        ItemTestAccess.favicon(plugin.items(), icon, page);
+                        ItemTestAccess.fetchSource(plugin.sources(), page);
+                        host.get().runBackground();
+                    });
+                    var lines = new ArrayList<String>();
+                    for (int each = 0; each < 3; each++) lines.add(proxy.next());
+                    assertThat(lines).as(proxy == first ? "from the start" : "after the change").containsExactlyInAnyOrder(
+                        "GET " + suggest + " HTTP/1.1", "GET " + icon + " HTTP/1.1", "GET " + page + " HTTP/1.1");
+                }
+                assertThat(first.asked() || second.asked()).isFalse();
+            } finally {
+                SwingUtilities.invokeAndWait(() -> host.get().close());
+            }
+        }
+    }
+
+    /**
+     * The review's M8: the start gives Chromium the HTTP proxy the settings name, before anything can ask for Chromium,
+     * so its context's initialization, played here without starting Chromium, gives it to the global context.
+     */
+    @Test void theStartGivesChromiumTheProxyTheSettingsName() throws Exception {
+        var global = new RecordingContext(1);
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            host.setSetting(ID, "http_proxy", true);
+            host.setSetting(ID, "proxy_host", "::1");
+            host.setSetting(ID, "proxy_port", 3128L);
+            var plugin = plugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            EngineTestAccess.contextInitialized(plugin.chromium(), global);
+            assertThat(host.failures()).isEmpty();
+        } });
+        assertThat(global.getPreference("proxy")).isEqualTo(Map.of("mode", "fixed_servers", "server", "[::1]:3128"));
+    }
+
+    /**
+     * The review's M4: a proxy Chromium refuses reaches the plugin's error: here Chromium's global context, a stand-in,
+     * refuses it as Chromium's context initializes, which the test plays without starting Chromium.
+     */
+    @Test void aProxyChromiumRefusesPostsThePluginsError() throws Exception {
+        var lines = new AtomicReference<List<String>>();
+        var host = new AtomicReference<FakePluginHost>();
+        SwingUtilities.invokeAndWait(() -> {
+            host.set(new FakePluginHost());
+            var plugin = plugin();
+            host.get().start(INFO, Set.of(), Set.of(), plugin);
+            EngineTestAccess.contextInitialized(plugin.chromium(), new RecordingContext(1).refusing("called on invalid thread"));
+        });
+        try {
+            // Told on the UI thread, after the work that was refused.
+            SwingUtilities.invokeAndWait(() -> lines.set(host.get().notifications().lines()));
+            assertThat(lines.get()).containsExactly("dev.jasper.browser|ERROR|" + Chromium.PROXY_REFUSED + "|called on invalid thread");
+        } finally {
+            SwingUtilities.invokeAndWait(() -> host.get().close());
         }
     }
 
@@ -188,12 +273,12 @@ class BrowserPluginTest {
             host.start(INFO, Set.of(), Set.of(), plugin);
             plugin.proxyFailed("called on invalid thread");
             assertThat(host.notifications().lines())
-                .containsExactly("dev.jasper.browser|ERROR|The proxy could not be set|called on invalid thread");
+                .containsExactly("dev.jasper.browser|ERROR|" + Chromium.PROXY_REFUSED + "|called on invalid thread");
             host.stopAll();
             plugin.proxyFailed("late");
             assertThat(host.notifications().lines()).as("a stopped plugin only logs").hasSize(1);
             assertThat(log.records()).extracting(LogRecord::getLevel, LogRecord::getMessage).containsExactly(
-                tuple(Level.WARNING, "The proxy could not be set: called on invalid thread"), tuple(Level.WARNING, "The proxy could not be set: late"));
+                tuple(Level.WARNING, Chromium.PROXY_REFUSED + ": called on invalid thread"), tuple(Level.WARNING, Chromium.PROXY_REFUSED + ": late"));
             assertThat(host.failures()).isEmpty();
         } });
     }

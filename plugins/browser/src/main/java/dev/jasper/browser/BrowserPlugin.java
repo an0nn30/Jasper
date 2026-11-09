@@ -92,8 +92,8 @@ import java.util.function.Function;
  * and downloads only once a page first starts or the user turns ad blocking on, or at Update Now (the plan's call); its
  * rule set applies to every page's requests and documents, a /dev/null page's too. The HTTP proxy, while on, is given
  * to Chromium's contexts, the persistent one and each /dev/null group's, and the plugin's own fetches, the favicons, the
- * suggestions, View Source's and the filter list's, go through it too; off, Chromium uses the system's proxy settings and
- * the fetches the JDK's default.
+ * suggestions, View Source's and the filter list's, go through it too, routed as Chromium routes, so a host on this
+ * computer or its link goes direct; off, Chromium uses the system's proxy settings and the fetches the JDK's default.
  */
 public class BrowserPlugin implements Plugin {
     static final String NEW_TAB = "dev.jasper.browser.new_tab", NEW_WINDOW = "dev.jasper.browser.new_window";
@@ -129,7 +129,8 @@ public class BrowserPlugin implements Plugin {
      *     its first download and after the proxy changes
      * @param filterAddress the filter list's address, from the settings
      */
-    BrowserPlugin(Function<Optional<InetSocketAddress>, HttpClient> filterClients, Function<BrowserSettings, URI> filterAddress) {
+    BrowserPlugin(Function<Optional<InetSocketAddress>, HttpClient> filterClients,
+                  Function<BrowserSettings, URI> filterAddress) {
         this.filterClients = filterClients;
         this.filterAddress = filterAddress;
     }
@@ -151,19 +152,23 @@ public class BrowserPlugin implements Plugin {
         // now: on the database's thread before it opens, or on Chromium's worker before Chromium writes there.
         // Plan 6's V25: a database file a Clear Website Data could not reach goes at the folder's first use, before it opens.
         var folder = new DataFolder(data, files -> ProfileWipe.wipeMarkedDatabase(data, files));
+        BrowserSettings.Declared settings = BrowserSettings.declare(context.settings());
         chromium = new Chromium(data, folder::restrict, worker, about, origins, this::startFailed);
+        // Plan 6 Task 11: the HTTP proxy, given before anything can ask for Chromium, which only remembers it until a page
+        // first does; a proxy it refuses is told. The plugin's own fetches go through it too (F3).
+        chromium.setProxy(settings.proxyServer());
+        chromium.onProxyFailed(this::proxyFailed);
+        proxy = settings.proxyAddress();
         // Cookies a Clear Cookies left for Chromium's start that could not be deleted then are told as its failure.
         chromium.onClearFailed(cause -> notCleared(WebsiteData.COOKIES_NOT_CLEARED, cause));
         // Spec section 18: the Editor's Chromium Markdown preview. A preview asks for Chromium only once it first shows.
         previews = new PreviewService(origins, chromium, context.background());
         context.services().publish(MarkdownPreviews.class, previews);
-        BrowserSettings.Declared settings = BrowserSettings.declare(context.settings());
-        proxy = settings.proxyAddress();
         // Spec section 12: ad blocking's filter list, made with no I/O and no client. It reads its cache, and downloads
         // when an update is due, only once a page first starts or the user turns ad blocking on (F8), and while on;
         // Update Now downloads it at once. Its client goes through the HTTP proxy.
-        var filters = new FilterList(data, folder::restrict, context.background(), () -> filterClients.apply(proxy), Clock.systemUTC(),
-            () -> filterAddress.apply(settings.read()));
+        var filters = new FilterList(data, folder::restrict, context.background(), () -> filterClients.apply(proxy),
+            Clock.systemUTC(), () -> filterAddress.apply(settings.read()));
         this.filters = filters;
         filters.enabled(settings.read().adBlocking());
         settings.onAdBlockingChanged(on -> {
@@ -275,10 +280,10 @@ public class BrowserPlugin implements Plugin {
             items.restore(request.state(), settings.read().startAddress(), request.window(), endedWhileRunning, store);
             return Optional.empty();
         });
-        // Plan 6 Task 11: the HTTP proxy, for Chromium's contexts and the plugin's own fetches (F3), now and at each change.
-        // Chromium only remembers it until a page first asks for it; a proxy it refuses is told.
-        chromium.onProxyFailed(this::proxyFailed);
-        proxyChanged(settings);
+        // Plan 6 Task 11: the items' and View Source's fetches go through the HTTP proxy too (F3), and each change of it
+        // reaches Chromium and every fetch.
+        items.useProxy(proxy);
+        sources.useProxy(proxy);
         settings.onProxyChanged(() -> { if (running) proxyChanged(settings); });
         running = true;
     }
@@ -301,8 +306,8 @@ public class BrowserPlugin implements Plugin {
      * error. UI thread.
      */
     void proxyFailed(String reason) {
-        context.log().log(System.Logger.Level.WARNING, "The proxy could not be set: " + reason);
-        if (running) context.notifications().group().error("The proxy could not be set", reason);
+        context.log().log(System.Logger.Level.WARNING, Chromium.PROXY_REFUSED + ": " + reason);
+        if (running) context.notifications().group().error(Chromium.PROXY_REFUSED, reason);
     }
 
     /**
@@ -472,6 +477,11 @@ public class BrowserPlugin implements Plugin {
     /** The plugin's browser items. */
     BrowserItems items() {
         return items;
+    }
+
+    /** View Source's page. */
+    SourcePage sources() {
+        return sources;
     }
 
     /**

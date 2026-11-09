@@ -391,6 +391,25 @@ class FilterListTest {
         assertThat(made.get(2).awaitTermination(Duration.ofSeconds(10))).as("closed with the list").isTrue();
     }
 
+    /**
+     * The review's M4: a client made while the list's client changes, as the proxy does, is made again, and the one made
+     * before the change is shut down, so the download goes the new way.
+     */
+    @Test void aClientMadeWhileTheClientChangesIsMadeAgain() throws Exception {
+        var calls = new AtomicInteger();
+        filters = list(() -> {
+            HttpClient client = client();
+            if (calls.incrementAndGet() == 1) filters.clientChanged();
+            return client;
+        });
+        assertThat(filters.updateNow().get(10, TimeUnit.SECONDS).error()).isEmpty();
+        assertThat(made).as("made again").hasSize(2);
+        assertThat(made.getFirst().awaitTermination(Duration.ofSeconds(10))).as("the one made before the change, shut down").isTrue();
+        assertThat(made.get(1).isTerminated()).as("the one the download used").isFalse();
+        assertThat(filters.updateNow().get(10, TimeUnit.SECONDS).error()).isEmpty();
+        assertThat(made).as("kept for the next download").hasSize(2);
+    }
+
     /** Ruling V36: a list is read once its cache has been read, nothing cached included, or it has been downloaded. */
     @Test void theListIsReadOnceItsCacheIsReadOrItIsDownloaded() throws Exception {
         filters = list(this::client);

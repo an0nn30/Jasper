@@ -13,9 +13,10 @@ import org.cef.browser.CefRequestContext;
  * one is a /dev/null group's own ({@link Chromium#inMemoryContext}), kept for the group: asked of Chromium once, by the
  * group's first page as it starts, and released once, as its group's store closes, unless Chromium has stopped by then.
  * Each page is handed a context object of its own over the kept one ({@link Chromium#browserContext}), never the kept
- * one, as JCEF disposes a browser's context object as the browser closes (plan 6's V10). Its public methods name no
- * Chromium type, and making one loads no Chromium class: nothing here names one until a page asks for its context. UI
- * thread.
+ * one, as JCEF disposes a browser's context object as the browser closes (plan 6's V10). A context Chromium fails to
+ * make, as when it refuses the HTTP proxy (F4), is not kept: the page that asked stays blank, the plugin's notification
+ * saying why, and the group's next page asks again (V44). Its public methods name no Chromium type, and making one loads
+ * no Chromium class: nothing here names one until a page asks for its context. UI thread.
  */
 public final class PageContext {
     private static final String CLOSED = "This browsing group's data store has closed";
@@ -73,7 +74,8 @@ public final class PageContext {
     /**
      * The context a page of the group is made with: for the persistent group null at once, Chromium's global context, as
      * 4a passes it; for a /dev/null group a new object of the page's own over the context kept for the group, which
-     * {@link Chromium#inMemoryContext} makes the first time only. Ask once for each browser made.
+     * {@link Chromium#inMemoryContext} makes the first time only, or again after it failed. Ask once for each browser
+     * made.
      *
      * @param chromium the plugin's Chromium
      * @return the page's context object; for a /dev/null group failed once it has closed, or as Chromium fails to make it
@@ -82,7 +84,8 @@ public final class PageContext {
         Objects.requireNonNull(chromium, "chromium");
         if (!inMemory) return CompletableFuture.completedFuture(null);
         if (closed) return CompletableFuture.failedFuture(new IllegalStateException(CLOSED));
-        if (made == null) {
+        // V44: a context Chromium failed to make is asked for again.
+        if (made == null || made.isCompletedExceptionally()) {
             from = chromium;
             made = make == null ? chromium.inMemoryContext() : make.apply(chromium);
         }

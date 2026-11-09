@@ -57,7 +57,8 @@ final class ChromiumApp {
      *     UI thread
      */
     static ChromiumApp start(Path dataDir, AboutScheme about, Predicate<CefBrowser> pageBrowser, PreviewScheme previews,
-            BiPredicate<CefBrowser, String> previewBrowser, Runnable terminated, Consumer<CefRequestContext> contextInitialized) {
+            BiPredicate<CefBrowser, String> previewBrowser, Runnable terminated,
+            Consumer<CefRequestContext> contextInitialized) {
         JCefAppConfig config = JCefAppConfig.getInstance();
         CefApp.setIsRemoteEnabled(false);
         SystemBootstrap.setLoader(config.getLoader());

@@ -758,19 +758,14 @@ class ChromiumStateTest {
     }
 
     /**
-     * Plan 6 Task 11: once Chromium runs, a change is handed to Chromium's thread, which applies it to the global context
-     * and to every in-memory context still kept, and closes their connections; a disposed one is never touched, as its
-     * native object may be gone, and neither is a browser's own object over a kept context.
+     * Plan 6 Task 11: once Chromium runs, a change is handed to Chromium's thread, which gives it to the global context
+     * and to every in-memory context still kept ({@link NetworkPreferencesTest} has which ones), and closes their
+     * connections.
      */
-    @Test void aChangeWhileRunningIsAppliedOnChromiumsThreadToTheGlobalContextAndEveryKeptContext() throws Exception {
+    @Test void aChangeWhileRunningIsGivenOnChromiumsThreadToTheGlobalContextAndTheKeptOnes() throws Exception {
         Chromium chromium = chromium(recording, LIMIT);
-        List<RecordingContext> kept = kept(chromium, new RecordingContext(1), new RecordingContext(2));
-        RecordingContext open = kept.get(0), closed = kept.get(1);
-        assertThat(open.getPreference("proxy")).as("each made with the proxy remembered").isEqualTo(Map.of("mode", "system"));
-        assertThat(open.connectionsClosed()).isEqualTo(1);
-        org.cef.browser.CefRequestContext browser = chromium.browserContext(open);
-        chromium.release(closed);
-        assertThat(closed.disposals()).isEqualTo(1);
+        RecordingContext open = kept(chromium, new RecordingContext(1)).getFirst();
+        assertThat(open.getPreference("proxy")).as("made with the proxy remembered").isEqualTo(Map.of("mode", "system"));
         var handed = new ConcurrentLinkedQueue<Runnable>();
         chromium.handOverWith(handed::add);
         chromium.setProxy(Optional.of("[::1]:8118"));
@@ -784,17 +779,50 @@ class ChromiumStateTest {
         assertThat(open.setOn("proxy")).isEqualTo("chromium-ui");
         assertThat(global.connectionsClosed()).isEqualTo(2);
         assertThat(open.connectionsClosed()).isEqualTo(2);
-        assertThat(closed.getPreference("proxy")).as("disposed: never touched").isEqualTo(Map.of("mode", "system"));
-        assertThat(closed.connectionsClosed()).isEqualTo(1);
-        assertThat(browser.getNativeRef(NATIVE)).as("a browser's own object is left as it is").isEqualTo(1);
         end(chromium);
     }
 
     /**
-     * Ruling F4: while the proxy is on, an in-memory context that refuses it is never handed out, so a /dev/null page
-     * cannot load instead of going direct; it is disposed, and the failure is told once, on the UI thread, with Chromium's
-     * reason. With the proxy off, such a context is the system's, as asked, and is handed out; the failure is told all the
-     * same.
+     * The review's M4: an in-memory context made between {@code setProxy}'s write and Chromium's thread running the change
+     * is made with the new proxy, whichever of the two Chromium's thread runs first; one made before the write gets it
+     * from the change.
+     */
+    @Test void aContextMadeBetweenTheProxysWriteAndItsHandOverGetsTheNewProxy() throws Exception {
+        Chromium chromium = chromium(recording, LIMIT);
+        var before = new RecordingContext(1);
+        var made = new java.util.ArrayDeque<>(List.of(before, new RecordingContext(2), new RecordingContext(3)));
+        chromium.makeContextsWith(made::poll);
+        chromium.client();
+        assertThat(chromium.enter()).isTrue();
+        chromium.inMemoryContext();
+        Thread.ofPlatform().start(() -> chromium.contextInitialized(global)).join(TimeUnit.SECONDS.toMillis(10));
+        var handed = new ConcurrentLinkedQueue<Runnable>();
+        chromium.handOverWith(handed::add);
+        var proxy = Map.of("mode", "fixed_servers", "server", "127.0.0.1:8118");
+
+        var asked = chromium.inMemoryContext();
+        chromium.setProxy(Optional.of("127.0.0.1:8118"));
+        assertThat(handed).as("the context's making, then the change").hasSize(2);
+        handed.poll().run();
+        RecordingContext first = (RecordingContext) asked.get(10, TimeUnit.SECONDS);
+        assertThat(first.getPreference("proxy")).as("made after the write: the new proxy at once").isEqualTo(proxy);
+        handed.poll().run();
+        assertThat(first.getPreference("proxy")).isEqualTo(proxy);
+        assertThat(before.getPreference("proxy")).as("made before the write: given it by the change").isEqualTo(proxy);
+
+        chromium.setProxy(Optional.of("127.0.0.1:3128"));
+        var later = chromium.inMemoryContext();
+        handed.poll().run();
+        handed.poll().run();
+        assertThat(((RecordingContext) later.get(10, TimeUnit.SECONDS)).getPreference("proxy"))
+            .isEqualTo(Map.of("mode", "fixed_servers", "server", "127.0.0.1:3128"));
+        end(chromium);
+    }
+
+    /**
+     * Ruling F4 through Chromium: while the proxy is on, an in-memory context that refuses it is never handed out, so a
+     * /dev/null page cannot load instead of going direct; the failure is told once, on the UI thread, with Chromium's
+     * reason ({@link NetworkPreferencesTest} has the context's dispose, and the proxy off).
      */
     @Test void whileTheProxyIsOnAnInMemoryContextThatRefusesItIsNeverHandedOutAndTheFailureIsTold() throws Exception {
         Chromium chromium = chromium(recording, LIMIT);
@@ -802,62 +830,42 @@ class ChromiumStateTest {
         chromium.onProxyFailed(reason -> toldOf.add(reason + (EventQueue.isDispatchThread() ? " on the UI thread" : "")));
         chromium.setProxy(Optional.of("127.0.0.1:8118"));
         var refusing = new RecordingContext(3).refusing("no request context");
-        var direct = new RecordingContext(4).refusing("no value to set");
-        var queue = new java.util.ArrayDeque<>(List.of(refusing, direct));
-        chromium.makeContextsWith(queue::poll);
+        chromium.makeContextsWith(() -> refusing);
         chromium.client();
         assertThat(chromium.enter()).isTrue();
         var on = chromium.inMemoryContext();
         Thread.ofPlatform().start(() -> chromium.contextInitialized(global)).join(TimeUnit.SECONDS.toMillis(10));
-        assertThat(failure(on)).isInstanceOf(IllegalStateException.class).hasMessage("The proxy could not be set: no request context");
+        assertThat(failure(on)).isInstanceOf(IllegalStateException.class).hasMessage(Chromium.PROXY_REFUSED + ": no request context");
         assertThat(refusing.disposals()).as("never kept").isEqualTo(1);
-        assertThat(refusing.connectionsClosed()).isZero();
         flushUi();
         assertThat(toldOf).containsExactly("no request context on the UI thread");
-
-        var handed = new ConcurrentLinkedQueue<Runnable>();
-        chromium.handOverWith(handed::add);
-        chromium.setProxy(Optional.empty());
-        handed.poll().run();
-        var off = chromium.inMemoryContext();
-        handed.poll().run();
-        assertThat(off.get(10, TimeUnit.SECONDS)).as("off: the system's, as asked").isSameAs(direct);
-        assertThat(direct.disposals()).isZero();
-        flushUi();
-        assertThat(toldOf).containsExactly("no request context on the UI thread", "no value to set on the UI thread");
         end(chromium);
     }
 
     /**
-     * Plan 6 Task 11: the global context that refuses the proxy, or a change Chromium's thread does not take, is told once
-     * for each application, on the UI thread; once Chromium has closed, a change is only remembered, touches nothing
-     * native and tells nothing.
+     * Plan 6 Task 11: a change Chromium's thread does not take is told, on the UI thread; once Chromium has closed, a
+     * change is only remembered, touches nothing native and tells nothing.
      */
-    @Test void aRefusedChangeIsToldOnceAndAChangeAfterTheCloseTouchesNothing() throws Exception {
+    @Test void aChangeChromiumsThreadRefusesIsToldAndAChangeAfterTheCloseTouchesNothing() throws Exception {
         Chromium chromium = chromium(recording, LIMIT);
         var toldOf = new CopyOnWriteArrayList<String>();
         chromium.onProxyFailed(toldOf::add);
         List<RecordingContext> kept = kept(chromium, new RecordingContext(5));
-        global.refusing("called on invalid thread");
-        kept.getFirst().refusing("called on invalid thread");
         var handed = new ConcurrentLinkedQueue<Runnable>();
         var hands = new AtomicInteger();
         chromium.handOverWith(task -> hands.incrementAndGet() == 1 && handed.add(task));
         chromium.setProxy(Optional.of("127.0.0.1:8118"));
         handed.poll().run();
-        flushUi();
-        assertThat(toldOf).as("once for the application").containsExactly("called on invalid thread");
         chromium.setProxy(Optional.of("127.0.0.1:3128"));
         flushUi();
-        assertThat(toldOf).as("a change Chromium's thread did not take").containsExactly("called on invalid thread",
-            "Chromium's thread did not take the work");
+        assertThat(toldOf).as("a change Chromium's thread did not take").containsExactly("Chromium's thread did not take the work");
         end(chromium);
         handed.clear();
         chromium.setProxy(Optional.of("127.0.0.1:9050"));
         flushUi();
         assertThat(handed).as("closed: nothing handed over").isEmpty();
-        assertThat(toldOf).hasSize(2);
-        assertThat(kept.getFirst().connectionsClosed()).isEqualTo(1);
+        assertThat(toldOf).hasSize(1);
+        assertThat(kept.getFirst().connectionsClosed()).as("at its making and the one change taken").isEqualTo(2);
     }
 
     /**

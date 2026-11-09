@@ -1,11 +1,11 @@
 package dev.jasper.browser.adblock;
 
+import dev.jasper.browser.http.ProxyRoute;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.ConnectException;
 import java.net.InetSocketAddress;
-import java.net.ProxySelector;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpConnectTimeoutException;
@@ -26,16 +26,15 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Flow;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.regex.Pattern;
 
 /**
  * A filter list's download (ruling F10): a GET of an https address, or an http one on this computer only
  * ({@link #fetches}), as TLS is the list's only integrity, with the client {@link #client(Optional)} makes, which
- * connects within 30 seconds and follows no redirect itself. The download follows at most 5 (ruling V38), each target resolved against
- * the address that answered, checked as the first address is and never from https to http, and only then asked, so a
- * target the list may not come from is never asked. Only a final 200 is read, at most 32 MiB of it, counted before it
- * is decoded, and one deadline covers the whole download, its redirects and body included ({@link #get}). Why a
- * download failed is told in words Settings shows ({@link #reason}). Any thread.
+ * connects within 30 seconds and follows no redirect itself. The download follows at most 5 (ruling V38), each target
+ * resolved against the address that answered, checked as the first address is and never from https to http, and only
+ * then asked, so a target the list may not come from is never asked. Only a final 200 is read, at most 32 MiB of it,
+ * counted before it is decoded, and one deadline covers the whole download, its redirects and body included
+ * ({@link #get}). Why a download failed is told in words Settings shows ({@link #reason}). Any thread.
  */
 public final class ListDownload {
     /** How long a connection to the list's server may take. */
@@ -50,27 +49,27 @@ public final class ListDownload {
     static final int MAX_REDIRECTS = 5;
     private static final String REDIRECTED = "the filter list was redirected to an address that is not https";
     private static final Set<Integer> REDIRECTS = Set.of(301, 302, 303, 307, 308);
-    private static final Pattern LOOPBACK = Pattern.compile("localhost|127(?:\\.[0-9]{1,3}){3}|\\[::1\\]");
 
     private ListDownload() { }
 
     /**
      * The list's client: one that connects within 30 seconds and follows no redirect, which {@link #get} follows itself.
-     * It sends no cookie and no credentials, and goes through {@code proxy} (plan 6's F3). The one place the list's
-     * client is made.
+     * It sends no cookie and no credentials, and goes through {@code proxy} as Chromium would (plan 6's F3 and V43): a
+     * list on this computer goes direct, so an http one never leaves it. The one place the list's client is made.
      *
      * @param proxy the HTTP proxy's address; empty for the JDK's default proxy selector
      * @return the client
      */
     public static HttpClient client(Optional<InetSocketAddress> proxy) {
         var builder = HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).followRedirects(HttpClient.Redirect.NEVER);
-        proxy.ifPresent(address -> builder.proxy(ProxySelector.of(address)));
+        proxy.ifPresent(address -> builder.proxy(ProxyRoute.through(address)));
         return builder.build();
     }
 
     /**
      * Whether the list may come from {@code address}: an https address with a host, or an http one whose host is this
-     * computer ({@code localhost}, {@code 127.0.0.0/8} or {@code [::1]}), without a user name or password.
+     * computer ({@code localhost}, {@code 127.0.0.0/8} or {@code [::1]}, as {@link ProxyRoute#loopback} reads it),
+     * without a user name or password.
      *
      * @param address an address
      * @return whether it may
@@ -78,7 +77,7 @@ public final class ListDownload {
     public static boolean fetches(URI address) {
         if (address == null || address.getScheme() == null || address.getHost() == null || address.getRawUserInfo() != null) return false;
         String scheme = address.getScheme().toLowerCase(Locale.ROOT);
-        return scheme.equals("https") || scheme.equals("http") && LOOPBACK.matcher(address.getHost().toLowerCase(Locale.ROOT)).matches();
+        return scheme.equals("https") || scheme.equals("http") && ProxyRoute.loopback(address.getHost());
     }
 
     /**

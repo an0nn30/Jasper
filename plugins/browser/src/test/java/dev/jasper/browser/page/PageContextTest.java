@@ -2,13 +2,19 @@ package dev.jasper.browser.page;
 
 import dev.jasper.browser.engine.AboutScheme;
 import dev.jasper.browser.engine.Chromium;
+import dev.jasper.browser.engine.EngineTestAccess;
 import dev.jasper.browser.engine.PreviewScheme;
 import dev.jasper.browser.engine.RecordingContext;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.SwingUtilities;
 import org.cef.browser.CefRequestContext;
 import org.junit.jupiter.api.Test;
@@ -152,6 +158,55 @@ class PageContextTest {
             stopped.close();
             assertThat(releases).isEmpty();
         });
+    }
+
+    /** Ruling V44: a context Chromium failed to make is not kept, so the group's next page asks for one again. */
+    @Test void aContextChromiumFailedToMakeIsAskedForAgainByTheNextPage() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var asks = new AtomicInteger();
+            var kept = new RecordingContext(7);
+            var context = new PageContext(true, chromium -> asks.incrementAndGet() == 1
+                ? CompletableFuture.failedFuture(new IllegalStateException(Chromium.PROXY_REFUSED + ": refused"))
+                : CompletableFuture.completedFuture(kept), (chromium, released) -> { });
+            Chromium chromium = chromium();
+            assertThat(context.context(chromium)).isCompletedExceptionally();
+            assertThat(context.context(chromium).join().getNativeRef(NATIVE)).as("asked again").isEqualTo(7);
+            assertThat(context.context(chromium).join().getNativeRef(NATIVE)).isEqualTo(7);
+            assertThat(asks).as("once made, kept").hasValue(2);
+        });
+    }
+
+    /**
+     * Rulings F4 and V44 through Chromium, played without starting it: while the proxy is on, an in-memory context that
+     * refuses it fails its page, which stays blank, the plugin's notification saying why; once the proxy is off, the
+     * group's next page asks again and gets a context.
+     */
+    @Test void aGroupWhoseContextRefusedTheProxyGetsOneForItsNextPageOnceTheProxyIsOff() throws Exception {
+        Chromium chromium = chromium();
+        var refusing = new RecordingContext(3).refusing("no request context");
+        var made = new RecordingContext(4);
+        var queue = new ArrayDeque<>(List.of(refusing, made));
+        EngineTestAccess.makeContextsWith(chromium, queue::poll);
+        chromium.setProxy(Optional.of("127.0.0.1:8118"));
+        PageContext group = PageContext.memory();
+        var first = new AtomicReference<CompletableFuture<CefRequestContext>>();
+        SwingUtilities.invokeAndWait(() -> first.set(group.context(chromium)));
+        EngineTestAccess.contextInitialized(chromium, new RecordingContext(1));
+        assertThat(first.get()).isCompletedExceptionally();
+        assertThat(refusing.disposals()).isEqualTo(1);
+        var handed = new ConcurrentLinkedQueue<Runnable>();
+        EngineTestAccess.handOverWith(chromium, handed::add);
+        chromium.setProxy(Optional.empty());
+        handed.poll().run();
+        var second = new AtomicReference<CompletableFuture<CefRequestContext>>();
+        SwingUtilities.invokeAndWait(() -> second.set(group.context(chromium)));
+        handed.poll().run();
+        CefRequestContext page = second.get().get(10, TimeUnit.SECONDS);
+        assertThat(page.getNativeRef(NATIVE)).as("the next page's, over the context made now").isEqualTo(4);
+        assertThat(made.getPreference("proxy")).isEqualTo(java.util.Map.of("mode", "system"));
+        page.dispose();
+        SwingUtilities.invokeAndWait(group::close);
+        chromium.close();
     }
 
     /** A Chromium that never starts: nothing here asks for its client. */

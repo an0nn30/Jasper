@@ -81,7 +81,8 @@ public final class Chromium implements AutoCloseable {
     static final String ONCE = "Chromium can start once each time Jasper runs. Quit and reopen Jasper to use the browser again.";
     static final String SLOW = "Chromium did not start within 90 seconds";
     static final String SLOW_CLEAR = "Chromium did not clear its data within 60 seconds";
-    static final String PROXY_REFUSED = "The proxy could not be set";
+    /** How a proxy Chromium refuses is told: the plugin's error's title, and the start of a failed context's reason. */
+    public static final String PROXY_REFUSED = "The proxy could not be set";
     private static final Duration START_LIMIT = Duration.ofSeconds(90);
     // F16: the bound of a whole clearing, the wait for a start under way included.
     private static final Duration CLEAR_LIMIT = Duration.ofSeconds(60);
@@ -129,13 +130,10 @@ public final class Chromium implements AutoCloseable {
     private volatile ProfileWipe.Disk wipeDisk = ProfileWipe.Disk.REAL;
     // Told, on the UI thread, why cookies a Clear Cookies left for the start could not be deleted.
     private volatile Consumer<Throwable> clearFailed = cause -> { };
-    // Plan 6 Task 11: the HTTP proxy every context is given, as host:port, empty for the system's settings; whether the
-    // start's giving of it has begun, after which each change goes to Chromium's thread; Chromium's global context, given
-    // as its context initializes; and who is told, on the UI thread, Chromium's reason when it refuses the proxy.
-    private volatile Optional<String> proxy = Optional.empty();
+    // Plan 6 Task 11: the HTTP proxy every context is given (V46), and whether the start's giving of it has begun, after
+    // which each change goes to Chromium's thread.
+    private final NetworkPreferences network = new NetworkPreferences();
     private volatile boolean proxyLive;
-    private volatile CefRequestContext global;
-    private volatile Consumer<String> proxyFailed = reason -> { };
 
     /**
      * A Chromium that starts nothing until {@link #client()} is first called.
@@ -169,7 +167,7 @@ public final class Chromium implements AutoCloseable {
         // Task 11: the first work for Chromium's thread, so its context's initialization gives the proxy before anything.
         onChromiumThread(() -> {
             proxyLive = true;
-            giveProxy();
+            network.give(keptContexts());
         });
     }
 
@@ -311,72 +309,43 @@ public final class Chromium implements AutoCloseable {
 
     /**
      * Remembers the HTTP proxy every request context of Chromium's is given (plan 6's Task 11), as
-     * {@link NetworkPreferences#proxy} writes it, and gives it: Chromium's global context as Chromium's context
-     * initializes, before any other work for Chromium's thread and so before any page; each in-memory context as it is
-     * made ({@link #inMemoryContext}); and, from then on, each change on Chromium's thread, to the global context and
-     * every in-memory context still kept, whose connections then close. Until it is set, the system's proxy settings are
-     * given, as the profile may keep another proxy from an earlier run. Before any page asks for Chromium it is only
-     * remembered, and starts nothing; once Chromium cannot serve pages, nothing native is touched. Each refusal is told
-     * to {@link #onProxyFailed}. Any thread.
+     * {@link NetworkPreferences} gives it: Chromium's global context as Chromium's context initializes, before any other
+     * work for Chromium's thread and so before any page; each in-memory context as it is made ({@link #inMemoryContext});
+     * and, from then on, each change on Chromium's thread, to the global context and every in-memory context still kept,
+     * whose connections then close. Until it is set, the system's proxy settings are given, as the profile may keep
+     * another proxy from an earlier run. Before any page asks for Chromium it is only remembered, and starts nothing;
+     * once Chromium cannot serve pages, nothing native is touched. Each refusal is told to {@link #onProxyFailed}. Any
+     * thread.
      *
      * @param server the proxy as {@code host:port}, an IPv6 address in brackets; empty for the system's proxy settings
      */
     public void setProxy(Optional<String> server) {
-        proxy = Objects.requireNonNull(server, "server");
+        network.remember(server);
         // After the write: a start's giving that began before it either reads it or is followed by this.
-        if (proxyLive) onChromiumThread(this::giveProxy).whenComplete((given, failure) -> {
+        if (!proxyLive) return;
+        onChromiumThread(() -> network.give(keptContexts())).whenComplete((given, failure) -> {
             // A Chromium that cannot serve pages has nothing to give it to.
-            if (failure != null && unavailable().isEmpty()) proxyRefused(Objects.requireNonNullElse(failure.getMessage(), failure.toString()));
+            if (failure != null && unavailable().isEmpty())
+                network.refused(Objects.requireNonNullElse(failure.getMessage(), failure.toString()));
         });
     }
 
     /**
      * Has {@code told} hear, on the UI thread, Chromium's reason whenever it refuses the proxy: once for each giving to
-     * the global context and the kept contexts, and once for each in-memory context as it is made.
+     * the global context and the kept contexts, once for each in-memory context as it is made, and when Chromium's
+     * thread does not take a change.
      *
      * @param told told the reason
      */
     public void onProxyFailed(Consumer<String> told) {
-        proxyFailed = Objects.requireNonNull(told, "told");
+        network.onRefused(told);
     }
 
-    /**
-     * Gives the proxy to the global context, once Chromium's context has initialized, and to every in-memory context still
-     * kept; the first refusal is told. Chromium's thread.
-     */
-    private void giveProxy() {
-        Map<String, Object> value = NetworkPreferences.proxy(proxy);
-        CefRequestContext started = global;
-        Optional<String> refused = started == null ? Optional.empty() : NetworkPreferences.apply(started, value);
-        List<KeptContext> kept;
+    /** The in-memory contexts made, disposed ones among them, which the proxy is given. Any thread. */
+    private List<KeptContext> keptContexts() {
         synchronized (contexts) {
-            kept = List.copyOf(contexts.values());
+            return List.copyOf(contexts.values());
         }
-        for (KeptContext each : kept) {
-            Optional<String> refusal = each.ifKept(context -> NetworkPreferences.apply(context, value)).flatMap(reason -> reason);
-            if (refused.isEmpty()) refused = refusal;
-        }
-        refused.ifPresent(this::proxyRefused);
-    }
-
-    /**
-     * {@code made}, an in-memory context just made, given the proxy before anything is made over it: a refusal is told,
-     * and while the proxy is on, the context is disposed and fails (F4). Chromium's thread.
-     */
-    private CefRequestContext withProxy(CefRequestContext made) {
-        Optional<String> server = proxy;
-        Optional<String> refused = NetworkPreferences.apply(made, NetworkPreferences.proxy(server));
-        if (refused.isEmpty()) return made;
-        proxyRefused(refused.get());
-        if (server.isEmpty()) return made; // the system's settings, which a new context has
-        disposeKept(made);
-        throw new IllegalStateException(PROXY_REFUSED + ": " + refused.get());
-    }
-
-    /** Tells, on the UI thread, Chromium's reason for refusing the proxy. Any thread. */
-    private void proxyRefused(String reason) {
-        Consumer<String> told = proxyFailed;
-        EventQueue.invokeLater(() -> told.accept(reason));
     }
 
     /**
@@ -395,7 +364,8 @@ public final class Chromium implements AutoCloseable {
         // Completed once the work is over, not inside it: what follows the context runs outside the thread's work.
         onChromiumThread(() -> {
             Supplier<CefRequestContext> maker = contextMaker;
-            kept.set(keep(withProxy(maker == null ? ChromiumApp.inMemoryContext() : maker.get())));
+            CefRequestContext context = maker == null ? ChromiumApp.inMemoryContext() : maker.get();
+            kept.set(keep(network.given(context, Chromium::disposeKept)));
         }).whenComplete((done, failure) -> {
             if (failure == null) made.complete(kept.get());
             else made.completeExceptionally(failure);
@@ -747,7 +717,7 @@ public final class Chromium implements AutoCloseable {
      * @param global Chromium's global context, which the proxy is given
      */
     void contextInitialized(CefRequestContext global) {
-        this.global = global;
+        network.globalContext(global);
         chromiumThread.contextInitialized();
     }
 

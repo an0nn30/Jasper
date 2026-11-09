@@ -63,7 +63,7 @@ final class SuggestionFetcher implements AutoCloseable {
         return result;
     }
 
-    /** Has the fetches from now on go through {@code proxy}, as {@link WebFetch#useProxy} says; empty for the JDK's default. */
+    /** Has the fetches from now on go through {@code proxy}, as {@link WebFetch#useProxy} says. */
     void useProxy(Optional<InetSocketAddress> proxy) {
         web.useProxy(proxy);
     }

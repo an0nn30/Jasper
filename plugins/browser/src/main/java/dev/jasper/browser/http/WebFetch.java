@@ -2,7 +2,6 @@ package dev.jasper.browser.http;
 
 import java.io.ByteArrayOutputStream;
 import java.net.InetSocketAddress;
-import java.net.ProxySelector;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -20,21 +19,23 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Flow;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 /**
  * The plugin's own fetches from the web, apart from Chromium: with the JDK's HTTP client, which sends no cookie and no
- * credentials and goes through the HTTP proxy it is given ({@link #useProxy}), the JDK's default proxy selector until
- * then, following redirects within the web schemes, for at most a limit of bytes and a time limit in all. Only an http
- * or https address with a host and without a user name or password is fetched; anything else, a failure, an answer
- * other than 200 and one over the limit give nothing. The client is made on the first fetch, on the executor given, as
- * making the first one takes tens of milliseconds, and outside any lock, so no thread that fetches or closes waits for
- * it; it ends with {@link #close()}, so an owner that fetches nothing holds none, and is made again after the proxy
- * changes. Any thread.
+ * credentials and goes through the HTTP proxy it is given ({@link #useProxy}) as Chromium would ({@link ProxyRoute}),
+ * the JDK's default proxy selector until then, following redirects within the web schemes, for at most a limit of bytes
+ * and a time limit in all. Only an http or https address with a host and without a user name or password is fetched;
+ * anything else, a failure, an answer other than 200 and one over the limit give nothing. The client is made on the
+ * first fetch, on the executor given, as making the first one takes tens of milliseconds, and outside any lock, so no
+ * thread that fetches or closes waits for it; it ends with {@link #close()}, so an owner that fetches nothing holds
+ * none, and is made again after the proxy changes. Any thread.
  */
 public final class WebFetch implements AutoCloseable {
     private final Executor starts;
     private final Duration timeout;
     private final int limit;
+    private final Function<Optional<InetSocketAddress>, HttpClient> clients;
     // Made on the first fetch, with the proxy then; guarded by this. Closed is written under the lock too, and read
     // without it.
     private HttpClient client;
@@ -49,10 +50,30 @@ public final class WebFetch implements AutoCloseable {
      * @param limit the most bytes of an answer that are read
      */
     public WebFetch(Executor starts, Duration timeout, int limit) {
+        this(starts, timeout, limit, proxy -> newClient(timeout, proxy));
+    }
+
+    /** As {@link #WebFetch(Executor, Duration, int)}, its clients made by {@code clients}: a test's. */
+    WebFetch(Executor starts, Duration timeout, int limit, Function<Optional<InetSocketAddress>, HttpClient> clients) {
         this.starts = Objects.requireNonNull(starts, "starts");
         this.timeout = Objects.requireNonNull(timeout, "timeout");
         if (limit < 0) throw new IllegalArgumentException("limit");
         this.limit = limit;
+        this.clients = Objects.requireNonNull(clients, "clients");
+    }
+
+    /**
+     * A fetcher's client: it connects within {@code timeout}, follows redirects within the web schemes and goes through
+     * {@code proxy} as {@link ProxyRoute} routes, or through the JDK's default proxy selector.
+     *
+     * @param timeout how long a connection may take
+     * @param proxy the HTTP proxy's address; empty for the JDK's default proxy selector
+     * @return the client
+     */
+    static HttpClient newClient(Duration timeout, Optional<InetSocketAddress> proxy) {
+        var builder = HttpClient.newBuilder().connectTimeout(timeout).followRedirects(HttpClient.Redirect.NORMAL);
+        proxy.ifPresent(address -> builder.proxy(ProxyRoute.through(address)));
+        return builder.build();
     }
 
     /**
@@ -82,8 +103,8 @@ public final class WebFetch implements AutoCloseable {
     }
 
     /**
-     * Has every fetch from now on go through {@code proxy} (plan 6's F3): the client is made again at the next fetch,
-     * and the fetches under way end, giving nothing, so nothing more goes the way they went.
+     * Has every fetch from now on go through {@code proxy} (plan 6's F3), as {@link ProxyRoute} routes: the client is
+     * made again at the next fetch, and the fetches under way end, giving nothing, so nothing more goes the way they went.
      *
      * @param proxy the HTTP proxy's address; empty for the JDK's default proxy selector
      */
@@ -174,9 +195,7 @@ public final class WebFetch implements AutoCloseable {
                 if (closed || client != null) return client;
                 through = proxy;
             }
-            var builder = HttpClient.newBuilder().connectTimeout(timeout).followRedirects(HttpClient.Redirect.NORMAL);
-            through.ifPresent(address -> builder.proxy(ProxySelector.of(address)));
-            HttpClient made = builder.build();
+            HttpClient made = clients.apply(through);
             HttpClient kept;
             synchronized (this) {
                 if (!closed && client == null && proxy == through) client = made;
