@@ -1,12 +1,20 @@
 package dev.jasper.browser.pages;
 
 import dev.jasper.browser.pages.OnboardingPages.SetupSwitch;
+import dev.jasper.browser.settings.BrowserSettings;
+import dev.jasper.sdk.PluginInfo;
+import dev.jasper.sdk.testing.FakePluginHost;
+import java.awt.EventQueue;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,8 +22,8 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The three onboarding pages: the intro and the features' copy, the features per platform, the setup's switches and
- * the one request, {@code finish}, that only the setup page may make.
+ * The three onboarding pages: the intro and the features' copy, the features per platform, the setup's switches, the
+ * Ad Blocker among them, and the one request, {@code finish}, that only the setup page may make.
  */
 class OnboardingPagesTest {
     @TempDir Path folder;
@@ -54,7 +62,7 @@ class OnboardingPagesTest {
     @Test void everyFeatureRowShowsWithCmdOnMacOsAndCtrlElsewhere() throws Exception {
         assertThat(OnboardingPages.FEATURES).extracting(OnboardingPages.Feature::title).containsExactly("Pages beside your terminals",
             "Links from the terminal", "An address field that searches", "Find in page", "Bookmarks and history",
-            "Snippets in page fields", "Copy on select", "/dev/null mode", "Site permissions");
+            "Snippets in page fields", "Copy on select", "/dev/null mode", "Site permissions", "Ad blocking");
         for (boolean macOs : new boolean[] {true, false}) {
             try (var other = new PagesFixture()) {
                 var pages = new OnboardingPages(other.pages, other.about, onboarding, macOs, List.of(), Runnable::run);
@@ -73,8 +81,13 @@ class OnboardingPagesTest {
                     "text", "Insert a snippet into the page field you are typing in."));
                 assertThat(rows.get(6)).isEqualTo(Map.of("title", "Copy on select",
                     "text", "With Copy on select on, selecting text in a page copies it."));
+                // Plan 6's three rows.
+                assertThat(rows.get(7)).isEqualTo(Map.of("title", "/dev/null mode", "text",
+                    "Browse without keeping history, cookies or other data: turn it on in Settings › Tools › Browser › Privacy & Data."));
                 assertThat(rows.get(8)).isEqualTo(Map.of("title", "Site permissions",
                     "text", "Allow or block each site's camera, microphone, notifications and sound, and review them on one page."));
+                assertThat(rows.get(9)).isEqualTo(Map.of("title", "Ad blocking",
+                    "text", "Block ads with a content-blocker filter list, updated every day."));
             }
         }
     }
@@ -98,7 +111,11 @@ class OnboardingPagesTest {
     @Test void aSwitchShowsItsStateAndSwitchCallsSet() throws Exception {
         var on = new AtomicBoolean(true);
         var calls = new ArrayList<Boolean>();
-        register(false, List.of(new SetupSwitch("ad-blocker", "Ad Blocker", "Blocks ads.", on::get, value -> { calls.add(value); on.set(value); })));
+        register(false, List.of(new SetupSwitch("ad-blocker", "Ad Blocker", "Blocks ads.", on::get, value -> {
+            calls.add(value);
+            on.set(value);
+            return CompletableFuture.completedFuture(null);
+        })));
         List<Object> switches = rows(fixture.object("onboarding-setup", "{\"op\":\"switches\"}"), "switches");
         assertThat(switches).containsExactly(Map.of("id", "ad-blocker", "title", "Ad Blocker", "description", "Blocks ads.", "on", true));
         assertThat(fixture.object("onboarding-setup", "{\"op\":\"switch\",\"id\":\"ad-blocker\",\"on\":\"false\"}")).containsEntry("on", false);
@@ -119,10 +136,75 @@ class OnboardingPagesTest {
     @Test void switchesAreReadAndSetOnTheGivenUiExecutor() throws Exception {
         var ran = new AtomicReference<Thread>();
         var pages = new OnboardingPages(fixture.pages, fixture.about, onboarding, true,
-            List.of(new SetupSwitch("a", "A", "B", () -> true, value -> { })), task -> { ran.set(Thread.currentThread()); task.run(); });
+            List.of(new SetupSwitch("a", "A", "B", () -> true, value -> CompletableFuture.completedFuture(null))),
+            task -> { ran.set(Thread.currentThread()); task.run(); });
         pages.register();
         fixture.ask("onboarding-setup", "{\"op\":\"switches\"}");
         assertThat(ran.get()).isNotNull();
+    }
+
+    /**
+     * A switch's state is read once its change is saved, as a setting's save may complete later: until then the page
+     * waits, and a save that fails fails the request with its reason, which the page shows, the switch as it was.
+     */
+    @Test void aSwitchIsAnsweredOnceItsChangeIsSavedAndASaveThatFailsFailsTheRequest() throws Exception {
+        var on = new AtomicBoolean();
+        var asked = new AtomicReference<Boolean>();
+        var saving = new AtomicReference<CompletableFuture<Void>>();
+        register(true, List.of(new SetupSwitch("ad-blocker", "Ad Blocker", "Blocks ads.", on::get, value -> {
+            asked.set(value);
+            saving.set(new CompletableFuture<>());
+            return saving.get();
+        })));
+        String secret = fixture.about.secret("onboarding-setup").orElseThrow();
+        var answer = fixture.about.query("jasper-about:onboarding-setup", true, 1, secret + "{\"op\":\"switch\",\"id\":\"ad-blocker\",\"on\":\"true\"}")
+            .orElseThrow();
+        assertThat(answer).as("waits for the save").isNotDone();
+        // As a setting's save does: the value shows, then the save completes.
+        on.set(asked.get());
+        saving.get().complete(null);
+        assertThat(answer.get(10, TimeUnit.SECONDS)).isEqualTo("{\"on\":true}");
+        var refused = fixture.about.query("jasper-about:onboarding-setup", true, 1, secret + "{\"op\":\"switch\",\"id\":\"ad-blocker\",\"on\":\"false\"}")
+            .orElseThrow();
+        saving.get().completeExceptionally(new IllegalStateException("browser.toml has errors; fix them before saving settings."));
+        assertThat(refused).failsWithin(java.time.Duration.ofSeconds(10)).withThrowableThat()
+            .withMessageContaining("browser.toml has errors; fix them before saving settings.");
+        assertThat(on).as("the switch as it was").isTrue();
+    }
+
+    /**
+     * Plan 6 Task 10: the setup page offers the Ad Blocker, which shows Enable Ad Blocking's value and saves it, and the
+     * note about Settings now has a switch to explain. The setting is declared on the SDK's fake host, without the
+     * plugin, so turning it on downloads nothing (F9).
+     */
+    @Test void theAdBlockerSwitchShowsAndSetsEnableAdBlocking() throws Exception {
+        var host = new AtomicReference<FakePluginHost>();
+        var declared = new AtomicReference<BrowserSettings.Declared>();
+        SwingUtilities.invokeAndWait(() -> {
+            host.set(new FakePluginHost());
+            host.get().start(new PluginInfo("dev.jasper.browser", "Browser", "0.2.0", Set.of()), Set.of(), Set.of(),
+                plugin -> declared.set(BrowserSettings.declare(plugin.settings())));
+        });
+        try {
+            BrowserSettings.Declared settings = declared.get();
+            SetupSwitch adBlocker = OnboardingPages.adBlocker(() -> settings.read().adBlocking(), settings::setAdBlocking);
+            assertThat(adBlocker.id()).isEqualTo("ad-blocker");
+            assertThat(adBlocker.title()).isEqualTo("Ad Blocker");
+            assertThat(adBlocker.description()).isEqualTo("Block ads with a filter list that updates every day.");
+            new OnboardingPages(fixture.pages, fixture.about, onboarding, true, List.of(adBlocker), EventQueue::invokeLater).register();
+            assertThat(rows(fixture.object("onboarding-setup", "{\"op\":\"switches\"}"), "switches")).containsExactly(Map.of("id", "ad-blocker",
+                "title", "Ad Blocker", "description", "Block ads with a filter list that updates every day.", "on", false));
+            assertThat(fixture.object("onboarding-setup", "{\"op\":\"switch\",\"id\":\"ad-blocker\",\"on\":\"true\"}")).containsEntry("on", true);
+            assertThat(settings.read().adBlocking()).isTrue();
+            assertThat(host.get().savedSettings("dev.jasper.browser")).containsEntry("ad_blocking", true);
+            assertThat(rows(fixture.object("onboarding-setup", "{\"op\":\"switches\"}"), "switches")).singleElement()
+                .satisfies(row -> assertThat(((Map<?, ?>) row).get("on")).isEqualTo(true));
+            assertThat(fixture.object("onboarding-setup", "{\"op\":\"switch\",\"id\":\"ad-blocker\",\"on\":\"false\"}")).containsEntry("on", false);
+            assertThat(host.get().savedSettings("dev.jasper.browser")).containsEntry("ad_blocking", false);
+            assertThat(host.get().failures()).isEmpty();
+        } finally {
+            SwingUtilities.invokeAndWait(() -> host.get().close());
+        }
     }
 
     @Test void finishWorksFromTheSetupPageAndIsRefusedFromTheIntroAndTheFeatures() throws Exception {

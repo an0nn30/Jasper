@@ -18,7 +18,9 @@
  * once per document; each request, untrusted, is answered from the page's
  * {@link dev.jasper.browser.page.PagePrivacy}, judged for the site of the document that asked, as the
  * {@code permissions} package names it; a /dev/null page, a document outside a secure context and one whose origin a
- * sandbox made opaque, as the bridge recorded it, have none that may have notifications. Depends on {@code engine},
+ * sandbox made opaque, as the bridge recorded it, have none that may have notifications. While ad blocking's filter
+ * list has a rule set active, {@code AdBlockRequests}, the request handler's part, cancels each request of a page but
+ * its main frame's that the {@code adblock} package's rules block. Depends on {@code adblock}, {@code engine},
  * {@code http}, {@code json}, {@code page} and {@code permissions}; it loads only once a page first asks for Chromium.
  */
 package dev.jasper.browser.links;

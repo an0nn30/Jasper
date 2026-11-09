@@ -35,7 +35,10 @@
  * router; no sub-frame runs it, and no challenge frame ({@link dev.jasper.browser.page.ChallengeFrames}). Every frame
  * but a challenge frame runs {@code audio.js}, which mutes the document's sound and tells the privacy router of its
  * first, in the audio mode the item's store holds for the page's top-level site, which its sub-frames follow; the
- * item mutes and unmutes every frame through {@code PagePrivacy}. {@code PageMenu} is the client's
+ * item mutes and unmutes every frame through {@code PagePrivacy}. While ad blocking's filter list, the {@code adblock}
+ * package's, has a rule set active, every frame but a challenge frame and a Jasper page's then runs
+ * {@code hide-elements.js}, which hides what the rule set's sheet for the document names through
+ * {@code CSSStyleSheet.insertRule}, its declaration fixed: a main frame its own sheet, a sub-frame the generic part. {@code PageMenu} is the client's
  * one context-menu handler: Jasper shows the page's right-click menu, {@code PageMenuItems} for what is under the
  * pointer, at the
  * {@link dev.jasper.browser.page.MenuPlace} the item gives, over its tab, and Chromium shows none; its View Source

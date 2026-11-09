@@ -13,6 +13,7 @@ import dev.jasper.sdk.settings.SettingKind;
 import dev.jasper.sdk.settings.SettingSpec;
 import dev.jasper.sdk.settings.SettingsPanel;
 import dev.jasper.sdk.testing.FakePluginHost;
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
@@ -40,12 +41,13 @@ class BrowserSettingsTest {
             });
             List<SettingSpec<?>> specs = recording.get().specs;
             assertThat(specs).extracting(SettingSpec::key).containsExactly("start_page", "page_zoom", "open_links_from_terminal",
-                "open_local_web_files", "search_engine", "custom_search_url", "custom_suggestions_url", "devnull_mode");
+                "open_local_web_files", "search_engine", "custom_search_url", "custom_suggestions_url", "devnull_mode", "ad_blocking",
+                "filter_list_url");
             assertThat(specs).extracting(SettingSpec::label).containsExactly("Start page", "Page zoom", "Open Links From Terminal",
                 "Open Local Web Files", "Default Search Engine", "Custom Search URL", "Custom Search Suggestions URL",
-                "Use /dev/null mode (no history, cookies, or other data saved)");
+                "Use /dev/null mode (no history, cookies, or other data saved)", "Enable Ad Blocking", "Filter List URL");
             assertThat(specs).extracting(SettingSpec::section).containsExactly("General", "General", "Link Opening", "Link Opening",
-                "Search Engine", "Search Engine", "Search Engine", "Privacy & Data");
+                "Search Engine", "Search Engine", "Search Engine", "Privacy & Data", "Ad Blocking", "Ad Blocking");
             assertThat(specs).allSatisfy(spec -> assertThat(spec.description()).isNotBlank());
             assertThat(specs.get(1).kind()).isEqualTo(SettingKind.integer(25, 500));
             assertThat(specs.get(1).unit()).isEqualTo("%");
@@ -65,6 +67,11 @@ class BrowserSettingsTest {
             assertThat(specs.get(7).applies()).isEqualTo(Applies.LIVE);
             assertThat(specs.get(7).description()).isEqualTo("Browser tabs, windows and panes opened after you turn this on keep cookies, "
                 + "history and all other browser data in memory, and lose them when that tab and the tabs it opened have all closed.");
+            // Plan 6 Task 10: Ad Blocking, off by default, and EasyList's content blocker list.
+            assertThat(specs.get(8).kind()).isEqualTo(SettingKind.bool());
+            assertThat(specs.get(8).defaultValue()).isEqualTo(false);
+            assertThat(specs.get(9).defaultValue()).isEqualTo("https://easylist-downloads.adblockplus.org/easylist_content_blocker.json");
+            assertThat(specs.get(9).description()).isEqualTo("A content blocker list in WebKit's format, downloaded automatically every 24 hours.");
             assertThat(host.failures()).isEmpty();
         } });
     }
@@ -84,7 +91,7 @@ class BrowserSettingsTest {
             String refused = "The URL must start with https:// or http:// and contain %s";
             assertThat(host.settingsReports(ID)).containsExactly("custom_search_url: " + refused, "custom_suggestions_url: " + refused);
             assertThat(declared.get().read()).isEqualTo(new BrowserSettings(BrowserSettings.WELCOME, 100, LinkOpening.ASK, LocalFileOpening.ASK,
-                SearchEngine.CUSTOM, "", "", false));
+                SearchEngine.CUSTOM, "", "", false, false, URI.create(BrowserSettings.EASYLIST)));
             host.setSetting(ID, "custom_search_url", "https://search.example.com/?q=%s");
             host.setSetting(ID, "custom_suggestions_url", "https://search.example.com/suggest?q=%s");
             assertThat(host.settingsReports(ID)).isEmpty();
@@ -111,10 +118,11 @@ class BrowserSettingsTest {
                 plugin -> declared.set(BrowserSettings.declare(plugin.settings())));
             List<BrowserSettings.Section> sections = declared.get().sections();
             assertThat(sections).extracting(BrowserSettings.Section::title)
-                .containsExactly("General", "Link Opening", "Search Engine", "Privacy & Data");
+                .containsExactly("General", "Link Opening", "Search Engine", "Privacy & Data", "Ad Blocking");
             assertThat(sections).extracting(section -> section.settings().stream().map(Setting::key).toList()).containsExactly(
                 List.of("start_page", "page_zoom"), List.of("open_links_from_terminal", "open_local_web_files"),
-                List.of("search_engine", "custom_search_url", "custom_suggestions_url"), List.of("devnull_mode"));
+                List.of("search_engine", "custom_search_url", "custom_suggestions_url"), List.of("devnull_mode"),
+                List.of("ad_blocking", "filter_list_url"));
             assertThat(BrowserSettings.SECTIONS).containsExactly("General", "Link Opening", "Search Engine", "Privacy & Data",
                 "Ad Blocking", "Proxy");
             assertThatThrownBy(() -> sections.getFirst().settings().clear()).as("a snapshot no caller changes")
@@ -142,7 +150,7 @@ class BrowserSettingsTest {
             host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(),
                 plugin -> declared.set(BrowserSettings.declare(plugin.settings())));
             assertThat(declared.get().read()).isEqualTo(new BrowserSettings(BrowserSettings.WELCOME, 100, LinkOpening.ASK,
-                LocalFileOpening.DEFAULT_EDITOR, SearchEngine.GOOGLE, "", "", false));
+                LocalFileOpening.DEFAULT_EDITOR, SearchEngine.GOOGLE, "", "", false, false, URI.create(BrowserSettings.EASYLIST)));
             var heard = new CopyOnWriteArrayList<LinkOpening>();
             declared.get().onLinksChanged(heard::add);
 
@@ -185,9 +193,50 @@ class BrowserSettingsTest {
                 assertThat(declared.get().read().pageZoom()).as("the default").isEqualTo(100);
             }
             assertThatThrownBy(() -> new BrowserSettings(BrowserSettings.WELCOME, 24, LinkOpening.ASK, LocalFileOpening.ASK,
-                SearchEngine.GOOGLE, "", "", false)).isInstanceOf(IllegalArgumentException.class);
+                SearchEngine.GOOGLE, "", "", false, false, URI.create(BrowserSettings.EASYLIST))).isInstanceOf(IllegalArgumentException.class);
             assertThatThrownBy(() -> new BrowserSettings(BrowserSettings.WELCOME, 501, LinkOpening.ASK, LocalFileOpening.ASK,
-                SearchEngine.GOOGLE, "", "", false)).isInstanceOf(IllegalArgumentException.class);
+                SearchEngine.GOOGLE, "", "", false, false, URI.create(BrowserSettings.EASYLIST))).isInstanceOf(IllegalArgumentException.class);
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /**
+     * Plan 6 Task 10 and ruling F10: the Filter List URL is an https address, or an http one on this computer, as TLS is
+     * the list's only integrity; anything else is refused for the default. Enable Ad Blocking and the URL are read in the
+     * snapshot, their changes heard on the UI thread, and Enable Ad Blocking saved as the onboarding's switch saves it.
+     */
+    @Test void theFilterListUrlIsHttpsOrThisComputersAndAdBlockingIsHeardAndSaved() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var declared = new AtomicReference<BrowserSettings.Declared>();
+            host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(),
+                plugin -> declared.set(BrowserSettings.declare(plugin.settings())));
+            assertThat(declared.get().read().adBlocking()).isFalse();
+            assertThat(declared.get().read().filterListUrl()).isEqualTo(URI.create(BrowserSettings.EASYLIST));
+            var turned = new CopyOnWriteArrayList<Boolean>();
+            var moved = new CopyOnWriteArrayList<URI>();
+            declared.get().onAdBlockingChanged(turned::add);
+            declared.get().onFilterListUrlChanged(moved::add);
+            String refused = "Enter an https address, or an http address on this computer.";
+            for (String address : List.of("https://lists.example/blocker.json", "http://localhost:8080/list.json", "http://127.0.0.1/list.json")) {
+                host.setSetting(ID, "filter_list_url", address);
+                assertThat(host.settingsReports(ID)).as(address).isEmpty();
+                assertThat(declared.get().read().filterListUrl()).isEqualTo(URI.create(address));
+            }
+            for (String address : List.of("http://lists.example/list.json", "ftp://lists.example/list.json", "lists.example/list.json",
+                    "https://user:secret@lists.example/list.json", "")) {
+                host.setSetting(ID, "filter_list_url", address);
+                assertThat(host.settingsReports(ID)).as(address).containsExactly("filter_list_url: " + refused);
+                assertThat(declared.get().read().filterListUrl()).as("the default").isEqualTo(URI.create(BrowserSettings.EASYLIST));
+            }
+            assertThat(moved).startsWith(URI.create("https://lists.example/blocker.json"), URI.create("http://localhost:8080/list.json"),
+                URI.create("http://127.0.0.1/list.json"), URI.create(BrowserSettings.EASYLIST));
+            assertThat(declared.get().setAdBlocking(true)).isCompleted();
+            assertThat(host.savedSettings(ID)).containsEntry("ad_blocking", true);
+            assertThat(declared.get().read().adBlocking()).isTrue();
+            host.setSetting(ID, "ad_blocking", false);
+            assertThat(turned).containsExactly(true, false);
+            assertThatThrownBy(() -> new BrowserSettings(BrowserSettings.WELCOME, 100, LinkOpening.ASK, LocalFileOpening.ASK, SearchEngine.GOOGLE,
+                "", "", false, true, URI.create("http://lists.example/list.json"))).isInstanceOf(IllegalArgumentException.class);
             assertThat(host.failures()).isEmpty();
         } });
     }

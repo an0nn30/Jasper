@@ -1,5 +1,7 @@
 package dev.jasper.browser.links;
 
+import dev.jasper.browser.adblock.FilterList;
+import dev.jasper.browser.adblock.RuleSet;
 import dev.jasper.browser.engine.AboutScheme;
 import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.links.LinkGesture.Where;
@@ -49,9 +51,10 @@ import org.cef.security.CefSSLInfo;
  *
  * <p>The request handler also serves {@code jasper-about:} to the pages of an in-memory context, a /dev/null group's:
  * Chromium's scheme handler factory serves the global context alone, so such a page's main-frame {@code jasper-about:}
- * request is answered through {@link Chromium#aboutResource}, as the factory would answer it. A request's handler is one
- * composite ({@code PageRequests}) of what each part asks of it: the opener bridge's for a main frame's navigation, and
- * this.
+ * request is answered through {@link Chromium#aboutResource}, as the factory would answer it. And while ad blocking's
+ * filter list has a rule set active, every request of a page but its main frame's meets it ({@link AdBlockRequests}),
+ * a /dev/null page's too (spec section 12). A request's handler is one composite ({@code PageRequests}) of what each
+ * part asks of it: the opener bridge's for a main frame's navigation, ad blocking's, and this.
  *
  * <p>JCEF keeps a client's first request handler, so this is the only one: what else a request handler is asked goes to
  * its defaults. Life span handlers are a list, which JetBrains' runtime adds its own to, so this adds one and removes
@@ -68,40 +71,44 @@ public final class PageNavigation {
 
     /**
      * Has Chromium install the handlers and the opener bridge on its client before any page is made on it; once, however
-     * often asked. Call it when a page first asks for Chromium, never at the plugin's start: this class names Chromium's
-     * types.
+     * often asked, with one installer for the plugin's run. Call it when a page first asks for Chromium, never at the
+     * plugin's start: this class names Chromium's types.
      *
      * @param chromium the plugin's Chromium
+     * @param filters the plugin's filter list, whose rule set the request handler applies while one is active
      */
-    public static void prepare(Chromium chromium) {
-        if (PREPARED.add(chromium)) chromium.onClient(client -> install(client, chromium));
+    public static void prepare(Chromium chromium, FilterList filters) {
+        if (PREPARED.add(chromium)) chromium.onClient(client -> install(client, chromium, filters));
     }
 
-    private static void install(CefClient client, Chromium chromium) {
+    private static void install(CefClient client, Chromium chromium, FilterList filters) {
         OpenerBridge bridge = OpenerBridge.install(client);
         // The page scripts' privacy router reads what the bridge records of each page's document.
         PrivacyQueries.install(client, bridge, chromium);
-        client.addRequestHandler(new Links(bridge, chromium));
+        client.addRequestHandler(new Links(bridge, chromium, filters));
         client.addLifeSpanHandler(new Popups());
     }
 
     /**
      * Links Chromium would open in a new tab or window, or download: Jasper places them itself. A main frame's navigation
-     * response also goes to the opener bridge, which keeps the limits its opener and content security policies set.
+     * response also goes to the opener bridge, which keeps the limits its opener and content security policies set, and
+     * every other request of a page meets the filter list's rule set while one is active ({@link AdBlockRequests}).
      */
     private static final class Links extends CefRequestHandlerAdapter {
         private final OpenerBridge bridge;
         private final Chromium chromium;
+        private final FilterList filters;
 
-        Links(OpenerBridge bridge, Chromium chromium) {
+        Links(OpenerBridge bridge, Chromium chromium, FilterList filters) {
             this.bridge = bridge;
             this.chromium = chromium;
+            this.filters = filters;
         }
 
         @Override public CefResourceRequestHandler getResourceRequestHandler(CefBrowser browser, CefFrame frame, CefRequest request,
                                                                              boolean isNavigation, boolean isDownload, String initiator,
                                                                              BoolRef disableDefaultHandling) {
-            return requests(browser, request, isNavigation, bridge::responses, chromium);
+            return requests(browser, request, isNavigation, bridge::responses, chromium, filters::active);
         }
 
         @Override public boolean onCertificateError(CefBrowser browser, CefLoadHandler.ErrorCode error, String url, CefSSLInfo info,
@@ -138,18 +145,24 @@ public final class PageNavigation {
 
     /**
      * One request's handler, the composite of its parts: the opener bridge's reader of a main frame's response, null when
-     * the request has none, and whether a {@code jasper-about:} request of an in-memory context is answered here.
-     * Chromium's IO thread.
+     * the request has none; whether a {@code jasper-about:} request of an in-memory context is answered here; and ad
+     * blocking's part, which cancels what the filter list blocks, null when the request has none. Chromium's IO thread.
      */
     static final class PageRequests extends CefResourceRequestHandlerAdapter {
         final CefResourceRequestHandler responses;
         final boolean about;
+        final AdBlockRequests blocking;
         private final Chromium chromium;
 
-        PageRequests(CefResourceRequestHandler responses, boolean about, Chromium chromium) {
+        PageRequests(CefResourceRequestHandler responses, boolean about, AdBlockRequests blocking, Chromium chromium) {
             this.responses = responses;
             this.about = about;
+            this.blocking = blocking;
             this.chromium = chromium;
+        }
+
+        @Override public boolean onBeforeResourceLoad(CefBrowser browser, CefFrame frame, CefRequest request) {
+            return blocking != null && blocking.onBeforeResourceLoad(browser, frame, request);
         }
 
         @Override public CefResourceHandler getResourceHandler(CefBrowser browser, CefFrame frame, CefRequest request) {
@@ -162,27 +175,36 @@ public final class PageNavigation {
     }
 
     /**
-     * The handler of {@code browser}'s {@code request}: the composite of what applies, or null when nothing does. Only a
-     * page's main frame gets one: its navigation's response goes to the opener bridge, and in an in-memory context
-     * (F1), whose pages Chromium's scheme handler factory does not reach, its {@code jasper-about:} request is answered
-     * here as the factory would answer it. Every other request, a {@code jasper-about:} one of a sub-frame or a
-     * sub-resource included, goes as Chromium takes it: no Jasper page loads one, and in an in-memory context nothing
-     * serves it. The request's address is read only for an in-memory page's main frame, as reading it copies it across
-     * JNI and a {@code data:} address can run to megabytes. Chromium's IO thread.
+     * The handler of {@code browser}'s {@code request}: the composite of what applies, or null when nothing does. A
+     * page's main frame gets its navigation's response read by the opener bridge, and in an in-memory context (F1),
+     * whose pages Chromium's scheme handler factory does not reach, its {@code jasper-about:} request answered here as
+     * the factory would answer it; it is never blocked (the plan's call). Every other request of a page's browser, a
+     * /dev/null page's too, gets ad blocking's part while the filter list has a rule set active, and nothing else: a
+     * {@code jasper-about:} one of a sub-frame or a sub-resource goes as Chromium takes it, as no Jasper page loads one,
+     * and in an in-memory context nothing serves it. A page's DevTools get none of ad blocking. The request's address is
+     * read only for an in-memory page's main frame, as reading it copies it across JNI and a {@code data:} address can
+     * run to megabytes. Chromium's IO thread.
      *
      * @param browser the browser whose request it is
      * @param request the request
      * @param isNavigation whether it is a navigation
      * @param responses the opener bridge's reader of a main frame's response
      * @param chromium serves {@code jasper-about:}
+     * @param rules the filter list's rule set while one is active
      * @return the handler, or null
      */
     static PageRequests requests(CefBrowser browser, CefRequest request, boolean isNavigation,
-                                 Supplier<CefResourceRequestHandler> responses, Chromium chromium) {
-        if (!(browser instanceof PageBrowser page) || request.getResourceType() != CefRequest.ResourceType.RT_MAIN_FRAME) return null;
-        boolean about = page.inMemory() && AboutScheme.page(request.getURL()).isPresent();
-        if (!isNavigation && !about) return null;
-        return new PageRequests(isNavigation ? responses.get() : null, about, chromium);
+                                 Supplier<CefResourceRequestHandler> responses, Chromium chromium, Supplier<Optional<RuleSet>> rules) {
+        if (!(browser instanceof PageBrowser page)) return null;
+        CefRequest.ResourceType type = request.getResourceType();
+        if (type == CefRequest.ResourceType.RT_MAIN_FRAME) {
+            boolean about = page.inMemory() && AboutScheme.page(request.getURL()).isPresent();
+            if (!isNavigation && !about) return null;
+            return new PageRequests(isNavigation ? responses.get() : null, about, null, chromium);
+        }
+        if (page.owner() == null || AdBlockRequests.kinds(type).isEmpty()) return null;
+        Optional<RuleSet> active = rules.get();
+        return active.isEmpty() ? null : new PageRequests(null, false, new AdBlockRequests(active.get()), chromium);
     }
 
     /** Popups: Jasper opens the ones the user asked for as items, and Chromium makes none. */

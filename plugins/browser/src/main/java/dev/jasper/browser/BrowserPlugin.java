@@ -1,5 +1,6 @@
 package dev.jasper.browser;
 
+import dev.jasper.browser.adblock.FilterList;
 import dev.jasper.browser.api.MarkdownPreviews;
 import dev.jasper.browser.dialogs.PageDialogs;
 import dev.jasper.browser.engine.AboutQueries;
@@ -53,7 +54,10 @@ import dev.jasper.sdk.ui.UiEvent;
 import dev.jasper.sdk.ui.ViewSpec;
 import java.awt.EventQueue;
 import java.net.URI;
+import java.net.http.HttpClient;
 import java.nio.file.Path;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -63,6 +67,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * The Browser: web pages as Jasper items. Its start registers New Browser Tab, New Browser Window and the Browser split
@@ -80,7 +86,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * section 19); that folder, which holds Chromium's cookies too, is made its owner's alone before either writes there.
  * They are the persistent store of its {@link DataStores}, beside which each group of /dev/null items has a store of
  * its own, in memory (spec section 12), each with its own site permissions; Jasper's pages answer from the store of the
- * browser that asks, and a site permission that could not be saved posts one error.
+ * browser that asks, and a site permission that could not be saved posts one error. Ad blocking's {@link FilterList},
+ * whose statistics and Update Now Settings shows and whose switch the onboarding's setup page offers, reads its cache
+ * and downloads only once a page first starts or the user turns ad blocking on, or at Update Now (the plan's call); its
+ * rule set applies to every page's requests and documents, a /dev/null page's too.
  */
 public class BrowserPlugin implements Plugin {
     static final String NEW_TAB = "dev.jasper.browser.new_tab", NEW_WINDOW = "dev.jasper.browser.new_window";
@@ -97,10 +106,26 @@ public class BrowserPlugin implements Plugin {
     private DataStores dataStores;
     private AboutScheme about;
     private SourcePage sources;
+    private FilterList filters;
     private boolean running;
+    private final Supplier<HttpClient> filterClients;
+    private final Function<BrowserSettings, URI> filterAddress;
 
     /** Created by the runtime. */
-    public BrowserPlugin() { }
+    public BrowserPlugin() {
+        this(FilterList::client, BrowserSettings::filterListUrl);
+    }
+
+    /**
+     * A plugin whose filter list's client and address are a test's (ruling F9): no test downloads a list from the web.
+     *
+     * @param filterClients makes the filter list's client, at its first download
+     * @param filterAddress the filter list's address, from the settings
+     */
+    BrowserPlugin(Supplier<HttpClient> filterClients, Function<BrowserSettings, URI> filterAddress) {
+        this.filterClients = filterClients;
+        this.filterAddress = filterAddress;
+    }
 
     @Override public void start(PluginContext context) {
         this.context = context;
@@ -126,6 +151,19 @@ public class BrowserPlugin implements Plugin {
         previews = new PreviewService(origins, chromium, context.background());
         context.services().publish(MarkdownPreviews.class, previews);
         BrowserSettings.Declared settings = BrowserSettings.declare(context.settings());
+        // Spec section 12: ad blocking's filter list, made with no I/O and no client. It reads its cache, and downloads
+        // when an update is due, only once a page first starts or the user turns ad blocking on (F8), and while on;
+        // Update Now downloads it at once.
+        var filters = new FilterList(data, folder::restrict, context.background(), filterClients, Clock.systemUTC(),
+            () -> filterAddress.apply(settings.read()));
+        this.filters = filters;
+        filters.enabled(settings.read().adBlocking());
+        settings.onAdBlockingChanged(on -> {
+            filters.enabled(on);
+            if (on) filters.start();
+        });
+        // A new address makes an update due at once.
+        settings.onFilterListUrlChanged(address -> filters.checkNow());
         // Spec section 12: history and bookmarks in one database, made with no I/O; it opens at its first use. Why it cannot
         // open is told on its own thread.
         var database = BrowserDatabase.file(folder, cause -> EventQueue.invokeLater(() -> storesUnavailable(cause)));
@@ -146,12 +184,14 @@ public class BrowserPlugin implements Plugin {
         // Spec section 1: whether the onboarding is finished, read from its marker on the background executor.
         var onboarding = new Onboarding(data.resolve("onboarding-finished"), context.background());
         var items = new BrowserItems(context, settings::read, dataStores, page -> {
-            PageNavigation.prepare(engine);
+            PageNavigation.prepare(engine, filters);
             PageDialogs.prepare(engine);
             AboutQueries.prepare(engine, about, context.background());
             // Before the first page asks for the welcome page, so that Chromium's IO thread only reads the answer from memory.
             onboarding.load();
-            page.start(engine);
+            // The plan's call: the filter list starts with the first page, and may download then.
+            filters.start();
+            page.start(engine, filters);
         });
         this.items = items;
         about.registerAction(WelcomePage.SETTINGS, () -> { if (running) items.showSettings(); });
@@ -159,16 +199,21 @@ public class BrowserPlugin implements Plugin {
         // persistent store's Clear Cookies, Clear Website Data and Manage Site Permissions. Making it opens nothing.
         var websiteData = new WebsiteData(chromium, dataStores.persistent(), () -> persistentAddresses(items, dataStores),
             sites -> { if (running) items.reloadShowing(dataStores.persistent(), sites); }, EventQueue::invokeLater, this::notCleared);
-        context.settings().page(new BrowserSettingsPanel(context.kit(), settings, new BrowserSettingsPanel.Actions(websiteData::clearCookies,
-            websiteData::clearAll, this::managePermissions, this::show)));
+        // Its Ad Blocking section shows the filter list's statistics, and Update Now.
+        var panel = new BrowserSettingsPanel(context.kit(), settings, new BrowserSettingsPanel.Actions(websiteData::clearCookies,
+            websiteData::clearAll, this::managePermissions, this::show),
+            new BrowserSettingsPanel.FilterStatistics(filters::status, () -> filters.staleDays(Instant.now()), filters::updateNow));
+        filters.onChanged(panel::filtersChanged);
+        context.settings().page(panel);
         // Jasper's pages built from their templates, in the workspace theme. Spec section 10: the history and bookmarks
         // pages, whose queries are answered from the history and the bookmarks of the asking browser's store, so a
         // /dev/null item's pages show its group's own; a browser with no store is refused.
         var pages = new AboutPages(context.appearance(), about);
-        // The welcome page, which sends the user to the onboarding until it is finished, and the onboarding's pages. No
-        // setting is offered on the setup page yet.
+        // The welcome page, which sends the user to the onboarding until it is finished, and the onboarding's pages, whose
+        // setup page offers the Ad Blocker.
         WelcomePage.register(about, pages, browser -> dataStores.forBrowser(browser).map(store -> store.stores().history()), onboarding);
-        new OnboardingPages(pages, about, onboarding, System.getProperty("os.name", "").startsWith("Mac"), List.of(), EventQueue::invokeLater).register();
+        new OnboardingPages(pages, about, onboarding, System.getProperty("os.name", "").startsWith("Mac"),
+            List.of(OnboardingPages.adBlocker(() -> settings.read().adBlocking(), settings::setAdBlocking)), EventQueue::invokeLater).register();
         about.register(HistoryPage.NAME, () -> pages.render(HistoryPage.NAME, Map.of()));
         about.registerQueries(HistoryPage.NAME, (browser, request) ->
             dataStores.answer(browser, store -> HistoryPage.answer(store.stores().history(), request)));
@@ -226,8 +271,9 @@ public class BrowserPlugin implements Plugin {
     }
 
     /**
-     * Jasper quits, or the plugin is turned off. The items close their open Edit Bookmark panels, whose bookmarks keep the
-     * tags they show, and give history their pages' last titles, then the data stores close: the persistent history and
+     * Jasper quits, or the plugin is turned off. The filter list's checks, its download under way and its client end.
+     * The items close their open Edit Bookmark panels, whose bookmarks keep the tags they show, and give history their
+     * pages' last titles, then the data stores close: the persistent history and
      * bookmarks' database takes no more work and closes once the work given before has run, and each /dev/null store
      * ends with its in-memory database and context, before Chromium closes. The items' favicon fetches and View Source's
      * fetches end. On the UI thread {@link Chromium#close()} only starts Chromium's dispose, and every Markdown preview
@@ -237,6 +283,8 @@ public class BrowserPlugin implements Plugin {
      */
     @Override public void stop() {
         running = false;
+        // The filter list's checks, its download under way and its client end.
+        if (filters != null) filters.close();
         if (items != null) items.close();
         if (dataStores != null) dataStores.close();
         if (sources != null) sources.close();
@@ -379,6 +427,11 @@ public class BrowserPlugin implements Plugin {
     /** The plugin's data stores. */
     DataStores dataStores() {
         return dataStores;
+    }
+
+    /** The plugin's filter list. */
+    FilterList filters() {
+        return filters;
     }
 
     /** The plugin's browser items. */

@@ -8,9 +8,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.function.BooleanSupplier;
-import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * The three onboarding pages (spec section 1): {@code jasper-about:onboarding-intro} ("Meet the Jasper Browser"),
@@ -21,8 +22,9 @@ import java.util.function.Consumer;
  * <p>The intro has no queries. The features page answers {@code {"op":"features"}} with
  * {@code {"features":[{"title","text"}]}}, each text in the platform's keys. The setup page answers
  * {@code {"op":"switches"}} with {@code {"switches":[{"id","title","description","on"}]}}, {@code {"op":"switch","id","on":"true"|"false"}}
- * with {@code {"on":<the switch's state now>}}, and {@code {"op":"finish"}} with {@code {}}. A switch is read and set on
- * the UI thread. Anything else fails with "Jasper does not understand this request.".
+ * with {@code {"on":<the switch's state once the change shows>}}, and {@code {"op":"finish"}} with {@code {}}. A switch
+ * is read and set on the UI thread; the Ad Blocker ({@link #adBlocker}) is the one the Browser offers. Anything else
+ * fails with "Jasper does not understand this request.".
  */
 public final class OnboardingPages {
     /** The names of the three pages. */
@@ -52,9 +54,10 @@ public final class OnboardingPages {
      * @param title the switch's label
      * @param description what it does
      * @param on whether it is on now; read on the UI thread
-     * @param set turns it on or off; called on the UI thread
+     * @param set turns it on or off; called on the UI thread, it completes once {@code on} shows the change, as a
+     *     setting's save does, and fails when the change cannot be made
      */
-    public record SetupSwitch(String id, String title, String description, BooleanSupplier on, Consumer<Boolean> set) {
+    public record SetupSwitch(String id, String title, String description, BooleanSupplier on, Function<Boolean, CompletableFuture<?>> set) {
         /** Checks that every part is given. */
         public SetupSwitch {
             Objects.requireNonNull(id, "id");
@@ -85,7 +88,20 @@ public final class OnboardingPages {
         new Feature("/dev/null mode", "Browse without keeping history, cookies or other data: turn it on in Settings › Tools › Browser › Privacy & Data.",
             "Browse without keeping history, cookies or other data: turn it on in Settings › Tools › Browser › Privacy & Data."),
         new Feature("Site permissions", "Allow or block each site's camera, microphone, notifications and sound, and review them on one page.",
-            "Allow or block each site's camera, microphone, notifications and sound, and review them on one page."));
+            "Allow or block each site's camera, microphone, notifications and sound, and review them on one page."),
+        new Feature("Ad blocking", "Block ads with a content-blocker filter list, updated every day.",
+            "Block ads with a content-blocker filter list, updated every day."));
+
+    /**
+     * The setup page's Ad Blocker (plan 6 Task 10): Enable Ad Blocking's switch.
+     *
+     * @param on whether ad blocking is on now
+     * @param set saves Enable Ad Blocking; its completion once the setting shows it
+     * @return the switch
+     */
+    public static SetupSwitch adBlocker(BooleanSupplier on, Function<Boolean, CompletableFuture<?>> set) {
+        return new SetupSwitch("ad-blocker", "Ad Blocker", "Block ads with a filter list that updates every day.", on, set);
+    }
 
     private final AboutPages pages;
     private final AboutScheme about;
@@ -164,16 +180,28 @@ public final class OnboardingPages {
         return StrictJson.write(Map.of("switches", rows));
     }
 
-    /** A {@code switch} request: the named switch set as asked, and answered with its state now. */
+    /**
+     * A {@code switch} request: the named switch set as asked, and answered with its state once the change shows, as a
+     * setting's save completes later; a change that cannot be made fails the request with its reason.
+     */
     private CompletableFuture<String> flip(Map<String, Object> asked) {
         if (!(asked.get("id") instanceof String id) || !(asked.get("on") instanceof String written)
             || !written.equals("true") && !written.equals("false")) return notUnderstood();
         SetupSwitch named = switches.stream().filter(one -> one.id().equals(id)).findFirst().orElse(null);
         if (named == null) return notUnderstood();
-        return CompletableFuture.supplyAsync(() -> {
-            named.set().accept(Boolean.parseBoolean(written));
-            return StrictJson.write(Map.of("on", named.on().getAsBoolean()));
-        }, ui);
+        var answer = new CompletableFuture<String>();
+        ui.execute(() -> {
+            try {
+                named.set().apply(Boolean.parseBoolean(written)).whenComplete((done, failure) -> ui.execute(() -> {
+                    if (failure != null) answer.completeExceptionally(failure instanceof CompletionException wrapped && wrapped.getCause() != null
+                        ? wrapped.getCause() : failure);
+                    else answer.complete(StrictJson.write(Map.of("on", named.on().getAsBoolean())));
+                }));
+            } catch (RuntimeException failure) {
+                answer.completeExceptionally(failure);
+            }
+        });
+        return answer;
     }
 
     private static String op(String request) {

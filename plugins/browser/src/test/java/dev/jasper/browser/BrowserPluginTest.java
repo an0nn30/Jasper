@@ -1,5 +1,6 @@
 package dev.jasper.browser;
 
+import dev.jasper.browser.adblock.FilterList;
 import dev.jasper.browser.api.MarkdownPreviews;
 import dev.jasper.browser.api.PreviewEvent;
 import dev.jasper.browser.engine.Chromium;
@@ -20,6 +21,7 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -27,11 +29,13 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import javax.swing.SwingUtilities;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
@@ -39,14 +43,102 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
-/** The plugin's registrations and its part in Chromium's life, on the SDK's fake host; nothing here starts Chromium. */
+/**
+ * The plugin's registrations and its part in Chromium's life, on the SDK's fake host; nothing here starts Chromium. No
+ * test downloads a filter list (F9): each plugin's list asks a client of the test, which fails the test unless the test
+ * means it to be asked, and its address is on no host of the web.
+ */
 class BrowserPluginTest {
     private static final String ID = "dev.jasper.browser";
     private static final PluginInfo INFO = new PluginInfo(ID, "Browser", "0.1.0", Set.of("browser.provide", "palette.contribute"));
+    /** The filter list's address in these tests, a reserved name. */
+    private static final URI LIST = URI.create("https://filters.test/list.json");
+    private final List<String> clientsAsked = new CopyOnWriteArrayList<>();
+
+    /** F9: a plugin whose filter list fails the test if it asks for a client. */
+    private BrowserPlugin plugin() {
+        return new BrowserPlugin(() -> {
+            clientsAsked.add("a client");
+            throw new AssertionError("A test must not download a filter list");
+        }, settings -> LIST);
+    }
+
+    @AfterEach void noTestDownloadedAFilterList() {
+        assertThat(clientsAsked).as("F9: no filter list downloaded").isEmpty();
+    }
+
+    /**
+     * F8 and spec section 19: a start with ad blocking already on reads no filter list, cached or not, and asks for no
+     * client; turning it on in Settings starts the list, which then reads its cache, fresh from its address, without the
+     * network. The stop ends it.
+     */
+    @Test void aStartWithAdBlockingOnReadsNoFilterListAndTurningItOnReadsTheCache(@TempDir Path root) throws Exception {
+        Path cache = Files.createDirectories(root.resolve(ID).resolve("data").resolve("adblock"));
+        Files.writeString(cache.resolve("state.json"), "{\"url\":\"" + LIST + "\",\"updated\":\"" + Instant.now() + "\",\"rules\":1,\"skipped\":0}");
+        Files.writeString(cache.resolve("rules.json"), "[{\"trigger\":{\"url-filter\":\"ads.example/\"},\"action\":{\"type\":\"block\"}}]");
+        var plugin = plugin();
+        var host = new AtomicReference<FakePluginHost>();
+        SwingUtilities.invokeAndWait(() -> {
+            host.set(new FakePluginHost(root));
+            host.get().setSetting(ID, "ad_blocking", true);
+            host.get().start(INFO, Set.of(), Set.of(), plugin);
+            host.get().runBackground();
+        });
+        try {
+            assertThat(plugin.filters().active()).as("nothing read at the start").isEmpty();
+            assertThat(plugin.filters().status()).isEqualTo(new FilterList.Status(0, Optional.empty(), false, Optional.empty()));
+            SwingUtilities.invokeAndWait(() -> {
+                host.get().setSetting(ID, "ad_blocking", false);
+                host.get().setSetting(ID, "ad_blocking", true);
+                host.get().runBackground();
+            });
+            assertThat(plugin.filters().active()).as("turned on, the list reads its cache").isPresent().get()
+                .extracting(dev.jasper.browser.adblock.RuleSet::size).isEqualTo(1);
+            assertThat(plugin.filters().status().updating()).as("fresh from its address: nothing is due").isFalse();
+            SwingUtilities.invokeAndWait(() -> host.get().stopAll());
+            assertThat(plugin.filters().active()).as("the stop ends the list").isEmpty();
+        } finally {
+            SwingUtilities.invokeAndWait(() -> host.get().close());
+        }
+    }
+
+    /**
+     * F9's proof: turning ad blocking on in the fake host, here through the setup page's Ad Blocker switch, which shows
+     * and sets Enable Ad Blocking, downloads the list only through the client the test gave the plugin, for the address
+     * it gave; that client opens no connection, and its failure is the list's status.
+     */
+    @Test void turningAdBlockingOnFromTheSetupPageDownloadsOnlyThroughTheGivenClient(@TempDir Path root) throws Exception {
+        var asked = new CopyOnWriteArrayList<String>();
+        var plugin = new BrowserPlugin(() -> {
+            asked.add("a client");
+            throw new IllegalStateException("no network in tests");
+        }, settings -> LIST);
+        var host = new AtomicReference<FakePluginHost>();
+        SwingUtilities.invokeAndWait(() -> {
+            host.set(new FakePluginHost(root));
+            host.get().start(INFO, Set.of(), Set.of(), plugin);
+        });
+        try {
+            assertThat(ask(plugin, "onboarding-setup", 1, "{\"op\":\"switches\"}")).isEqualTo("{\"switches\":[{\"id\":\"ad-blocker\",\"title\":"
+                + "\"Ad Blocker\",\"description\":\"Block ads with a filter list that updates every day.\",\"on\":false}]}");
+            assertThat(ask(plugin, "onboarding-setup", 1, "{\"op\":\"switch\",\"id\":\"ad-blocker\",\"on\":\"true\"}")).isEqualTo("{\"on\":true}");
+            SwingUtilities.invokeAndWait(() -> {
+                assertThat(host.get().savedSettings(ID)).containsEntry("ad_blocking", true);
+                host.get().runBackground();
+            });
+            assertThat(asked).as("the given client alone, asked once").containsExactly("a client");
+            assertThat(plugin.filters().status()).isEqualTo(new FilterList.Status(0, Optional.empty(), false, Optional.of("no network in tests")));
+            assertThat(plugin.filters().active()).isEmpty();
+            assertThat(root.resolve(ID).resolve("data").resolve("adblock").resolve("rules.json")).doesNotExist();
+            SwingUtilities.invokeAndWait(() -> assertThat(host.get().failures()).isEmpty());
+        } finally {
+            SwingUtilities.invokeAndWait(() -> host.get().close());
+        }
+    }
 
     @Test void aChromiumThatCannotStartPostsOneNotificationWithTheReasonWhileThePluginRuns() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
-            var plugin = new BrowserPlugin();
+            var plugin = plugin();
             host.start(INFO, Set.of(), Set.of(), plugin);
             plugin.startFailed(new IllegalStateException("Chromium did not start within 90 seconds"));
             assertThat(host.notifications().lines())
@@ -64,7 +156,7 @@ class BrowserPluginTest {
      */
     @Test void historyBookmarksAndSitePermissionsThatAreUnavailablePostANotificationWithTheReasonWhileThePluginRuns() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost(); var log = new CapturedLog("dev.jasper.plugins." + ID)) {
-            var plugin = new BrowserPlugin();
+            var plugin = plugin();
             host.start(INFO, Set.of(), Set.of(), plugin);
             plugin.storesUnavailable(new java.sql.SQLException("[SQLITE_NOTADB] file is not a database"));
             assertThat(host.notifications().lines())
@@ -86,7 +178,7 @@ class BrowserPluginTest {
      */
     @Test void theStartMakesTheStoresWithoutOpeningThemAndTheStopClosesThem() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
-            var plugin = new BrowserPlugin();
+            var plugin = plugin();
             host.start(INFO, Set.of(), Set.of(), plugin);
             assertThat(MemoryStores.started(plugin.stores())).isFalse();
             assertThat(plugin.stores().closed()).isNotDone();
@@ -104,7 +196,7 @@ class BrowserPluginTest {
     @Test @DisabledOnOs(OS.WINDOWS) void theDataFolderIsItsOwnersAloneOnceTheDatabaseOpens(@TempDir Path root) throws Exception {
         Path data = Files.createDirectories(root.resolve(ID).resolve("data"));
         Files.setPosixFilePermissions(data, PosixFilePermissions.fromString("rwxr-xr-x"));
-        var plugin = new BrowserPlugin();
+        var plugin = plugin();
         var host = new AtomicReference<FakePluginHost>();
         SwingUtilities.invokeAndWait(() -> {
             host.set(new FakePluginHost(root));
@@ -122,7 +214,7 @@ class BrowserPluginTest {
     /** Spec section 11: the start registers the Bookmarks and Browser History scopes, which read nothing until searched. */
     @Test void theStartRegistersTheBookmarksAndBrowserHistoryScopesWithoutOpeningTheDatabase() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
-            var plugin = new BrowserPlugin();
+            var plugin = plugin();
             UUID window = host.addTerminalWindow();
             host.start(INFO, Set.of(), Set.of(), plugin);
             assertThat(host.searchScope("dev.jasper.browser.scope.bookmarks", "", window, null)).isEmpty();
@@ -139,7 +231,7 @@ class BrowserPluginTest {
      */
     @Test void thePluginPublishesTheMarkdownPreviewsAndTellsThemWhenChromiumCannotStart() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
-            var plugin = new BrowserPlugin();
+            var plugin = plugin();
             host.start(INFO, Set.of(), Set.of(), plugin);
             MarkdownPreviews previews = previews(host);
             assertThat(previews.available()).isTrue();
@@ -159,7 +251,7 @@ class BrowserPluginTest {
     /** Stopping the Browser stops Chromium: every preview still open is unavailable, and no preview is available after. */
     @Test void stoppingThePluginTellsEachOpenPreviewItIsUnavailable() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
-            var plugin = new BrowserPlugin();
+            var plugin = plugin();
             host.start(INFO, Set.of(), Set.of(), plugin);
             MarkdownPreviews previews = previews(host);
             List<PreviewEvent> told = new ArrayList<>();
@@ -181,7 +273,7 @@ class BrowserPluginTest {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
             UUID window = host.addTerminalWindow();
             host.activateTerminalWindow(window);
-            var plugin = new BrowserPlugin();
+            var plugin = plugin();
             host.start(INFO, Set.of(), Set.of(), plugin);
             assertThat(host.invoke(BrowserPlugin.NEW_TAB, window, null)).isTrue();
             assertThat(host.contentTabs()).as("not started: it opens").hasSize(1);
@@ -210,7 +302,7 @@ class BrowserPluginTest {
 
     @Test void newBrowserTabAndNewBrowserWindowAreInTheFileMenuWithTheGlobeAndNoDefaultKey() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
-            host.start(INFO, Set.of(), Set.of(), new BrowserPlugin());
+            host.start(INFO, Set.of(), Set.of(), plugin());
             assertThat(host.menu("FILE")).containsExactly("item:" + BrowserPlugin.NEW_TAB, "item:" + BrowserPlugin.NEW_WINDOW);
             assertThat(host.actions()).contains(BrowserPlugin.NEW_TAB + "|New Browser Tab|true", BrowserPlugin.NEW_WINDOW + "|New Browser Window|true");
             for (String action : new String[] { BrowserPlugin.NEW_TAB, BrowserPlugin.NEW_WINDOW })
@@ -231,7 +323,7 @@ class BrowserPluginTest {
     /** Spec section 15: the bookmark notifications are a group of their own, which Settings lists from the start. */
     @Test void theStartDeclaresTheBookmarksNotificationGroup() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
-            host.start(INFO, Set.of(), Set.of(), new BrowserPlugin());
+            host.start(INFO, Set.of(), Set.of(), plugin());
             assertThat(host.notifications().groups()).contains("dev.jasper.browser.bookmarks|Bookmarks|CARD");
             assertThat(host.failures()).isEmpty();
         } });
@@ -240,7 +332,7 @@ class BrowserPluginTest {
     /** Spec section 12: pages' notifications post in a group of their own, which Settings lists from the start. */
     @Test void theStartDeclaresThePageNotificationsGroup() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
-            host.start(INFO, Set.of(), Set.of(), new BrowserPlugin());
+            host.start(INFO, Set.of(), Set.of(), plugin());
             assertThat(host.notifications().groups()).contains("dev.jasper.browser.pages|Page notifications|CARD");
             assertThat(host.failures()).isEmpty();
         } });
@@ -250,9 +342,9 @@ class BrowserPluginTest {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
             UUID window = host.addTerminalWindow();
             host.activateTerminalWindow(window);
-            host.start(INFO, Set.of(), Set.of(), new BrowserPlugin());
+            host.start(INFO, Set.of(), Set.of(), plugin());
             assertThat(host.declared(ID)).containsExactly("start_page", "page_zoom", "open_links_from_terminal", "open_local_web_files",
-                "search_engine", "custom_search_url", "custom_suggestions_url", "devnull_mode");
+                "search_engine", "custom_search_url", "custom_suggestions_url", "devnull_mode", "ad_blocking", "filter_list_url");
             assertThat(host.browserPlugin()).as("Jasper's web browser").contains(ID);
             assertThat(host.invoke(BrowserPlugin.NEW_TAB, window, null)).isTrue();
             var tab = host.contentTabs().getLast();
@@ -275,7 +367,7 @@ class BrowserPluginTest {
             UUID window = host.addTerminalWindow();
             host.activateTerminalWindow(window);
             host.setSetting(ID, "start_page", "example.com");
-            host.start(INFO, Set.of(), Set.of(), new BrowserPlugin());
+            host.start(INFO, Set.of(), Set.of(), plugin());
             assertThat(host.invoke(BrowserPlugin.NEW_TAB, window, null)).isTrue();
             assertThat(host.contentPresentation(host.contentTabs().getLast()).location()).as("as the address field loads it")
                 .isEqualTo("https://example.com");
@@ -296,7 +388,7 @@ class BrowserPluginTest {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
             UUID window = host.addTerminalWindow();
             host.setSetting(ID, "start_page", "example.org");
-            host.start(INFO, Set.of(), Set.of(), new BrowserPlugin());
+            host.start(INFO, Set.of(), Set.of(), plugin());
             var saved = BrowserRestore.state(URI.create("https://example.com/docs"), Optional.of("docs"), OptionalInt.empty(), false).orElseThrow();
             assertThat(host.restoreTab(ID, window, "Docs", saved)).isPresent();
             var docs = host.contentTabs().getLast();
@@ -321,7 +413,7 @@ class BrowserPluginTest {
      * the setting says, and any other saved item in the persistent one.
      */
     @Test void devNullModeChoosesTheStoreOfNewAndRestoredItems() throws Exception {
-        var plugin = new BrowserPlugin();
+        var plugin = plugin();
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
             UUID window = host.addTerminalWindow();
             host.activateTerminalWindow(window);
@@ -370,7 +462,7 @@ class BrowserPluginTest {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost(root)) {
             UUID window = host.addTerminalWindow();
             host.activateTerminalWindow(window);
-            host.start(INFO, Set.of(), Set.of(), new BrowserPlugin());
+            host.start(INFO, Set.of(), Set.of(), plugin());
             assertThat(marker).as("read once").doesNotExist();
             for (String address : new String[] { "https://example.com/docs", "https://example.org/" })
                 assertThat(host.restoreTab(ID, window, "Saved",
@@ -395,7 +487,7 @@ class BrowserPluginTest {
      * item's browser none of them, and a browser no page has is refused.
      */
     @Test void jaspersPagesAnswerEachQueryFromTheAskingBrowsersStore(@TempDir Path root) throws Exception {
-        var plugin = new BrowserPlugin();
+        var plugin = plugin();
         var host = new AtomicReference<FakePluginHost>();
         SwingUtilities.invokeAndWait(() -> {
             host.set(new FakePluginHost(root));
@@ -440,7 +532,7 @@ class BrowserPluginTest {
     /** Spec section 12: the start registers {@code jasper-about:permissions}, "Site Permissions", with its queries. */
     @Test void theStartRegistersThePermissionsPageAndItsQueries() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
-            var plugin = new BrowserPlugin();
+            var plugin = plugin();
             host.start(INFO, Set.of(), Set.of(), plugin);
             assertThat(plugin.about().secret("permissions")).as("its queries").isPresent();
             var answer = plugin.about().answer("jasper-about:permissions");
@@ -453,7 +545,7 @@ class BrowserPluginTest {
 
     /** Plan 6: a site permission that could not be saved posts "Site permissions could not be saved", while the plugin runs. */
     @Test void aSitePermissionThatCannotBeSavedPostsAnErrorWhileThePluginRuns(@TempDir Path root) throws Exception {
-        var plugin = new BrowserPlugin();
+        var plugin = plugin();
         var host = new AtomicReference<FakePluginHost>();
         SwingUtilities.invokeAndWait(() -> {
             host.set(new FakePluginHost(root));
@@ -487,7 +579,7 @@ class BrowserPluginTest {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
             UUID window = host.addTerminalWindow();
             host.activateTerminalWindow(window);
-            var plugin = new BrowserPlugin();
+            var plugin = plugin();
             host.start(INFO, Set.of(), Set.of(), plugin);
             assertThat(host.settingsPanel(ID)).as("the Browser's own page").isPresent();
             var accepted = new java.util.concurrent.atomic.AtomicInteger();
@@ -531,7 +623,7 @@ class BrowserPluginTest {
             UUID window = host.addTerminalWindow();
             host.activateTerminalWindow(window);
             host.setSetting(ID, "devnull_mode", true);
-            var plugin = new BrowserPlugin();
+            var plugin = plugin();
             host.start(INFO, Set.of(), Set.of(), plugin);
             plugin.managePermissions();
             assertThat(plugin.items().items()).singleElement().satisfies(item -> {
@@ -555,7 +647,7 @@ class BrowserPluginTest {
         Path data = Files.createDirectories(root.resolve(ID).resolve("data"));
         dev.jasper.browser.store.DatabaseFixtures.plan5(data, "https://cleared.example/");
         Files.writeString(data.resolve("chromium-clear"), "all database");
-        var plugin = new BrowserPlugin();
+        var plugin = plugin();
         var host = new AtomicReference<FakePluginHost>();
         SwingUtilities.invokeAndWait(() -> {
             host.set(new FakePluginHost(root));
@@ -572,7 +664,7 @@ class BrowserPluginTest {
     /** A clearing that failed posts its error with the reason, while the plugin runs. */
     @Test void aClearingThatFailedPostsAnErrorWhileThePluginRuns() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
-            var plugin = new BrowserPlugin();
+            var plugin = plugin();
             host.start(INFO, Set.of(), Set.of(), plugin);
             plugin.notCleared(dev.jasper.browser.item.WebsiteData.NOT_CLEARED,
                 new java.util.concurrent.TimeoutException("Chromium did not clear its data within 60 seconds"));

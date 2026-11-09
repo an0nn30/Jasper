@@ -1,6 +1,8 @@
 package dev.jasper.browser.settings;
 
+import dev.jasper.browser.adblock.FilterList;
 import dev.jasper.browser.settings.BrowserSettingsPanel.Actions;
+import dev.jasper.browser.settings.BrowserSettingsPanel.FilterStatistics;
 import dev.jasper.browser.settings.BrowserSettingsPanel.Prompt;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.testing.FakeKitView;
@@ -9,7 +11,13 @@ import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.UiEvent;
 import java.awt.EventQueue;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -22,8 +30,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Plan 6 Task 8: Settings › Tools › Browser is the Browser's own page. It shows every declared setting as Settings'
  * standard row, by section, as the generated page did, and Privacy &amp; Data adds Clear All Cookies, Clear Website Data
  * and Manage Site Permissions, with iTerm2's labels. Each clearing asks first, and the actions run only once the user
- * accepts; Clear Website Data tells its success only once the clearing has completed. Driven as Settings drives it, on
- * the SDK's fake host, with recording actions: nothing here clears anything or shows a real dialog.
+ * accepts; Clear Website Data tells its success only once the clearing has completed. Ad Blocking adds the filter
+ * list's statistics and Update Now (plan 6 Task 10). Driven as Settings drives it, on the SDK's fake host, with
+ * recording actions: nothing here clears anything, shows a real dialog or downloads a list (F9).
  */
 class BrowserSettingsPanelTest {
     private static final String ID = "dev.jasper.browser";
@@ -31,6 +40,9 @@ class BrowserSettingsPanelTest {
     private final List<Prompt> prompts = new CopyOnWriteArrayList<>();
     private final List<String> ran = new CopyOnWriteArrayList<>();
     private volatile CompletableFuture<Void> cookies = new CompletableFuture<>(), data = new CompletableFuture<>();
+    private volatile FilterList.Status filterStatus = new FilterList.Status(0, Optional.empty(), false, Optional.empty());
+    private volatile OptionalInt stale = OptionalInt.empty();
+    private volatile CompletableFuture<FilterList.Status> update = new CompletableFuture<>();
     private FakePluginHost host;
     private BrowserSettingsPanel panel;
 
@@ -48,7 +60,7 @@ class BrowserSettingsPanelTest {
             var page = (Nodes.Stack) view.spec().root();
             assertThat(page.role()).isEqualTo(Nodes.LayoutRole.SETTINGS_PAGE);
             assertThat(page.children()).extracting(node -> ((Nodes.Section) node).title())
-                .containsExactly("General", "Link Opening", "Search Engine", "Privacy & Data");
+                .containsExactly("General", "Link Opening", "Search Engine", "Privacy & Data", "Ad Blocking");
             assertThat(rows(view, "browser.settings.general")).containsExactly("settings:start_page:row", "settings:page_zoom:row");
             assertThat(rows(view, "browser.settings.link-opening"))
                 .containsExactly("settings:open_links_from_terminal:row", "settings:open_local_web_files:row");
@@ -56,7 +68,9 @@ class BrowserSettingsPanelTest {
                 .containsExactly("settings:search_engine:row", "settings:custom_search_url:row", "settings:custom_suggestions_url:row");
             assertThat(rows(view, "browser.settings.privacy-data")).containsExactly("settings:devnull_mode:row",
                 BrowserSettingsPanel.CLEAR_COOKIES + ":row", BrowserSettingsPanel.CLEAR_DATA + ":row", BrowserSettingsPanel.PERMISSIONS + ":row");
-            for (String section : List.of("general", "link-opening", "search-engine", "privacy-data"))
+            assertThat(rows(view, "browser.settings.ad-blocking")).containsExactly("settings:ad_blocking:row", "settings:filter_list_url:row",
+                BrowserSettingsPanel.FILTERS + ":row");
+            for (String section : List.of("general", "link-opening", "search-engine", "privacy-data", "ad-blocking"))
                 assertThat(node(view, "browser.settings." + section + ".card", Nodes.Card.class).kind()).as(section).isEqualTo(Nodes.CardKind.SETTINGS);
 
             var cookiesRow = node(view, BrowserSettingsPanel.CLEAR_COOKIES + ":row", Nodes.SettingRow.class);
@@ -212,6 +226,96 @@ class BrowserSettingsPanelTest {
         });
     }
 
+    /**
+     * Plan 6 Task 10: Ad Blocking's Filter Statistics row says how many rules the list has and when it was updated,
+     * or that it is updating, or why it could not be updated, with Update Now at its trailing edge.
+     */
+    @Test void theFilterStatisticsSayTheCountAndTheUpdateOrThatItUpdatesOrWhyItFailed() throws Exception {
+        Instant updated = Instant.parse("2026-11-09T10:15:00Z");
+        String when = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.ROOT).withZone(ZoneId.systemDefault()).format(updated);
+        filterStatus = new FilterList.Status(12_345, Optional.of(updated), false, Optional.empty());
+        onUi(() -> {
+            FakeKitView view = page();
+            var row = node(view, BrowserSettingsPanel.FILTERS + ":row", Nodes.SettingRow.class);
+            assertThat(row.title()).isEqualTo("Filter Statistics");
+            assertThat(row.description()).isEqualTo("12,345 rules · Updated " + when);
+            assertThat(button(view, BrowserSettingsPanel.FILTERS).label()).isEqualTo("Update Now");
+            assertThat(button(view, BrowserSettingsPanel.FILTERS).state()).isEqualTo(ControlState.READY);
+        });
+        for (var shown : List.of(
+                java.util.Map.entry(new FilterList.Status(1, Optional.empty(), false, Optional.empty()), "1 rule"),
+                java.util.Map.entry(new FilterList.Status(0, Optional.empty(), false, Optional.empty()), "0 rules"),
+                java.util.Map.entry(new FilterList.Status(12_345, Optional.of(updated), true, Optional.empty()), "Updating…"),
+                java.util.Map.entry(new FilterList.Status(12_345, Optional.of(updated), false, Optional.of("the server answered HTTP 500")),
+                    "Could not update the filter list: the server answered HTTP 500"))) {
+            filterStatus = shown.getKey();
+            panel.filtersChanged();
+            flushUi();
+            onUi(() -> assertThat(node(host.settingsPanelView(ID).orElseThrow(), BrowserSettingsPanel.FILTERS + ":row", Nodes.SettingRow.class)
+                .description()).as(shown.getKey().toString()).isEqualTo(shown.getValue()));
+        }
+        onUi(() -> assertThat(button(host.settingsPanelView(ID).orElseThrow(), BrowserSettingsPanel.FILTERS).state().busy())
+            .as("a list that is not updating").isFalse());
+        filterStatus = new FilterList.Status(3, Optional.of(updated), true, Optional.empty());
+        panel.filtersChanged();
+        flushUi();
+        onUi(() -> assertThat(button(host.settingsPanelView(ID).orElseThrow(), BrowserSettingsPanel.FILTERS).state())
+            .as("busy while the list updates, as an hourly check may").isEqualTo(new ControlState(true, false, true, "")));
+        assertThat(host.failures()).isEmpty();
+    }
+
+    /** A list that has gone 7 days or more without an update adds a warning, iTerm2's text completed, in the card. */
+    @Test void aStaleListAddsAWarning() throws Exception {
+        filterStatus = new FilterList.Status(3, Optional.of(Instant.parse("2026-10-01T00:00:00Z")), false, Optional.empty());
+        onUi(() -> {
+            FakeKitView view = page();
+            assertThat(find(view.spec().root(), BrowserSettingsPanel.STALE)).as("not stale").isNull();
+            assertThat(node(view, "browser.settings.ad-blocking.card", Nodes.Card.class).kind()).isEqualTo(Nodes.CardKind.SETTINGS);
+        });
+        stale = OptionalInt.of(9);
+        panel.filtersChanged();
+        flushUi();
+        onUi(() -> {
+            FakeKitView view = host.settingsPanelView(ID).orElseThrow();
+            var warning = node(view, BrowserSettingsPanel.STALE, Nodes.Text.class);
+            assertThat(warning.text()).isEqualTo("Ad block rules haven't been updated for 9 days");
+            assertThat(warning.severity()).contains(Nodes.Severity.WARNING);
+            var card = node(view, "browser.settings.ad-blocking.card", Nodes.Card.class);
+            assertThat(card.kind()).as("a text among setting rows").isEqualTo(Nodes.CardKind.MIXED);
+            assertThat(card.children()).extracting(Nodes.Node::id).containsExactly("settings:ad_blocking:row", "settings:filter_list_url:row",
+                BrowserSettingsPanel.FILTERS + ":row", BrowserSettingsPanel.STALE);
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * Update Now downloads the list at once, without asking: its button is busy until the download has ended, and a
+     * press meanwhile does nothing; the row then shows the list's status.
+     */
+    @Test void updateNowDownloadsOnceAndTheRowShowsTheStatusOnceItEnds() throws Exception {
+        onUi(() -> {
+            FakeKitView view = page();
+            view.emit(new UiEvent.Action(BrowserSettingsPanel.FILTERS));
+            assertThat(ran).containsExactly("update");
+            assertThat(prompts).as("asks nothing").isEmpty();
+            assertThat(button(view, BrowserSettingsPanel.FILTERS).state()).isEqualTo(new ControlState(true, false, true, ""));
+            view.emit(new UiEvent.Action(BrowserSettingsPanel.FILTERS));
+            assertThat(ran).as("a second press while it runs").containsExactly("update");
+        });
+        filterStatus = new FilterList.Status(7, Optional.of(Instant.parse("2026-11-09T10:15:00Z")), false, Optional.empty());
+        update.complete(filterStatus);
+        flushUi();
+        onUi(() -> {
+            FakeKitView view = host.settingsPanelView(ID).orElseThrow();
+            assertThat(button(view, BrowserSettingsPanel.FILTERS).state()).isEqualTo(ControlState.READY);
+            assertThat(node(view, BrowserSettingsPanel.FILTERS + ":row", Nodes.SettingRow.class).description()).startsWith("7 rules · Updated ");
+            update = new CompletableFuture<>();
+            view.emit(new UiEvent.Action(BrowserSettingsPanel.FILTERS));
+            assertThat(ran).containsExactly("update", "update");
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
     @Test void manageSitePermissionsRunsItsActionWithoutAsking() throws Exception {
         onUi(() -> {
             FakeKitView view = page();
@@ -263,7 +367,10 @@ class BrowserSettingsPanelTest {
             }, () -> {
                 ran.add("data");
                 return data;
-            }, () -> ran.add("permissions"), prompts::add));
+            }, () -> ran.add("permissions"), prompts::add), new FilterStatistics(() -> filterStatus, () -> stale, () -> {
+                ran.add("update");
+                return update;
+            }));
             context.settings().page(panel);
         });
         host.settingsPanel(ID).orElseThrow();

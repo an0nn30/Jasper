@@ -1,15 +1,21 @@
 package dev.jasper.browser.page;
 
+import dev.jasper.browser.adblock.FilterList;
+import dev.jasper.browser.adblock.RuleSet;
 import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.json.StrictJson;
 import dev.jasper.browser.permissions.AudioMode;
 import dev.jasper.browser.permissions.Decision;
 import dev.jasper.browser.permissions.Origins;
 import dev.jasper.browser.permissions.Permission;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.function.Consumer;
+import java.util.Set;
+import java.util.WeakHashMap;
+import java.util.function.Supplier;
 import org.cef.CefClient;
 import org.cef.browser.CefBrowser;
 import org.cef.browser.CefFrame;
@@ -33,35 +39,115 @@ import org.cef.browser.CefFrame;
  * store in memory included (ruling V20), and that becomes the page's current mode ({@link PagePrivacy#audioMode}),
  * which every sub-frame starting a document is given, so an embedded player is muted with its page. Muting the page
  * runs {@code setMuted} in each frame ({@link #everyFrame(CefBrowser, String)}). The muting is cooperative: the page's
- * own scripts can undo it, and an {@code AudioContext} made before the script ran is not tracked. Both hooks are given
- * to the client once, when a page first starts, as {@link PageEvents#prepare} gives its handlers.
+ * own scripts can undo it, and an {@code AudioContext} made before the script ran is not tracked.
+ *
+ * <p>While ad blocking's filter list has a rule set active, every frame but a challenge frame, a Jasper page's and one
+ * whose sheet is empty then runs {@code hide-elements.js}, called with the lines its document hides ({@link Hiding}): a
+ * main frame its own sheet, a sub-frame the list's generic part alone (F34). The script adds each line through
+ * {@code CSSStyleSheet.insertRule} to a sheet the document adopts, with the one fixed declaration
+ * {@code display:none!important}, so a hostile list can hide elements and do nothing else (F5); a /dev/null page's
+ * frames hide them too, as blocking is a protection. Both hooks are given to the client once, when a page first starts,
+ * as {@link PageEvents#prepare} gives its handlers.
  */
 final class FrameScripts {
     /** The notifications stand-in: a function of the document's permission. */
     static final String NOTIFICATIONS = PageEvents.script("notifications.js");
     /** The audio muting: a function of the document's audio mode. */
     static final String AUDIO = PageEvents.script("audio.js");
+    /** The element hiding: a function of the document's sheet. */
+    static final String HIDE_ELEMENTS = PageEvents.script("hide-elements.js");
     /** The permission a document is given: Allowed, Blocked or none stored. */
     static final String GRANTED = "granted", DENIED = "denied", DEFAULT = "default";
     // The names the scripts go by in a page's console and stack traces.
-    private static final String NOTIFICATIONS_URL = "jasper-about:notifications.js", AUDIO_URL = "jasper-about:audio.js";
-    private static final Consumer<CefClient> INSTALL = FrameScripts::install;
+    private static final String NOTIFICATIONS_URL = "jasper-about:notifications.js", AUDIO_URL = "jasper-about:audio.js",
+        HIDE_URL = "jasper-about:hide-elements.js";
+    private static final String JASPER_ABOUT = "jasper-about:";
+    // The Chromiums given the hooks, held weakly: one installer for each, so one for each plugin run, however often a page asks.
+    private static final Set<Chromium> PREPARED = Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
     private static final System.Logger LOG = System.getLogger(FrameScripts.class.getName());
 
     private FrameScripts() { }
 
     /**
      * Has Chromium hook its client's main-frame and sub-frame load starts before any page is made on it; once, however
-     * often asked. Called when a page first asks for Chromium, never at the plugin's start: this class names Chromium's
-     * types.
+     * often asked, with one installer for the plugin's run. Called when a page first asks for Chromium, never at the
+     * plugin's start: this class names Chromium's types.
+     *
+     * @param chromium the plugin's Chromium
+     * @param filters the plugin's filter list, whose rule set active hides each document's elements
      */
-    static void prepare(Chromium chromium) {
-        chromium.onClient(INSTALL);
+    static void prepare(Chromium chromium, FilterList filters) {
+        if (PREPARED.add(chromium)) {
+            var hiding = new Hiding(filters::active);
+            chromium.onClient(client -> install(client, hiding));
+        }
     }
 
-    private static void install(CefClient client) {
-        PageEvents.onMainFrameLoadStart(client, FrameScripts::loadStarting);
-        PageEvents.onSubFrameLoadStart(client, FrameScripts::loadStarting);
+    /**
+     * The element hiding, called with {@code sheet} quoted: a string literal, as {@link StrictJson#quote} writes it, so no
+     * selector can end the literal or the call, and nothing is written as HTML.
+     *
+     * @param sheet the lines to hide, {@code selector{display:none!important}} each, as a {@link RuleSet} gives them
+     * @return the script
+     */
+    static String hideElements(String sheet) {
+        return HIDE_ELEMENTS + "\n(" + StrictJson.quote(sheet) + ");";
+    }
+
+    /**
+     * Ad blocking's part of the frames' scripts (spec section 12): the element hiding of a frame starting a document, as
+     * the filter list's rule set active then gives its sheet. A main frame hides what its own document's sheet names,
+     * the generic lines and its site's ({@link RuleSet#stylesheet}); a sub-frame hides the generic lines alone
+     * ({@link RuleSet#genericStylesheet}), which its list shares with every sub-frame (F34), so their script is made once
+     * and kept for the next. The rule set indexes its rules and bounds its work, so no sheet scans every rule. No
+     * script for a Jasper page ({@code jasper-about:}), nor for a sheet that is empty. Chromium's thread.
+     */
+    static final class Hiding {
+        /** No hiding: no rule set is ever active. */
+        static final Hiding NONE = new Hiding(Optional::empty);
+        private final Supplier<Optional<RuleSet>> rules;
+        // The last sub-frame's sheet and its script, which the next sub-frame most likely shares; guarded by this.
+        private String sheet = "", script = "";
+
+        /**
+         * The hiding of {@code rules}.
+         *
+         * @param rules the rule set active, read as each document starts: the filter list's
+         */
+        Hiding(Supplier<Optional<RuleSet>> rules) {
+            this.rules = rules;
+        }
+
+        /**
+         * The element hiding a frame starting to load the document at {@code address} runs.
+         *
+         * @param mainFrame whether it is its page's main frame
+         * @param address the document's address
+         * @return the script; empty without a rule set, for a Jasper page, and when the sheet is empty
+         */
+        Optional<Script> script(boolean mainFrame, String address) {
+            Optional<RuleSet> active = rules.get();
+            if (active.isEmpty() || address == null || address.regionMatches(true, 0, JASPER_ABOUT, 0, JASPER_ABOUT.length()))
+                return Optional.empty();
+            if (mainFrame) {
+                String own = active.get().stylesheet(address);
+                return own.isEmpty() ? Optional.empty() : Optional.of(new Script(HIDE_URL, hideElements(own)));
+            }
+            String generic = active.get().genericStylesheet(address);
+            if (generic.isEmpty()) return Optional.empty();
+            synchronized (this) {
+                if (!generic.equals(sheet)) {
+                    sheet = generic;
+                    script = hideElements(generic);
+                }
+                return Optional.of(new Script(HIDE_URL, script));
+            }
+        }
+    }
+
+    private static void install(CefClient client, Hiding hiding) {
+        PageEvents.onMainFrameLoadStart(client, (browser, frame) -> loadStarting(browser, frame, hiding));
+        PageEvents.onSubFrameLoadStart(client, (browser, frame) -> loadStarting(browser, frame, hiding));
     }
 
     /**
@@ -71,15 +157,16 @@ final class FrameScripts {
      *
      * @param browser the page's browser
      * @param frame the frame, which is not disposed here
+     * @param hiding ad blocking's element hiding
      */
-    static void loadStarting(PageBrowser browser, CefFrame frame) {
+    static void loadStarting(PageBrowser browser, CefFrame frame, Hiding hiding) {
         Page page = browser.owner();
         if (page == null) return;
         try {
             boolean main = frame.isMain();
             String address = frame.getURL();
             if (main) page.privacy().documentStarted(audioMode(address, page));
-            for (Script script : scripts(main, address, page)) frame.executeJavaScript(script.text(), script.url(), 0);
+            for (Script script : scripts(main, address, page, hiding)) frame.executeJavaScript(script.text(), script.url(), 0);
         } catch (RuntimeException failure) {
             LOG.log(System.Logger.Level.WARNING, "A page's privacy scripts could not run", failure);
         }
@@ -100,14 +187,18 @@ final class FrameScripts {
      * @param mainFrame whether it is its page's main frame
      * @param address the document's address
      * @param page the page, whose privacy hooks give its item's stored decisions and its current audio mode
+     * @param hiding ad blocking's element hiding
      * @return for a main frame that is no challenge frame, the notifications stand-in and the audio muting; for a
-     *     sub-frame that is none, the audio muting in the page's current mode; none for a challenge frame
+     *     sub-frame that is none, the audio muting in the page's current mode; then the element hiding, when
+     *     {@code hiding} gives one; none for a challenge frame
      */
-    static List<Script> scripts(boolean mainFrame, String address, Page page) {
+    static List<Script> scripts(boolean mainFrame, String address, Page page, Hiding hiding) {
         if (ChallengeFrames.is(address)) return List.of();
-        Script audio = new Script(AUDIO_URL, audio(page.privacy().audioMode()));
-        if (!mainFrame) return List.of(audio);
-        return List.of(new Script(NOTIFICATIONS_URL, notifications(state(address, page))), audio);
+        var scripts = new ArrayList<Script>(3);
+        if (mainFrame) scripts.add(new Script(NOTIFICATIONS_URL, notifications(state(address, page))));
+        scripts.add(new Script(AUDIO_URL, audio(page.privacy().audioMode())));
+        hiding.script(mainFrame, address).ifPresent(scripts::add);
+        return List.copyOf(scripts);
     }
 
     /**

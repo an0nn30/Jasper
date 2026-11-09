@@ -180,6 +180,7 @@ class LinkDecisionTest {
     }
 
     private static BrowserSettings settings(LinkOpening links, LocalFileOpening files) {
-        return new BrowserSettings(BrowserSettings.WELCOME, 100, links, files, SearchEngine.GOOGLE, "", "", false);
+        return new BrowserSettings(BrowserSettings.WELCOME, 100, links, files, SearchEngine.GOOGLE, "", "", false, false,
+            URI.create(BrowserSettings.EASYLIST));
     }
 }

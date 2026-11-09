@@ -1,5 +1,8 @@
 package dev.jasper.browser.links;
 
+import dev.jasper.browser.adblock.BlockerJson;
+import dev.jasper.browser.adblock.ContentRules;
+import dev.jasper.browser.adblock.RuleSet;
 import dev.jasper.browser.page.LoadFailure;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageBrowser;
@@ -13,6 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import javax.swing.SwingUtilities;
 import org.cef.browser.CefFrame;
 import org.cef.network.CefRequest;
@@ -164,24 +168,24 @@ class PageNavigationTest {
             var responses = new org.cef.handler.CefResourceRequestHandlerAdapter() { };
 
             var welcome = new Request("jasper-about:welcome", ResourceType.RT_MAIN_FRAME);
-            var both = PageNavigation.requests(inMemory, welcome, true, () -> responses, null);
+            var both = PageNavigation.requests(inMemory, welcome, true, () -> responses, null, Optional::empty);
             assertThat(both).isNotNull();
             assertThat(both.responses).as("the opener bridge's").isSameAs(responses);
             assertThat(both.about).as("jasper-about: through the request handler").isTrue();
             assertThat(welcome.urlReads).isEqualTo(1);
 
             var web = new Request("https://example.com/", ResourceType.RT_MAIN_FRAME);
-            var bridged = PageNavigation.requests(inMemory, web, true, () -> responses, null);
+            var bridged = PageNavigation.requests(inMemory, web, true, () -> responses, null, Optional::empty);
             assertThat(bridged.responses).isSameAs(responses);
             assertThat(bridged.about).isFalse();
 
             var typed = new Request("JASPER-ABOUT://history/?q=1", ResourceType.RT_MAIN_FRAME);
-            var aboutOnly = PageNavigation.requests(inMemory, typed, false, () -> responses, null);
+            var aboutOnly = PageNavigation.requests(inMemory, typed, false, () -> responses, null, Optional::empty);
             assertThat(aboutOnly.responses).as("no navigation, no response to read").isNull();
             assertThat(aboutOnly.about).isTrue();
 
             var persistentWelcome = new Request("jasper-about:welcome", ResourceType.RT_MAIN_FRAME);
-            var global = PageNavigation.requests(persistent, persistentWelcome, true, () -> responses, null);
+            var global = PageNavigation.requests(persistent, persistentWelcome, true, () -> responses, null, Optional::empty);
             assertThat(global.responses).isSameAs(responses);
             assertThat(global.about).as("the global context's factory serves it").isFalse();
             assertThat(persistentWelcome.urlReads).as("a persistent page's address is not read").isZero();
@@ -189,13 +193,73 @@ class PageNavigationTest {
             for (PageBrowser browser : List.of(persistent, inMemory)) {
                 var image = new Request("jasper-about:welcome", ResourceType.RT_IMAGE);
                 var frame = new Request("jasper-about:welcome", ResourceType.RT_SUB_FRAME);
-                assertThat(PageNavigation.requests(browser, image, false, () -> responses, null)).isNull();
-                assertThat(PageNavigation.requests(browser, frame, true, () -> responses, null)).isNull();
+                assertThat(PageNavigation.requests(browser, image, false, () -> responses, null, Optional::empty)).isNull();
+                assertThat(PageNavigation.requests(browser, frame, true, () -> responses, null, Optional::empty)).isNull();
                 assertThat(image.urlReads + frame.urlReads).as("no address read for what is no main frame").isZero();
             }
             var none = new Request("jasper-about:welcome", ResourceType.RT_MAIN_FRAME);
-            assertThat(PageNavigation.requests(null, none, true, () -> responses, null)).isNull();
+            assertThat(PageNavigation.requests(null, none, true, () -> responses, null, Optional::empty)).isNull();
             assertThat(none.urlReads).isZero();
+        });
+    }
+
+    /**
+     * Plan 6 Task 10: while a rule set is active, every request of a page's browser but its main frame's gets the
+     * composite with ad blocking's part, a /dev/null page's too, as blocking is a protection; a main frame's never does,
+     * as ad blocking never blocks one. A page's DevTools, and a browser that is no page's, get none. No request's address
+     * is read to choose its handler.
+     */
+    @Test void whileARuleSetIsActiveEveryRequestButAMainFramesGetsAdBlocking() throws Exception {
+        onUiThread(() -> {
+            Page persistent = page(), devNull = page(PageContext.memory());
+            var responses = new org.cef.handler.CefResourceRequestHandlerAdapter() { };
+            RuleSet rules = RuleSet.of(ContentRules.compile(BlockerJson.read(
+                "[{\"trigger\": {\"url-filter\": \"ads.example/\"}, \"action\": {\"type\": \"block\"}}]")).rules());
+            Supplier<Optional<RuleSet>> active = () -> Optional.of(rules);
+            for (PageBrowser browser : List.of(PageTestAccess.pageBrowser(persistent), PageTestAccess.pageBrowser(devNull))) {
+                var image = new Request("https://ads.example/banner.png", ResourceType.RT_IMAGE);
+                var frame = new Request("https://ads.example/frame", ResourceType.RT_SUB_FRAME);
+                var blocked = PageNavigation.requests(browser, image, false, () -> responses, null, active);
+                assertThat(blocked).isNotNull();
+                assertThat(blocked.responses).as("no response to read").isNull();
+                assertThat(blocked.about).isFalse();
+                assertThat(blocked.blocking).as("ad blocking's part").isNotNull();
+                assertThat(PageNavigation.requests(browser, frame, true, () -> responses, null, active).blocking).isNotNull();
+                assertThat(image.urlReads + frame.urlReads).as("no address read to choose the handler").isZero();
+                var main = PageNavigation.requests(browser, new Request("https://ads.example/", ResourceType.RT_MAIN_FRAME), true,
+                    () -> responses, null, active);
+                assertThat(main.blocking).as("a main frame is never blocked").isNull();
+                assertThat(main.responses).isSameAs(responses);
+                assertThat(PageNavigation.requests(browser, new Request("https://ads.example/", ResourceType.RT_NAVIGATION_PRELOAD_MAIN_FRAME),
+                    true, () -> responses, null, active)).as("nor its preload").isNull();
+                assertThat(PageNavigation.requests(browser, image, false, () -> responses, null, Optional::empty)).as("no rule set").isNull();
+            }
+            PageBrowser tools = PageTestAccess.devToolsBrowser(PageTestAccess.devTools(persistent, new Point(1, 1)));
+            assertThat(PageNavigation.requests(tools, new Request("https://ads.example/a.png", ResourceType.RT_IMAGE), false,
+                () -> responses, null, active)).as("a page's DevTools").isNull();
+            assertThat(PageNavigation.requests(null, new Request("https://ads.example/a.png", ResourceType.RT_IMAGE), false,
+                () -> responses, null, active)).as("no page's browser").isNull();
+        });
+    }
+
+    /** The composite's ad blocking part answers whether a request is cancelled, and the composite without it cancels none. */
+    @Test void theCompositeCancelsWhatItsAdBlockingPartBlocks() throws Exception {
+        onUiThread(() -> {
+            RuleSet rules = RuleSet.of(ContentRules.compile(BlockerJson.read(
+                "[{\"trigger\": {\"url-filter\": \"ads.example/\"}, \"action\": {\"type\": \"block\"}}]")).rules());
+            PageBrowser browser = PageTestAccess.pageBrowser(page());
+            var handler = PageNavigation.requests(browser, new Request("https://ads.example/a.png", ResourceType.RT_IMAGE), false,
+                () -> null, null, () -> Optional.of(rules));
+            var page = (org.cef.browser.CefBrowser) Proxy.newProxyInstance(org.cef.browser.CefBrowser.class.getClassLoader(),
+                new Class<?>[] {org.cef.browser.CefBrowser.class}, (proxy, method, args) -> {
+                    if (method.getName().equals("getURL")) return "https://news.example/";
+                    throw new UnsupportedOperationException(method.getName());
+                });
+            assertThat(handler.onBeforeResourceLoad(page, null, new Request("https://ads.example/a.png", ResourceType.RT_IMAGE))).isTrue();
+            assertThat(handler.onBeforeResourceLoad(page, null, new Request("https://cdn.example/a.png", ResourceType.RT_IMAGE))).isFalse();
+            var main = PageNavigation.requests(browser, new Request("https://ads.example/", ResourceType.RT_MAIN_FRAME), true,
+                () -> null, null, () -> Optional.of(rules));
+            assertThat(main.onBeforeResourceLoad(page, null, new Request("https://ads.example/", ResourceType.RT_MAIN_FRAME))).isFalse();
         });
     }
 

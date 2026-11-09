@@ -49,6 +49,7 @@ class ProfileWipeTest {
 
     @Test void allDeletesTheProfileAndTheMarker() throws Exception {
         Path cookies = profile();
+        Path filters = Files.writeString(Files.createDirectories(data.resolve("adblock")).resolve("rules.json"), "[]");
         ProfileWipe.mark(data, Mark.ALL);
         assertThat(Files.readString(marker())).isEqualTo("all");
         assertThat(ProfileWipe.runIfMarked(data)).as("nothing left to clear").isEqualTo(Mark.NONE);
@@ -58,6 +59,7 @@ class ProfileWipeTest {
         assertThat(marker()).doesNotExist();
         assertThat(data.resolve("chromium.log")).as("review round 1's item 10: emptied, as its lines may name hosts").isEmptyFile();
         assertThat(data.resolve("browser.sqlite")).as("the database is not the profile's").isRegularFile();
+        assertThat(filters).as("the plan's call: Clear Website Data leaves the filter list").hasContent("[]");
         assertThat(warnings).isEmpty();
     }
 

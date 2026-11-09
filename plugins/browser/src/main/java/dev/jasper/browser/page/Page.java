@@ -1,5 +1,6 @@
 package dev.jasper.browser.page;
 
+import dev.jasper.browser.adblock.FilterList;
 import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.store.Reached;
 import dev.jasper.sdk.Subscription;
@@ -207,19 +208,20 @@ public final class Page implements AutoCloseable {
      * group's request context, and makes the browser in that context once the client, the context and what
      * {@link #makeAfter} gave are all ready, which then loads what the page was last asked to. Only the browser waits for
      * them: Chromium's start waits for none. The client's display, load, keyboard, context-menu and permission handlers,
-     * and the hooks that run its frames' privacy scripts, are installed before any page is made on it. Once; nothing
-     * after {@link #close()}.
+     * and the hooks that run its frames' privacy scripts and ad blocking's element hiding, are installed before any page
+     * is made on it. Once; nothing after {@link #close()}.
      *
      * @param chromium the plugin's Chromium
+     * @param filters the plugin's filter list, whose rule set active the page's frames hide elements as
      */
-    public void start(Chromium chromium) {
+    public void start(Chromium chromium, FilterList filters) {
         Objects.requireNonNull(chromium, "chromium");
         if (started || closed) return;
         started = true;
         PageEvents.prepare(chromium);
         PageMenu.prepare(chromium);
         MediaAccess.prepare(chromium);
-        FrameScripts.prepare(chromium);
+        FrameScripts.prepare(chromium, filters);
         CompletableFuture<CefClient> client = chromium.client();
         CompletableFuture<CefRequestContext> inContext = context.context(chromium);
         // What the item waits for counts once done, however it ended.
