@@ -114,15 +114,20 @@ class RuleSetIndexTest {
 
     /** Review I1 (V30): no call over the fixture spends a tenth of its reads, so a real list is never cut short. */
     @Test void noCallOverTheFixtureSpendsATenthOfItsReads() {
-        RuleSet set = RuleSet.of(rules);
+        var runs = new ArrayList<Run>();
+        RuleSet set = RuleSet.of(rules, rule -> { }, (filter, url) -> runs.add(new Run(filter, url)));
         int most = 0;
+        var addresses = new ArrayList<>(urls);
+        // Re-review (V33): each fixture address made 200 characters long, whose literal checks cost 7 each.
+        for (String url : urls) addresses.add(url + (url.contains("?") ? "&" : "?") + "pad=" + "p".repeat(Math.max(0, 195 - url.length())));
+        assertThat(addresses.getLast()).hasSizeGreaterThanOrEqualTo(200);
         var pages = new ArrayList<>(PAGES);
-        pages.addAll(urls);
-        for (String url : urls)
+        pages.addAll(addresses);
+        for (String url : addresses)
             for (Set<ResourceKind> kinds : KINDS)
                 for (String page : PAGES) {
                     var reads = new UrlFilter.Reads(RuleSet.CALL_READS);
-                    set.blocks(url, kinds, page, reads);
+                    assertThat(set.blocks(url, kinds, page, reads)).as("%s as %s on %s", url, kinds, page).isEqualTo(set.scan(url, kinds, page));
                     most = Math.max(most, reads.used());
                 }
         for (String page : pages) {
@@ -131,6 +136,13 @@ class RuleSetIndexTest {
             most = Math.max(most, reads.used());
         }
         assertThat(most).isPositive().isLessThanOrEqualTo(RuleSet.CALL_READS / 10);
+        int mostForAMatch = 0;
+        for (Run run : new HashSet<>(runs)) {
+            var reads = new UrlFilter.Reads(Integer.MAX_VALUE);
+            run.filter().matches(run.url(), reads);
+            mostForAMatch = Math.max(mostForAMatch, reads.used());
+        }
+        assertThat(mostForAMatch).as("the most a match was charged").isPositive().isLessThanOrEqualTo(UrlFilter.STEPS / 10);
     }
 
     /** Review M2: a page's sheet examines a few of the list's hide rules, not every one. */

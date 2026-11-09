@@ -232,6 +232,58 @@ class RuleSetTest {
         assertThat(reads.used()).isEqualTo(RuleSet.CALL_READS);
     }
 
+    /** Re-review (V33): a call's charge bounds its work, though its filters' optional parts run steps without reads. */
+    @Test void aCallIsChargedForTheStepsItsReadsStandFor() {
+        String optional = "http.*" + "(x)?".repeat(255) + "y", half = "http.*" + "x?(x)?".repeat(127) + "y";
+        var blocks = new ArrayList<Map<String, Object>>();
+        for (int at = 0; at < 40; at++) blocks.add(rule(trigger("url-filter", optional), block()));
+        RuleSet blocking = rules(blocks);
+        var pages = new ArrayList<Map<String, Object>>();
+        for (int at = 0; at < 50; at++) {
+            pages.add(rule(trigger("url-filter", half), hide(".h" + at)));
+            pages.add(rule(trigger("url-filter", half), ignore()));
+        }
+        RuleSet hiding = rules(pages);
+        try (var log = new CapturedLog(RuleSet.class.getName())) {
+            for (String url : List.of("https://a.test/x.js?" + "x".repeat(20), "https://a.test/" + "x".repeat(8 * 1024))) {
+                var reads = new UrlFilter.Reads(RuleSet.CALL_READS);
+                assertTimeoutPreemptively(Duration.ofSeconds(5), () -> assertThat(blocking.blocks(url, SCRIPT, PAGE, reads)).isFalse());
+                assertThat(reads.used()).isLessThanOrEqualTo(RuleSet.CALL_READS);
+                assertThat(reads.characters()).as("characters read, at 257 each").isLessThanOrEqualTo(RuleSet.CALL_READS / 257);
+            }
+            String page = "https://a.test/" + "x".repeat(8 * 1024);
+            for (boolean own : new boolean[] {true, false}) {
+                var reads = new UrlFilter.Reads(RuleSet.CALL_READS);
+                assertTimeoutPreemptively(Duration.ofSeconds(5),
+                    () -> assertThat(own ? hiding.stylesheet(page, reads) : hiding.genericStylesheet(page, reads)).isEmpty());
+                assertThat(reads.characters()).as("characters read, at 256 each").isLessThanOrEqualTo(RuleSet.CALL_READS / 256);
+            }
+            assertThat(log.records()).hasSize(2);
+        }
+    }
+
+    /** Re-review (V33): each literal check is charged for the address it reads, so a list's size cannot hold a call. */
+    @Test void eachLiteralCheckIsChargedForTheAddressItReads() {
+        String alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
+        var distinct = new ArrayList<Map<String, Object>>();
+        for (char a : alphabet.toCharArray())
+            for (char b : alphabet.toCharArray()) distinct.add(rule(trigger("url-filter", "q" + a + b + "[a-z]"), block()));
+        var list = new ArrayList<Map<String, Object>>(ContentRules.MAX_RULES);
+        for (int at = 0; at < ContentRules.MAX_RULES; at++) list.add(distinct.get(at % distinct.size()));
+        RuleSet rules = rules(list);
+        try (var log = new CapturedLog(RuleSet.class.getName())) {
+            var reads = new UrlFilter.Reads(RuleSet.CALL_READS);
+            String url = "https://a.test/" + "x".repeat(8 * 1024);
+            assertTimeoutPreemptively(Duration.ofSeconds(10), () -> assertThat(rules.blocks(url, SCRIPT, PAGE, reads)).isFalse());
+            assertThat(reads.used()).as("stopped at the call's budget").isEqualTo(RuleSet.CALL_READS);
+            assertThat(reads.characters()).as("no expression ran").isZero();
+            var brief = new UrlFilter.Reads(RuleSet.CALL_READS);
+            assertThat(rules.blocks("https://a.test/x.js", SCRIPT, PAGE, brief)).isFalse();
+            assertThat(brief.used()).as("a short address: 1 a check").isEqualTo(ContentRules.MAX_RULES);
+            assertThat(log.records()).hasSize(1);
+        }
+    }
+
     /** Review I1 (V30): one rule past its own budget counts as no match, and the call goes on to the next. */
     @Test void aRuleOverItsOwnBudgetCountsAsNoMatchAndTheCallGoesOn() {
         RuleSet rules = rules(List.of(rule(trigger("url-filter", "/ads/"), block()), rule(trigger("url-filter", "z.*.*.*.*q"), ignore())));

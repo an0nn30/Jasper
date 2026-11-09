@@ -32,9 +32,10 @@ import java.util.function.Predicate;
  * rules of {@code .*} with an {@code unless-domain}, each a few lookups of the page's host. No rule's expression runs
  * on an address that lacks its literal. The hide rules that cover every page's document are joined once, as the sheet
  * every page shares, and so are those that cover every http and https page's, for those pages alone. A request's and
- * a page's address are read to their first 8 KiB, and each call's expressions make at most 2,000,000 reads in all:
- * past them, a request is not blocked and a page hides only what the rules already read proved. A rule set is
- * immutable, and safe on any thread.
+ * a page's address are read to their first 8 KiB, and each call is charged at most 2,000,000 for its rules' work: a
+ * read of a character at its filter's charge ({@link UrlFilter}), and a check of a literal 1 and 1 more for each 32
+ * characters of the address. Past that, a request is not blocked and a page hides only what the rules already read
+ * proved. A rule set is immutable, and safe on any thread.
  */
 public final class RuleSet {
     private static final Set<ResourceKind> PAGE = Collections.unmodifiableSet(EnumSet.of(ResourceKind.DOCUMENT));
@@ -43,7 +44,7 @@ public final class RuleSet {
     public static final RuleSet EMPTY = of(List.of());
     /** How many characters a page's sheet has at most. */
     static final int SHEET_LIMIT = 2 * 1024 * 1024;
-    /** How many reads of an address the expressions of one call, a request's or a page's, make at most in all. */
+    /** How much one call, a request's or a page's, is charged at most for its rules' reads and literal checks. */
     static final int CALL_READS = 2_000_000;
     /** How many of a literal's 4-character runs its key is chosen from, and counted, from its start. */
     static final int GRAMS = 64;
@@ -107,13 +108,13 @@ public final class RuleSet {
      * @param pageUrl the address of the page that makes it; null or one with no host, such as {@code about:blank}, fits
      *     no {@code if-domain}, every {@code unless-domain}, and no first party
      * @return whether its last matching rule that blocks or ignores the earlier rules is one that blocks; false when
-     *     the rules ran out of their reads first
+     *     the rules ran past the call's charge first
      */
     public boolean blocks(String url, Set<ResourceKind> kinds, String pageUrl) {
         return blocks(url, kinds, pageUrl, new UrlFilter.Reads(CALL_READS));
     }
 
-    /** {@link #blocks(String, Set, String)}, its expressions' reads spent from {@code reads}. */
+    /** {@link #blocks(String, Set, String)}, its rules' work charged to {@code reads}. */
     boolean blocks(String url, Set<ResourceKind> kinds, String pageUrl, UrlFilter.Reads reads) {
         if (url == null || kinds == null || kinds.isEmpty()) return false;
         Request request = Request.of(url, kinds, pageUrl);
@@ -150,8 +151,8 @@ public final class RuleSet {
     /**
      * What the page hides: one {@code selector{display:none!important}} line for each selector of each hide rule that
      * matches the page's own document and comes after the last ignore rule that does, the shared sheet's lines first,
-     * at most 2 MiB of them in all. When the rules run out of their reads, the sheet keeps the lines of the rules after
-     * the one being read, which no ignore rule unread can drop.
+     * at most 2 MiB of them in all. When the rules run past the call's charge, the sheet keeps the lines of the rules
+     * after the one being read, which no ignore rule unread can drop.
      *
      * @param pageUrl the page's address
      * @return the lines, each ended by a line feed; empty when it hides nothing
@@ -160,7 +161,7 @@ public final class RuleSet {
         return sheet(pageUrl, true, new UrlFilter.Reads(CALL_READS));
     }
 
-    /** {@link #stylesheet(String)}, its expressions' reads spent from {@code reads}. */
+    /** {@link #stylesheet(String)}, its rules' work charged to {@code reads}. */
     String stylesheet(String pageUrl, UrlFilter.Reads reads) {
         return sheet(pageUrl, true, reads);
     }
@@ -174,6 +175,11 @@ public final class RuleSet {
      */
     public String genericStylesheet(String pageUrl) {
         return sheet(pageUrl, false, new UrlFilter.Reads(CALL_READS));
+    }
+
+    /** {@link #genericStylesheet(String)}, its rules' work charged to {@code reads}. */
+    String genericStylesheet(String pageUrl, UrlFilter.Reads reads) {
+        return sheet(pageUrl, false, reads);
     }
 
     /** {@link #stylesheet}, by a scan of every rule and without its bound: what the index must agree with. */
@@ -235,19 +241,23 @@ public final class RuleSet {
     private boolean matches(Entry entry, Request request, UrlFilter.Reads reads) {
         if (!fits(entry, request)) return false;
         UrlFilter filter = entry.rule().filter();
-        if (!(filter.caseSensitive() ? request.url() : request.folded()).contains(filter.literalText())) return false;
+        String literal = filter.literalText();
+        if (!literal.isEmpty()) {
+            reads.charge(1 + request.url().length() / 32);
+            if (!(filter.caseSensitive() ? request.url() : request.folded()).contains(literal)) return false;
+        }
         ran.accept(filter, request.url());
         return filter.matches(request.url(), reads);
     }
 
     private void spent() {
-        log("A content blocker list's rules ran out of the 2,000,000 reads one address may take, and the rules left count as no "
-            + "match");
+        log("A content blocker list's rules ran past the 2,000,000 one address may be charged for their work, and the rules left "
+            + "count as no match");
     }
 
     private void overran(UrlFilter filter) {
-        log("A content blocker rule ran out of the 100,000 reads one match may take, or of the stack, which counts as no "
-            + "match: url-filter " + filter.source());
+        log("A content blocker rule ran past the 100,000 one match may be charged for its reads, or past the stack, which "
+            + "counts as no match: url-filter " + filter.source());
     }
 
     private void log(String message) {

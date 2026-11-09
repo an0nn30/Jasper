@@ -20,8 +20,10 @@ import java.util.regex.PatternSyntaxException;
  * groups one inside another; a group repeated by an unbounded repeat holds no repeat of its own ({@code (a+)+}, on
  * which Java would backtrack without bound; a group after {@code ?} may); and no quantified group can match the empty
  * text ({@code (x?)?}), whose two ways through would each go on without reading a character. A match reads at most
- * the first 8 KiB of an address, and gives up after 100,000 reads of a character, which counts as no match; the reads
- * also count against the budget of the call the match is part of, which a {@link RuleSet} gives each request and page.
+ * the first 8 KiB of an address. Each read of a character is charged 1, and 1 more for each of the filter's atoms
+ * quantified by {@code *} or {@code ?}, each of which may run a step of the match without a read; a match charged past
+ * 100,000 gives up, which counts as no match, and the charge also counts against the budget of the call the match is
+ * part of, which a {@link RuleSet} gives each request and page.
  * Character classes are written out as their member characters, so that a read costs the same whatever the class.
  *
  * <p>Each filter has its literal, the longest run of characters every match holds, by which the rule set's index
@@ -49,15 +51,18 @@ public final class UrlFilter {
     private final boolean caseSensitive;
     private final String literal;
     private final boolean everything, web;
+    // What one read of a character is charged: 1, and 1 for each atom quantified by * or ? in the expression.
+    private final int cost;
     private volatile Pattern pattern;
     private volatile boolean overflowed;
 
-    private UrlFilter(String source, boolean caseSensitive, String literal, boolean everything, boolean web) {
+    private UrlFilter(String source, boolean caseSensitive, String literal, boolean everything, boolean web, int cost) {
         this.source = source;
         this.caseSensitive = caseSensitive;
         this.literal = literal;
         this.everything = everything;
         this.web = web;
+        this.cost = cost;
     }
 
     /**
@@ -73,7 +78,7 @@ public final class UrlFilter {
         try {
             Parsed parsed = new Parser(source).parse();
             return Optional.of(new UrlFilter(source, caseSensitive, caseSensitive ? parsed.literal() : fold(parsed.literal()),
-                parsed.everything(), caseSensitive ? parsed.lowerCaseWeb() : parsed.web()));
+                parsed.everything(), caseSensitive ? parsed.lowerCaseWeb() : parsed.web(), 1 + parsed.optional()));
         } catch (Refused refused) {
             return Optional.empty();
         }
@@ -139,7 +144,7 @@ public final class UrlFilter {
 
     /**
      * Whether the filter matches somewhere in the address's first 8 KiB, in either case unless it is case-sensitive.
-     * A match over its budget of 100,000 reads counts as no match. A filter whose expression overflows the thread's
+     * A match charged past 100,000 for its reads counts as no match. A filter whose expression overflows the thread's
      * stack, compiling or matching, matches nothing from then on.
      *
      * @param url the address
@@ -150,7 +155,7 @@ public final class UrlFilter {
     }
 
     /**
-     * {@link #matches(String)}, its reads spent from {@code reads}: one past them ends the call, and a match past its
+     * {@link #matches(String)}, its reads charged to {@code reads}: one past them ends the call, and a match past its
      * own 100,000 or past the stack is recorded there.
      *
      * @throws Reads.Exhausted when the call's reads are spent
@@ -160,7 +165,7 @@ public final class UrlFilter {
         if (everything) return true;
         if (overflowed) return false;
         try {
-            return compiled().matcher(new Budget(url, reads)).find();
+            return compiled().matcher(new Budget(url, reads, cost)).find();
         } catch (Budget.Spent spent) {
             reads.overrun(this);
             return false;
@@ -208,12 +213,13 @@ public final class UrlFilter {
     }
 
     /**
-     * The reads one call, a request's or a page's, may still make across the filters it runs, and the first of those
-     * filters that ran past its own 100,000 reads or past the stack. One call's, on one thread.
+     * What one call, a request's or a page's, may still be charged for the work of the rules it runs: each read of a
+     * character at its filter's charge, and each check of a rule's literal for the address it reads. It records the
+     * first filter that ran past its own 100,000 or past the stack. One call's, on one thread.
      */
     static final class Reads {
         private final int limit;
-        private int left;
+        private int left, characters;
         private UrlFilter overran;
 
         Reads(int limit) {
@@ -221,9 +227,14 @@ public final class UrlFilter {
             left = limit;
         }
 
-        /** How many reads the call made. */
+        /** How much the call was charged. */
         int used() {
             return limit - left;
+        }
+
+        /** How many characters the call's matches read. */
+        int characters() {
+            return characters;
         }
 
         /** The first filter that ran past its own reads or the stack in the call; empty when none did. */
@@ -231,9 +242,22 @@ public final class UrlFilter {
             return Optional.ofNullable(overran);
         }
 
-        private void spend() {
-            if (left == 0) throw Exhausted.EXHAUSTED;
-            left--;
+        /**
+         * Charges the call {@code amount}, all it has left when that is less.
+         *
+         * @throws Exhausted when the call has less than {@code amount} left
+         */
+        void charge(int amount) {
+            if (left < amount) {
+                left = 0;
+                throw Exhausted.EXHAUSTED;
+            }
+            left -= amount;
+        }
+
+        private void read(int cost) {
+            charge(cost);
+            characters++;
         }
 
         private void overrun(UrlFilter filter) {
@@ -268,8 +292,9 @@ public final class UrlFilter {
      * @param everything whether it matches every address
      * @param web whether it is {@code ^https?://}, its letters in either case, with nothing after but {@code .*}
      * @param lowerCaseWeb whether it is that with its letters in small letters
+     * @param optional how many atoms the expression quantifies by {@code *} or {@code ?}, in groups too
      */
-    private record Parsed(String literal, String expression, boolean everything, boolean web, boolean lowerCaseWeb) { }
+    private record Parsed(String literal, String expression, boolean everything, boolean web, boolean lowerCaseWeb, int optional) { }
 
     /**
      * One top-level term of a filter, or of a group's.
@@ -280,11 +305,13 @@ public final class UrlFilter {
      * @param holdsQuantifier whether the atom is a group that holds a {@code *}, {@code +} or {@code ?}
      * @param nullable whether the term can match the empty text: one quantified by {@code *} or {@code ?}, or a group
      *     whose every term can
+     * @param optional how many atoms the term quantifies by {@code *} or {@code ?}, itself and those in its group
      * @param quantifier the {@code *}, {@code +} or {@code ?} after the atom; 0 when none
      */
-    private record Piece(String expression, int literal, boolean dot, boolean holdsQuantifier, boolean nullable, char quantifier) {
+    private record Piece(String expression, int literal, boolean dot, boolean holdsQuantifier, boolean nullable, int optional,
+        char quantifier) {
         Piece quantified(char by) {
-            return new Piece(expression + by, literal, dot, holdsQuantifier, nullable || by != '+', by);
+            return new Piece(expression + by, literal, dot, holdsQuantifier, nullable || by != '+', optional + (by == '+' ? 0 : 1), by);
         }
 
         boolean anything() {
@@ -314,11 +341,15 @@ public final class UrlFilter {
             for (; last > first && pieces.get(last - 1).anything(); last--) end = false;
             List<Piece> kept = pieces.subList(first, last);
             var expression = new StringBuilder(start ? "^" : "");
-            for (Piece piece : kept) expression.append(piece.expression());
+            int optional = 0;
+            for (Piece piece : kept) {
+                expression.append(piece.expression());
+                optional += piece.optional();
+            }
             if (end) expression.append("\\z");
             boolean anchored = start && !end;
             return new Parsed(literal, expression.toString(), kept.isEmpty() && !(start && end), anchored && web(kept, false),
-                anchored && web(kept, true));
+                anchored && web(kept, true), optional);
         }
 
         /** Whether the terms are {@code https?://}, its letters in either case or, {@code small}, in small ones. */
@@ -354,7 +385,7 @@ public final class UrlFilter {
         private Piece atom() throws Refused {
             char c = source.charAt(at++);
             return switch (c) {
-                case '.' -> new Piece(".", -1, true, false, false, (char) 0);
+                case '.' -> new Piece(".", -1, true, false, false, 0, (char) 0);
                 case '[' -> characterClass();
                 case '(' -> group();
                 case '\\' -> character(escape());
@@ -366,7 +397,7 @@ public final class UrlFilter {
         }
 
         private static Piece character(char c) {
-            return new Piece(escaped(c), c, false, false, false, (char) 0);
+            return new Piece(escaped(c), c, false, false, false, 0, (char) 0);
         }
 
         /** The ASCII punctuation after a backslash. */
@@ -386,11 +417,13 @@ public final class UrlFilter {
             if (inner.isEmpty()) throw Refused.REFUSED;
             var expression = new StringBuilder("(?:");
             boolean nullable = true;
+            int optional = 0;
             for (Piece piece : inner) {
                 expression.append(piece.expression());
                 nullable &= piece.nullable();
+                optional += piece.optional();
             }
-            return new Piece(expression.append(')').toString(), -1, false, quantifiers > before, nullable, (char) 0);
+            return new Piece(expression.append(')').toString(), -1, false, quantifiers > before, nullable, optional, (char) 0);
         }
 
         /** The class whose bracket was read, written out as its members, so that Java reads it in one step. */
@@ -405,7 +438,7 @@ public final class UrlFilter {
                     at++;
                     var expression = new StringBuilder(negated ? "[^" : "[");
                     for (char c = 0x20; c < 0x7F; c++) if (members[c]) expression.append(escaped(c));
-                    return new Piece(expression.append(']').toString(), -1, false, false, false, (char) 0);
+                    return new Piece(expression.append(']').toString(), -1, false, false, false, 0, (char) 0);
                 }
                 char low = classCharacter(), high = low;
                 if (at + 1 < source.length() && source.charAt(at) == '-' && source.charAt(at + 1) != ']') {
@@ -460,18 +493,19 @@ public final class UrlFilter {
     }
 
     /**
-     * The first 8 KiB of an address, which a match may read 100,000 times at most, each read spent from its call's
-     * reads too; the next read past either ends the match.
+     * The first 8 KiB of an address, each read of which is charged the filter's charge, to the match's 100,000 and to
+     * its call's reads; the read past either ends the match.
      */
     private static final class Budget implements CharSequence {
         private final String text;
-        private final int length;
+        private final int length, cost;
         private final Reads reads;
         private int steps;
 
-        Budget(String text, Reads reads) {
+        Budget(String text, Reads reads, int cost) {
             this.text = text;
             this.reads = reads;
+            this.cost = cost;
             length = Math.min(text.length(), URL_LIMIT);
         }
 
@@ -480,8 +514,8 @@ public final class UrlFilter {
         }
 
         @Override public char charAt(int index) {
-            if (++steps > STEPS) throw Spent.SPENT;
-            reads.spend();
+            if ((steps += cost) > STEPS) throw Spent.SPENT;
+            reads.read(cost);
             return text.charAt(Objects.checkIndex(index, length));
         }
 

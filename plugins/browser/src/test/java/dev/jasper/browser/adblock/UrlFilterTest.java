@@ -192,6 +192,33 @@ class UrlFilterTest {
         assertThat(heavy.matches("https://a.test/ax")).as("a short address is within the budget").isTrue();
     }
 
+    /**
+     * Re-review (V33): a read is charged 1, and 1 for each of the filter's atoms quantified by {@code *} or {@code ?},
+     * which may each run a step without one, against the match's 100,000 and the call's reads.
+     */
+    @Test void aReadIsChargedOnePlusTheFiltersOptionalAtoms() {
+        String optional = "http.*" + "(x)?".repeat(255) + "y";
+        var charges = new java.util.LinkedHashMap<String, Integer>();
+        charges.put("ads", 1);
+        charges.put("a.*b?c", 3);
+        charges.put("((a)?b)?c", 3);
+        charges.put(".*ads.*", 1);
+        charges.put("^https?://.*", 2);
+        charges.put("a[^/]*b+c", 2);
+        charges.put(optional, 257);
+        for (var charge : charges.entrySet()) {
+            var reads = new UrlFilter.Reads(Integer.MAX_VALUE);
+            filter(charge.getKey(), false).matches("http://a.test/abc?" + "x".repeat(40), reads);
+            assertThat(reads.characters()).as(charge.getKey()).isPositive();
+            assertThat(reads.used()).as(charge.getKey()).isEqualTo(charge.getValue() * reads.characters());
+        }
+        var reads = new UrlFilter.Reads(Integer.MAX_VALUE);
+        assertThat(filter(optional, false).matches("http://a.test/" + "x".repeat(8 * 1024), reads)).isFalse();
+        assertThat(reads.overran()).as("past the match's own budget").isPresent();
+        assertThat(reads.used()).isLessThanOrEqualTo(UrlFilter.STEPS);
+        assertThat(reads.characters()).isLessThanOrEqualTo(UrlFilter.STEPS / 257);
+    }
+
     /** Review I1 (V30): a match spends the reads of the call it is part of, and ends the call once they are gone. */
     @Test void aMatchSpendsItsCallsReads() {
         UrlFilter heavy = filter("a.*.*.*.*x", false);
