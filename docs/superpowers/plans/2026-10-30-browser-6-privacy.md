@@ -168,13 +168,20 @@ these deviations from the plan's text, each with its ruling:
     list's 2,000,000 values, an address changed during a download, Filter Statistics' new text), the checklist (its
     blocked-requests and Filter Statistics lines, and three lines the wave added), the notifications guide's Bookmarks
     and Page notifications groups, the README's, Plugins' and the docs index's Browser descriptions, and STATUS;
-  - Verification: W1's RED and GREEN are in its commit. W2's tests came first (the compile failed on the missing
-    `HelperClose`, `Origins.host`, `AboutScheme.UNANSWERED` and two-argument `refused`); reverting each change alone
-    then failed its tests: the stopped Chromium's helper 1, the refused system settings 3, `restate`'s expired entry 1
-    and its other text 1. The move kept `ChromiumStateTest`'s 57 tests passing, changed only in reaching the clearing's
-    seams; `:jasper-plugin-browser:check`, the Javadoc and `verifyPluginArchitecture` pass; `ThemeMigrationCoverageTest`
-    asked for `ChromiumClearing`'s row in `migration.csv`; `sdkReference` changed nothing; source hygiene is clean, and
-    no file the wave touched holds a raw U+00A0, U+2028 or U+2029. No GUI was launched.
+  - Verification: each part wrote its tests first (W1's compile failed with 156 errors, W2's on the missing
+    `HelperClose`, `Origins.host`, `AboutScheme.UNANSWERED` and two-argument `refused`), then reverted each change
+    alone against them: every revert failed its tests, W1's test-only race fixes aside (W2's: the stopped Chromium's
+    helper 1, the refused system settings 3, `restate`'s expired entry 1 and its other text 1). The move kept
+    `ChromiumStateTest`'s 57 tests passing, changed only in reaching the clearing's seams; `ThemeMigrationCoverageTest`
+    asked for the rows of `PatternCacheTest`, `ListDownloadTest`, `ListServer` and `ChromiumClearing` in
+    `migration.csv`. `./gradlew check --continue` (JBR 25.0.4.1 b635.75 jcef, 10m 40s, after the code and the docs but
+    for these counts): **15,540 tests, 0 failures, 0 errors, 103 skipped** (1,389 classes in the 16 build folders,
+    without the example plugin's: jasper-app 5,292 with 90 skipped, Editor 5,387 with 4 skipped, Browser 1,345 with 1
+    skipped, jasper-ui 1,020, Remote 659, jasper-sdk 135, jasper-sdk-testkit 310), that is, the docs' 15,518, W1's 17
+    Browser tests and W2's 4 Browser and 1 jasper-app; the example external plugin's `check pluginZip` against
+    `build/sdk-release` passes (1 test, up to date: no SDK change); `sdkReference` changed nothing; source hygiene is
+    clean over 3,455 Java files, and no file the wave touched holds a raw U+00A0, U+2028 or U+2029. No GUI was
+    launched.
 
 The controller's rulings, one line each:
 - V0: every ruling the pre-flight scan proposed (F1-F44) is adopted and cited as V-F*n*, except where V1-V6 decide

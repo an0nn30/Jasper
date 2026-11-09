@@ -48,14 +48,14 @@ another's storage), the plan's banner and this entry; `docs/packaging.md`'s came
 came with Task 5. The fix wave added the notifications guide's Bookmarks and Page notifications groups, and the
 README's, Plugins' and the docs index's Browser descriptions (V47, V55). The fix wave's code: W1 bounds the content
 blocker's compiled patterns, its parse, its examining and its filter list's client (V48-V53, V56), and W2 makes part
-A's fixes and moves Chromium's clearing into `ChromiumClearing`, a pure move (V54, V46). Verification: after both docs
-commits, at `51b74b627`, `./gradlew check --continue` (JBR 25.0.4.1 b635.75 jcef, 10m 13s) gave **15,518 tests, 0
-failures, 0 errors, 103 skipped** (1,388 classes in the 16 build folders, without the example plugin's: jasper-app
-5,291 with 90 skipped, Editor 5,387 with 4 skipped, Browser 1,324 with 1 skipped, jasper-ui 1,020, Remote 659,
-jasper-sdk 135, jasper-sdk-testkit 310), as at `965c11432` before the docs: the 15,086 of plan 5 and slice 1b and plan
-6's 432; the example external plugin's `check pluginZip` against `build/sdk-release` passes (1 test); `sdkReference`
-changed nothing; source hygiene is clean over 3,452 Java files, and no file the docs touched holds a raw U+00A0, U+2028
-or U+2029. No GUI was launched.
+A's fixes and moves Chromium's clearing into `ChromiumClearing`, a pure move (V54, V46). Verification: after the fix
+wave's code and docs, `./gradlew check --continue` (JBR 25.0.4.1 b635.75 jcef, 10m 40s) gave **15,540 tests, 0
+failures, 0 errors, 103 skipped** (1,389 classes in the 16 build folders, without the example plugin's: jasper-app
+5,292 with 90 skipped, Editor 5,387 with 4 skipped, Browser 1,345 with 1 skipped, jasper-ui 1,020, Remote 659,
+jasper-sdk 135, jasper-sdk-testkit 310), that is, the 15,518 after the docs (the 15,086 of plan 5 and slice 1b and plan
+6's 432) and the wave's 22; the example external plugin's `check pluginZip` against `build/sdk-release` passes (1
+test); `sdkReference` changed nothing; source hygiene is clean over 3,455 Java files, and no file the docs or the wave
+touched holds a raw U+00A0, U+2028 or U+2029. No GUI was launched.
 
 The controller's rulings, one line each (the pre-flight scan's F1-F44 adopted as V0; the banner gives each V-F*n* where
 it applied):
