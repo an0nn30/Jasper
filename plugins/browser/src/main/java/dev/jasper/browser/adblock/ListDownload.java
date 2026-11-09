@@ -92,7 +92,8 @@ public final class ListDownload {
      * @param client the list's client, which follows no redirect itself
      * @param address the list's address
      * @param deadline how long the whole download may take, its redirects and body included
-     * @param current whether the client may still be asked: false once it has been retired, which asks no redirect more
+     * @param current whether the client may still be asked: false once it has been retired, which asks nothing more,
+     *     its first request included
      * @return the body; it fails with a {@link Refused} for an address {@link #fetches} refuses, a redirect to one, from
      *     https to http, to an address that cannot be read, past the fifth, or once the client is no longer current, and
      *     any other status, a {@link TooLarge} for a body over 32 MiB, a {@link TimeoutException} once the deadline has

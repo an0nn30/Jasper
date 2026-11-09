@@ -568,8 +568,8 @@ public final class FilterList implements AutoCloseable {
     }
 
     /**
-     * Whether the list's lane has run all the work it was given: a test's seam (V58), as a download's end runs the lane
-     * on its client's thread, where work given meanwhile runs after it.
+     * Whether the list's lane has run all the work it was given: a test's seam (V58), as a test's direct executor runs
+     * a download's end, and the lane after it, on the client's thread, where work given meanwhile runs after it.
      */
     boolean idle() {
         synchronized (tasks) {

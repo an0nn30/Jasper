@@ -191,10 +191,11 @@ these deviations from the plan's text, each with its ruling:
   - **V57:** `PatternCache` keeps each filter by its place in the rule set, in arrays of the rule set's size, so no
     list chooses the hash a lookup goes by, and equal filters at two places compile and weigh apart. The review's
     `HashFlood` (8,192 filters of one `String` hash over 250,000 rules) takes 5.8 to 6.9 ms a request, against 10.9 to
-    12.8 s, and its control 5.8 to 9.2 ms. The audit found one more: a rule's domain lists were `Set.copyOf`'s probing
-    sets, which scan the hosts of one hash (0.83 ms a request at 488 rules of 1,023 colliding hosts, 0.05 ms now); they
-    are sorted arrays, short ones compared in turn. Every other hashed key in `adblock` and `http` is a `String` in a
-    `HashMap`, which keeps one hash's strings in a tree, a fixed set, an identity map or an enum set.
+    12.8 s, and its control 6.1 to 9.2 ms after a 26.7 ms first call. The audit found one more: a rule's domain lists
+    were `Set.copyOf`'s probing sets, which scan the hosts of one hash (0.83 ms a request at 488 rules of 1,023
+    colliding hosts, 0.05 ms now); they are sorted arrays, short ones compared in turn. Every other hashed key in
+    `adblock` and `http` is a `String` in a `HashMap`, which keeps one hash's strings in a tree, a fixed set, an
+    identity map or an enum set.
   - **V58:** `run()` counts a `\` before any printable character but a letter or digit, the space included, so the
     review's `SpaceRunCalls` takes 2.3 ms a request (32.9 ms its first), against 14 ms and 55.7 ms; the first request,
     not only each redirect, is checked against a retired client; `FilterListTest` waits for the list's lane
