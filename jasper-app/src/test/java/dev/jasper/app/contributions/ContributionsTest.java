@@ -69,7 +69,7 @@ class ContributionsTest {
         MenuSection top = model.addMenuSection(MenuTarget.topLevel("dev.x.menu", "Tool"));
         assertThatIllegalArgumentException().isThrownBy(() -> model.addMenuSection(MenuTarget.topLevel("dev.x.menu", "Again")));
         view.set(List.of(new MenuEntry.Item("dev.x.a"), new MenuEntry.Separator(),
-            new MenuEntry.Submenu("More", List.of(new MenuEntry.Item("dev.x.a")))));
+            new MenuEntry.Submenu("", "More", true, List.of(new MenuEntry.Item("dev.x.a")))));
         assertThat(model.menus()).containsExactly(view, top);
         assertThat(view.entries()).hasSize(3);
         top.close();

@@ -775,7 +775,9 @@ public final class FakePluginHost implements AutoCloseable {
      * @param target {@code FILE}, {@code EDIT}, {@code VIEW}, {@code TAB}, {@code TOOLS}, {@code SESSION},
      *     {@code TRANSFER}, {@code context} or {@code top:<menuId>}
      * @return {@code item:id}, {@code web-address:id} (an {@code addForWebAddress} item), {@code ---} and
-     *     {@code submenu:title} lines, children indented, sections separated by {@code ===}
+     *     {@code submenu:title} lines, children indented, sections separated by {@code ===}; since 0.31.0, menu entries
+     *     ({@code addEntries}) as {@code entry:id:label} lines and {@code entries:label} lines for their submenus, each
+     *     followed by {@code :disabled} while disabled
      */
     public List<String> menu(String target) { return menu(target, true); }
 
@@ -796,7 +798,7 @@ public final class FakePluginHost implements AutoCloseable {
     /**
      * The plugin menus a window's menu bar shows: each {@code Menus.create} menu, and each {@code Menus.createForContent}
      * menu while the window's current item, its focused pane's item, is one of that plugin's content tabs. A menu shows
-     * only while it holds an item of a registered action, as the application's.
+     * only while it holds an item of a registered action or a menu entry, as the application's.
      *
      * @param windowId a window
      * @return {@code top:<menuId>} lines, each plugin's menus in the order they were created; empty for a window that is
@@ -812,7 +814,8 @@ public final class FakePluginHost implements AutoCloseable {
                 if (!section.target.startsWith("top:") || section.content && !context.ui.showsContent(window.get().selected)) continue;
                 List<String> lines = new ArrayList<>();
                 section.render(lines, "", true);
-                if (lines.stream().anyMatch(line -> line.strip().startsWith("item:"))) menus.add(section.target);
+                if (lines.stream().map(String::strip).anyMatch(line -> line.startsWith("item:") || line.startsWith("entry:")))
+                    menus.add(section.target);
             }
         }
         return menus;
@@ -862,6 +865,20 @@ public final class FakePluginHost implements AutoCloseable {
                     item instanceof FakeUi.Menu.WebAddressItem ? address : Optional.empty());
             }
         }
+        return false;
+    }
+
+    /**
+     * Chooses a menu entry ({@code PluginMenu.addEntries}) as a person would: the first enabled one with this id that opens
+     * no submenu, in the order the plugins started and their menus list them, outside disabled submenus. Its group's
+     * {@code chosen} hears the id; a throw is recorded in {@link #failures()}, as a throwing action's is.
+     *
+     * @param entryId the entry's id
+     * @return whether an entry was chosen; false for a disabled, removed or unknown one, a separator and a submenu
+     * @since 0.31.0
+     */
+    public boolean chooseMenuEntry(String entryId) {
+        for (FakePluginContext context : contexts.values()) if (context.ui.chooseEntry(entryId)) return true;
         return false;
     }
 

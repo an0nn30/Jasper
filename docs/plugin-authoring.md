@@ -340,6 +340,16 @@ private static void installUi(PluginContext context, long stepMillis) {
   [`webAddress()`](sdk-reference.html#dev.jasper.sdk.ui.ActionContext.webAddress()); chosen any other way, it gets
   none. It needs no capability, since the user chose the item with that selection. Any other menu throws
   `IllegalStateException`.
+- [`addEntries(items, chosen)`](sdk-reference.html#dev.jasper.sdk.ui.PluginMenu.addEntries(List,Consumer)) adds menu
+  entries that are not actions, such as a list of downloads: each
+  [`MenuItem`](sdk-reference.html#dev.jasper.sdk.ui.MenuItem) shows its label and enabled state, a separator shows as
+  one, and an item with children is a submenu titled by its label. Choosing a leaf calls `chosen` with its id on the UI thread. Entries are never in the palette or the keymap,
+  show no key and no icon, and their labels are plain text. A leaf's `action`, which `MenuItem` requires, is not shown:
+  make it the item's id. An id repeated anywhere in the tree, or a shortcut, throws `IllegalArgumentException`, and the
+  `terminalContext()` section or a submenu of it throws `IllegalStateException`.
+  [`MenuEntries.set(items)`](sdk-reference.html#dev.jasper.sdk.ui.MenuEntries.set(List)) replaces them where they
+  stand. A change of labels and enabled states alone shows at once, in an open menu too; any other change waits while
+  the window has a menu open.
 
 | `StandardMenu` | For |
 | --- | --- |

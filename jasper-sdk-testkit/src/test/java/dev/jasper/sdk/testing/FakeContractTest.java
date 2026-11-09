@@ -59,6 +59,11 @@ class FakeContractTest extends PluginContractTest {
             @Override public List<String> menuBar(java.util.UUID windowId) { return host.menuBar(windowId); }
             @Override public List<String> contextMenu(java.util.UUID paneId) { return host.contextMenu(paneId); }
             @Override public boolean chooseFromContextMenu(java.util.UUID paneId, String actionId) { return host.chooseFromContextMenu(paneId, actionId); }
+            @Override public boolean chooseMenuEntry(String entryId) {
+                boolean[] chose = {false};
+                ui(() -> chose[0] = host.chooseMenuEntry(entryId));
+                return chose[0];
+            }
             @Override public List<String> status() { return host.status(); }
             @Override public List<String> panels() { return host.panels(); }
             @Override public javax.swing.JComponent openPanel(String panelId) { return host.openPanel(panelId); }

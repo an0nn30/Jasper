@@ -63,16 +63,25 @@ public interface ContractHarness extends AutoCloseable {
      * {@code SESSION}, {@code TRANSFER}, {@code context},
      * {@code top:<menuId>}): {@code item:id}, {@code web-address:id} (an {@code addForWebAddress} item), {@code ---},
      * {@code submenu:title}, children indented two spaces, sections separated by {@code ===}; items of closed actions
-     * omitted.
+     * omitted. Menu entries ({@code addEntries}) are {@code entry:id:label} lines and {@code entries:label} lines for
+     * their submenus, each followed by {@code :disabled} while disabled, and {@code ---} for their separators.
      */
     List<String> menu(String target);
 
     /**
      * The plugin menus a window's menu bar shows ({@code Menus.create} and {@code Menus.createForContent}), as
      * {@code top:<menuId>} in the order they were created: a content menu only while the window's current item is one of
-     * its plugin's content tabs, and no menu without an item of a registered action; empty for a window that is not open.
+     * its plugin's content tabs, and no menu without an item of a registered action or a menu entry; empty for a window
+     * that is not open.
      */
     List<String> menuBar(java.util.UUID windowId);
+
+    /**
+     * Chooses the first enabled menu entry ({@code PluginMenu.addEntries}) with this id, in the order the menus list them,
+     * as a person would, and waits: its plugin's {@code chosen} hears the id on the UI thread, contained. False when no
+     * enabled entry that opens no submenu has the id, or it sits in a disabled submenu.
+     */
+    boolean chooseMenuEntry(String entryId);
 
     /**
      * The terminal context menu's model lines for a pane: the lines {@link #menu} gives for {@code context}, empty

@@ -167,7 +167,7 @@ checks the open context and the UI thread, enforces namespaces (ids start with `
 the plugin's own actions, contains callbacks, and writes the single application-wide `Contributions` model. Everything
 a plugin registered is removed, newest first, when it stops or fails to start. Each `WindowContent` connects to the
 model once: `WindowContributions` turns every contributed action into a Swing `Action` in the window's
-`CommandRegistry` (so each is also a command palette command), and the window's chrome and status bar rebuild only their plugin sections when the model changes. Every window takes the actions, the menus, the palette scopes, the panels and the status entries. Workspace code never sees an SDK type.
+`CommandRegistry` (so each is also a command palette command), and the window's chrome and status bar rebuild only their plugin sections when the model changes. A plugin's menu entries (`PluginMenu.addEntries`) are snapshotted with keys, so a change of their labels and enabled states alone updates a window's built items in place; a menu bar rebuild waits while one of the window's menus is open. Every window takes the actions, the menus, the palette scopes, the panels and the status entries. Workspace code never sees an SDK type.
 
 A toolbar view (`ToolbarItem.View`) is built by the plugin's factory, inside containment, each time a window opens. `ToolbarViewAdmission` admits only an INLINE `Stack` of LABEL `Text`, DROPDOWN,
 SEARCHABLE or PICKER `Choice`, at most one PRIMARY `Button`, icon-only GHOST `Button`s (a blank label), `MenuButton`s

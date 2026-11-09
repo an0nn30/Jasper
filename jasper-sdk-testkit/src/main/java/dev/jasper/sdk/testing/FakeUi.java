@@ -11,6 +11,8 @@ import dev.jasper.sdk.ui.ActionSpec;
 import dev.jasper.sdk.ui.Actions;
 import dev.jasper.sdk.ui.DialogSpec;
 import dev.jasper.sdk.ui.OverlaySpec;
+import dev.jasper.sdk.ui.MenuEntries;
+import dev.jasper.sdk.ui.MenuItem;
 import dev.jasper.sdk.ui.Menus;
 import dev.jasper.sdk.ui.PanelFactory;
 import dev.jasper.sdk.ui.PanelHost;
@@ -54,6 +56,18 @@ final class FakeUi {
             WebAddressItem(String actionId) { this.actionId = actionId; }
         }
 
+        /** An {@code addEntries} group of menu entries (SDK 0.31.0); identity, not value, decides removal. */
+        static final class Entries implements MenuEntries {
+            final Menu menu; final Consumer<String> chosen; List<MenuItem> items; boolean closed;
+            Entries(Menu menu, List<MenuItem> items, Consumer<String> chosen) { this.menu = menu; this.items = items; this.chosen = chosen; }
+            @Override public void set(List<MenuItem> next) {
+                menu.ui.context.requireOpen();
+                var checked = checked(next);
+                if (!closed) items = checked;
+            }
+            @Override public void close() { closed = true; menu.children.remove(this); }
+        }
+
         final String target; final String title; final Menu parent; final FakeUi ui;
         final List<Object> children = new ArrayList<>();
         /** A {@code createForContent} menu, which a window shows only while one of its plugin's content tabs is current there. */
@@ -76,6 +90,15 @@ final class FakeUi {
             children.add(leaf);
             return () -> children.remove(leaf);
         }
+        /** A submenu shares its root's target, so the terminal section's submenus refuse entries too. */
+        @Override public MenuEntries addEntries(List<MenuItem> items, Consumer<String> chosen) {
+            ui.context.requireOpen();
+            java.util.Objects.requireNonNull(chosen, "chosen");
+            if (target.equals("context")) throw new IllegalStateException("Menu entries do not belong to the terminal's right-click menu");
+            var entries = new Entries(this, checked(items), chosen);
+            children.add(entries);
+            return entries;
+        }
         @Override public Subscription addSeparator() {
             ui.context.requireOpen();
             Object leaf = new String[]{null};
@@ -95,10 +118,15 @@ final class FakeUi {
             else parent.children.remove(this);
         }
 
-        /** The entries as lines; {@code web-address:<id>} lines only when {@code webAddress} says they show. */
+        /**
+         * The entries as lines; {@code web-address:<id>} lines only when {@code webAddress} says they show. Menu entries are
+         * {@code entry:<id>:<label>} and, for their submenus, {@code entries:<label>} lines, each with {@code :disabled}
+         * while disabled.
+         */
         void render(List<String> lines, String indent, boolean webAddress) {
             for (Object child : children) {
                 if (child instanceof Menu menu) { lines.add(indent + "submenu:" + menu.title); menu.render(lines, indent + "  ", webAddress); }
+                else if (child instanceof Entries entries) render(entries.items, lines, indent);
                 else if (child instanceof WebAddressItem item) {
                     if (webAddress && ui.host.actionExists(item.actionId)) lines.add(indent + "web-address:" + item.actionId);
                 }
@@ -122,10 +150,79 @@ final class FakeUi {
                     if (found != null) return found;
                 } else if (child instanceof WebAddressItem item) {
                     if (webAddress && item.actionId.equals(actionId)) return item;
-                } else if (actionId.equals(((String[]) child)[0])) return child;
+                } else if (child instanceof String[] leaf && actionId.equals(leaf[0])) return child;
             }
             return null;
         }
+
+        /** Menu entries as lines: {@code ---}, {@code entries:<label>} with their children indented, and {@code entry:<id>:<label>}. */
+        private static void render(List<MenuItem> items, List<String> lines, String indent) {
+            for (MenuItem item : items) {
+                String disabled = item.enabled() ? "" : ":disabled";
+                if (item.separator()) lines.add(indent + "---");
+                else if (!item.children().isEmpty()) {
+                    lines.add(indent + "entries:" + item.label() + disabled);
+                    render(item.children(), lines, indent + "  ");
+                } else lines.add(indent + "entry:" + item.id() + ":" + item.label() + disabled);
+            }
+        }
+
+        /**
+         * What choosing the first enabled menu entry with this id runs, submenus in place: its group's {@code chosen} with
+         * the id. A disabled submenu does not open; a separator and a submenu report nothing. Null when there is none.
+         */
+        Runnable entry(String entryId) {
+            for (Object child : children) {
+                Runnable found = child instanceof Menu menu ? menu.entry(entryId)
+                    : child instanceof Entries entries ? entry(entries.items, entryId, entries.chosen) : null;
+                if (found != null) return found;
+            }
+            return null;
+        }
+
+        private static Runnable entry(List<MenuItem> items, String entryId, Consumer<String> chosen) {
+            for (MenuItem item : items) {
+                if (item.separator() || !item.enabled()) continue;
+                if (item.children().isEmpty()) { if (item.id().equals(entryId)) return () -> chosen.accept(entryId); }
+                else {
+                    Runnable found = entry(item.children(), entryId, chosen);
+                    if (found != null) return found;
+                }
+            }
+            return null;
+        }
+    }
+
+    /**
+     * Menu entries' checks, as the application's (SDK 0.31.0): the items copied, their ids unique across the whole tree,
+     * children included, and none with a shortcut.
+     */
+    static List<MenuItem> checked(List<MenuItem> items) {
+        var copy = List.copyOf(items);
+        var seen = new java.util.HashSet<String>();
+        var pending = new java.util.ArrayDeque<MenuItem>(copy);
+        while (!pending.isEmpty()) {
+            var item = pending.pop();
+            if (!seen.add(item.id())) throw new IllegalArgumentException("Duplicate id: " + item.id());
+            if (!item.shortcut().isEmpty()) throw new IllegalArgumentException("A menu entry shows no shortcut: " + item.id());
+            pending.addAll(item.children());
+        }
+        return copy;
+    }
+
+    /**
+     * Chooses this plugin's first enabled menu entry with this id as a person would; a throw is recorded, as a throwing
+     * action's is. False when there is none.
+     */
+    boolean chooseEntry(String entryId) {
+        for (Menu section : sections) {
+            Runnable chosen = section.entry(entryId);
+            if (chosen == null) continue;
+            try { chosen.run(); }
+            catch (RuntimeException | LinkageError failure) { host.recordFailure(pluginId() + " menu entry " + entryId + ": " + failure); }
+            return true;
+        }
+        return false;
     }
 
     /**

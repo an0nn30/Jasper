@@ -64,6 +64,17 @@ final class WindowChrome {
     private WindowContributions contributions;
     private boolean renderingMenus;
     private boolean menusDirty;
+    /** Whether a menu pass waits for this window's open menu to close (browser plan 7 Task 1b, F9). */
+    private boolean menusWaiting;
+    /** What the last menu pass was built from ({@link #menuShape()}); null before the first. */
+    private List<Object> builtShape;
+    /**
+     * The items and submenus the last menu pass built for keyed entries (a plugin's menu entries; browser plan 7 Task
+     * 1b), by key: a change of their text or enabled state alone updates them in place.
+     */
+    private final Map<String, JMenuItem> keyed = new java.util.HashMap<>();
+    /** What choosing each keyed command runs now: the newest model's, so a shown item never runs an older snapshot's. */
+    private final Map<String, Runnable> choices = new java.util.HashMap<>();
     /** The current item's plugin the last menu pass built for, which decides its content menus; null for none. */
     private String menuContent;
 
@@ -375,18 +386,20 @@ final class WindowChrome {
         toolbar.revalidate(); toolbar.repaint();
     }
 
-    /** Builds contributed entries; {@code item} makes menu-bar items or ordinary popup items. */
+    /** Builds contributed entries for the menu bar, which keeps the keyed ones' components ({@link #keyed}). */
     private List<Component> build(List<MenuEntry> entries, java.util.function.Function<Action, JMenuItem> item) {
-        return build(entries, item, Optional::empty);
+        return build(entries, item, Optional::empty, true);
     }
 
     /**
-     * As above; a web-address item shows only when {@code webAddress}, the right-clicked pane's selection as one web
-     * address, is present, and its item gives the action that address (browser plan 3b Task 6). Only a web-address item
-     * asks for it.
+     * Builds contributed entries; {@code item} makes menu-bar items or ordinary popup items. A web-address item shows
+     * only when {@code webAddress}, the right-clicked pane's selection as one web address, is present, and its item gives
+     * the action that address (browser plan 3b Task 6). Only a web-address item asks for it. A plugin's menu entry shows
+     * its label as plain text and its enabled state (browser plan 7 Task 1b); in the menu bar ({@code keep}) its item is
+     * kept by key and runs the newest choice for it.
      */
     private List<Component> build(List<MenuEntry> entries, java.util.function.Function<Action, JMenuItem> item,
-                                  java.util.function.Supplier<Optional<URI>> webAddress) {
+                                  java.util.function.Supplier<Optional<URI>> webAddress, boolean keep) {
         List<Component> built = new ArrayList<>();
         for (MenuEntry entry : entries) {
             switch (entry) {
@@ -400,12 +413,26 @@ final class WindowChrome {
                 }
                 case MenuEntry.Separator separator -> built.add(new JPopupMenu.Separator());
                 case MenuEntry.Submenu submenu -> {
-                    List<Component> children = build(submenu.entries(), item, webAddress);
+                    List<Component> children = build(submenu.entries(), item, webAddress, keep);
                     if (children.stream().noneMatch(child -> child instanceof JMenuItem)) break;
                     JMenu menu = PlainText.menu(submenu.title());
                     children.forEach(menu::add);
                     NativeStyles.installed().menu(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
+                    menu.setEnabled(submenu.enabled());
+                    if (keep && !submenu.key().isEmpty()) keyed.put(submenu.key(), menu);
                     built.add(menu);
+                }
+                case MenuEntry.Command command -> {
+                    JMenuItem shown = PlainText.item(command.label());
+                    NativeStyles.installed().menu(shown, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
+                    shown.setEnabled(command.enabled());
+                    if (keep) {
+                        String key = command.key();
+                        keyed.put(key, shown);
+                        choices.put(key, command.chosen());
+                        shown.addActionListener(event -> choose(key));
+                    } else shown.addActionListener(event -> command.chosen().run());
+                    built.add(shown);
                 }
             }
         }
@@ -413,9 +440,26 @@ final class WindowChrome {
         return built.stream().anyMatch(child -> child instanceof JMenuItem) ? built : List.of();
     }
 
+    /**
+     * The contributions changed (an action, a menu section, the split items or the tool windows): the keyed items this
+     * window built take their newest text, enabled state and choice at once, an open menu's included, and a change of
+     * anything else a menu pass builds from rebuilds the contributed menus ({@link #renderContributedMenus}), which waits
+     * while one of this window's menus is open (browser plan 7 Task 1b).
+     */
+    void contributionsChanged() {
+        refreshKeyed();
+        if (!menuShape().equals(builtShape)) renderContributedMenus();
+    }
+
+    /**
+     * Rebuilds the contributed menus, unless one of this window's menus is open: a pass replaces each contributed menu, an
+     * open one too, so then it waits until that menu closes ({@link #menuClosed}; browser plan 7 Task 1b, F9).
+     */
     void renderContributedMenus() {
         menusDirty = true;
         if (renderingMenus) return;
+        if (menuOpen()) { menusWaiting = true; return; }
+        menusWaiting = false;
         renderingMenus = true;
         try {
             // macOS/JBR can dispatch EDT callbacks while a native menu peer is changing.
@@ -447,7 +491,102 @@ final class WindowChrome {
 
     private static String contentPlugin(dev.jasper.app.contributions.Tab tab) { return tab == null ? null : tab.plugin(); }
 
+    /**
+     * Whether one of this window's menus is open (browser plan 7 Task 1b, F9): Swing's selection path starts at its menu
+     * bar, or one of the bar's top-level menus is selected, as JBR's screen menu bar on macOS reports an open menu while
+     * the path stays empty.
+     */
+    private boolean menuOpen() {
+        MenuElement[] path = MenuSelectionManager.defaultManager().getSelectedPath();
+        if (path.length > 0 && path[0] == menuBar) return true;
+        for (Component child : menuBar.getComponents()) if (child instanceof JMenu menu && menu.isSelected()) return true;
+        return false;
+    }
+
+    /**
+     * A menu of this window closed, a turn before: a pass that waited for it runs now, unless another of the window's
+     * menus is open by then.
+     */
+    private void menuClosed() { if (menusWaiting && !menuOpen()) renderContributedMenus(); }
+
+    /** Runs what choosing the keyed command {@code key} runs now, while the window takes input; nothing for a vanished one. */
+    private void choose(String key) {
+        Runnable chosen = choices.get(key);
+        if (chosen != null && !owner.closed() && !dev.jasper.app.platform.WindowInput.blocked(owner)) chosen.run();
+    }
+
+    /** Gives the keyed items and submenus the last pass built their newest text and enabled state, and the commands their newest choices. */
+    private void refreshKeyed() {
+        choices.clear();
+        if (contributions == null) return;
+        for (MenuSection section : contributions.model().menus())
+            if (section.target().type() != MenuTarget.Type.CONTEXT) refreshKeyed(section.entries());
+    }
+
+    private void refreshKeyed(List<MenuEntry> entries) {
+        for (MenuEntry entry : entries) {
+            if (entry instanceof MenuEntry.Command command) {
+                choices.put(command.key(), command.chosen());
+                show(keyed.get(command.key()), command.label(), command.enabled());
+            } else if (entry instanceof MenuEntry.Submenu submenu) {
+                if (!submenu.key().isEmpty()) show(keyed.get(submenu.key()), submenu.title(), submenu.enabled());
+                refreshKeyed(submenu.entries());
+            }
+        }
+    }
+
+    /** Shows {@code text} and {@code enabled} on a kept item, if the last pass built one; plain text, as it was built. */
+    private static void show(JMenuItem item, String text, boolean enabled) {
+        if (item == null) return;
+        if (!text.equals(item.getText())) item.setText(text);
+        if (item.isEnabled() != enabled) item.setEnabled(enabled);
+    }
+
+    /**
+     * What a menu pass builds from, with each keyed entry's text, enabled state and choice left out: which split items'
+     * entries show and their labels, each section the menu bar can show (its identity, whether a content menu shows for
+     * the current item, and its entries' kinds, keys and titles of action submenus, with whether each placed action
+     * exists), and the tool window toggles that exist. A change that keeps it needs no pass (browser plan 7 Task 1b).
+     */
+    private List<Object> menuShape() {
+        if (contributions == null) return List.of();
+        List<Object> shape = new ArrayList<>();
+        for (var listed : contributions.model().splitItems())
+            shape.add(List.of(listed.rightLabel(), contributions.action(listed.rightAction()) != null,
+                listed.downLabel(), contributions.action(listed.downAction()) != null));
+        dev.jasper.app.contributions.Tab current = owner.selectedContent();
+        for (MenuSection section : contributions.model().menus()) {
+            if (section.target().type() == MenuTarget.Type.CONTEXT) continue;
+            shape.add(section);
+            shape.add(section.target().showsFor(current));
+            shape.add(shape(section.entries()));
+        }
+        if (!owner.look().menus().toolWindowsInView())
+            for (var panel : contributions.model().panels())
+                shape.add(List.of(panel.toggleActionId(), contributions.action(panel.toggleActionId()) != null));
+        return shape;
+    }
+
+    private List<Object> shape(List<MenuEntry> entries) {
+        List<Object> shape = new ArrayList<>();
+        for (MenuEntry entry : entries) {
+            shape.add(switch (entry) {
+                case MenuEntry.Item placed -> List.of("item", placed.actionId(), contributions.action(placed.actionId()) != null);
+                case MenuEntry.WebAddressItem placed -> placed;
+                case MenuEntry.Separator separator -> separator;
+                case MenuEntry.Submenu submenu -> submenu.key().isEmpty()
+                    ? List.of("submenu", submenu.title(), shape(submenu.entries()))
+                    : List.of("entries", submenu.key(), shape(submenu.entries()));
+                case MenuEntry.Command command -> List.of("command", command.key());
+            });
+        }
+        return shape;
+    }
+
     private void rebuildContributedMenus() {
+        builtShape = menuShape();
+        keyed.clear();
+        choices.clear();
         menuContent = contentPlugin(owner.selectedContent());
         contributedSections.forEach((menu, added) -> added.forEach(menu::remove));
         contributedSections.clear();
@@ -719,8 +858,9 @@ final class WindowChrome {
         NativeStyles.installed().menu(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
         menu.addMenuListener(new MenuListener() {
             @Override public void menuSelected(MenuEvent event) { owner.updateActions(); refreshPaneMoves(menu); }
-            @Override public void menuDeselected(MenuEvent event) {}
-            @Override public void menuCanceled(MenuEvent event) {}
+            // Later, once Swing has cleared the rest of the selection path and a chosen item's action has run.
+            @Override public void menuDeselected(MenuEvent event) { SwingUtilities.invokeLater(WindowChrome.this::menuClosed); }
+            @Override public void menuCanceled(MenuEvent event) { SwingUtilities.invokeLater(WindowChrome.this::menuClosed); }
         });
         return menu;
     }
@@ -859,7 +999,7 @@ final class WindowChrome {
             var webAddress = new SelectedWebAddress(owner.currentPane());
             for (MenuSection section : contributions.model().menus()) {
                 if (section.target().type() != MenuTarget.Type.CONTEXT) continue;
-                List<Component> built = build(section.entries(), PlainText::item, webAddress);
+                List<Component> built = build(section.entries(), PlainText::item, webAddress, false);
                 if (built.isEmpty()) continue;
                 menu.addSeparator();
                 built.forEach(menu::add);

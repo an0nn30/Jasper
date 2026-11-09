@@ -7,7 +7,7 @@ code, and must return promptly. Slow work goes to the plugin's background execut
 thread before they touch the SDK.</p>
 
 <h3>The UI thread rule</h3>
-<p>Registering anything (actions, menus, toolbar and status items, tool windows, content tabs, split items, restorers, palette scopes, file sources,
+<p>Registering anything (actions, menus and their entries, toolbar and status items, tool windows, content tabs, split items, restorers, palette scopes, file sources,
 subcommands, event subscriptions, services), creating and updating views, and every query or command on
 {@link Terminals} and its handles must happen on the UI thread. A call from another thread throws
 {@code IllegalStateException}: "<i>what</i> must be called on the UI thread: <i>plugin id</i>", or "Kit requires EDT" from the
@@ -69,7 +69,7 @@ needs the UI thread, such as updating a view or a status item, does need it.</p>
 
 <h3>Subscriptions and lifetimes</h3>
 <p>Most registrations return a {@link Subscription}, or a handle that is one: {@link PluginAction}, {@link PluginMenu},
-{@link StatusItem}, {@link StatusProgress}, {@link UiView}, {@link UiAnchor}, {@link PluginPopover} and every dialog
+{@link MenuEntries}, {@link StatusItem}, {@link StatusProgress}, {@link UiView}, {@link UiAnchor}, {@link PluginPopover} and every dialog
 ({@link WindowSurface}). Closing it ends that one registration. Declared settings, a settings page, published
 services and notification groups are not; they last until the plugin stops. A {@link ContentTab} closes, without
 asking, with {@link ContentTab#close()} or when the plugin stops. A plugin rarely needs to close anything: when it stops, Jasper

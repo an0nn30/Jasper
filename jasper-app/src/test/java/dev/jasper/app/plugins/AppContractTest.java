@@ -430,7 +430,8 @@ class AppContractTest extends PluginContractTest {
                         if (where.type() != dev.jasper.app.contributions.MenuTarget.Type.TOP_LEVEL || !where.showsFor(current)) continue;
                         List<String> lines = new java.util.ArrayList<>();
                         render(contributions, section.entries(), "", lines, true);
-                        if (lines.stream().anyMatch(line -> line.strip().startsWith("item:"))) menus.add("top:" + where.key());
+                        if (lines.stream().map(String::strip).anyMatch(line -> line.startsWith("item:") || line.startsWith("entry:")))
+                            menus.add("top:" + where.key());
                     }
                     return menus;
                 });
@@ -450,6 +451,16 @@ class AppContractTest extends PluginContractTest {
                         render(contributions, section.entries(), "", lines, webAddress);
                     }
                     return lines;
+                });
+            }
+            @Override public boolean chooseMenuEntry(String entryId) {
+                return onEdtValue(() -> {
+                    // As the window's item runs it: the newest snapshot's choice, contained by the plugin's host.
+                    for (var section : contributions.menus()) {
+                        var command = entry(section.entries(), entryId);
+                        if (command.isPresent()) { command.get().chosen().run(); return true; }
+                    }
+                    return false;
                 });
             }
             @Override public boolean chooseFromContextMenu(UUID paneId, String actionId) {
@@ -950,11 +961,27 @@ class AppContractTest extends PluginContractTest {
                 }
                 case dev.jasper.app.contributions.MenuEntry.Separator separator -> lines.add(indent + "---");
                 case dev.jasper.app.contributions.MenuEntry.Submenu submenu -> {
-                    lines.add(indent + "submenu:" + submenu.title());
+                    lines.add(indent + (submenu.key().isEmpty() ? "submenu:" + submenu.title()
+                        : "entries:" + submenu.title() + (submenu.enabled() ? "" : ":disabled")));
                     render(contributions, submenu.entries(), indent + "  ", lines, webAddress);
                 }
+                case dev.jasper.app.contributions.MenuEntry.Command command -> lines.add(indent + "entry:" + HostedMenu.entryId(command.key())
+                    + ":" + command.label() + (command.enabled() ? "" : ":disabled"));
             }
         }
+    }
+
+    /** The first enabled menu entry with this id that opens no submenu, outside disabled submenus, as a person can choose it. */
+    private static Optional<dev.jasper.app.contributions.MenuEntry.Command> entry(List<dev.jasper.app.contributions.MenuEntry> entries, String entryId) {
+        for (var entry : entries) {
+            if (entry instanceof dev.jasper.app.contributions.MenuEntry.Command command && command.enabled()
+                    && HostedMenu.entryId(command.key()).equals(entryId)) return Optional.of(command);
+            if (entry instanceof dev.jasper.app.contributions.MenuEntry.Submenu submenu && submenu.enabled()) {
+                var nested = entry(submenu.entries(), entryId);
+                if (nested.isPresent()) return nested;
+            }
+        }
+        return Optional.empty();
     }
 
     /** The first entry of a section, submenus in place, that shows an item for the action; web-address items only when {@code webAddress}. */
@@ -967,6 +994,7 @@ class AppContractTest extends PluginContractTest {
                 case dev.jasper.app.contributions.MenuEntry.WebAddressItem item -> webAddress && item.actionId().equals(actionId);
                 case dev.jasper.app.contributions.MenuEntry.Separator separator -> false;
                 case dev.jasper.app.contributions.MenuEntry.Submenu submenu -> false;
+                case dev.jasper.app.contributions.MenuEntry.Command command -> false;
             };
             if (shows) return Optional.of(entry);
             if (entry instanceof dev.jasper.app.contributions.MenuEntry.Submenu submenu) {

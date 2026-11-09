@@ -114,6 +114,8 @@ final class HostedUi {
     private final GlassSource glass;
     private final HostedTypography typography;
     private final Set<String> ownActions = new HashSet<>();
+    /** How many {@code addEntries} groups the plugin made. */
+    private int entriesMade;
     private final List<Runnable> closers = new ArrayList<>();
     /** Whether this plugin ships with Jasper, which puts its split items first (workspace plan 8b Rulings 5); its context sets it. */
     BooleanSupplier bundled = () -> false;
@@ -211,6 +213,20 @@ final class HostedUi {
 
     private void requireUi(String what) {
         if (!onUi.getAsBoolean()) throw new IllegalStateException(what + " must be called on the UI thread: " + pluginId);
+    }
+
+    /** The plugin's id. */
+    String pluginId() { return pluginId; }
+
+    /** A number no earlier {@code addEntries} group of this plugin has (browser plan 7 Task 1b), for its entries' keys. */
+    int nextEntries() { return ++entriesMade; }
+
+    /**
+     * Runs plugin code {@code run} contained, named {@code what} in an incident, while the context is open; once it has
+     * closed, nothing.
+     */
+    void contain(String what, Runnable run) {
+        if (open.getAsBoolean()) containment.run(pluginId, what, run);
     }
 
     /** Whether this plugin registered the action and has not closed it. */
