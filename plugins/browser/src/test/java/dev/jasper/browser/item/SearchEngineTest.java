@@ -138,6 +138,7 @@ class SearchEngineTest {
     }
 
     static BrowserSettings settings(SearchEngine engine, String customSearch, String customSuggestions) {
-        return new BrowserSettings(BrowserSettings.WELCOME, 100, LinkOpening.ASK, LocalFileOpening.ASK, engine, customSearch, customSuggestions);
+        return new BrowserSettings(BrowserSettings.WELCOME, 100, LinkOpening.ASK, LocalFileOpening.ASK, engine, customSearch, customSuggestions, false,
+            false, URI.create(BrowserSettings.EASYLIST));
     }
 }

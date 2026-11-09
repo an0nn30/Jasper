@@ -376,6 +376,46 @@ class NotificationCenterTest {
         assertThat(ran).containsExactly("second body", "second");
     }
 
+    /**
+     * Plan 6's V8: {@code restate} puts a request of the same text back on a live entry, keeping its count, time and read
+     * state; it ignores an entry that expired or is gone, and refuses a request of another text.
+     */
+    @Test void restateSwapsALiveEntrysRequestAndIgnoresAnExpiredOrMissingOne() {
+        var center = center();
+        var ran = new ArrayList<String>();
+        NotificationRequest first = request(CARDS, "same").withActivate(() -> ran.add("first"));
+        UUID id = center.post(first).orElseThrow();
+        clock.advance(Duration.ofSeconds(5));
+        center.post(request(CARDS, "same").withActivate(() -> ran.add("second")));
+        center.markRead(id);
+        Notification before = center.find(id).orElseThrow();
+        changes.clear();
+        center.restate(id, first);
+        Notification after = center.find(id).orElseThrow();
+        assertThat(after.request()).isSameAs(first);
+        assertThat(after.count()).isEqualTo(2);
+        assertThat(after.posted()).isEqualTo(before.posted());
+        assertThat(after.read()).isTrue();
+        assertThat(kinds()).as("a card showing it updates").containsExactly("Upserted");
+        center.activate(id);
+        assertThat(ran).containsExactly("first");
+
+        assertThatThrownBy(() -> center.restate(id, request(CARDS, "other"))).isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("A notification keeps its text");
+        assertThat(center.find(id).orElseThrow().request()).isSameAs(first);
+
+        center.expire(id);
+        Notification expired = center.find(id).orElseThrow();
+        changes.clear();
+        NotificationRequest late = request(CARDS, "same").withActivate(() -> ran.add("late"));
+        center.restate(id, late);
+        assertThat(center.find(id).orElseThrow()).as("expired: ignored").isSameAs(expired);
+        center.restate(UUID.randomUUID(), late);
+        center.remove(id);
+        center.restate(id, late);
+        assertThat(kinds()).as("nothing for an expired or missing entry").containsExactly("Removed");
+    }
+
     @Test void whatAnExpiringActionPostsIsNotFoldedIntoTheEntryItEnds() {
         var center = center();
         var posted = new ArrayList<UUID>();

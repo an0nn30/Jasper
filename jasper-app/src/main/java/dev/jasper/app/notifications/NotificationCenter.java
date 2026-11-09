@@ -235,6 +235,24 @@ public final class NotificationCenter {
         update(id, Notification::withExpired);
     }
 
+    /**
+     * The entry carries {@code request}, of the same text, in place of the one it carries: its poster took back the
+     * repeat whose links it carried, and an earlier post's go back on it. Its count, time, read state and place stay, and
+     * a card showing it updates. Ignored for an entry that is gone or expired.
+     *
+     * @param id the entry
+     * @param request the request it carries from now on
+     * @throws IllegalArgumentException when {@code request}'s text is not the entry's
+     */
+    public void restate(UUID id, NotificationRequest request) {
+        requireEdt();
+        Objects.requireNonNull(request, "request");
+        Notification entry = history.get(id);
+        if (entry == null || entry.expired()) return;
+        if (!entry.request().sameText(request)) throw new IllegalArgumentException("A notification keeps its text");
+        update(id, current -> current.withRequest(request));
+    }
+
     public void remove(UUID id) {
         requireEdt();
         if (history.remove(id) == null) return;

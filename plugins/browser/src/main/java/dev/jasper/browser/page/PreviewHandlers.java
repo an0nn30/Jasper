@@ -41,7 +41,7 @@ import org.cef.network.CefRequest;
  *   ({@link #link}).</li>
  *   <li><b>Requests.</b> Every request outside the preview's own origin ({@link PreviewScheme#allows}) is cancelled.</li>
  *   <li><b>Refused.</b> Popups are cancelled, script dialogs suppressed and the right-click menu emptied, as the Editor's
- *   Basic preview has none.</li>
+ *   Basic preview has none; the camera, the microphone and screen capture are cancelled ({@link MediaAccess}).</li>
  *   <li><b>Focus.</b> When Chromium gives the focus away, past the page's last link or before its first, Swing's moves on
  *   from the canvas to the next or previous component.</li>
  *   <li><b>Keys.</b> On macOS, Select All, which Chromium leaves to the Edit menu there (4a's R35); the preview has no
@@ -65,6 +65,9 @@ final class PreviewHandlers {
     private static final Consumer<CefClient> INSTALL = PreviewHandlers::install;
     private static final Function<CefBrowser, String> TOKENS = PreviewHandlers::token;
     private static final System.Logger LOG = System.getLogger(PreviewHandlers.class.getName());
+    // The preview client's permission handler: a preview's browser is no page's, so it cancels every camera, microphone
+    // and screen request, and none is left to Chromium's own handling (ruling F26, finding 5-r1). It never answers late.
+    static final MediaAccess MEDIA = new MediaAccess(() -> true);
 
     private PreviewHandlers() { }
 
@@ -86,6 +89,7 @@ final class PreviewHandlers {
         client.addFocusHandler(new Focus());
         client.addKeyboardHandler(new Keys());
         client.addLoadHandler(new Loads());
+        client.addPermissionHandler(MEDIA);
         client.addMessageRouter(CefMessageRouter.create(new CefMessageRouter.CefMessageRouterConfig(QUERY, CANCEL), new Router()));
     }
 

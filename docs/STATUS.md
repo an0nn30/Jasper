@@ -1,5 +1,232 @@
 # Jasper — Status and Handoff
 
+**Browser plan 6: privacy — 2026-11-09** (`claude/browser-privacy`, worktree `.claude/worktrees/browser-4b-4c-e6deab`,
+from local `main` `ef3347601`, which has plans 4a, 4b, 4c, 9 and 5 merged; the plan `daa19c574`, commits `827ac12ba`
+to `03af74d75`, local `main` `67653bbf6` (Mermaid, plan 9's slice 1b) merged in as `965c11432`, the docs, `7ad704159`,
+`51b74b627` and `1092ada75`, and the final fix wave, `c7be4d2ed` and `5125f2ba0`, its docs, `cb0c7dca6` and
+`eee0926bd`, and W1's round 2, `baa0f084a`, and its docs; not merged or pushed;
+[plan](superpowers/plans/2026-10-30-browser-6-privacy.md), whose banner lists every deviation by task,
+[spec](superpowers/specs/2026-10-26-jasper-browser-plugin-design.md) sections 6, 12, 14, 16, 17, 21 and 23,
+[guide](browser.md#devnull-mode); executed with per-task subagents and reviews, Task 1 as 1a and 1b, each task's fix
+rounds until its re-review found every finding addressed; the final reviews passed the branch "With fixes" and the docs
+"Approved with fixes", and the fix wave that followed, with a round after W1's re-review, is done). The Browser gains
+iTerm2's privacy features:
+- **/dev/null mode** (`devnull_mode`): each new tab, window or pane opens in a browsing group of its own, an in-memory
+  Chromium context and an in-memory database, which the tabs its page opens join; its cookies, storage, history, site
+  permissions, audio choices and certificate allowances end with the group's last tab. The toolbar's indicator and its
+  popover; no bookmark items in ☰; notifications denied (V20); the saved workspace keeps `devnull = "true"`, no address
+  and the title "Web Browser" (`ContentTab.setSavedTitle`), and the tab comes back at the start page in a group of its
+  own.
+- **Site permissions:** the camera, the microphone, both, and notifications, asked in Jasper's prompt over the page
+  ("Allow Camera", Block and Allow), kept for the page's top-level site (V16), with V19's double-click interval and the
+  page's dialog limit; screen capture and location refused without a prompt; kept in `browser.sqlite`'s `permissions`
+  table; `jasper-about:permissions` (the Quick Actions' Permissions, Settings' Manage Permissions) and ☰'s Reset items
+  (V17, V18).
+- **Page notifications** as Jasper's, in the Page notifications group: "host — body" (V2), at most 10 a page a minute,
+  `close()` taking one out of history (`NotificationHandle.remove()`), only from a secure page outside /dev/null mode
+  whose origin is not opaque (V20-V22).
+- **Audio:** a page whose site has no choice kept is muted at its first sound, and the bar asks (Allow Once, Allow
+  Always, Deny Once, Deny Always); ☰'s Unmute Current Page; cooperative muting in every frame but challenge frames.
+- **Settings › Tools › Browser** is the plugin's own page: Privacy & Data's Clear Cookies, Clear Website Data (V1, V24:
+  the live clear, the database erased and compacted, and the next start's wipe of `data/chromium`, V25-V27) and Manage
+  Site Permissions; Ad Blocking's Filter Statistics and Update Now; Proxy.
+- **Ad blocking** (`ad_blocking`, off by default; the onboarding's Ad Blocker switch): a WebKit content-blocker list
+  (EasyList's by default; `https`, or `http` on this computer), compiled and matched within bounds a hostile list
+  cannot pass (V28-V34, V48-V50), cached in `data/adblock/`, checked hourly and downloaded every 24 hours; a page's
+  requests blocked on Chromium's IO thread, but never its main frame's, and its elements hidden through `insertRule`
+  on an adopted sheet (V-F5).
+- **The HTTP proxy** (`http_proxy`, `proxy_host`, `proxy_port`): Chromium's `proxy` preference on the global context
+  and on each /dev/null context, failing closed for a /dev/null group (V-F4, V44), and Jasper's own fetches routed as
+  Chromium routes (V43); off, the system's settings (V42).
+
+SDK 0.30.0 (every bundled range `>=0.30.0, <0.31`): `NotificationHandle.remove()` and `ContentTab.setSavedTitle`, with
+the testkit's `FakeNotifications.Post.count()` and `removed()` and `FakePluginHost.savedTitle`; the host keeps each
+handle's request and counts handles per entry across plugins (V8, V9), and a click on an open anchored popover's anchor
+closes it, for every popover (V14). The Browser stays 0.2.0, and nothing new ships. Docs: the Browser guide (/dev/null
+mode, site permissions, page notifications, audio, clearing data, ad blocking and the HTTP proxy, with the toolbar, the
+welcome page, History, certificate errors, Restore, Jasper's own requests, Settings and Files), the configuration
+guide's plugin table, AGENTS.md's Verified JCEF behaviour (`setPreference`, and JCEF's lack of a context that shares
+another's storage), the plan's banner and this entry; `docs/packaging.md`'s camera and microphone usage descriptions
+came with Task 5. The fix wave added the notifications guide's Bookmarks and Page notifications groups, and the
+README's, Plugins' and the docs index's Browser descriptions (V47, V55). The fix wave's code: W1 bounds the content
+blocker's compiled patterns, its parse, its examining and its filter list's client (V48-V53, V56), and W2 makes part
+A's fixes and moves Chromium's clearing into `ChromiumClearing`, a pure move (V54, V46). W1's re-review found the
+pattern cache open to a hash flood and a leading run of spaces uncharged, and W1's round 2 keys the cache by each
+filter's place and a rule's domain lists by sorted arrays, charges the run, checks the first request against a retired
+client and makes `FilterListTest` wait for the list's lane (V57, V58). Verification: after the round's code and docs,
+`./gradlew check --continue` (JBR 25.0.4.1 b635.75 jcef, 10m 34s) gave **15,546 tests, 0 failures, 0 errors, 103
+skipped** (1,389 classes in the 16 build folders, without the example plugin's: jasper-app 5,292 with 90 skipped,
+Editor 5,387 with 4 skipped, Browser 1,351 with 1 skipped, jasper-ui 1,020, Remote 659, jasper-sdk 135,
+jasper-sdk-testkit 310), that is, the wave's 15,540 (the 15,518 after the docs and the wave's 22) and the round's 6;
+the example external plugin's `check pluginZip` against `build/sdk-release` passes (1 test, up to date: no SDK
+change); source hygiene is clean, and no file the docs, the wave or the round touched holds a raw U+00A0, U+2028 or
+U+2029. No GUI was launched.
+
+The controller's rulings, one line each (the pre-flight scan's F1-F44 adopted as V0; the banner gives each V-F*n* where
+it applied):
+- V0: every ruling the pre-flight scan proposed (F1-F44) is adopted and cited as V-F*n*, except where V1-V6 decide
+  otherwise.
+- V1: F18, the user's choice ("Clear now + wipe", 2026-11-06): Clear Website Data clears live and wipes
+  `<data>/chromium` at the next start, and the confirmation and the docs say that sign-ins made before the next start
+  are lost too.
+- V2: F23: a page notification's content begins with the page's host ("example.com — BODY"), as Chrome and macOS name
+  the site.
+- V3: F39, the user's choice ("Match Chrome", 2026-11-06): no extra WebRTC or DNS-prediction preferences while the
+  proxy is on, as Chrome; the Browser guide records the 407, DNS-prediction and WebRTC STUN leaks.
+- V4: F35: no benchmarks now; Task 13 records a start-up and memory batch, ad blocking off and on, as pending for the
+  benchmark sitting.
+- V5: F1: no GUI launch; F1's `jasper-about:` in /dev/null tabs is the first pending GUI line.
+- V6: F30: Task 1 splits into 1a (the SDK 0.30.0 bump alone, over `0ddd79162`'s file list) and 1b
+  (`NotificationHandle.remove()` and F2's saved-title member), each reviewed.
+- V7: Task 1b's additions are accepted (`Post.count()`, a plain post removed before it lands never made, `remove()`
+  after the stop still removing); Task 6's "11th post in 60 s" case uses distinct texts or `count()`.
+- V8: each handle keeps its own request; a partial removal puts the newest remaining handle's request back on the
+  entry (the host's center call swaps the request, keeping count and read state; the fake keeps handles per post).
+- V9: the host counts handles per center entry across plugins, as the fake does; the group-id overlap itself is
+  recorded.
+- V10: each browser gets a disposable `CefRequestContext` object of its own over the group's shared storage: CEF's
+  share-storage creation if JCEF exposes it, else an engine subclass with a no-op dispose over the kept native handle;
+  the kept context is Jasper's alone, released once.
+- V11: in-memory databases set `PRAGMA temp_store = MEMORY`.
+- V12: the kept context is disposed only when its group has closed and every `BrowserContext` handed out over it has
+  been disposed by JCEF; each handed-out dispose decrements and zeroes its own ref; DevTools browsers get counted
+  objects of their own; the sweep follows the same rule after JCEF's browsers close.
+- V13: Task 2 fixes the pre-existing deferred-close gap: Jasper's own `onAfterCreated` closes a browser whose page
+  closed first, or a never-created `PageBrowser` hands back at close.
+- V14: the host consumes a press that dismisses an anchored popover and lands on its own anchor, for every anchored
+  popover; the plugin's timer guard goes.
+- V15: the unavailable notice reads "Browser history, bookmarks and site permissions are unavailable".
+- V16: camera and microphone grants are keyed by the page's top-level origin, not CEF's requesting frame origin, and
+  the prompt names it.
+- V17: ☰'s Reset revokes the origin the menu was rendered for, even after a navigation.
+- V18: amends V17: the item remembers, per permission, the site the menu last offered that Reset for, and revokes it
+  there.
+- V19: the prompt ignores both answers until the double-click interval (`awt.multiClickInterval`, else 500 ms) has
+  passed since it showed or since another modal of the page closed, and a page's script dialogs wait while its prompt
+  shows.
+- V20: as Chrome's Incognito, a /dev/null item denies page notifications: the polyfill reports "denied",
+  `requestPermission` resolves "denied" without a prompt, and the router refuses a /dev/null browser's posts.
+- V21: notifications need a secure context, as in Chromium: https or loopback http; `file:` is denied.
+- V22: a sandboxed (opaque-origin) main-frame document is denied, judged by the opener bridge's current
+  `Document.origin()`.
+- V23: Task 7's calls are accepted: a document with no site is muted with no bar, ☰'s Unmute plays it and nothing is
+  stored; one `audio.playing` per page per main-frame document; the bar's answers count only while it shows;
+  `audio.js` wraps the `muted` accessor, so a player's own mute survives Allow Once, and leaves the volume alone.
+- V24: Clear All Data keeps deleting bookmarks, and the confirmation names everything it deletes (history, bookmarks,
+  site permissions, cookies, cache and local storage) with V1's warning.
+- V25: a file-backed database running in memory makes Clear Website Data fail with a cause, and marks the
+  `browser.sqlite*` files for deletion at the next start.
+- V26: a failed or late per-origin storage call is logged and left to the wipe; the cache, the cookies and the marker
+  still fail the run; the database rows are erased even when the live part fails, and the failure is reported.
+- V27: the marked-database hook runs before, and regardless of, the chmod; a marked file that cannot be deleted makes
+  the database run in memory for that run and keeps the mark; the marker gains `database` whenever the erase does not
+  complete, and the database is erased first.
+- V28: a `css-display-none` selector list is split at top-level commas (outside `()`, `[]` and quotes), each part at
+  most 1,024 characters and refused on `{`, `}`, `;`, `@` or `<`, at most 5,000 parts a rule, the page's sheet still
+  2 MiB; a `url-filter` of `.*` or `^https?://` (with or without a trailing `.*`) counts as generic for the
+  precomputed sheet.
+- V28's detail: a `\`-escaped character never splits a part; `Rule` keeps its selector as written, and one splitter
+  serves `ContentRules`' check and `RuleSet`'s lines; the generic place search is a lower bound; `^https?://` generic
+  rules form an http(s)-only part of the generic sheet, chosen by the page's scheme, and the index agrees with
+  `scanStylesheet` on `file:`, `data:`, `about:` and upper-case schemes.
+- V29: a quantified group whose content can match the empty string is refused, and a filter has at most 256
+  quantified atoms.
+- V30: each `blocks` and each `stylesheet` call has one budget of 2,000,000 reads shared across the rules it runs (the
+  per-match 100,000 stays); past it, `blocks` answers not blocked and `stylesheet` keeps only what the walk has
+  proved; an overrun logs once per list, and no filter is disabled.
+- V31: a class is written out as its member characters (printable ASCII only, so at most 95), which Java compiles into
+  one bitmap.
+- V32: a list holds at most 500,000 domain entries in all (rules past that are skipped and counted), and a literal's
+  rarity is counted and chosen over its first 64 4-grams only.
+- V33: a read is charged 1 plus the filter's count of `*`- and `?`-quantified atoms, and a literal pre-check 1 plus the
+  address length / 32 (of the capped address), both against the match budget and the call's.
+- V34: a list's compile (`ContentRules.compile`, `RuleSet.of`) stays on the background executor; a hostile 30 MiB list
+  may take seconds and a transient heap peak there, recorded as a known gap. Amended by V49 and V56: at the cap of
+  2,000,000 values a list's parse and compile peak at about 404 MB for 2,000,000 empty objects (286 ms; it completes
+  in a 256 MiB heap) and about 600 MB for 250,000 real-looking rules (436 ms; it needs about 400 MiB), both under half
+  of `-Xmx2048m`, and a list one value past it is refused in 12 to 26 ms.
+- V35: `SetupSwitch.set` returning the save's future is accepted, a plan 5 signature change.
+- V36: before the list has been read, the status reads "Loads with the first browser page" instead of "0 rules".
+- V37: the hourly check runs on a `ScheduledExecutorService` the list owns (one named daemon thread), shut down in
+  `close()`, and the tick reads its own future under the lock.
+- V38: redirects are followed by hand (`Redirect.NEVER`, at most 5, each target checked by `fetches` before it is
+  requested, within http and https), so a refused target is never asked.
+- V39: a frame's quoted script is capped at 4 MiB, the sheet cut at a line boundary to fit, and a main frame whose
+  sheet equals the cached generic sheet reuses the cached quoted script; `StrictJson.quote` stays as it is.
+- V40: ws and wss requests get `websocket` and `raw`, and `RT_NAVIGATION_PRELOAD_SUB_FRAME` gets what `RT_SUB_FRAME`
+  gets.
+- V41: `FilterList` is split along the reviewer's seams: `ListDownload`, `ListCache` and `FilterList`.
+- V42: with the proxy off, Chromium uses the system's settings and Jasper's own fetches the JDK's default selector,
+  which follows the system only when the JVM runs with `-Djava.net.useSystemProxies=true`; the docs say so, naming
+  Settings' custom VM options as the way, and the Browser sets no process-wide property.
+- V43: Jasper's own fetches go direct for Chromium's implicit bypass hosts (`localhost`, `*.localhost`,
+  `127.0.0.0/8`, `[::1]`, `169.254.0.0/16`, `[fe80::]/10`) and through the proxy otherwise, by one selector in `http`
+  whose loopback rule `ListDownload` shares.
+- V44: a refused /dev/null context keeps failing closed, with a blank item and the notification, which names the
+  cause; `PageContext` drops a failed future, so the group's next item asks again.
+- V45: a kept context that refuses a change keeps its old route, with the error posted, recorded as a known gap;
+  underscores stay refused.
+- V46: the proxy state moves into `NetworkPreferences` now, `Chromium` keeping the `proxyLive` hand-off and a delegate;
+  splitting the clearing out of `Chromium` goes to the final wave.
+- V47: the README's and `docs/plugins.md`'s Browser descriptions name plan 6's features (/dev/null mode, site
+  permissions, page notifications, audio muting, clearing data, ad blocking, an HTTP proxy) in their own style, in the
+  final fix wave.
+- V48: compiled patterns live in one cache per `RuleSet`, least recently used out first, within an estimated weight of
+  32 MiB; a filter's compile is charged to the call's budget, calibrated so the 2,000,000 budget bounds a call's
+  compiles to about 10 ms on this Mac; a compile the budget cannot pay is not started; a one-member class is written as
+  its character.
+- V49: `BlockerJson` counts the JSON values outside strings in one linear pre-scan and refuses a list of more than
+  2,000,000 before it parses; V34 is amended with the peak measured at that cap.
+- V50: each candidate a call examines is charged 1 against the call's budget, and an ignore rule whose match overruns
+  counts as matched, so both budgets err toward allowing the request and hiding less.
+- V51: the filter list's client always has a selector (`ProxyRoute.loopback` hosts directly, everything else through
+  the proxy when it is on and `ProxySelector.getDefault()` when it is off); a retired client refuses further redirect
+  hops; a `filter_list_url` change during a download checks again once it ends.
+- V52: amends V36: the status reads "Loads when ad blocking is on and a browser page opens".
+- V53: the fix wave fixes the timing-sensitive tests (the `updating()` assertions hold the server on a latch, only
+  `/hold` has the short deadline, the daemon-thread test reads the list's own scheduler's threads) and the unparsable
+  `Location`'s reason.
+- V54: part A's fixes in the wave: a clearing helper made after Chromium stopped running closes at once, with a GUI
+  line; a refused `{mode: system}` while the proxy is off is logged, not posted; one `Origins.host`; one constant for
+  "Jasper could not answer this request."; `DataFolder`'s Windows Javadoc; Task 1b's `restate` test and identity
+  comment, Task 5's clock in `try/finally`, Task 6's softened script comments; Chromium's clearing moved, as a pure
+  move, into a package-private engine class.
+- V55: part C's docs fixes and V47 in the wave: "fail" for `ERR_BLOCKED_BY_CLIENT` in the guide and the checklist; the
+  notifications guide's Page notifications and Bookmarks groups; the four softened sentences; `1092ada75` and
+  `BrowserItem`'s size in the banner and STATUS; the README's, Plugins' and the docs index's Browser lines.
+- V56: W1's calls are accepted: the compile charge counts the source and a case-sensitive leading run as well as the
+  expression, as the 10 ms bound needs; a hostile list's first call may take about 30 ms while the JIT is cold;
+  gathering the always bucket's candidates stays uncharged (1 to 7 ms, bounded by the 250,000 rules); V34 is amended
+  with the measured 404 MB parse peak at the cap.
+- V57: the pattern cache keeps each filter by its place in the rule set, so no list chooses a lookup's hash, and every
+  hash map or set keyed by a type a list controls that is not `Comparable` is keyed the same way; strings stay, as a
+  `HashMap` keeps one hash's strings in a tree; equal filters at two places compile and weigh apart.
+- V58: `run()` counts a `\` before any printable character but a letter or digit, the space included; the first
+  request is checked against a retired client, as each redirect is; `FilterListTest` waits for the list's lane; the
+  two nits; V56 amended with the domain buckets' gathering (9 to 14 ms warm, up to 42 ms in a first call, bounded by
+  the 500,000 hosts of `MAX_LIST_DOMAINS`).
+- V59: W2's calls are accepted: `UNANSWERED` replaces all six identical copies, three of them older than plan 6; the
+  refusal while the proxy is off logs on `NetworkPreferences`' logger; the `CompletionException` unwrap stays per
+  package; the 121- to 125-character Javadoc lines stay.
+
+Known gaps and follow-ups (the banner has them all, with the deferred minors by task): muting, hiding and the
+notification stand-in are cooperative scripts in the page's own world, which a page can undo and detect; an audio
+context or a shadow root's autoplay set up before Jasper's script ran plays on; a hidden element's suppressed lazy load
+is a side channel (Task 10's M9); a list's parse and compile peak at about 400 to 600 MB on the background executor
+(V34, as V49 and V56 amend it); a hostile list's first call may take about 30 ms while the JIT is cold, and gathering
+the candidates of the always bucket and of the domain buckets is not charged (up to 42 ms in a first call, V56 as V58
+amends it); with the proxy on, a 407 fails the page, and DNS prediction and
+WebRTC STUN go around it (V3); with it off, Jasper's own fetches ignore a proxy the system alone names unless the JVM
+runs with `-Djava.net.useSystemProxies=true` (V42); a kept context that refuses a change keeps its old route (V45); a
+`*.localhost` fetch may be looked up by the system resolver, and a non-decimal, trailing-dot or zone-id loopback or
+link-local address goes through the proxy (the safe direction); until the next start after Clear Website Data, open
+pages keep their Back and Forward lists and `:visited` (V-F40); `BrowserItem` grew from 907 to 1,030 lines (kept
+whole). Task 13 (the user's check on macOS, with their OK): pending,
+V-F1's `jasper-about:` pages in a /dev/null tab first (V5), then the plan's eight groups, the task reviews' lines and
+the fix wave's, and a question for the user: may Manage Permissions open its tab behind Settings?
+([checklist](browser-verification.md#plan-6-privacy)). Windows and Linux are not run; the start-up and memory batch,
+with ad blocking off and on, waits for the benchmark sitting (V4).
+
 **Browser plan 5: history, bookmarks and Jasper integrations — 2026-11-06** (`claude/browser-history-bookmarks`,
 worktree `.claude/worktrees/browser-4b-4c-e6deab`, from local `main` `68265a983`, which has plans 4a, 4b, 4c and 9
 merged; the plan `4930f00b6`, commits `6240e693d` to `986462e5c`, the docs, the final fix wave `1e9f2f717` to
@@ -1045,8 +1272,8 @@ plugins on the public plugin SDK. The [documentation index](README.md) lists eve
   `claude/test-isolation-leaks` (the Swing test-isolation guard, 3 commits).
 - **Modules.** `jasper-ui`, `jasper-terminal`, `jasper-app`, `jasper-buddy`, `jasper-sdk` and `jasper-sdk-testkit`, plus
   one `:jasper-plugin-<dir>` for each directory under `plugins/`.
-- **SDK** `0.29.0` (`JasperSdk.VERSION`; no release carries it yet, `v1.0.0` has 0.18.1); every bundled plugin declares
-  `sdk = ">=0.29.0, <0.30"`.
+- **SDK** `0.30.0` (`JasperSdk.VERSION`; no release carries it yet, `v1.0.0` has 0.18.1); every bundled plugin declares
+  `sdk = ">=0.30.0, <0.31"`.
 - **Themes.** Built in: Jasper Meadow (`jasper-meadow`, Dark and Light; the default theme of both appearances under
   either look), Slate Cobalt (Dark and Light; start-up falls back to its Dark variant when a theme cannot be applied),
   Catppuccin Latte, Frappé, Macchiato and Mocha, and Ubuntu Yaru; the Enterprise plugin adds the Enterprise theme.

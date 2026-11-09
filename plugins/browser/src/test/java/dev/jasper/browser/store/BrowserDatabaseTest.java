@@ -42,12 +42,13 @@ class BrowserDatabaseTest {
         }
     }
 
-    @Test void aNewFileGetsTheFourTablesAndVersionOne() throws Exception {
+    /** The four tables of history and bookmarks, and plan 6's site permissions. */
+    @Test void aNewFileGetsTheFiveTablesAndVersionOne() throws Exception {
         Path file = data.resolve("data").resolve("browser.sqlite");
         BrowserDatabase database = file(file);
         assertThat(done(database.<List<String>>call(connection -> strings(connection,
             "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name"))))
-            .containsExactly("bookmark_tags", "bookmarks", "history", "visits");
+            .containsExactly("bookmark_tags", "bookmarks", "history", "permissions", "visits");
         assertThat(done(database.<List<String>>call(connection -> strings(connection, "SELECT name FROM sqlite_master WHERE type = 'index' AND sql IS NOT NULL"))))
             .containsExactly("history_by_time");
         assertThat(done(database.<List<String>>call(connection -> List.of(text(connection, "PRAGMA user_version"), text(connection, "PRAGMA journal_mode"),
@@ -285,7 +286,7 @@ class BrowserDatabaseTest {
 
     /** H37: a folder whose permissions cannot be set is logged once, as a warning, and the database opens all the same. */
     @Test void aDataFolderWhosePermissionsCannotBeSetIsLoggedOnceAndStillOpens() throws Exception {
-        var folder = new DataFolder(data, path -> { throw new IOException("Operation not permitted"); });
+        var folder = new DataFolder(data, path -> { throw new IOException("Operation not permitted"); }, files -> true);
         try (var log = new CapturedLog(DataFolder.class)) {
             BrowserDatabase database = BrowserDatabase.file(folder, this::unavailable);
             opened.add(database);
@@ -308,6 +309,113 @@ class BrowserDatabaseTest {
         assertThat(database.started()).isFalse();
         assertThat(database.call(connection -> "never")).isCompletedExceptionally();
         assertThat(data.resolve("browser.sqlite")).doesNotExist();
+    }
+
+    /**
+     * Ruling V25: whether a database asked for a file uses none, as Clear Website Data must know: once a call has
+     * answered, true when the file could not be used and it runs in memory, or SQLite cannot run at all; false for a
+     * file in use and for a database in memory.
+     */
+    @Test void aDatabaseAskedForAFileTellsWhetherItUsesNone() throws Exception {
+        BrowserDatabase used = file(data.resolve("used").resolve("browser.sqlite"));
+        assertThat(used.fileUnused()).as("before its first call").isFalse();
+        done(used.call(connection -> null));
+        assertThat(used.fileUnused()).isFalse();
+        Path folder = Files.createDirectories(data.resolve("unusable"));
+        DatabaseFixtures.notADatabase(folder);
+        BrowserDatabase unusable = file(folder.resolve("browser.sqlite"));
+        done(unusable.call(connection -> null));
+        assertThat(unusable.fileUnused()).as("in memory instead").isTrue();
+        BrowserDatabase none = BrowserDatabase.file(data.resolve("none.sqlite"), this::unavailable, url -> {
+            throw new SQLException("Error opening connection", new UnsatisfiedLinkError("no sqlitejdbc in java.library.path"));
+        });
+        opened.add(none);
+        assertThat(none.call(connection -> null)).failsWithin(10, TimeUnit.SECONDS);
+        assertThat(none.fileUnused()).as("no database at all").isTrue();
+        BrowserDatabase memory = BrowserDatabase.memory();
+        opened.add(memory);
+        done(memory.call(connection -> null));
+        assertThat(memory.fileUnused()).as("never asked for a file").isFalse();
+        assertThat(unavailable).hasSize(2);
+    }
+
+    /**
+     * Ruling V25: a data folder's first use, before the database opens, lets a clearing that marked the database delete
+     * its file, its log and its shared memory, so the database opens a new file.
+     */
+    @Test void aDataFoldersFirstUseDeletesAMarkedDatabaseBeforeItOpens() throws Exception {
+        Path folder = Files.createDirectories(data.resolve("marked"));
+        DatabaseFixtures.plan5(folder, "https://cleared.example/");
+        var asked = new CopyOnWriteArrayList<List<Path>>();
+        var dataFolder = new DataFolder(folder, files -> {
+            asked.add(files);
+            return deleted(files);
+        });
+        BrowserDatabase database = BrowserDatabase.file(dataFolder, this::unavailable);
+        opened.add(database);
+        assertThat(done(new HistoryStore(database).list("", Optional.empty(), 10)).entries()).as("a new file").isEmpty();
+        Path file = folder.resolve("browser.sqlite").toAbsolutePath();
+        assertThat(asked).containsExactly(List.of(file, file.resolveSibling("browser.sqlite-wal"), file.resolveSibling("browser.sqlite-shm")));
+        dataFolder.restrict();
+        assertThat(asked).as("once, at the first use").hasSize(1);
+        assertThat(database.fileUnused()).isFalse();
+        assertThat(unavailable).isEmpty();
+
+        // Re-review's item 1: a folder whose permissions cannot be set, as on a network-mounted home, still deletes them.
+        Path refusing = Files.createDirectories(data.resolve("refusing"));
+        DatabaseFixtures.plan5(refusing, "https://cleared.example/");
+        var refused = new DataFolder(refusing, path -> { throw new IOException("Operation not permitted"); }, files -> {
+            asked.add(files);
+            return deleted(files);
+        });
+        try (var log = new CapturedLog(DataFolder.class)) {
+            BrowserDatabase again = BrowserDatabase.file(refused, this::unavailable);
+            opened.add(again);
+            assertThat(done(new HistoryStore(again).list("", Optional.empty(), 10)).entries()).as("a new file all the same").isEmpty();
+            assertThat(log.records()).as("the refused permissions, logged once").hasSize(1);
+        }
+        assertThat(asked).hasSize(2);
+        assertThat(unavailable).isEmpty();
+    }
+
+    /**
+     * Ruling V27: a marked database whose files cannot be deleted, as Windows refuses while another program holds them, is
+     * not opened: the database runs in memory for the run, says so, and its file, with the mark, waits for the next start.
+     */
+    @Test void aMarkedDatabaseThatCannotBeDeletedIsNotOpenedAndRunsInMemory() throws Exception {
+        Path folder = Files.createDirectories(data.resolve("held"));
+        DatabaseFixtures.plan5(folder, "https://cleared.example/");
+        Path file = folder.resolve("browser.sqlite");
+        byte[] before = Files.readAllBytes(file);
+        BrowserDatabase database = BrowserDatabase.file(new DataFolder(folder, files -> false), this::unavailable);
+        opened.add(database);
+        assertThat(done(new HistoryStore(database).list("", Optional.empty(), 10)).entries()).as("the cleared rows are not read").isEmpty();
+        assertThat(database.fileUnused()).isTrue();
+        assertThat(unavailable).singleElement().satisfies(cause -> assertThat(cause)
+            .hasMessage("The browser's database is to be deleted, as Clear Website Data asked, and could not be: " + file.toAbsolutePath()));
+        assertThat(Files.readAllBytes(file)).as("left as it was").isEqualTo(before);
+    }
+
+    /** Deletes {@code files}, as the plugin's hook does for a marked database: whether the database may use them now. */
+    private static boolean deleted(List<Path> files) {
+        for (Path each : files) {
+            try {
+                Files.deleteIfExists(each);
+            } catch (IOException failure) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * V11: a database in memory, a /dev/null group's, keeps its temporary tables and sort spills in memory too: the
+     * bundled SQLite would otherwise spill them to temporary files on disk.
+     */
+    @Test void aDatabaseInMemoryKeepsItsTemporaryStoreInMemory() throws Exception {
+        BrowserDatabase database = BrowserDatabase.memory();
+        opened.add(database);
+        assertThat(done(database.<String>call(connection -> text(connection, "PRAGMA temp_store")))).as("MEMORY").isEqualTo("2");
     }
 
     @Test void aFailedCallFailsItsFutureAndTheNextCallRuns() throws Exception {
@@ -333,6 +441,7 @@ class BrowserDatabaseTest {
         long entry = done(history.record("https://a.example/", Reached.LINK, 1)).orElseThrow().entry();
         assertThat(done(history.list("", Optional.empty(), 10)).entries()).extracting(HistoryStore.HistoryEntry::id).containsExactly(entry);
         assertThat(done(database.<String>call(connection -> text(connection, "PRAGMA journal_mode")))).as("in memory").isEqualTo("memory");
+        assertThat(done(database.<String>call(connection -> text(connection, "PRAGMA temp_store")))).as("V11").isEqualTo("2");
         assertThat(done(database.<String>call(connection -> text(connection, "PRAGMA foreign_keys")))).isEqualTo("1");
         assertThat(kept).hasBinaryContent(before);
         assertThat(sidecars(file)).isEmpty();

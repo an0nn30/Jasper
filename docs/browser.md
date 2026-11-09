@@ -23,8 +23,8 @@ the Markdown preview is the Editor's Basic one, and while Jasper is itself the s
 The start page is `jasper-about:welcome` by default: Jasper's welcome page, "Welcome Back", in the workspace theme's
 colours. It shows **Top Sites**, the eight sites you visit most ([History](#history)), with **Refresh**, and Quick
 Actions: **Bookmarks** and **History**, which open the [bookmarks page](#bookmarks) and the [history page](#history),
-and **Settings**, which opens Settings › Tools › Browser. An open welcome page shows a theme change the next time it
-loads.
+**Settings**, which opens Settings › Tools › Browser, and **Permissions**, which opens the
+[permissions page](#site-permissions). An open welcome page shows a theme change the next time it loads.
 
 Until you finish the onboarding, the welcome page shows three onboarding pages instead: Meet the Jasper Browser, What
 Can It Do? and Let’s Get You Set Up. **Start Browsing** on the last one finishes the onboarding, which is remembered in
@@ -45,8 +45,8 @@ without any user name and password in it.
   Jasper hands the Browser open in the system browser (a local web file in the Default editor; while Jasper is itself
   the system's default browser, a web link opens nothing), and New Browser Tab, New Browser Window and the Browser split
   item post the notification again instead of opening a page.
-- All pages share one Chromium profile, kept across runs: cookies, session cookies included, the cache and other site
-  data ([Files](#files)).
+- All pages but those in [/dev/null mode](#devnull-mode) share one Chromium profile, kept across runs: cookies, session
+  cookies included, the cache and other site data ([Files](#files)).
 
 ## The toolbar
 
@@ -60,9 +60,11 @@ Along the top of each page, from left to right:
 - **Not secure**, in the warning colour, while the page is one you went on to past a certificate error
   ([Certificate errors](#certificate-errors));
 - the address field, with the site icon at its left;
+- in a [/dev/null](#devnull-mode) tab, the /dev/null indicator;
 - the menu button (☰): **Add Bookmark**, or **Remove Bookmark** while the page is bookmarked
   ([Bookmarks](#bookmarks)); **Manage Bookmarks** and **History**, which load the bookmarks and [history](#history)
-  pages; and **Settings**, which opens Settings › Tools › Browser.
+  pages; the Reset items of the page's [site permissions](#site-permissions) and, while the page is muted, **Unmute
+  Current Page** ([Audio](#audio)); and **Settings**, which opens Settings › Tools › Browser.
 
 The site icon, which the page's tab shows too, is the page's favicon once the page has loaded, Jasper's icon on
 Jasper's own `jasper-about:` pages, and a globe while the page loads, on an [error page](#error-pages) and whenever the
@@ -167,7 +169,8 @@ leave Ctrl+H to the keymap there ([Keyboard shortcuts](keyboard-shortcuts.md#bun
 Every page loaded in a browser pane is recorded: its address and, once the page has one, its title, which follows the
 page's title at most once a second. Only `http`, `https` and `file` addresses of at most 8,192 characters are recorded,
 without any user name and password in them; Jasper's own `jasper-about:` pages, and `about:`, `data:` and `blob:`
-pages, are not. A load that ends on an [error page](#error-pages) leaves no entry. Nothing expires.
+pages, are not. A load that ends on an [error page](#error-pages) leaves no entry. Nothing expires. A
+[/dev/null](#devnull-mode) tab's pages are recorded in its group's memory, and go with the group.
 
 Jasper also counts the visits of each site: an address's host, with its port, and its path, without the scheme, the
 query and the fragment, so `http://example.com/docs` and `https://example.com/docs?page=2` are one site and
@@ -175,12 +178,12 @@ query and the fragment, so `http://example.com/docs` and `https://example.com/do
 the address field's [suggestions](#search-and-suggestions) and the [command palette](#palette-scopes) list sites; the
 suggestions and the palette see only the 10,000 sites visited most recently.
 
-History and [bookmarks](#bookmarks) are kept in `browser.sqlite` in the plugin's data folder ([Files](#files)), which
-Jasper opens the first time it needs it, such as when a browser page first shows, and never as it starts. When the file
-cannot be used, because Jasper cannot read or write it, it is damaged, a later Jasper wrote it, or another program holds
-it for more than 2 seconds, Jasper leaves it as it was, posts "Browser history and bookmarks are unavailable" with the
-reason, and keeps history and bookmarks in memory until it quits. When SQLite itself cannot load, there are none for
-the run. Browsing works as usual either way.
+History, [bookmarks](#bookmarks) and [site permissions](#site-permissions) are kept in `browser.sqlite` in the plugin's
+data folder ([Files](#files)), which Jasper opens the first time it needs it, such as when a browser page first shows,
+and never as it starts. When the file cannot be used, because Jasper cannot read or write it, it is damaged, a later
+Jasper wrote it, or another program holds it for more than 2 seconds, Jasper leaves it as it was, posts "Browser
+history, bookmarks and site permissions are unavailable" with the reason, and keeps them in memory until it quits. When
+SQLite itself cannot load, there are none for the run. Browsing works as usual either way.
 
 **The history page**, `jasper-about:history`, opens from Web › History, ☰ › History, Show Full History and the welcome
 page's Quick Actions, with the keyboard in its search field. "Browsing History" lists the entries newest first, under
@@ -527,11 +530,230 @@ Jasper accepts this certificate for it until Jasper quits." and **Continue to th
 site.
 
 - From then until Jasper quits, every browser page loads that host while it presents that same certificate; another
-  certificate for the host shows the error page again.
+  certificate for the host shows the error page again. A choice made in a [/dev/null](#devnull-mode) tab holds only for
+  its group's pages, until the group's last tab closes, and one made elsewhere for every page outside /dev/null mode.
 - While a page is at an `https` address of such a host, the toolbar shows **Not secure** before the address field, in
   place of the site icon.
 - A revoked certificate (`ERR_CERT_REVOKED`), `ERR_CERT_INVALID` and `ERR_CERT_CONTAINS_ERRORS` show no Details and
   no way past.
+
+## /dev/null mode
+
+With **Use /dev/null mode** on ([Settings](#settings), `devnull_mode`), each browser tab, window or pane that opens
+afresh, from New Browser Tab, New Browser Window, the Browser split items, a palette row that opens a tab or a link
+Jasper hands the Browser, opens in /dev/null mode, in a browsing group of its own. The tabs and panes its page opens,
+through its links, popups, right-click menu or DevTools, join its group. A group keeps its cookies, cache, local storage
+and other site data, its [history](#history), its [site permissions](#site-permissions) and [audio](#audio) choices and
+the [certificates](#certificate-errors) you went on past in memory only, shared by its tabs and apart from every other
+group and from your other pages, and loses them when its last tab closes, or when Jasper quits. Turning the setting on
+or off changes no open tab.
+
+- The toolbar shows the /dev/null indicator between the address field and ☰. A click on it shows "/dev/null Mode":
+  "Your browsing activity is not being saved. No history, bookmarks, or other data will be stored. This mode is set in
+  Settings › Tools › Browser › Privacy & Data.", which Escape, a click outside or another click on the indicator closes.
+- ☰ has no Add Bookmark, Manage Bookmarks or History. Web › History, the history page, the welcome page's Top Sites and
+  the address field's suggestions show the group's own visits, and the command palette's [scopes](#palette-scopes)
+  never do.
+- A /dev/null tab's pages show no notifications ([Page notifications](#page-notifications)).
+  [Ad blocking](#ad-blocking) and the [HTTP proxy](#the-http-proxy) apply to them as to any page, and Settings'
+  [clearing](#clearing-data) leaves them alone.
+- The saved workspace keeps no address of a /dev/null tab, and "Web Browser" as its title. After a relaunch the tab
+  comes back at the start page, in /dev/null mode, in a group of its own ([Restore](#restore)).
+
+## Site permissions
+
+A page can ask for the camera, the microphone, both, or to show notifications
+([Page notifications](#page-notifications)). Jasper asks you over the page, once the page is its window's current item:
+"Allow Camera", "Allow Microphone", "Allow Camera and Microphone" or "Allow Notifications", such as "The website
+https://example.com wants to use your camera.", with **Block** and **Allow**.
+
+- **Allow** and **Block** are remembered for the site, Allowed or Blocked, and answer its later requests without asking.
+  Escape and closing the prompt choose neither and remember nothing; the page's same request is then refused, without
+  asking, until the page next loads.
+- Allow and Block count only once the system's double-click interval (half a second where it names none) has passed
+  since the prompt showed or since another of the page's dialogs closed, so that a page cannot time your click onto
+  Allow. Enter presses neither.
+- A page shows one prompt at a time, and its `alert()` and `confirm()` wait while it does. Prompts count among the
+  page's [dialogs](#page-dialogs): the third to open straight after another, and every later one, is refused without
+  showing, until the page next loads. Leaving or closing the page takes its prompt away, refused.
+- A permission is kept for the site of the page's address, its scheme, host and port: a frame inside the page asks in
+  the page's site's name, and gets what that site was allowed. Every `file:` page is one site, `file://`.
+- A page's request to share the screen or a window is refused without asking, and so is a request for your location.
+- In the packaged Jasper.app on macOS, the first page you allow the camera or the microphone also brings macOS's own
+  question for Jasper ([macOS camera and microphone](packaging.md#macos-camera-and-microphone)).
+
+Permissions are kept in `browser.sqlite` ([Files](#files)), and a [/dev/null](#devnull-mode) group's in memory. When one
+cannot be saved, Jasper posts "Site permissions could not be saved" with the reason, and keeps it until it quits.
+
+**The permissions page**, `jasper-about:permissions` ("Site Permissions"), shows the permissions of its tab's browsing
+group. It opens from the welcome page's Quick Actions, and from **Manage Permissions** in Settings' Privacy & Data
+([Settings](#settings)), which opens it in a new tab outside /dev/null mode, whatever the setting. It lists
+them by site: Camera, Microphone, Camera and Microphone, Notifications and Audio Playback ([Audio](#audio)), each
+Allowed or Blocked. The search field ("Search by website or permission type…"), All Types and All Statuses narrow the
+list. A site's **Clear** forgets its permissions, a permission's × forgets it after "Revoke Camera permission for
+https://example.com?", and **Clear All Permissions** forgets every one; the pages that show those sites then load
+again, so a page that has the camera open loses it.
+
+**☰'s Reset items:** while the page's site has permissions kept, ☰ lists a Reset item for each, such as "Reset Camera
+Permission (Blocked)", which forgets it and loads again the pages of the group that show the site. An item acts on the
+site the menu showed it for, even when the page has gone elsewhere since.
+
+## Page notifications
+
+A page's notifications show as Jasper's, in the **Page notifications** group ([Notifications](notifications.md#groups)).
+The page asks with `Notification.requestPermission()`, which shows the "Allow Notifications" prompt
+([Site permissions](#site-permissions)); while its site is allowed, `new Notification(title, {body})` posts a
+notification in the page's window, and a click on it shows the page's tab.
+
+- **The title** is the page's, on one line and cut to 200 characters, or the site's host when it shows nothing.
+- **The text** begins with the host, as in "example.com — There", so that a page cannot post one worded as Jasper's
+  own; a host longer than 60 characters is shortened from the left, keeping its last labels. The body follows, with at
+  most two blank lines in a row, and the whole text is cut to 4,000 characters. Icons and the other options are
+  ignored, and the page's `click` handler never runs.
+- **At most 10 a minute:** a page's later notifications are refused, and its script gets `error`. The same text posted
+  again within a minute, as by two tabs of one site, adds to the first notification.
+- **`close()`** takes the notification out of Jasper's panel, until the page loads another document or closes; from
+  then on the notifications it posted stay.
+- **Only a secure page** may ask: an `https` page, or an `http` one on this computer (`localhost` and the names under
+  it, `127.0.0.0/8` and `[::1]`). Any other `http` page, a `file:` page, a page in a [/dev/null](#devnull-mode) tab and
+  a document a sandbox gave an opaque origin are denied, without a prompt.
+- **Only the page's top frame** gets Jasper's notifications. A frame inside the page, a page script that ran before
+  Jasper's and a service worker get Chromium's own, which Jasper does not show. `navigator.permissions.query()` reports
+  Chromium's answer, which can differ from `Notification.permission`, and a page can tell that it runs in Jasper.
+
+## Audio
+
+The first time a page whose site has no choice kept plays sound, Jasper mutes every frame of the page and asks, in the
+bar between the toolbar and the page, "Audio was muted. Allow playback by https://example.com?", with
+
+- **Allow Once**, which plays the page's sound until the page next loads;
+- **Allow Always**, which plays it and keeps Allowed for the site;
+- **Deny Once**, which keeps it muted until the page next loads;
+- **Deny Always**, which keeps it muted and keeps Blocked for the site.
+
+A site kept as Allowed plays without the bar, and one kept as Blocked is muted without it. While a page is muted, ☰
+offers **Unmute Current Page**, which plays its sound until the page next loads and keeps nothing. The bar goes as the
+page loads another document.
+
+- The choice is the site of the page's address ([Site permissions](#site-permissions)), so a player embedded in the
+  page is muted with it. It shows on the permissions page and in ☰'s Reset items as Audio Playback.
+- `http` and `file:` pages are asked as `https` ones are. A page without a site, such as `about:blank` or a `data:`
+  page, is muted without the bar, and Unmute Current Page plays it.
+- Muting is the page's to undo: Jasper's script mutes the page's media elements and suspends its audio contexts in the
+  page's own JavaScript world, so the page's scripts can unmute themselves, and an audio context, or an autoplay in a
+  shadow root, that the page set up before the script ran is not muted. A page can tell that it runs in Jasper.
+
+## Clearing data
+
+Settings › Tools › Browser › Privacy & Data clears what your pages keep. Each asks first, in a sheet over the active
+window with **Cancel** and **OK**, and its button is busy while it runs. Neither touches a [/dev/null](#devnull-mode)
+group or the [filter list](#ad-blocking).
+
+- **Clear Cookies** (Clear All Cookies) asks "This will remove all cookies from all websites. Continue?", then deletes
+  every cookie, which signs you out of every site.
+- **Clear All Data** (Clear Website Data) asks "This will remove all browsing data including history, bookmarks, site
+  permissions, cookies, cache and local storage. The next time Jasper starts, it also signs you out of any site you sign
+  in to before then. Continue?". It deletes the history, the bookmarks and the site permissions, loads again the pages
+  of a site whose permissions went, and compacts `browser.sqlite`, so that nothing deleted stays in the file. Chromium
+  then deletes every cookie, the cache, and the local storage and other site data of the 1,000 sites visited most
+  recently, of the open pages' sites and of the sites the cookies were for. The next time Chromium starts, in a later
+  run, Jasper deletes Chromium's whole profile, `data/chromium`, before Chromium opens it, with what was left and every
+  sign-in since, and empties `chromium.log`, whose lines can name sites. "All website data has been cleared
+  successfully!" says when it is done.
+- Until Chromium next starts, open pages keep their Back and Forward lists, and Chromium still shows links you visited
+  as visited.
+
+Before Chromium has started in the run, Clear Cookies leaves the cookies for Chromium to delete as it starts, before any
+page, and Clear All Data deletes the profile at once. While Chromium starts, each waits for it, and when Chromium could
+not start, its next start does the work. A clearing that does not end within 60 seconds, or fails, posts "Cookies could
+not be cleared" or "Website data could not be cleared" with the reason; history, bookmarks and site permissions are
+deleted even when Chromium's part fails, and a site Chromium could not clear waits for the profile's deletion. When
+`browser.sqlite` could not be used, so that history ran in memory, Clear All Data fails with "The browser's database
+file could not be used, so it was not cleared; Jasper deletes it the next time it starts", and the next run deletes the
+file before it opens it. Jasper moves the profile aside before deleting it; a profile it cannot move, as when Windows
+has one of its files open, stays as it is for that run, and a later start deletes it.
+
+## Ad blocking
+
+With **Enable Ad Blocking** on (`ad_blocking`, off by default; the onboarding's Let’s Get You Set Up page has it as the
+**Ad Blocker** switch), Jasper blocks the requests and hides the parts of pages that its filter list names, in every
+browser page, /dev/null ones included. Jasper's own `jasper-about:` pages and DevTools are left alone.
+
+- **Blocked:** a page's requests for frames, images, style sheets, scripts, fonts, media, `fetch()` and
+  `XMLHttpRequest`, WebSockets, pings and its other sub-resources, at `http`, `https`, `ws` and `wss` addresses, fail.
+  The page's own load, the address you open, is never blocked.
+- **Hidden:** the elements a rule's selectors select, by a style sheet of Jasper's that the page adopts, so that a
+  page's content security policy does not stop it. A frame inside a page hides only what the list hides on every page.
+  The page's scripts can take the sheet away, and elements in shadow roots are not hidden.
+- Turning ad blocking off stops the blocking at once; what was hidden shows again as each page next loads.
+
+**The filter list** is a content-blocker list in WebKit's JSON format, from **Filter List URL** (`filter_list_url`),
+by default EasyList's, `https://easylist-downloads.adblockplus.org/easylist_content_blocker.json`.
+
+- **Its address** is an `https` address, or an `http` one on this computer (`localhost`, `127.0.0.0/8` or `[::1]`), as
+  TLS is all that vouches for the list. A download follows at most 5 redirects, each only to such an address and never
+  from `https` to `http`; it connects within 30 seconds, takes at most 120 seconds in all and reads at most 32 MiB.
+- **When:** Jasper reads its copy of the list, and checks for an update, only once the first browser page shows or you
+  turn ad blocking on, and from then on every hour while ad blocking is on. It downloads the list when 24 hours have
+  passed since the last update, when it has none, or when its copy came from another address, so a new Filter List URL
+  downloads at once, or as soon as a download under way ends. **Update Now** downloads it at once, with ad blocking on
+  or off.
+- A list that cannot be downloaded or read leaves the one Jasper had in place. The copy is kept in `data/adblock/`
+  ([Files](#files)).
+
+**Filter Statistics**, after the two settings, says how many rules the list has and when it was updated ("*n* rules ·
+Updated *date and time*"), "Updating…" while it downloads, why its last update failed ("Could not update the filter
+list: …"), or, before Jasper has read the list in the run, "Loads when ad blocking is on and a browser page opens".
+From the seventh day without an update it adds "Ad block rules haven't been updated for *n* days".
+
+**The rules Jasper applies** are those whose trigger has a `url-filter` and no keys but `url-filter`,
+`url-filter-is-case-sensitive`, `resource-type`, `load-type` and one of `if-domain` and `unless-domain`, and whose
+action is `block`, `css-display-none` with its `selector`, or `ignore-previous-rules`. Every other rule, such as one
+with `if-top-url` or `load-context`, or a `block-cookies` or `make-https` action, is skipped, and so is one past these
+bounds:
+
+- A `url-filter` is WebKit's regular expression: characters, `.`, a character class, a group, `*`, `+` and `?`, `^`
+  first, `$` last and `\` before punctuation; anything else, such as `|`, `{2}` or `\d`, is refused. So that no match
+  can take long, a filter has at most 2,048 characters, 256 repeats and 4 of them `*` or `+`, and groups at most 8
+  deep, and has neither a group under `*` or `+` with a repeat inside it (`(a+)+`) nor a repeated group that can match
+  nothing (`(x?)?`). A match reads at most an address's first 8 KiB.
+- `first-party` and `third-party` compare the request's site with the page's: a host's last two labels, or its last
+  three under a two-letter country code with a common second level, such as `co.uk`, `com.au` or `gob.mx`, so
+  `www.cnn.com` and `edition.cnn.com` are one site. Jasper has no public suffix list: all of `github.io` is one site
+  too.
+- A list has at most 32 MiB, 8 levels of nesting and 2,000,000 values: its objects, arrays, strings, numbers, `true`,
+  `false` and `null`, not counting its members' names. Jasper keeps its first 250,000 rules, at most 1,024 hosts in a
+  rule's `if-domain` or `unless-domain` and 500,000 in all, and at most 5,000 selectors in a rule, each of at most 1,024
+  characters, with no `{`, `}`, `;`, `@` or `<`. A page hides at most 2 MiB of selectors.
+- Each request, and each page's hiding, has a bound on the matching work its rules take; past it, the request goes
+  through and the page hides less.
+
+A list can only block requests and hide elements: its rules add no style of their own and load nothing. Hiding still
+tells something, as an element it hides no longer loads its lazy images, so a list whose selectors test a field, such
+as `:has(input[value^="a"])`, could let a server learn from the requests that do not come what the field holds, as
+with WebKit's content blockers.
+
+## The HTTP proxy
+
+With **Enable HTTP Proxy** on (`http_proxy`), every browser page's requests, /dev/null ones' included, go through the
+HTTP proxy at **Proxy Server** and **Proxy Port** (`proxy_host`, by default `127.0.0.1`, and `proxy_port`, by default
+8118), which Chromium asks with `CONNECT` for `https`. So do [Jasper's own requests](#jaspers-own-requests), the
+favicons, the search suggestions, View Source's copies and the filter list. Requests to this computer and to link-local
+addresses go directly, as Chromium sends them whatever the proxy: `localhost` and the names under it, `127.0.0.0/8`,
+`[::1]`, `169.254.0.0/16` and `[fe80::]/10`. A change applies at once: Chromium closes its open connections, and
+Jasper's own requests take the new route from the next one.
+
+- **Proxy Server** takes a host name, an IPv4 address, or an IPv6 address without brackets, such as `::1`, and nothing
+  else: no scheme, port, user name or space ("Enter a host name or IP address."). Write an international host name in
+  its punycode form (`xn--…`); a name with `_`, or one that ends in a dot, is refused.
+- **When Chromium refuses the proxy,** Jasper posts "The proxy could not be set" with Chromium's reason, and the pages
+  that are open keep the route they had. A /dev/null tab opened then stays blank rather than load without the proxy.
+- **Turned off,** Chromium uses the system's proxy settings, and Jasper's own requests go directly, unless Jasper runs
+  with `-Djava.net.useSystemProxies=true`, a line you can add to its
+  [custom VM options](configuration.md#custom-vm-options), with which they follow the system's settings too.
+- **Around the proxy,** as in Chrome: Chromium looks up some host names ahead of time with the system's resolver (DNS
+  prediction), and WebRTC's STUN requests go out directly, so a page can learn your address. Jasper does not sign in to
+  a proxy: one that asks for credentials (407) fails the page.
 
 ## Links from terminals and Jasper
 
@@ -688,14 +910,15 @@ Page**, press Enter in its address field, click **Reload** or open a link in it.
 - A page that shows an [error page](#error-pages) saves the address that failed, and one that shows an error page's
   [source](#view-source) saves the source page of that address.
 - An address is saved without any user name and password in it.
+- A [/dev/null](#devnull-mode) tab saves no address, and "Web Browser" as its title. It comes back in /dev/null mode, in
+  a group of its own.
 - A page that saved no address, or one the address field would not load, comes back at the start page.
 
 A page's back and forward history, form contents and scroll position do not come back.
 
 ## Jasper's own requests
 
-Jasper fetches these itself, apart from Chromium, without your pages' cookies or any credentials, and directly rather
-than through a proxy your system's settings name:
+Jasper fetches these itself, apart from Chromium, without your pages' cookies or any credentials:
 
 - a page's favicon, once the page has loaded: for an `http` or `https` page, the icon its first `<link rel="icon">`
   or `<link rel="mask-icon">` names, else `/favicon.ico` at its server, when that is an `http` or `https` address. A
@@ -703,17 +926,23 @@ than through a proxy your system's settings name:
   `data:` icon, leaves the globe. A page keeps the first favicon it names;
 - the search engine's suggestions for what you type ([Search and suggestions](#search-and-suggestions)): at most 64
   KiB, within 3 seconds;
-- View Source's copy of an `http` or `https` page ([View Source](#view-source)).
+- View Source's copy of an `http` or `https` page ([View Source](#view-source));
+- the [filter list](#ad-blocking).
 
-On a network that reaches the web only through a proxy, these fail: pages show the globe, the address field lists no
-engine suggestions, and View Source shows the HTML Chromium holds.
+While the [HTTP proxy](#the-http-proxy) is on, they go through it, except those to this computer and to link-local
+addresses. While it is off, they go directly rather than through a proxy your system's settings name, unless Jasper
+runs with `-Djava.net.useSystemProxies=true`. On a network that reaches the web only through a proxy, they then fail:
+pages show the globe, the address field lists no engine suggestions, View Source shows the HTML Chromium holds, and the
+filter list does not update.
 
 ## Settings
 
 The settings live in `plugins/dev.jasper.browser/dev.jasper.browser.toml` in
-[Jasper home](getting-started.md#jasper-home) and on Settings › Tools › Browser, in the sections General, Link Opening
-and Search Engine. Jasper creates the file, with every setting commented out, when it is missing; changes in the file
-or on the page apply without a restart. A bad value is reported and its default used
+[Jasper home](getting-started.md#jasper-home) and on Settings › Tools › Browser, in the sections General, Link Opening,
+Search Engine, Privacy & Data, Ad Blocking and Proxy. Privacy & Data ends with Clear All Cookies, Clear Website Data and
+Manage Site Permissions ([Clearing data](#clearing-data)), and Ad Blocking with Filter Statistics and Update Now
+([Ad blocking](#ad-blocking)). Jasper creates the file, with every setting commented out, when it is missing; changes
+in the file or on the page apply without a restart. A bad value is reported and its default used
 ([Plugin settings](plugins.md#plugin-settings)).
 
 | Key | Default | Values | On the page | Applies to |
@@ -725,6 +954,12 @@ or on the page apply without a restart. A bad value is reported and its default 
 | `search_engine` | `"google"` | `google` (Google), `duckduckgo` (DuckDuckGo), `bing` (Bing), `kagi` (Kagi), `custom` (Custom): what the address field and the right-click menu's Search with search with, and where the field's suggestions come from ([Search and suggestions](#search-and-suggestions)) | Default Search Engine | The next keystroke in the address field, search and right-click menu |
 | `custom_search_url` | `""` | With `custom`: the address of a search's results, an `http://` or `https://` address without a user name or password and with `%s` in its path, query or fragment where the terms go, such as `"https://search.example.com/?q=%s"`; empty searches with Google ("The URL must start with https:// or http:// and contain %s") | Custom Search URL | The next search |
 | `custom_suggestions_url` | `""` | With `custom`: an address of the same form that answers OpenSearch JSON, with `%s` where the typed text goes; empty shows no engine suggestions ("The URL must start with https:// or http:// and contain %s") | Custom Search Suggestions URL | The next keystroke in the address field |
+| `devnull_mode` | `false` | `true` opens browser tabs, windows and panes in [/dev/null mode](#devnull-mode) | Use /dev/null mode (no history, cookies, or other data saved) | Browser tabs, windows and panes opened afterwards |
+| `ad_blocking` | `false` | `true` blocks and hides what the filter list names ([Ad blocking](#ad-blocking)) | Enable Ad Blocking | Every page's requests, once the list is read, and what each page hides from its next load |
+| `filter_list_url` | `"https://easylist-downloads.adblockplus.org/easylist_content_blocker.json"` | A WebKit content-blocker list: an `https` address, or an `http` one on this computer ("Enter an https address, or an http address on this computer.") | Filter List URL | The list's next check, at once |
+| `http_proxy` | `false` | `true` sends the pages' requests and Jasper's own through the proxy below ([The HTTP proxy](#the-http-proxy)) | Enable HTTP Proxy | Every page, at once |
+| `proxy_host` | `"127.0.0.1"` | A host name or an IP address, an IPv6 address without brackets ("Enter a host name or IP address.") | Proxy Server | Every page, at once, while the proxy is on |
+| `proxy_port` | `8118` | 1 to 65535 | Proxy Port | Every page, at once, while the proxy is on |
 
 ## Files
 
@@ -735,12 +970,15 @@ Under [Jasper home](getting-started.md#jasper-home):
 | `plugins/dev.jasper.browser/dev.jasper.browser.toml` | The [settings](#settings) |
 | `plugins/dev.jasper.browser/data/chromium/` | Chromium's profile: cookies, the cache and other site data |
 | `plugins/dev.jasper.browser/data/chromium.log` | Chromium's warnings and errors |
-| `plugins/dev.jasper.browser/data/browser.sqlite` | [History](#history) and [bookmarks](#bookmarks), in SQLite |
+| `plugins/dev.jasper.browser/data/browser.sqlite` | [History](#history), [bookmarks](#bookmarks) and [site permissions](#site-permissions), in SQLite |
 | `plugins/dev.jasper.browser/data/onboarding-finished` | That the [onboarding](#opening-pages) is finished |
+| `plugins/dev.jasper.browser/data/adblock/` | The [filter list](#ad-blocking)'s copy: `rules.json`, the rules Jasper applies, and `state.json`, its address, when it was downloaded and how many rules it kept and skipped |
+| `plugins/dev.jasper.browser/data/chromium-clear` | What a [clearing](#clearing-data) left for the next start |
+| `plugins/dev.jasper.browser/data/chromium-cleared-*` | A profile a clearing moved aside, until it is deleted |
 
 SQLite's native library loads from the copy in `jasper-sqlite` (on Linux `jasper-sqlite-<user>`) in the system's
 temporary folder that [Remote](remote.md#files) describes, which the Browser writes there when Remote has not.
 
-On macOS and Linux, before Jasper first opens `browser.sqlite` or starts Chromium, it takes every permission of other
-users away from the `data` folder, and from `browser.sqlite` and its `-wal` and `-shm` files, so no other user of the
-computer can read your history, your bookmarks or Chromium's cookies.
+On macOS and Linux, before Jasper first opens `browser.sqlite`, starts Chromium or reads the filter list, it takes every
+permission of other users away from the `data` folder, and from `browser.sqlite` and its `-wal` and `-shm` files, so no
+other user of the computer can read your history, your bookmarks or Chromium's cookies.

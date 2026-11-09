@@ -1,12 +1,15 @@
 /**
  * A page on screen. {@link dev.jasper.browser.page.Page} is what a browser item drives, in plain types: it makes the
- * page's canvas at once and its browser only once asked to start. {@link dev.jasper.browser.page.PageView} is the
- * lightweight canvas Chromium's off-screen frames are painted on and its input comes from,
- * {@link dev.jasper.browser.page.PageRenderer} receives those frames, and {@link dev.jasper.browser.page.PageBrowser}
- * is the page's browser. {@link dev.jasper.browser.page.PageEvents} holds the client's one display, load and keyboard
- * handler, which hand each page's callbacks to its {@code Page} and refuse fullscreen, and tells the {@code links}
- * package's hook each main frame's load start on Chromium's thread; the main frame then runs {@code detect-favicon.js},
- * which names the document's icon through the {@code links} package's message router, and
+ * page's canvas at once and its browser only once asked to start, in its browsing group's
+ * {@link dev.jasper.browser.page.PageContext}, Chromium's global context or a /dev/null group's own in memory, and
+ * tells its item its browser's identifier as Chromium makes it, on Chromium's thread.
+ * {@link dev.jasper.browser.page.PageView} is the lightweight canvas Chromium's off-screen frames are painted on and its
+ * input comes from, {@link dev.jasper.browser.page.PageRenderer} receives those frames, and
+ * {@link dev.jasper.browser.page.PageBrowser} is the page's browser. {@link dev.jasper.browser.page.PageEvents} holds
+ * the client's one display, load and keyboard handler, and a life span handler, which hand each page's callbacks to its
+ * {@code Page} and refuse fullscreen, and tells the {@code links} package's hook each main frame's load start on
+ * Chromium's thread; the main frame then runs {@code detect-favicon.js}, which names the document's icon through the
+ * {@code links} package's message router, and
  * {@link dev.jasper.browser.page.Favicons} fetches it for the page. {@link dev.jasper.browser.page.NavigationHistory}
  * reads a page's history through DevTools after each main-frame load end and committed navigation, and a moment after a
  * title change, for its item's Back and Forward hold menus, and goes to the entry chosen; the {@code json} package
@@ -22,11 +25,26 @@
  * {@code PageText} reads it with {@code selection.js} in the same isolated world
  * ({@link dev.jasper.browser.page.Page#selectedText}).
  * {@link dev.jasper.browser.page.DialogPlace} is where the {@code dialogs} package shows a page's dialogs, as its item
- * gives it. {@code PageMenu} is the client's one context-menu handler: Jasper shows the page's right-click menu,
- * {@code PageMenuItems} for what is under the pointer, at the {@link dev.jasper.browser.page.MenuPlace} the item gives,
- * over its tab, and Chromium shows none; its View Source reads the page's HTML through {@code Page.source}, and its
- * Inspect Element opens the page's {@link dev.jasper.browser.page.DevTools}: a canvas of their own, which the page
- * makes, and Chromium's DevTools browser, which the page's browser makes, on the page's client.
+ * gives it. {@code MediaAccess} is the client's one permission handler: a page's camera and microphone requests are its
+ * top-level site's, as the {@code permissions} package names it, and go through the page's
+ * {@link dev.jasper.browser.page.PagePrivacy} to its item, which answers them; screen capture, and any request of a
+ * browser that is no page's, are cancelled. {@code FrameScripts} hooks each main-frame and sub-frame load start: a
+ * page's main frame runs {@code notifications.js}, which stands in for {@code window.Notification} in the page's own
+ * world, given the permission the item's store holds for the document's site through {@code PagePrivacy}, or denied
+ * for a /dev/null page and outside a secure context, and asks Jasper through the {@code links} package's privacy
+ * router; no sub-frame runs it, and no challenge frame ({@link dev.jasper.browser.page.ChallengeFrames}). Every frame
+ * but a challenge frame runs {@code audio.js}, which mutes the document's sound and tells the privacy router of its
+ * first, in the audio mode the item's store holds for the page's top-level site, which its sub-frames follow; the
+ * item mutes and unmutes every frame through {@code PagePrivacy}. While ad blocking's filter list, the {@code adblock}
+ * package's, has a rule set active, every frame but a challenge frame and a Jasper page's then runs
+ * {@code hide-elements.js}, which hides what the rule set's sheet for the document names through
+ * {@code CSSStyleSheet.insertRule}, its declaration fixed: a main frame its own sheet, a sub-frame the generic part. {@code PageMenu} is the client's
+ * one context-menu handler: Jasper shows the page's right-click menu, {@code PageMenuItems} for what is under the
+ * pointer, at the
+ * {@link dev.jasper.browser.page.MenuPlace} the item gives, over its tab, and Chromium shows none; its View Source
+ * reads the page's HTML through {@code Page.source}, and its Inspect Element opens the page's
+ * {@link dev.jasper.browser.page.DevTools}: a canvas of their own, which the page makes, and Chromium's DevTools
+ * browser, which the page's browser makes, on the page's client.
  * Each main-frame load start reaches its page with how the load reached it, the {@code store} package's
  * {@link dev.jasper.browser.store.Reached}, read from Chromium's transition, for its item's history
  * ({@link dev.jasper.browser.page.Page#onVisit}).
@@ -39,7 +57,8 @@
  * Markdown preview's page, in plain types, for the {@code preview} package: it makes its canvas at once, and its browser,
  * on Chromium's preview client, only once the canvas first shows; {@code PreviewHandlers} are the preview client's own
  * handlers and message router, which refuse every navigation but the shell's first load, every request off the
- * preview's origin, popups, dialogs and the right-click menu, and its Find runs {@code find.js} too.
+ * preview's origin, popups, dialogs, the right-click menu and the camera and microphone, and its Find runs
+ * {@code find.js} too.
  * {@link dev.jasper.browser.page.LastPress}, {@code Favicons}, {@code Page}'s methods and {@code PreviewPage}'s name no
  * Chromium type, and none of these classes loads until a browser item opens or a Markdown preview is made.
  */

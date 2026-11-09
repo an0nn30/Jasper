@@ -303,6 +303,25 @@ public final class HistoryStore {
     }
 
     /**
+     * The sites visited, each once, most recently visited first, for Clear Website Data (plan 6's F20): each row's
+     * address's scheme in lower case, {@code ://}, and its host with its port, as the row counts it; {@code file://} for a
+     * local file's.
+     *
+     * @param limit the most sites given, at least 1
+     * @return the sites
+     */
+    public CompletableFuture<List<String>> origins(int limit) {
+        if (limit < 1) return CompletableFuture.failedFuture(new IllegalArgumentException("At least one site is asked for"));
+        return database.call(connection -> {
+            try (var select = connection.prepareStatement("SELECT lower(substr(url, 1, instr(url, ':') - 1)) || '://' || host AS origin,"
+                    + " MAX(last_visit) AS newest FROM visits GROUP BY origin ORDER BY newest DESC, origin LIMIT ?")) {
+                select.setInt(1, limit);
+                return Sql.all(select, rows -> rows.getString(1));
+            }
+        });
+    }
+
+    /**
      * Tells {@code listener}, on the database's thread, after each {@link #delete} that deleted an entry and each
      * {@link #clear}. A recorded or retitled load is told through its future.
      *

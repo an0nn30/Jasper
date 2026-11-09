@@ -1,9 +1,10 @@
 package dev.jasper.browser.routing;
 
-import dev.jasper.browser.BrowserPlugin;
+import dev.jasper.browser.OfflinePlugins;
 import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.item.BrowserItem;
 import dev.jasper.browser.item.BrowserItems;
+import dev.jasper.browser.item.DataStores;
 import dev.jasper.browser.settings.BrowserSettings;
 import dev.jasper.browser.store.MemoryStores;
 import dev.jasper.sdk.PluginInfo;
@@ -47,7 +48,7 @@ class WebAddressItemsTest {
 
     @Test void theItemsAreThereWhileLinksMayOpenInJasperAndGoWhileTheyGoToTheDefaultBrowser() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
-            host.start(INFO, Set.of(), Set.of(), new BrowserPlugin());
+            host.start(INFO, Set.of(), Set.of(), OfflinePlugins.plugin());
             assertThat(host.actions()).contains(RIGHT + "|Open URL in Split Right|true", DOWN + "|Open URL in Split Down|true");
             assertThat(host.menu("context")).as("Always Ask, the default").containsExactlyElementsOf(SHOWN);
             host.setSetting(ID, LINKS, "default");
@@ -62,7 +63,7 @@ class WebAddressItemsTest {
         } });
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
             host.setSetting(ID, LINKS, "default");
-            host.start(INFO, Set.of(), Set.of(), new BrowserPlugin());
+            host.start(INFO, Set.of(), Set.of(), OfflinePlugins.plugin());
             assertThat(host.menu("context")).as("absent from the start").isEmpty();
             host.setSetting(ID, LINKS, "ask");
             assertThat(host.menu("context")).containsExactlyElementsOf(SHOWN);
@@ -78,7 +79,7 @@ class WebAddressItemsTest {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
             host.setSetting(ID, LINKS, "default");
             host.setDefaultBrowser(true);
-            host.start(INFO, Set.of(), Set.of(), new BrowserPlugin());
+            host.start(INFO, Set.of(), Set.of(), OfflinePlugins.plugin());
             assertThat(host.menu("context")).as("Jasper is the default from the start").containsExactlyElementsOf(SHOWN);
             host.setDefaultBrowser(false);
             assertThat(host.menu("context")).as("another browser became the default").isEmpty();
@@ -111,7 +112,7 @@ class WebAddressItemsTest {
                 context.set(plugin);
                 recorded.context = plugin;
                 var settings = BrowserSettings.declare(plugin.settings());
-                new BrowserItems(plugin, settings::read, memory.make(), page -> { });
+                new BrowserItems(plugin, settings::read, new DataStores(memory.make(), () -> false), page -> { });
                 WebAddressItems.register(plugin, recorded, settings);
             });
             assertThat(host.contextMenu(second)).containsExactlyElementsOf(SHOWN);
@@ -145,7 +146,7 @@ class WebAddressItemsTest {
             host.start(INFO, Set.of(), Set.of(), plugin -> {
                 declined.context = plugin;
                 var settings = BrowserSettings.declare(plugin.settings());
-                new BrowserItems(plugin, settings::read, memory.make(), page -> { });
+                new BrowserItems(plugin, settings::read, new DataStores(memory.make(), () -> false), page -> { });
                 WebAddressItems.register(plugin, declined, settings);
             });
             assertThat(host.chooseFromContextMenu(pane, RIGHT)).isTrue();
@@ -166,7 +167,7 @@ class WebAddressItemsTest {
             var chromium = new AtomicReference<>(Chromium.State.NOT_STARTED);
             host.start(INFO, Set.of(), Set.of(), plugin -> {
                 var settings = BrowserSettings.declare(plugin.settings());
-                items.set(new BrowserItems(plugin, settings::read, memory.make(), page -> { }));
+                items.set(new BrowserItems(plugin, settings::read, new DataStores(memory.make(), () -> false), page -> { }));
                 var role = new BrowserRole(plugin, items.get(), settings, chromium::get);
                 plugin.platform().browser(role);
                 WebAddressItems.register(plugin, role, settings);

@@ -227,6 +227,9 @@ public interface ContractHarness extends AutoCloseable {
     /** UI thread: the restore state a tab gives, a content tab's or a provided session's; empty when it does not come back. */
     java.util.Optional<dev.jasper.sdk.RestoreState> restoreState(java.util.UUID tabId);
 
+    /** UI thread: the title Jasper saves a plugin's open content tab with: the one its plugin gave, else the title it shows. */
+    String savedTitle(java.util.UUID tabId);
+
     /** UI thread: closes a tab the test added, of either kind, its pane with it; a window keeps an empty workspace when its last tab closes. */
     void closeTab(java.util.UUID tabId);
 
@@ -347,6 +350,8 @@ public interface ContractHarness extends AutoCloseable {
          * Every notification plugins posted, oldest first, as {@code group|SEVERITY|title|content|labels|cause|window|state}:
          * the plugin's action labels joined with {@code ;}, or {@code -}; {@code cause} when it carried one (the application
          * then offers Show more…), or {@code -}; the target window's id, or {@code -}; and {@code live} or {@code expired}.
+         * A post with the same text as one at most a minute before counts on that one, which moves last; a removed
+         * notification is left out.
          */
         List<String> notifications();
         /** Every notification group declared for plugins, in declaration order, as {@code id|name|MODE}. */

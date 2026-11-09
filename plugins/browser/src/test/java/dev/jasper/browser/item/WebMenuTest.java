@@ -1,6 +1,6 @@
 package dev.jasper.browser.item;
 
-import dev.jasper.browser.BrowserPlugin;
+import dev.jasper.browser.OfflinePlugins;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.settings.BrowserSettings;
 import dev.jasper.browser.store.MemoryStores;
@@ -52,7 +52,7 @@ class WebMenuTest {
 
     @Test void eachItemIsAnActionOfTheBrowsersItemsWithTheSpecsKeysOnMacOsAndOnLinuxAndWindows() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
-            host.start(INFO, Set.of(), Set.of(), new BrowserPlugin());
+            host.start(INFO, Set.of(), Set.of(), OfflinePlugins.plugin());
             for (Expected item : ITEMS) {
                 assertThat(host.actions()).contains(item.id() + "|" + item.title() + "|true");
                 assertThat(host.actionSpec(item.id())).as(item.id()).get().satisfies(spec -> {
@@ -68,7 +68,7 @@ class WebMenuTest {
     /** Spec section 7: History, which iTerm2 keeps beside Reload Page, and its own palette words. */
     @Test void historyIsAnItemOfItsOwnWithItsPaletteWords() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
-            host.start(INFO, Set.of(), Set.of(), new BrowserPlugin());
+            host.start(INFO, Set.of(), Set.of(), OfflinePlugins.plugin());
             assertThat(host.actionSpec(HISTORY)).get().satisfies(spec -> {
                 assertThat(spec.title()).isEqualTo("History");
                 assertThat(spec.keywords()).contains("browser", "web", "page", "history", "visited");
@@ -79,7 +79,7 @@ class WebMenuTest {
 
     @Test void theMenuHoldsOpenLocationThenBackAndForwardThenReloadPageAndHistory() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
-            host.start(INFO, Set.of(), Set.of(), new BrowserPlugin());
+            host.start(INFO, Set.of(), Set.of(), OfflinePlugins.plugin());
             assertThat(host.menu(MENU)).containsExactly("item:" + OPEN_LOCATION, "---", "item:" + BACK, "item:" + FORWARD,
                 "---", "item:" + RELOAD, "item:" + HISTORY);
             assertThat(host.failures()).isEmpty();
@@ -91,7 +91,7 @@ class WebMenuTest {
             UUID window = host.addTerminalWindow();
             host.activateTerminalWindow(window);
             host.addTerminalTab(window, "zsh");
-            host.start(INFO, Set.of(), Set.of(), new BrowserPlugin());
+            host.start(INFO, Set.of(), Set.of(), OfflinePlugins.plugin());
             assertThat(host.menuBar(window)).as("a terminal is current").doesNotContain(MENU);
             assertThat(host.invoke(NEW_TAB, window, null)).isTrue();
             var browser = host.contentTabs().getLast();
@@ -181,7 +181,7 @@ class WebMenuTest {
     private BrowserItems items(FakePluginHost host) {
         var items = new AtomicReference<BrowserItems>();
         host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(),
-            plugin -> items.set(new BrowserItems(plugin, BrowserSettings.declare(plugin.settings())::read, memory.make(), (Page page) -> { })));
+            plugin -> items.set(new BrowserItems(plugin, BrowserSettings.declare(plugin.settings())::read, new DataStores(memory.make(), () -> false), (Page page) -> { })));
         return items.get();
     }
 

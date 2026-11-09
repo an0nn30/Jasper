@@ -6,11 +6,13 @@
  * package's channel with the page's secret, and {@code jasper.el}, which puts a page's text in only as text.
  * {@link dev.jasper.browser.pages.HistoryPage} is {@code jasper-about:history}, which answers its script from the
  * {@code store} package's history, and {@link dev.jasper.browser.pages.BookmarksPage} is {@code jasper-about:bookmarks}, which
- * answers its script from the bookmarks. {@link dev.jasper.browser.pages.WelcomePage} is {@code jasper-about:welcome}, which
+ * answers its script from the bookmarks. {@link dev.jasper.browser.pages.PermissionsPage} is
+ * {@code jasper-about:permissions}, which answers its script from the {@code permissions} package's site permissions of
+ * the asking browser's store. {@link dev.jasper.browser.pages.WelcomePage} is {@code jasper-about:welcome}, which
  * answers its Top Sites from the history, and {@link dev.jasper.browser.pages.OnboardingPages} are the three pages it leads to
  * until {@link dev.jasper.browser.pages.Onboarding} is finished. {@link dev.jasper.browser.pages.PageHtml} is what Jasper's pages share, the
  * {@code item} package's error and source pages too: the theme's colours as CSS, escaping and the pages' random tokens.
- * Depends on {@code engine} for the scheme's registry, {@code store}, {@code json}, the SDK and the JDK; it names no
- * Chromium type, and the {@code item} package may use it, never the reverse.
+ * Depends on {@code engine} for the scheme's registry, {@code store}, {@code permissions}, {@code json}, the SDK and the
+ * JDK; it names no Chromium type, and the {@code item} package may use it, never the reverse.
  */
 package dev.jasper.browser.pages;

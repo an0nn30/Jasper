@@ -12,8 +12,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 /**
- * Browser plans 4a, 4c and 5: the application host refuses openFile, hasModal, createForContent, isDefaultBrowser,
- * onDefaultBrowserChanged, setTextInsertion and a text target's calls off the UI thread; the testkit models no UI thread.
+ * Browser plans 4a, 4c, 5 and 6: the application host refuses openFile, hasModal, createForContent, isDefaultBrowser,
+ * onDefaultBrowserChanged, setTextInsertion, setSavedTitle and a text target's calls off the UI thread; the testkit
+ * models no UI thread.
  */
 class HostedUiThreadTest {
     @Test void theBrowserCoreCallsOffTheUiThreadThrow() {
@@ -68,6 +69,24 @@ class HostedUiThreadTest {
             harness.ui(() -> assertThat(target.isOpen()).as("the insertion is still set").isTrue());
             harness.copyOnSelect(true);
             assertThat(page.get().platform().copyOnSelect()).as("any thread").isTrue();
+        }
+    }
+
+    /** SDK 0.30.0: a content tab's saved title refuses other threads, and the tab keeps the title it is saved with. */
+    @Test void aSavedTitleRefusesOtherThreads() {
+        try (var harness = new AppContractTest().newHarness()) {
+            UUID window = harness.addTerminalWindow();
+            var page = new AtomicReference<PluginContext>();
+            harness.start(new PluginInfo("test.page", "Page", "1.0.0", Set.of()), Set.of(), Set.of(), page::set);
+            var tab = new AtomicReference<dev.jasper.sdk.ui.ContentTab>();
+            harness.ui(() -> tab.set(page.get().windows().openTab(new dev.jasper.sdk.ui.ContentSpec("page", "Page"),
+                page.get().terminals().window(window).orElseThrow(), page.get().kit().create(new dev.jasper.sdk.ui.ViewSpec(
+                    new dev.jasper.sdk.ui.Nodes.Text("body", dev.jasper.sdk.ui.ControlState.READY, "Page", dev.jasper.sdk.ui.Nodes.TextRole.BODY)),
+                    event -> { }))));
+            assertThatIllegalStateException().isThrownBy(() -> tab.get().setSavedTitle(java.util.Optional.of("Web Browser")))
+                .withMessageContaining("UI thread");
+            UUID item = harness.windowTabs(window).getLast().getLast();
+            assertThat(harness.savedTitle(item)).isEqualTo("Page");
         }
     }
 

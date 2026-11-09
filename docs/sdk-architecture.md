@@ -284,7 +284,8 @@ restarts; an exception or a false decision keeps the content. Repeated requests 
 disposes once without asking, for plugin shutdown. `WindowHandle.tabs()` lists content tabs as items, and the
 active-pane APIs report terminal panes only, so a plugin sees an empty active pane while one of its tabs is active.
 
-A tab carries its plugin's restore state (`Tab.restore()`, the app's `layout.TabRestore`), and the registry keeps
+A tab carries its plugin's restore state (`Tab.restore()`, the app's `layout.TabRestore`) and the title it is saved
+with (`Tab.savedTitle()`, which `ContentTab.setSavedTitle` sets, else its title), and the registry keeps
 each plugin's restorers (`Windows.restorer`). `WindowManager.snapshot()` saves a plugin's tab as a `TabRecord.Content`
 of its window while its plugin has a restorer for its kind, never Jasper's own tabs, and leaves out tabs, plugins'
 first, when the file would pass `WorkspaceFile.MAX_BYTES`. Restoring a window, `WindowContent.restore`
@@ -521,7 +522,17 @@ context, turns the SDK spec into a `NotificationRequest` with the plugin id as i
 body in containment, and posts from any thread. A spec with a cause goes to `PluginRuntime.NotificationHost.caused`,
 which the application wires to `IncidentNotices.pluginNotice`: the trace is captured on the posting thread and
 recorded as the plugin's incident, named after the title, and the notification gains Show more…. A handle learns its
-entry's id on the UI thread and expires with it; teardown expires everything the plugin posted.
+entry's id on the UI thread and expires with it. The center counts a repeat on its earlier entry and gives the entry
+the repeat's request, and plugin `a` may declare the group `a.b`, plugin `a.b`'s default group, so an entry can have
+several handles, of several plugins. `HostedNotifications.Holds`, one per `PluginHost`, keeps each entry's handles
+while it is in history: `remove()` takes the entry out (`NotificationCenter.remove`) once each of them has been
+removed, also after teardown. Until then the entry carries the request of a running plugin's handle: when the handle
+whose request it carries is removed, or its plugin stops, `NotificationCenter.restate` gives it the newest remaining
+running plugin's handle's request, keeping its count and read state, and with none left it expires; so teardown expires
+what the plugin posted unless another running plugin holds it. A plain post whose handle is removed before the UI
+thread makes it is not made; a post with a cause is made by the incident path and removed as it lands: its card closes
+in the same turn, and while Jasper is in the background the operating system's notification may already have gone
+out.
 `PluginRuntime.problems()` lists what kept plugins from running at launch, and `application.PluginProblemNotices`
 posts each in Plugin problems with Open Plugins.
 

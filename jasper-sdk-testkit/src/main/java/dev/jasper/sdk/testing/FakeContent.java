@@ -25,6 +25,8 @@ final class FakeContent implements ContentTab {
     List<ContentStatus> status=List.of();
     /** How the tab comes back when Jasper restores its windows; empty while it does not (workspace tabs spec 13). */
     Optional<dev.jasper.sdk.RestoreState> restore;
+    /** The title Jasper saves the tab with in place of the one it shows (SDK 0.30.0); empty saves the one it shows. */
+    Optional<String> savedTitle=Optional.empty();
     WindowOwner owner;
     /** The owned view the tab shows; null for raw content. */
     FakeKitView view;
@@ -47,6 +49,7 @@ final class FakeContent implements ContentTab {
     public void setStatus(List<ContentStatus> values){if(closed)return;for(var value:values)if(!value.icon().isEmpty())ui.context.kit().validateIcon(value.icon());status=List.copyOf(values);}
     public void setFocusTarget(Runnable value){if(!closed)focus=value;}
     public void setRestore(Optional<dev.jasper.sdk.RestoreState> value){Objects.requireNonNull(value,"value");if(!closed)restore=value;}
+    public void setSavedTitle(Optional<String> value){Objects.requireNonNull(value,"value");if(!closed)savedTitle=value;}
     public void setTextInsertion(Optional<Consumer<InsertedText>> value){Objects.requireNonNull(value,"value");if(!closed)insertion=value;}
     /** Whether the tab takes inserted text now: open, with an insertion set. */
     boolean takesText(){return !closed&&insertion.isPresent();}

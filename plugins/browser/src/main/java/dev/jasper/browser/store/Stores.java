@@ -66,6 +66,15 @@ public final class Stores implements AutoCloseable {
         return visitIndex;
     }
 
+    /**
+     * The database they are kept in, where the same data store keeps its site permissions too.
+     *
+     * @return the database, which these close
+     */
+    public BrowserDatabase database() {
+        return database;
+    }
+
     /** Closes the database as {@link BrowserDatabase#close} does: at once, the work given before it still running. */
     @Override public void close() {
         database.close();
@@ -80,8 +89,12 @@ public final class Stores implements AutoCloseable {
         return database.closed();
     }
 
-    /** Whether the database has started its thread, which only its first call does. */
-    boolean started() {
+    /**
+     * Whether the database has opened: its first call opens it, and starts its thread. Asking opens nothing.
+     *
+     * @return whether it has had a call
+     */
+    public boolean opened() {
         return database.started();
     }
 }

@@ -5,18 +5,19 @@ import dev.jasper.browser.page.Favicons;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.restore.BrowserRestore;
 import dev.jasper.browser.settings.BrowserSettings;
-import dev.jasper.browser.store.Stores;
 import dev.jasper.sdk.RestoreState;
 import dev.jasper.sdk.WindowOwner;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.ui.IconAsset;
 import dev.jasper.sdk.ui.TabPlacement;
+import java.net.InetSocketAddress;
 import java.net.URI;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -26,12 +27,14 @@ import javax.swing.Timer;
 
 /**
  * The plugin's open browser items, in every window: it opens them, finds one by the OSC 8 target it was opened for,
- * and knows each window's focused one. It registers the globe every item shows, gives the items the settings, the
- * history and bookmarks they record into and suggest from, and the certificates the user went on past, shared by them
- * all until Jasper quits, hands each error page's Try Again and
- * Continue to the item whose page it is, finds the item's capture a source page shows, and holds the fetchers of their
- * pages' favicons and their address fields' search suggestions until {@link #close()}. A page is made, and Chromium so
- * asked for, only when its item first shows. UI thread.
+ * and knows each window's focused one. It registers the globe every item shows, gives the items the settings and the
+ * plugin's {@link DataStores}, whose store each item opens in holds the history and bookmarks it records into and
+ * suggests from, the site permissions its page is answered from and the certificates the user went on past, reloads a
+ * store's items that show a site whose permissions changed, hands each error page's Try Again and
+ * Continue to the item whose page it is, finds the item's capture a source page shows, holds the notifications their
+ * pages show ({@link PageNotifications}), and holds the fetchers of their pages' favicons and their address fields'
+ * search suggestions until {@link #close()}. A page is made, and Chromium so asked for, only when its item first shows.
+ * UI thread.
  */
 public final class BrowserItems implements AutoCloseable {
     /** The globe: a browser item's tab icon, and its actions' and split item's. */
@@ -41,17 +44,19 @@ public final class BrowserItems implements AutoCloseable {
         + "M 1.7 8 L 14.3 8 M 8 1.7 A 2.7 6.3 0 1 0 8 14.3 A 2.7 6.3 0 1 0 8 1.7 Z");
     private final PluginContext context;
     private final Supplier<BrowserSettings> settings;
-    private final Stores stores;
+    private final DataStores stores;
     private final Consumer<Page> start;
     private final BiFunction<Duration, Runnable, Runnable> later;
     private final Function<URI, CompletableFuture<List<String>>> suggest;
     private final List<BrowserItem> open = new java.util.ArrayList<>();
-    // Spec section 14: one for the plugin's run, in memory, so it ends when Jasper quits.
-    private final CertificateAllowance certificates = new CertificateAllowance();
     // Made with the first item; it makes its HTTP client only once a page names a favicon.
     private Favicons favicons;
     // Made with the first suggestion request.
     private SuggestionFetcher suggestions;
+    // The HTTP proxy both fetchers go through, those made later too (plan 6's F3).
+    private Optional<InetSocketAddress> proxy = Optional.empty();
+    // Made with the first item.
+    private PageNotifications notifications;
     private boolean closed;
 
     /**
@@ -60,19 +65,20 @@ public final class BrowserItems implements AutoCloseable {
      *
      * @param context the plugin's context; while it starts, as the globe is registered now
      * @param settings the settings as they are now, which the items read each time they search or suggest
-     * @param stores the history and bookmarks, which the items record into and suggest from; the plugin closes them
+     * @param stores the data stores the items open in, whose history and bookmarks they record into and suggest from;
+     *     the plugin closes them
      * @param start makes a page, the first time its item shows
      */
-    public BrowserItems(PluginContext context, Supplier<BrowserSettings> settings, Stores stores, Consumer<Page> start) {
+    public BrowserItems(PluginContext context, Supplier<BrowserSettings> settings, DataStores stores, Consumer<Page> start) {
         this(context, settings, stores, start, BrowserItems::onUiAfter, null);
     }
 
     /**
-     * As {@link #BrowserItems(PluginContext, Supplier, Stores, Consumer)}, with {@code later} running a task on the UI
+     * As {@link #BrowserItems(PluginContext, Supplier, DataStores, Consumer)}, with {@code later} running a task on the UI
      * thread after a delay, answering what cancels it, and {@code suggest} fetching an engine's suggestions; null fetches
      * them with the plugin's own {@link SuggestionFetcher}.
      */
-    BrowserItems(PluginContext context, Supplier<BrowserSettings> settings, Stores stores, Consumer<Page> start,
+    BrowserItems(PluginContext context, Supplier<BrowserSettings> settings, DataStores stores, Consumer<Page> start,
                  BiFunction<Duration, Runnable, Runnable> later, Function<URI, CompletableFuture<List<String>>> suggest) {
         this.context = Objects.requireNonNull(context, "context");
         this.settings = Objects.requireNonNull(settings, "settings");
@@ -84,7 +90,7 @@ public final class BrowserItems implements AutoCloseable {
     }
 
     /**
-     * Opens a browser item at {@code url}; its page loads the first time it shows.
+     * Opens a browser item at {@code url}, in {@link DataStores#forNewItem()}'s store; its page loads the first time it shows.
      *
      * @param url what it loads
      * @param placement where it opens
@@ -93,13 +99,28 @@ public final class BrowserItems implements AutoCloseable {
      * @return the item
      */
     public BrowserItem open(URI url, TabPlacement placement, Optional<String> target, Optional<WindowOwner> window) {
-        return BrowserItem.open(this, url, placement, target, window);
+        return open(url, placement, target, window, stores.forNewItem());
+    }
+
+    /**
+     * Opens a browser item at {@code url}, in {@code store}, which it holds until it closes; its page loads the first time
+     * it shows.
+     *
+     * @param url what it loads
+     * @param placement where it opens
+     * @param target the OSC 8 target it is for, or empty
+     * @param window the window it opens from, or empty for the most recently active one
+     * @param store the data store it opens in: the persistent one, or a /dev/null group's
+     * @return the item
+     */
+    public BrowserItem open(URI url, TabPlacement placement, Optional<String> target, Optional<WindowOwner> window, DataStore store) {
+        return BrowserItem.open(this, url, placement, target, window, store);
     }
 
     /**
      * Opens a saved item again, as Jasper restores its windows: at once, in a new tab of {@code window} (where Jasper
-     * then puts it as it was saved), at its saved address and zoom, for its saved OSC 8 target. An item that saved no
-     * address, or one the address field would not load, comes back at {@code start}, and one that saved no zoom, or one
+     * then puts it as it was saved), at its saved address and zoom, for its saved OSC 8 target. A saved /dev/null item comes back at {@code start}, whatever
+     * it saved. An item that saved no address, or one the address field would not load, comes back at {@code start}, and one that saved no zoom, or one
      * outside 25% to 500%, at Page zoom; a target WebLink would refuse is dropped. Its page loads, and Chromium starts,
      * the first time it shows; with {@code wait}, only once the user loads it. It asks the user nothing.
      *
@@ -107,14 +128,17 @@ public final class BrowserItems implements AutoCloseable {
      * @param start the start page
      * @param window the window being restored
      * @param wait whether the item waits to be loaded, as after a run that ended while Chromium ran
+     * @param store the data store it comes back in: the caller's choice by the saved mode, a new /dev/null store for a
+     *     saved /dev/null item and the persistent one for any other
      * @return the item
      */
-    public BrowserItem restore(RestoreState saved, URI start, WindowOwner window, boolean wait) {
+    public BrowserItem restore(RestoreState saved, URI start, WindowOwner window, boolean wait, DataStore store) {
         Objects.requireNonNull(saved, "saved");
         Objects.requireNonNull(start, "start");
         Objects.requireNonNull(window, "window");
-        return BrowserItem.open(this, BrowserRestore.url(saved).orElse(start), TabPlacement.NEW_TAB, BrowserRestore.target(saved),
-            Optional.of(window), BrowserRestore.zoom(saved), wait);
+        URI at = BrowserRestore.devNull(saved) ? start : BrowserRestore.url(saved).orElse(start);
+        return BrowserItem.open(this, at, TabPlacement.NEW_TAB, BrowserRestore.target(saved),
+            Optional.of(window), BrowserRestore.zoom(saved), wait, store);
     }
 
     /**
@@ -147,6 +171,21 @@ public final class BrowserItems implements AutoCloseable {
     public Optional<BrowserItem> focused(WindowHandle window) {
         Objects.requireNonNull(window, "window");
         return open.stream().filter(item -> item.focusedIn(window)).findFirst();
+    }
+
+    /**
+     * The items open in {@code store} whose page shows one of {@code origins} load again, as a permission of those sites
+     * changed there: an item that shows an error page for one tries again. Items of another store, and an item that waits
+     * or has not shown its page yet, load nothing.
+     *
+     * @param store the data store whose permissions changed
+     * @param origins the sites, as {@code Origins.of} names them
+     */
+    public void reloadShowing(DataStore store, Set<String> origins) {
+        Objects.requireNonNull(store, "store");
+        Objects.requireNonNull(origins, "origins");
+        if (origins.isEmpty()) return;
+        for (BrowserItem item : List.copyOf(open)) if (item.store() == store) item.privacy().reloadShowing(origins);
     }
 
     /** Opens Settings at the Browser's page. */
@@ -199,8 +238,8 @@ public final class BrowserItems implements AutoCloseable {
 
     /**
      * The plugin stops: each item's open Edit Bookmark panel closes, keeping its tags, and its page gives history its last
-     * title, before the plugin closes the stores; the favicon and suggestion fetches under way end, and no page or field
-     * fetches one from now on.
+     * title, before the plugin closes the data stores; the favicon and suggestion fetches under way end, and no page or
+     * field fetches one from now on.
      */
     @Override public void close() {
         closed = true;
@@ -209,27 +248,43 @@ public final class BrowserItems implements AutoCloseable {
         if (suggestions != null) suggestions.close();
     }
 
+    /**
+     * Has the items' favicon and suggestion fetches from now on go through {@code proxy} (plan 6's F3), as
+     * {@code http}'s {@code WebFetch} says, the fetchers made later too.
+     *
+     * @param proxy the HTTP proxy's address; empty for the JDK's default proxy selector
+     */
+    public void useProxy(Optional<InetSocketAddress> proxy) {
+        this.proxy = Objects.requireNonNull(proxy, "proxy");
+        if (favicons != null) favicons.useProxy(proxy);
+        if (suggestions != null) suggestions.useProxy(proxy);
+    }
+
     /** The fetcher of the items' pages' favicons; one that fetches nothing once the plugin has stopped. */
     Favicons favicons() {
         if (favicons == null) {
             favicons = new Favicons(FaviconDecoder::toPng, context.background());
+            favicons.useProxy(proxy);
             if (closed) favicons.close();
         }
         return favicons;
+    }
+
+    /** The notifications the items' pages show, in the plugin's Page notifications group. */
+    PageNotifications pageNotifications() {
+        if (notifications == null)
+            notifications = new PageNotifications(context.notifications().group(PageNotifications.GROUP),
+                () -> System.nanoTime() / 1_000_000);
+        return notifications;
     }
 
     PluginContext context() {
         return context;
     }
 
-    /** The history and bookmarks, which each item reads once, as it opens. */
-    Stores stores() {
+    /** The data stores the items open in. */
+    DataStores dataStores() {
         return stores;
-    }
-
-    /** The certificates the user went on past, which every item shares. Any thread. */
-    CertificateAllowance certificates() {
-        return certificates;
     }
 
     /** The settings as they are now. */
@@ -255,6 +310,7 @@ public final class BrowserItems implements AutoCloseable {
     private CompletableFuture<List<String>> fetchSuggestions(URI request) {
         if (suggestions == null) {
             suggestions = new SuggestionFetcher(context.background());
+            suggestions.useProxy(proxy);
             if (closed) suggestions.close();
         }
         return suggestions.fetch(request);

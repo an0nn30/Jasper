@@ -6,8 +6,21 @@ public interface NotificationHandle {
     void expire();
 
     /**
-     * Whether it has expired: through {@link #expire()}, an action that expires it, the user removing or clearing it,
-     * its group dropping it, or the plugin stopping.
+     * Removes the notification: its card closes, its links stop working and it leaves history. A removed notification
+     * also reads as expired. Idempotent; safe from any thread.
+     *
+     * <p>Jasper counts a post with the same text as one made at most a minute before on that earlier notification, which
+     * takes the newer post's links, so one notification can have several handles: it leaves history once each of them
+     * has been removed, and until then it has the links of the newest post whose handle is left. Each removed handle
+     * reads as expired from then on.
+     *
+     * @since 0.30.0
+     */
+    void remove();
+
+    /**
+     * Whether it has expired: through {@link #expire()} or {@link #remove()}, an action that expires it, the user
+     * removing or clearing it, its group dropping it, or the plugin stopping.
      *
      * @return true once expired
      */

@@ -123,6 +123,45 @@ class PluginTabRestoreTest {
     }
 
     /**
+     * SDK 0.30.0's ContentTab.setSavedTitle: an item saved with the title its plugin gave, whatever it shows, comes back
+     * through its restorer with that title as the request's.
+     */
+    @Test void anItemSavedWithItsPluginsTitleComesBackWithIt() throws Exception {
+        TabId shell = TabId.random(), saved = TabId.random();
+        windows(mainWith(shell, saved, NOTE), Map.of(NOTES, "Notes"));
+        List<String> titles = new ArrayList<>();
+        var resaved = new java.util.concurrent.atomic.AtomicReference<WorkspaceFile.Snapshot>();
+        edt(() -> {
+            pageRestorer(titles);
+            windows.manager.ensureWindow("cold", null).orElseThrow();
+            resaved.set(windows.manager.snapshot().orElseThrow());
+            windows.manager.closeAll();
+        });
+        windows.launch();
+        assertThat(((WorkspaceFile.TabRecord.Content) resaved.get().window().tabs().get(saved)).title()).isEqualTo("Web Browser");
+        windows(resaved.get(), Map.of(NOTES, "Notes"));
+        edt(() -> {
+            pageRestorer(titles);
+            windows.manager.ensureWindow("cold", null).orElseThrow();
+        });
+        windows.launch();
+        assertThat(titles).as("saved as todo.md, then as the title its plugin gave").containsExactly("todo.md", "Web Browser");
+    }
+
+    /** The notes plugin's restorer, keeping each title it is given; its item shows a page's title and is saved with another. */
+    private void pageRestorer(List<String> titles) {
+        windows.model.tabs().restorer(NOTES, "note", restoring -> {
+            titles.add(restoring.title());
+            Tab opened = windows.model.tabs().open(NOTES, "note:" + restoring.state().state().get("name"), restoring.title(),
+                restoring.window(), new javax.swing.JPanel());
+            opened.restore(Optional.of(restoring.state()));
+            opened.presentation("Account 1234 - Bank", "", null, false, "", "");
+            opened.savedTitle(Optional.of("Web Browser"));
+            return Optional.empty();
+        });
+    }
+
+    /**
      * 6b Task 1's review: a saved item whose id is already open is taken as restored elsewhere. It is left out of its
      * window's restore with a warning that names its plugin and id, and no placeholder is registered under that id, which
      * would throw out of the restore.

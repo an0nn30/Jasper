@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Site Permissions</title>
+{{style}}
+</head>
+<body>
+<main>
+<h1>Site Permissions</h1>
+<div class="toolbar">
+<input type="search" id="search" placeholder="Search by website or permission type…" aria-label="Search by website or permission type" autocomplete="off" autofocus>
+<button type="button" id="clear" class="danger">Clear All Permissions</button>
+</div>
+<div class="toolbar">
+<select id="type" aria-label="Permission type">
+<option value="">All Types</option>
+<option value="camera">Camera</option>
+<option value="microphone">Microphone</option>
+<option value="camera-microphone">Camera and Microphone</option>
+<option value="notifications">Notifications</option>
+<option value="audio">Audio Playback</option>
+</select>
+<select id="status" aria-label="Status">
+<option value="">All Statuses</option>
+<option value="allowed">Allowed</option>
+<option value="blocked">Blocked</option>
+</select>
+</div>
+<p id="failure" class="failure" role="alert" hidden></p>
+<div id="sites"></div>
+<p id="empty" class="empty" hidden>No permissions found</p>
+</main>
+{{script}}
+</body>
+</html>

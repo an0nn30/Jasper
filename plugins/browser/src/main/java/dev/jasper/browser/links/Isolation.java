@@ -1,5 +1,6 @@
 package dev.jasper.browser.links;
 
+import dev.jasper.browser.permissions.Origins;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Locale;
@@ -18,7 +19,6 @@ import java.util.stream.Collectors;
 final class Isolation {
     private static final Pattern WEB = Pattern.compile("(?i)(https?)://(?:[^/?#]*@)?(\\[[^\\]/?#]*\\]|[^:/?#\\[\\]@]+)(?::([0-9]*))?(?:[/?#].*)?",
         Pattern.DOTALL);
-    private static final Pattern LOOPBACK = Pattern.compile("localhost|.+\\.localhost|127(?:\\.[0-9]{1,3}){3}|\\[::1\\]");
 
     private Isolation() { }
 
@@ -46,11 +46,7 @@ final class Isolation {
      * @return whether it is
      */
     static boolean secure(String url) {
-        Optional<String> origin = origin(url);
-        if (origin.isEmpty()) return false;
-        if (origin.get().startsWith("https://")) return true;
-        String host = origin.get().substring("http://".length()).replaceFirst(":[0-9]+$", "");
-        return LOOPBACK.matcher(host).matches();
+        return origin(url).map(Origins::secure).orElse(false);
     }
 
     /**

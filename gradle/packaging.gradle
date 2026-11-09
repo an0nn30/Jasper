@@ -32,6 +32,10 @@ def aotRequested = providers.gradleProperty('jasper.aot').map { it == 'true' }.g
 // Shown by macOS's Local Network privacy prompt. Without the grant, connections to LAN addresses
 // fail with EHOSTUNREACH ("No route to host"), which is how Remote's SSH connections to them fail.
 def localNetworkUsage = 'Jasper connects to SSH hosts on your local network.'
+// Browser plan 6 (spec 12): shown by macOS's camera and microphone privacy prompts. Without them, macOS ends a process
+// that opens either, which a web page the user allowed does.
+def cameraUsage = "Web pages in Jasper's browser use your camera only when you allow it."
+def microphoneUsage = "Web pages in Jasper's browser use your microphone only when you allow it."
 // Workspace-tabs spec 5.4: Jasper appears in Open With and takes drops on its Dock icon for text, source code and
 // folders, without claiming any of them as their default application.
 def macDocumentTypes = '[{"CFBundleTypeName":"Text","CFBundleTypeRole":"Editor","LSHandlerRank":"Alternate","LSItemContentTypes":["public.text","public.source-code"]},{"CFBundleTypeName":"Folder","CFBundleTypeRole":"Viewer","LSHandlerRank":"Alternate","LSItemContentTypes":["public.folder"]}]'
@@ -285,6 +289,8 @@ def packageApp = tasks.register('packageApp') {
     inputs.property('bundledNatives', providers.provider { bundledNatives(normalizedHost().os, normalizedHost().architecture).collect { it.toString() } })
     inputs.property('bundledNativeOptions', providers.provider { bundledNativeJvmOptions(normalizedHost().os) })
     inputs.property('localNetworkUsage', localNetworkUsage)
+    inputs.property('cameraUsage', cameraUsage)
+    inputs.property('microphoneUsage', microphoneUsage)
     inputs.property('documentTypes', macDocumentTypes)
     inputs.property('urlTypes', macUrlTypes)
     inputs.property('version', version)
@@ -327,6 +333,10 @@ def packageApp = tasks.register('packageApp') {
                     new File(image, 'Contents/Info.plist').absolutePath], 'plutil icon catalog name')
                 executeNative(['/usr/bin/plutil', '-replace', 'NSLocalNetworkUsageDescription', '-string', localNetworkUsage,
                     new File(image, 'Contents/Info.plist').absolutePath], 'plutil local network usage')
+                executeNative(['/usr/bin/plutil', '-replace', 'NSCameraUsageDescription', '-string', cameraUsage,
+                    new File(image, 'Contents/Info.plist').absolutePath], 'plutil camera usage')
+                executeNative(['/usr/bin/plutil', '-replace', 'NSMicrophoneUsageDescription', '-string', microphoneUsage,
+                    new File(image, 'Contents/Info.plist').absolutePath], 'plutil microphone usage')
                 executeNative(['/usr/bin/plutil', '-replace', 'CFBundleDocumentTypes', '-json', macDocumentTypes,
                     new File(image, 'Contents/Info.plist').absolutePath], 'plutil document types')
                 executeNative(['/usr/bin/plutil', '-replace', 'CFBundleURLTypes', '-json', macUrlTypes,
@@ -687,6 +697,10 @@ def verifyPackage = tasks.register('verifyPackage') {
             if (identifier != 'dev.jasper.app' || bundleVersion != context.version) throw new GradleException("Package verification failed: plist identity/version is ${identifier}/${bundleVersion}")
             def localNetwork = executeNative(['/usr/bin/plutil', '-extract', 'NSLocalNetworkUsageDescription', 'raw', '-o', '-', plist.absolutePath], 'plutil local network').stdout.trim()
             if (localNetwork != localNetworkUsage) throw new GradleException("Package verification failed: plist local network usage description is '${localNetwork}'")
+            def camera = executeNative(['/usr/bin/plutil', '-extract', 'NSCameraUsageDescription', 'raw', '-o', '-', plist.absolutePath], 'plutil camera').stdout.trim()
+            if (camera != cameraUsage) throw new GradleException("Package verification failed: plist camera usage description is '${camera}'")
+            def microphone = executeNative(['/usr/bin/plutil', '-extract', 'NSMicrophoneUsageDescription', 'raw', '-o', '-', plist.absolutePath], 'plutil microphone').stdout.trim()
+            if (microphone != microphoneUsage) throw new GradleException("Package verification failed: plist microphone usage description is '${microphone}'")
             def documentTypes = new groovy.json.JsonSlurper().parseText(executeNative(['/usr/bin/plutil', '-extract', 'CFBundleDocumentTypes', 'json', '-o', '-', plist.absolutePath], 'plutil document types').stdout)
             if (documentTypes != new groovy.json.JsonSlurper().parseText(macDocumentTypes)) throw new GradleException("Package verification failed: plist document types are ${documentTypes}")
             def urlTypes = new groovy.json.JsonSlurper().parseText(executeNative(['/usr/bin/plutil', '-extract', 'CFBundleURLTypes', 'json', '-o', '-', plist.absolutePath], 'plutil URL types').stdout)

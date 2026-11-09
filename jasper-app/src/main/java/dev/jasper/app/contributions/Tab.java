@@ -18,7 +18,7 @@ import javax.swing.JComponent;
 /**
  * One item of any window, the one a pane shows (workspace tabs spec 9.1; tabs and panes spec 3; the code calls an item
  * a tab): its id and kind, its content, its presentation (title, detail, icon, unsaved marker, location, host, status
- * items), its commands, focus target and text insertion, and the window that holds it. Moving the
+ * items), its commands, focus target, text insertion and saved title, and the window that holds it. Moving the
  * tab between windows never replaces this object or its content; only {@link TabRegistry#remove(Tab)} disposes it. EDT
  * only.
  */
@@ -52,6 +52,7 @@ public final class Tab implements AutoCloseable {
     private List<ContentCommand> commands = List.of();
     private List<ContentStatus> status = List.of();
     private Optional<TabRestore> restore = Optional.empty();
+    private Optional<String> savedTitle = Optional.empty();
     private Optional<BiConsumer<String, Boolean>> insertion = Optional.empty();
 
     Tab(TabRegistry registry, TabId id, Kind kind, String plugin, String key, String title, TabContent content) {
@@ -106,6 +107,23 @@ public final class Tab implements AutoCloseable {
      * @return its plugin's restorer kind and restore state; empty while it does not come back
      */
     public Optional<TabRestore> restore() { return restore; }
+
+    /** @return the title the item is saved with (workspace tabs spec 13): the one its plugin gave, else its title */
+    public String savedTitle() { return savedTitle.orElse(title); }
+
+    /**
+     * The title the item is saved with in place of its title, as its plugin says (SDK 0.30.0's
+     * {@code ContentTab.setSavedTitle}); empty saves its title. A change is saved as a layout change is. Ignored once the
+     * tab has closed.
+     *
+     * @param value the title to save, or empty
+     */
+    public void savedTitle(Optional<String> value) {
+        Objects.requireNonNull(value, "value");
+        if (closed || value.equals(savedTitle)) return;
+        savedTitle = value;
+        registry.restoreChanged.run();
+    }
 
     /**
      * How the tab comes back when the windows are restored, as its plugin says; a change is saved as a layout change is.

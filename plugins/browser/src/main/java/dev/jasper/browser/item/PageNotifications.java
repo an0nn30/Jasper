@@ -1,0 +1,209 @@
+package dev.jasper.browser.item;
+
+import dev.jasper.browser.page.Page;
+import dev.jasper.browser.permissions.Origins;
+import dev.jasper.sdk.notifications.DisplayMode;
+import dev.jasper.sdk.notifications.GroupSpec;
+import dev.jasper.sdk.notifications.NotificationGroup;
+import dev.jasper.sdk.notifications.NotificationHandle;
+import dev.jasper.sdk.notifications.NotificationSpec;
+import dev.jasper.sdk.notifications.Severity;
+import dev.jasper.sdk.terminal.WindowHandle;
+import java.lang.ref.WeakReference;
+import java.util.ArrayDeque;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.WeakHashMap;
+import java.util.function.LongSupplier;
+
+/**
+ * The notifications pages show, as Jasper notifications (spec section 12) in the plugin's Page notifications group:
+ * information, with no icon, in the window of the page's item, where a click shows the page's tab. The title is the
+ * page's, on one line and cut to 200 characters, or the page's host when it shows nothing. The content begins with the
+ * page's host (ruling V2), as Chrome and macOS name the site, a long one cut from the left so that its registrable
+ * domain shows, then the page's body with at most two blank lines in a row, at most 4,000 characters in all, so no
+ * page can post a card that reads as Jasper's own. A page shows at most {@value #PER_MINUTE} in any minute; beyond
+ * that a post is refused, and its script fires {@code error}. The script's {@code close()} takes its notification out
+ * of Jasper's history; once the page has forgotten them, at each main-frame load start and as it closes, it reaches
+ * those it posted no more, and they stay. Jasper counts the same text posted within a minute, by two tabs of one site
+ * say, on one notification, which keeps the links of the newest post left as either is closed. UI thread.
+ */
+public final class PageNotifications {
+    /** Pages' notifications' own group, which Settings lists. */
+    public static final GroupSpec GROUP = new GroupSpec("dev.jasper.browser.pages", "Page notifications", DisplayMode.CARD);
+    /** The most notifications a page shows in any minute. */
+    static final int PER_MINUTE = 10;
+    private static final long MINUTE_MILLIS = 60_000;
+    private static final int MAX_TITLE = 200, MAX_CONTENT = 4_000;
+    /** The longest host shown whole. */
+    static final int MAX_HOST = 60;
+    private static final String ELLIPSIS = "…", BETWEEN = " — ";
+    private final NotificationGroup group;
+    private final LongSupplier clock;
+    // Each page's posts in the last minute and the notifications its document can still close, held only while the page
+    // is.
+    private final Map<Page, Posts> pages = new WeakHashMap<>();
+
+    /** One page's: when it posted in the last minute, oldest first, and its document's notifications by the script's name. */
+    private static final class Posts {
+        final ArrayDeque<Long> times = new ArrayDeque<>();
+        final Map<String, NotificationHandle> handles = new HashMap<>();
+    }
+
+    /**
+     * The notifications of the plugin's pages.
+     *
+     * @param group the plugin's {@link #GROUP}
+     * @param clock the time, in milliseconds that only go forward
+     */
+    PageNotifications(NotificationGroup group, LongSupplier clock) {
+        this.group = Objects.requireNonNull(group, "group");
+        this.clock = Objects.requireNonNull(clock, "clock");
+    }
+
+    /**
+     * {@code page}'s script shows a notification it names {@code id}: posted as the class says, in {@code window}, unless
+     * the page has shown {@value #PER_MINUTE} in the last minute.
+     *
+     * @param page the page whose script asked
+     * @param window the window of the page's item
+     * @param origin the site of the document that asked, as {@code Origins.of} names it
+     * @param id the script's name for it, which its close names
+     * @param title its title, as the script gave it
+     * @param body its body, as the script gave it
+     * @return whether it was posted
+     */
+    boolean post(Page page, WindowHandle window, String origin, String id, String title, String body) {
+        Objects.requireNonNull(page, "page");
+        Objects.requireNonNull(window, "window");
+        Objects.requireNonNull(origin, "origin");
+        Objects.requireNonNull(id, "id");
+        Objects.requireNonNull(title, "title");
+        Objects.requireNonNull(body, "body");
+        Posts posts = pages.computeIfAbsent(page, any -> new Posts());
+        long now = clock.getAsLong();
+        while (!posts.times.isEmpty() && now - posts.times.peekFirst() >= MINUTE_MILLIS) posts.times.removeFirst();
+        if (posts.times.size() >= PER_MINUTE) return false;
+        String host = shown(host(origin));
+        String text = body(body);
+        var shown = new WeakReference<>(page);
+        NotificationSpec spec = NotificationSpec.of(Severity.INFO, title(title, host))
+            .withContent(cut(text.isEmpty() ? host : host + BETWEEN + text, MAX_CONTENT))
+            .withWindow(window)
+            .withActivate(() -> {
+                Page clicked = shown.get();
+                if (clicked != null) clicked.showItem();
+            });
+        NotificationHandle handle = group.post(spec);
+        posts.times.addLast(now);
+        // Those Jasper has let go, as its history drops the oldest, no page can close any more.
+        posts.handles.values().removeIf(NotificationHandle::expired);
+        posts.handles.put(id, handle);
+        return true;
+    }
+
+    /**
+     * {@code page}'s script closes the notification it named {@code id}: it leaves Jasper's history, unless the page has
+     * forgotten it since.
+     *
+     * @param page the page whose script asked
+     * @param id the script's name for it
+     */
+    void close(Page page, String id) {
+        Posts posts = pages.get(page);
+        NotificationHandle handle = posts == null ? null : posts.handles.remove(id);
+        if (handle != null) handle.remove();
+    }
+
+    /**
+     * {@code page}'s document has gone, at a main-frame load start or as the page closes: its script's names reach its
+     * notifications no more, and they stay. The page's posts still count for the minute.
+     *
+     * @param page the page
+     */
+    void forget(Page page) {
+        Posts posts = pages.get(page);
+        if (posts != null) posts.handles.clear();
+    }
+
+    /**
+     * The notification's title: {@code title} on one line, where each control character, line or paragraph separator
+     * and run of white space becomes one space, then trimmed and cut to 200 characters; or {@code host} when it shows
+     * nothing. Line breaks would push the content, and the host it begins with, off the card.
+     */
+    static String title(String title, String host) {
+        var line = new StringBuilder(title.length());
+        boolean space = false;
+        for (int at = 0; at < title.length(); at++) {
+            char c = title.charAt(at);
+            int type = Character.getType(c);
+            if (type == Character.CONTROL || type == Character.LINE_SEPARATOR || type == Character.PARAGRAPH_SEPARATOR
+                    || Character.isWhitespace(c) || Character.isSpaceChar(c)) {
+                space = true;
+                continue;
+            }
+            if (space && !line.isEmpty()) line.append(' ');
+            space = false;
+            line.append(c);
+        }
+        return cut(visible(line.toString()) ? line.toString() : host, MAX_TITLE);
+    }
+
+    /**
+     * The notification's body: {@code body} with every line break a newline, at most two lines in a row that show
+     * nothing, and trimmed. Jasper's history shows a notification's content whole, so a page cannot pad it out.
+     */
+    static String body(String body) {
+        String lines = body.replace("\r\n", "\n").replace('\r', '\n').replace('\u0085', '\n').replace('\u2028', '\n')
+            .replace('\u2029', '\n');
+        var out = new StringBuilder(lines.length());
+        int blank = 0;
+        for (String line : lines.split("\n", -1)) {
+            blank = visible(line) ? 0 : blank + 1;
+            if (blank > 2) continue;
+            if (!out.isEmpty()) out.append('\n');
+            out.append(line);
+        }
+        return out.toString().strip();
+    }
+
+    /**
+     * {@code host} as a notification shows it: whole up to {@value #MAX_HOST} characters, and longer ones cut from the
+     * left, at a label where at least two labels are left, as Chrome elides an origin, so that its registrable domain
+     * shows.
+     */
+    static String shown(String host) {
+        if (host.length() <= MAX_HOST) return host;
+        String tail = host.substring(host.length() - (MAX_HOST - 1));
+        int dot = tail.indexOf('.');
+        if (dot >= 0 && tail.indexOf('.', dot + 1) > dot + 1) tail = tail.substring(dot + 1);
+        return ELLIPSIS + tail;
+    }
+
+    /**
+     * The host of {@code origin}, without its scheme and port ({@link Origins#host}); an origin with none, as a file's,
+     * is itself.
+     */
+    static String host(String origin) {
+        String host = Origins.host(origin);
+        return visible(host) ? host : origin;
+    }
+
+    /**
+     * Whether {@code text} shows anything, as Jasper requires of a title: some character that is not white space, a
+     * space separator, a formatting mark or another control character.
+     */
+    private static boolean visible(String text) {
+        return text.codePoints().anyMatch(point -> !Character.isWhitespace(point) && !Character.isSpaceChar(point)
+            && Character.getType(point) != Character.FORMAT && !Character.isISOControl(point));
+    }
+
+    /** {@code text}, or its first characters and an ellipsis in {@code max}; a surrogate pair is kept whole or dropped. */
+    private static String cut(String text, int max) {
+        if (text.length() <= max) return text;
+        int end = max - 1;
+        if (end > 0 && Character.isHighSurrogate(text.charAt(end - 1))) end--;
+        return text.substring(0, end) + ELLIPSIS;
+    }
+}

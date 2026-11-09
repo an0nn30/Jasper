@@ -128,7 +128,7 @@ class StartLoadsNoChromiumTest {
                 try (var host = new FakePluginHost(Path.of(args[0]))) {
                     var window = host.addTerminalWindow();
                     host.activateTerminalWindow(window);
-                    host.start(new PluginInfo("dev.jasper.browser", "Browser", "0.1.0", Set.of("browser.provide", "palette.contribute")), Set.of(), Set.of(), new BrowserPlugin());
+                    host.start(new PluginInfo("dev.jasper.browser", "Browser", "0.1.0", Set.of("browser.provide", "palette.contribute")), Set.of(), Set.of(), OfflinePlugins.plugin());
                     if (args[1].equals(OPEN) && (!host.invoke("dev.jasper.browser.new_tab", window, null) || host.contentTabs().size() != 1))
                         failures.add("New Browser Tab opened no item");
                     if (args[1].equals(RESTORE)) {

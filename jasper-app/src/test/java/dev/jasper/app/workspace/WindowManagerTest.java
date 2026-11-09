@@ -972,6 +972,35 @@ class WindowManagerTest {
         launch();
     }
 
+    /** SDK 0.30.0's ContentTab.setSavedTitle: a plugin's tab is saved with the title it gives, and a change asks for a save. */
+    @Test void aPluginsTabIsSavedWithTheTitleItGives(@TempDir Path folder) throws Exception {
+        List<Runnable> scheduled = new ArrayList<>();
+        edt(() -> {
+            manager.workspace(new WorkspaceStore(folder.resolve("workspace.toml"), manager::snapshot,
+                (delay, task) -> { scheduled.add(task); return () -> { }; }, Runnable::run, aside -> { }));
+            JasperWindow window = manager.ensureWindow("cold", null).orElseThrow();
+            model.tabs().restorer("dev.example.browser", "page", restoring -> Optional.empty());
+            Tab page = model.tabs().open("dev.example.browser", "page", "Start", window.id(), new JPanel());
+            page.restore(Optional.of(new dev.jasper.app.layout.TabRestore("page", Map.of())));
+            page.presentation("Account 1234 - Bank", "", null, false, "", "");
+            window.events().activated().accept(true);
+            assertThat(savedTitle(page)).as("the title it shows, by default").isEqualTo("Account 1234 - Bank");
+            List.copyOf(scheduled).forEach(Runnable::run);
+            scheduled.clear();
+            page.savedTitle(Optional.of("Web Browser"));
+            assertThat(scheduled).as("a save is scheduled").isNotEmpty();
+            assertThat(savedTitle(page)).isEqualTo("Web Browser");
+            page.savedTitle(Optional.empty());
+            assertThat(savedTitle(page)).isEqualTo("Account 1234 - Bank");
+        });
+        launch();
+    }
+
+    /** The title the saved window gives {@code tab}. */
+    private String savedTitle(Tab tab) {
+        return ((WorkspaceFile.TabRecord.Content) manager.snapshot().orElseThrow().window().tabs().get(tab.id())).title();
+    }
+
     /**
      * Controller Ruling 4: a new window while none is open restores the saved window first; New Window and a plugin's
      * tab placed in a new window alike.

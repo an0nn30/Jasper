@@ -72,9 +72,15 @@ import javax.swing.JComponent;
  * back and forward, and an entry chosen from Back's or Forward's hold menu goes to that entry of the page's history,
  * while their Show Full History loads Jasper's history page ({@link #showHistory}). The menu button's Add Bookmark
  * bookmarks the page at once and opens its {@link BookmarkPanel}, Remove Bookmark removes the page's bookmark and says
- * "Bookmark Removed", and Manage Bookmarks and History load Jasper's bookmarks and history pages. It
- * saves its URL, its own zoom and its target with Jasper's workspace ({@link BrowserRestore}): what it loads first until
- * it shows, then where each committed navigation takes its page.
+ * "Bookmark Removed", and Manage Bookmarks and History load Jasper's bookmarks and history pages. Its Reset items, one
+ * for each permission its store holds for the page's site ({@link PrivacyMenu}), revoke that permission for the site the
+ * menu offered them for and reload the store's items that show the site; the menu follows the store's permissions as
+ * they change. Its page's requests for the camera, the microphone and notifications are answered from its store, or
+ * asked of the user ({@link SitePermissions}), and its page's notifications show as Jasper's in the item's window
+ * ({@link PageNotifications}), but for a /dev/null item, which denies them. The first sound of a page whose site has no
+ * stored choice mutes it, and the audio bar between the toolbar and the page asks; the menu offers Unmute Current Page
+ * while the page is muted ({@link PrivacyMenu}). It saves its URL, its own zoom and its target with Jasper's workspace
+ * ({@link BrowserRestore}): what it loads first until it shows, then where each committed navigation takes its page.
  * Restored after a run that ended while Chromium ran, an item waits: in place of the canvas it says that Jasper closed
  * while the page was open, and it asks for its page only once the user loads it, with its Load Page button, Enter in the
  * address field, Reload or {@link #load}.
@@ -92,7 +98,11 @@ import javax.swing.JComponent;
  * ({@link Page#insertText}), then Return when asked; a focus that takes no text gets neither; the clipboard is never
  * touched. While Copy on select is on
  * ({@code Platform.copyOnSelect()}, spec section 15), each selection the user finishes in the page is copied
- * ({@link Page#onSelectionGesture}, {@link Page#selectedText}), except one in a frame of another origin. UI thread.
+ * ({@link Page#onSelectionGesture}, {@link Page#selectedText}), except one in a frame of another origin. An item opens
+ * in a {@link DataStore} (spec section 12), which it holds while it is open: its page is made in the store's request
+ * context, once the store is {@link DataStore#ready ready}; its history, bookmarks, address suggestions and Edit Bookmark
+ * panel are the store's, and so are the certificates it goes on past; and the links and popups its page opens in items
+ * of their own open in the same store, so a /dev/null item's stay in its group. UI thread.
  */
 public final class BrowserItem implements AutoCloseable {
     static final String ROOT = "browser", PAGE = "browser.page", CONTENT = "browser.page.content";
@@ -107,8 +117,12 @@ public final class BrowserItem implements AutoCloseable {
     // The longest address the tab's location and status show; a data: address can run to megabytes.
     private static final int SHOWN_ADDRESS = 2_000;
     private final BrowserItems items;
-    // The history and bookmarks the item records into and suggests from, read once, as it opens.
+    // The data store the item opens in, which it holds while it is open; and that store's history and bookmarks, which
+    // the item records into and suggests from.
+    private final DataStore store;
     private final Stores stores;
+    // Whether the item still holds its store, which it gives back once.
+    private boolean holdsStore = true;
     private final Optional<String> target;
     private final Page page;
     private final ErrorPages errors;
@@ -117,6 +131,12 @@ public final class BrowserItem implements AutoCloseable {
     private final BrowserToolbar toolbar = new BrowserToolbar(this::storeSuggestions);
     // The item's listening to its bookmarks and visits, which ends as it closes.
     private final Subscription bookmarksChanged, visitsChanged;
+    // The menu's privacy group, which follows the store's permissions until the item closes.
+    private final PrivacyMenu privacy;
+    // Answers the page's camera, microphone and notification requests until the item closes or the plugin stops.
+    private final SitePermissions sitePermissions;
+    // The plugin's pages' notifications, which the page's go to.
+    private final PageNotifications notifications;
     private final BrowserFindBar findBar;
     private final UiView view;
     private ContentTab tab;
@@ -124,6 +144,8 @@ public final class BrowserItem implements AutoCloseable {
     private DevToolsItem devTools;
     // The Edit Bookmark panel opened last, which may have closed since; null before the first.
     private BookmarkPanel panel;
+    // The /dev/null indicator's popover opened last, which may have closed since; null before the first.
+    private DevNullPopover devNullPopover;
     private URI url;
     // Where the item's restore state says it is: what it loads first until it shows, then where its page committed.
     private URI saved;
@@ -142,15 +164,20 @@ public final class BrowserItem implements AutoCloseable {
     private Runnable typingPause = NOTHING;
     private CompletableFuture<List<String>> suggestion;
 
-    private BrowserItem(BrowserItems items, URI url, Optional<String> target, OptionalInt zoom, boolean waiting) {
+    private BrowserItem(BrowserItems items, URI url, Optional<String> target, OptionalInt zoom, boolean waiting, DataStore store) {
         this.items = items;
-        stores = items.stores();
+        this.store = store;
+        stores = store.stores();
         this.target = target;
         this.url = url;
         saved = url;
         ownZoom = zoom;
         this.waiting = waiting;
-        page = new Page(url, this::changed, items.favicons(), items.context().background());
+        page = new Page(url, this::changed, items.favicons(), items.context().background(), store.context());
+        // The page's browser is found in the item's store from the moment Chromium names it, on Chromium's thread, so
+        // its documents' first queries are answered from that store.
+        DataStores all = items.dataStores();
+        page.onBrowser(browser -> all.browserMade(browser, store), browser -> all.browserClosed(browser, store));
         showZoom(zoom.orElseGet(() -> items.settings().pageZoom()));
         page.onNavigationButton(this::navigationButton);
         page.onMagnify(this::magnify);
@@ -160,7 +187,16 @@ public final class BrowserItem implements AutoCloseable {
         page.onAddressChange(this::committed);
         page.onLoadStart(address -> loadStarts++);
         page.onSelectionGesture(this::selectionFinished);
-        errors = new ErrorPages(page, items.certificates(), this::load);
+        errors = new ErrorPages(page, store.allowance(), this::load);
+        privacy = new PrivacyMenu(store, items, errors::address, this::reloadForPermissions, page);
+        sitePermissions = new SitePermissions(page, store, items::closed);
+        // The page's notifications are Jasper's, in the item's window, until it closes; a new document's names are its own.
+        // A /dev/null item shows none, as Chrome's Incognito (ruling V20).
+        notifications = items.pageNotifications();
+        page.privacy().onNotifications(notice -> !closed && tab != null && !store.devNull()
+                && notifications.post(page, tab.window(), notice.origin(), notice.id(), notice.title(), notice.body()),
+            id -> notifications.close(page, id));
+        page.onLoadStart(address -> notifications.forget(page));
         page.onLoadFailure(failure -> { if (!closed) errors.failed(failure); });
         sources = new SourcePages(page, this::load);
         history = new HistoryRecorder(page, stores, items::later);
@@ -174,40 +210,54 @@ public final class BrowserItem implements AutoCloseable {
         // The item draws again as the bookmarks change, and as the visits do while something is typed, for the field's list.
         bookmarksChanged = stores.bookmarkIndex().onChanged(this::render);
         visitsChanged = stores.visitIndex().onChanged(() -> { if (toolbar.typing()) render(); });
+        // And as its store's permissions change, for the menu's Reset items.
+        privacy.follows(this::render);
     }
 
     /**
-     * Opens a browser item at {@code url}. Its page loads the first time the item shows.
+     * Opens a browser item at {@code url}, in {@code store}. Its page loads the first time the item shows.
      *
      * @param items the plugin's items, which keep it while it is open
      * @param url what it loads
      * @param placement where it opens
      * @param target the OSC 8 target it is for, or empty
      * @param window the window it opens from, or empty for the most recently active one
+     * @param store the data store it opens in, which it holds until it closes
      * @return the item, at Page zoom
      */
     public static BrowserItem open(BrowserItems items, URI url, TabPlacement placement, Optional<String> target,
-                                   Optional<WindowOwner> window) {
-        return open(items, url, placement, target, window, OptionalInt.empty(), false);
+                                   Optional<WindowOwner> window, DataStore store) {
+        return open(items, url, placement, target, window, OptionalInt.empty(), false, store);
     }
 
     /**
-     * As {@link #open(BrowserItems, URI, TabPlacement, Optional, Optional)}, at {@code zoom}, a zoom of its own from
-     * {@link Zoom#MIN} to {@link Zoom#MAX}, or empty for Page zoom; with {@code waiting}, the item waits.
+     * As {@link #open(BrowserItems, URI, TabPlacement, Optional, Optional, DataStore)}, at {@code zoom}, a zoom of its own
+     * from {@link Zoom#MIN} to {@link Zoom#MAX}, or empty for Page zoom; with {@code waiting}, the item waits.
      */
     static BrowserItem open(BrowserItems items, URI url, TabPlacement placement, Optional<String> target,
-                            Optional<WindowOwner> window, OptionalInt zoom, boolean waiting) {
+                            Optional<WindowOwner> window, OptionalInt zoom, boolean waiting, DataStore store) {
         Objects.requireNonNull(items, "items");
         Objects.requireNonNull(url, "url");
         Objects.requireNonNull(placement, "placement");
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(window, "window");
         Objects.requireNonNull(zoom, "zoom");
-        var item = new BrowserItem(items, url, target, zoom, waiting);
-        item.attach(placement, window);
+        Objects.requireNonNull(store, "store");
+        // The item holds its store from the start: one that fails before its tab opens, or as it opens, gives it back.
+        store.retain();
+        BrowserItem item = null;
+        try {
+            item = new BrowserItem(items, url, target, zoom, waiting, store);
+            item.attach(placement, window);
+        } catch (RuntimeException | Error failure) {
+            if (item == null) store.release();
+            else item.releaseStore();
+            throw failure;
+        }
         return item;
     }
 
+    /** The item opens its tab; one that cannot open lets go of what the item made for it. */
     private void attach(TabPlacement placement, Optional<WindowOwner> window) {
         var spec = new ContentSpec(KEY + UUID.randomUUID(), title);
         try {
@@ -215,9 +265,12 @@ public final class BrowserItem implements AutoCloseable {
         } catch (RuntimeException | Error failure) {
             bookmarksChanged.close();
             visitsChanged.close();
+            privacy.close();
             view.close();
             throw failure;
         }
+        // A /dev/null item's saved record holds no page title: the workspace keeps this one, in the turn the tab opened.
+        if (store.devNull()) tab.setSavedTitle(Optional.of(TabTitle.UNTITLED));
         tab.setFocusTarget(this::focusContent);
         // Copy, Paste and the font size commands have no key of their own: Jasper's run them, on the keys the keymap gives
         // those, as in Editor tabs. Find's are the Editor's, which on macOS are Jasper's own.
@@ -256,6 +309,24 @@ public final class BrowserItem implements AutoCloseable {
      */
     public Optional<String> target() {
         return target;
+    }
+
+    /**
+     * The data store the item opened in, which it holds while it is open.
+     *
+     * @return the store
+     */
+    public DataStore store() {
+        return store;
+    }
+
+    /**
+     * Whether the item is in /dev/null mode: its store is a /dev/null group's.
+     *
+     * @return whether it is
+     */
+    public boolean devNull() {
+        return store.devNull();
     }
 
     /**
@@ -510,6 +581,19 @@ public final class BrowserItem implements AutoCloseable {
         return closed ? Optional.empty() : sources.source(token, address);
     }
 
+    /** The item's privacy group of the menu, which also loads the page again as the permissions of its site change. */
+    PrivacyMenu privacy() {
+        return privacy;
+    }
+
+    /**
+     * A permission of the page's site changed in the item's store: the page loads again, and on an error page what failed
+     * is tried again. Nothing while the item waits, before it has shown its page, or once it has closed.
+     */
+    private void reloadForPermissions() {
+        if (!closed && !waiting && asked) errors.reload();
+    }
+
     /** Whether the item has asked for its page, which it does the first time it shows. */
     boolean pageAsked() {
         return asked;
@@ -539,6 +623,8 @@ public final class BrowserItem implements AutoCloseable {
         if (asked || closed || waiting) return;
         asked = true;
         loadIndexes();
+        // Chromium is asked for at once; only the page's browser waits for the store.
+        page.makeAfter(store.ready());
         items.start(page);
     }
 
@@ -555,10 +641,13 @@ public final class BrowserItem implements AutoCloseable {
 
     /**
      * The plugin stops, before the stores close, and before the host closes the plugin's popovers: an Edit Bookmark panel
-     * still open closes, and its bookmark keeps the tags it shows (H23), and the page's last title lands in history.
+     * still open closes, and its bookmark keeps the tags it shows (H23), the page's prompts go while Chromium still runs,
+     * and the page's last title lands in history.
      */
     void flush() {
         if (panel != null) panel.close();
+        if (devNullPopover != null) devNullPopover.close();
+        sitePermissions.close();
         history.flush();
     }
 
@@ -590,17 +679,32 @@ public final class BrowserItem implements AutoCloseable {
         view.selectAll(id);
     }
 
+    /**
+     * The item's tab closed: its page's last title goes to history first, then the item lets go of everything, its page
+     * and its store last, which a /dev/null group's last item closes.
+     */
     private void closed() {
         closed = true;
         history.flush();
         bookmarksChanged.close();
         visitsChanged.close();
+        privacy.close();
+        sitePermissions.close();
         endSuggestions();
         sources.close();
         if (devTools != null) devTools.close();
         items.closed(this);
+        notifications.forget(page);
         view.close();
         page.close();
+        releaseStore();
+    }
+
+    /** The item gives its store back, once: a /dev/null group's last item closes the group's store. */
+    private void releaseStore() {
+        if (!holdsStore) return;
+        holdsStore = false;
+        store.release();
     }
 
     /** The mouse's back or forward button was released over the page. */
@@ -610,10 +714,10 @@ public final class BrowserItem implements AutoCloseable {
     }
 
     /**
-     * A link or popup of the page opens an item of its own beside this one, for no OSC 8 target: in a new tab right
-     * after this item's tab, or split from this item's pane. A split opens beside the focused pane of the window's shown
-     * tab, so this item is selected first when it is not that. An address that is no URI opens nothing. Answers the new
-     * item's page, which the opener bridge links to this one.
+     * A link or popup of the page opens an item of its own beside this one, for no OSC 8 target, in this item's store: in
+     * a new tab right after this item's tab, or split from this item's pane. A split opens beside the focused pane of the
+     * window's shown tab, so this item is selected first when it is not that. An address that is no URI opens nothing.
+     * Answers the new item's page, which the opener bridge links to this one.
      */
     private Optional<Page> openItem(String address, TabPlacement placement) {
         if (closed || tab == null) return Optional.empty();
@@ -621,7 +725,7 @@ public final class BrowserItem implements AutoCloseable {
         if (link.isEmpty()) return Optional.empty();
         if (placement != TabPlacement.NEXT_TAB && !tab.isActive()) tab.select();
         try {
-            return Optional.of(items.open(link.get(), placement, Optional.empty(), Optional.of(tab)).page);
+            return Optional.of(items.open(link.get(), placement, Optional.empty(), Optional.of(tab), store).page);
         } catch (IllegalStateException closing) { // the windows close, or Jasper quits
             items.context().log().log(System.Logger.Level.WARNING, "A link could not open: " + closing.getMessage(), closing);
             return Optional.empty();
@@ -650,7 +754,7 @@ public final class BrowserItem implements AutoCloseable {
      * its token, which ends with the item.
      */
     private Optional<RestoreState> restore(URI at) {
-        return BrowserRestore.state(SourcePage.saved(at), target, ownZoom);
+        return BrowserRestore.state(SourcePage.saved(at), target, ownZoom, store.devNull());
     }
 
     /** Increase or Decrease Font Size: the page shows at {@code percent}, which the item saves as its own zoom. */
@@ -734,6 +838,7 @@ public final class BrowserItem implements AutoCloseable {
                 render();
                 view.selectAll(BrowserToolbar.ADDRESS);
             }
+            case BrowserToolbar.DEVNULL -> openDevNullPopover();
             case BrowserToolbar.SETTINGS -> items.showSettings();
             case BrowserToolbar.SHOW_HISTORY, BrowserToolbar.HISTORY -> showHistory();
             case BrowserToolbar.BOOKMARKS -> showBookmarks();
@@ -743,8 +848,11 @@ public final class BrowserItem implements AutoCloseable {
                 endWait();
                 page.focus();
             }
-            // An entry of Back's or Forward's hold menu.
-            default -> NavigationHistory.entryId(action).ifPresent(page::goToHistoryEntry);
+            // A Reset item or Unmute Current Page of the menu, an answer of the audio bar, or an entry of Back's or
+            // Forward's hold menu.
+            default -> {
+                if (!privacy.choose(action)) NavigationHistory.entryId(action).ifPresent(page::goToHistoryEntry);
+            }
         }
     }
 
@@ -766,6 +874,19 @@ public final class BrowserItem implements AutoCloseable {
             }
             if (!closed && !items.closed() && tab != null && loadStarts == started) openPanel(bookmark);
         }));
+    }
+
+    /**
+     * The /dev/null indicator: opens its popover. A click on the indicator while the popover is open dismisses it in the
+     * host, which consumes that press, so this action does not run for it.
+     */
+    private void openDevNullPopover() {
+        if (devNullPopover != null && devNullPopover.open()) return;
+        try {
+            devNullPopover = DevNullPopover.show(items.context(), view);
+        } catch (IllegalArgumentException | IllegalStateException unanchored) { // the view or its indicator cannot anchor now
+            items.context().log().log(System.Logger.Level.DEBUG, "The /dev/null popover could not open", unanchored);
+        }
     }
 
     /** The bookmark's panel, from the menu button; none while the button cannot anchor one. */
@@ -863,11 +984,13 @@ public final class BrowserItem implements AutoCloseable {
 
     private ViewSpec spec() {
         Nodes.Node bar = toolbar.node(shown(errors.address()), page.loading(), errors.canGoBack(), page.canGoForward(), icon(),
-            page.history(), items.settings(), errors.notSecure(), Optional.of(stores.bookmarkIndex().has(errors.address())));
+            page.history(), items.settings(), errors.notSecure(), store.devNull(),
+            store.devNull() ? Optional.empty() : Optional.of(stores.bookmarkIndex().has(errors.address())), privacy.group());
         // A waiting item keeps the canvas's slot, hidden: a slot that leaves the view closes its content, the page.
         Nodes.Node canvas = new Nodes.Custom(PAGE, waiting ? HIDDEN : ControlState.READY, CONTENT, Nodes.CustomKind.PREVIEW, "Web page");
         return new ViewSpec(new Nodes.Split(ROOT, ControlState.READY, Nodes.SplitKind.DOCUMENT,
-            waiting ? List.of(bar, canvas, placeholder(), findBar.node()) : List.of(bar, canvas, findBar.node())));
+            waiting ? List.of(bar, privacy.audioBar(), canvas, placeholder(), findBar.node())
+                : List.of(bar, privacy.audioBar(), canvas, findBar.node())));
     }
 
     /** What a waiting item shows in place of its page: why it waits, and Load Page. */

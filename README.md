@@ -53,7 +53,7 @@ Everything below ships with Jasper as a bundled plugin, listed in Settings › P
 | Project Index | `dev.jasper.indexer` | Offers to index the project a terminal enters, locally or on a saved host, and finds its files from the command palette | Yes |
 | Shell History | `dev.jasper.history` | Searches every shell's history from the command palette, to paste or run a command or save it as a snippet | Yes |
 | Snippets | `dev.jasper.snippets` | Saved commands with fill-in placeholders, from the command palette | Yes |
-| Browser | `dev.jasper.browser` | Web pages in workspace tabs and panes, drawn by Chromium, with a toolbar, a Web menu, history, tagged bookmarks and popups that keep their `window.opener`; links you click in a terminal can open here, after asking first | Yes |
+| Browser | `dev.jasper.browser` | Web pages in workspace tabs and panes, drawn by Chromium, with a toolbar, a Web menu, history, tagged bookmarks and popups that keep their `window.opener`; a /dev/null mode that saves no history, cookies or site data; site permissions, page notifications, audio muting, Clear Cookies and Clear Website Data, ad blocking and an HTTP proxy; links you click in a terminal can open here, after asking first | Yes |
 | Enterprise | `dev.jasper.enterprise` | The Enterprise look: IntelliJ Classic's title bar on macOS and Windows, labelled tool-window stripes led by their icons, the Run window, classic controls and icons and IBM Plex fonts, in Jasper Meadow by default; it also ships the Enterprise theme | No |
 | Sample | `dev.jasper.sample` | Exercises the plugin runtime for plugin authors; does nothing until one of its `demo_*` settings is set | Yes |
 

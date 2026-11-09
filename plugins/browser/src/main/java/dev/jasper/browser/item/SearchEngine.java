@@ -16,9 +16,9 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Settings › Browser's Default Search Engine (spec sections 6 and 17): where the address field's searches go and where
- * its search suggestions come from, each a URL with {@code %s} where the terms go. Custom takes both URLs from the
- * settings.
+ * Settings › Tools › Browser's Default Search Engine (spec sections 6 and 17): where the address field's searches go
+ * and where its search suggestions come from, each a URL with {@code %s} where the terms go. Custom takes both URLs from
+ * the settings.
  */
 public enum SearchEngine {
     /** Google, the default. */

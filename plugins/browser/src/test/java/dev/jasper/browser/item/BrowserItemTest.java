@@ -5,8 +5,16 @@ import dev.jasper.browser.page.NavigationHistory.Entry;
 import dev.jasper.browser.page.NavigationHistory.History;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageTestAccess;
+import dev.jasper.browser.pages.HistoryPage;
+import dev.jasper.browser.permissions.Decision;
+import dev.jasper.browser.permissions.Permission;
 import dev.jasper.browser.settings.BrowserSettings;
+import dev.jasper.browser.store.BrowserDatabase;
+import dev.jasper.browser.store.DataFolder;
+import dev.jasper.browser.store.HistoryStore;
 import dev.jasper.browser.store.MemoryStores;
+import dev.jasper.browser.store.Reached;
+import dev.jasper.browser.store.Stores;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.testing.FakeKit;
@@ -22,9 +30,12 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -44,7 +55,9 @@ import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Browser items on the testkit's fake host. Their pages are made by a recording stand-in, because a page cannot be made
@@ -364,8 +377,9 @@ class BrowserItemTest {
             assertThat(root).isInstanceOfSatisfying(dev.jasper.sdk.ui.Nodes.Split.class, split -> {
                 assertThat(split.kind()).isEqualTo(dev.jasper.sdk.ui.Nodes.SplitKind.DOCUMENT);
                 assertThat(split.children()).extracting(dev.jasper.sdk.ui.Nodes.Node::id)
-                    .containsExactly(BrowserToolbar.BAR, BrowserItem.PAGE, BrowserFindBar.ROOT);
-                assertThat(split.children().get(1)).isInstanceOfSatisfying(dev.jasper.sdk.ui.Nodes.Custom.class, page -> {
+                    .containsExactly(BrowserToolbar.BAR, AudioBar.BAR, BrowserItem.PAGE, BrowserFindBar.ROOT);
+                assertThat(split.children().get(1).state().visible()).as("the audio bar, until a page's sound is muted").isFalse();
+                assertThat(split.children().get(2)).isInstanceOfSatisfying(dev.jasper.sdk.ui.Nodes.Custom.class, page -> {
                     assertThat(page.kind()).isEqualTo(dev.jasper.sdk.ui.Nodes.CustomKind.PREVIEW);
                     assertThat(page.contentId()).isEqualTo(BrowserItem.CONTENT);
                 });
@@ -468,6 +482,387 @@ class BrowserItemTest {
     }
 
     /**
+     * Spec section 12: an item holds its data store, the persistent one unless it opened in another, and a link or popup
+     * its page opens in an item of its own opens in the opener's store: in /dev/null, the opener's group.
+     */
+    @Test void aLinkOrPopupOpensInItsOpenersStore() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var items = items(host, page -> { });
+            DataStore devNull = items.dataStores().newDevNull();
+            var opener = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), devNull);
+            assertThat(opener.store()).isSameAs(devNull);
+            Optional<Page> opened = ItemTestAccess.page(opener).openItem("https://example.com/popup", TabPlacement.NEXT_TAB);
+            var popup = items.items().getLast();
+            assertThat(opened).containsSame(popup.page());
+            assertThat(popup.store()).as("the opener's group").isSameAs(devNull);
+            ItemTestAccess.page(opener).openItem("https://example.com/split", TabPlacement.SPLIT_RIGHT);
+            assertThat(items.items().getLast().store()).isSameAs(devNull);
+            var persistent = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            assertThat(persistent.store()).isSameAs(items.dataStores().persistent());
+            ItemTestAccess.page(persistent).openItem("https://example.org/", TabPlacement.NEXT_TAB);
+            assertThat(items.items().getLast().store()).isSameAs(items.dataStores().persistent());
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /**
+     * Plan 6: with Use /dev/null mode on, a new item opens in a new /dev/null store; turning it off changes no open item,
+     * and the next new item opens in the persistent store. A page's popup stays in its opener's store whatever it says.
+     */
+    @Test void newItemsFollowTheSettingAndTurningItOffChangesNoOpenItem() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var items = items(host, page -> { });
+            var ordinary = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            assertThat(ordinary.devNull()).as("off by default").isFalse();
+            assertThat(ordinary.store()).isSameAs(items.dataStores().persistent());
+
+            host.setSetting(ID, "devnull_mode", true);
+            var first = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            var second = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            assertThat(first.devNull()).isTrue();
+            assertThat(first.store().devNull()).isTrue();
+            assertThat(second.store()).as("each in a group of its own").isNotSameAs(first.store());
+            assertThat(ordinary.devNull()).as("turning it on changes no open item").isFalse();
+            ItemTestAccess.page(ordinary).openItem("https://example.org/", TabPlacement.NEXT_TAB);
+            assertThat(items.items().getLast().devNull()).as("a popup follows its opener, not the setting").isFalse();
+
+            host.setSetting(ID, "devnull_mode", false);
+            assertThat(first.devNull()).as("turning it off changes no open item").isTrue();
+            ItemTestAccess.page(first).openItem("https://example.org/", TabPlacement.NEXT_TAB);
+            assertThat(items.items().getLast().store()).as("a popup of an open /dev/null item").isSameAs(first.store());
+            var after = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            assertThat(after.devNull()).isFalse();
+            assertThat(after.store()).isSameAs(items.dataStores().persistent());
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /**
+     * Plan 6 (F2): a /dev/null item saves the tab title "Web Browser", whatever page it shows; it saves no address, and
+     * keeps its target and zoom. An ordinary item saves what it shows.
+     */
+    @Test void aDevNullItemSavesNoPageTitleAndNoAddress() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var items = items(host, page -> { });
+            var devNull = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.of("docs"), Optional.empty(), items.dataStores().newDevNull());
+            assertThat(host.savedTitle(devNull.tab())).isEqualTo("Web Browser");
+            PageTestAccess.titleChanged(devNull.page(), "A secret page");
+            devNull.load(URI.create("https://secret.example/private?q=1"));
+            assertThat(host.contentPresentation(devNull.tab()).title()).as("the tab shows it").isEqualTo("A secret page");
+            assertThat(host.savedTitle(devNull.tab())).as("the record does not").isEqualTo("Web Browser");
+            assertThat(host.restoreState(devNull.tab()).orElseThrow().values()).containsOnly(Map.entry("devnull", "true"),
+                Map.entry("target", "docs"));
+
+            var ordinary = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            PageTestAccess.titleChanged(ordinary.page(), "A public page");
+            assertThat(host.savedTitle(ordinary.tab())).isEqualTo("A public page");
+            assertThat(host.restoreState(ordinary.tab()).orElseThrow().values()).containsEntry("url", "https://example.com");
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    @Test void twoItemsOpenedApartInDevNullHaveTwoStores() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var items = items(host, page -> { });
+            var one = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), items.dataStores().newDevNull());
+            var two = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), items.dataStores().newDevNull());
+            assertThat(one.store().devNull()).isTrue();
+            assertThat(two.store().devNull()).isTrue();
+            assertThat(one.store()).isNotSameAs(two.store());
+            assertThat(one.store().stores()).isNotSameAs(two.store().stores());
+            assertThat(one.store().context()).isNotSameAs(two.store().context());
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /** Spec section 12: a /dev/null group's store ends with the last of its items, its opener first or not. */
+    @Test void closingTheOpenerKeepsThePopupsStoreOpenUntilThePopupCloses() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var items = items(host, page -> { });
+            DataStore devNull = items.dataStores().newDevNull();
+            var opener = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), devNull);
+            opener.page().openItem("https://example.com/popup", TabPlacement.NEXT_TAB);
+            var popup = items.items().getLast();
+            opener.close();
+            assertThat(devNull.closed()).as("the popup still holds it").isFalse();
+            assertThat(items.dataStores().live()).contains(devNull);
+            popup.close();
+            assertThat(devNull.closed()).isTrue();
+            assertThat(items.dataStores().live()).doesNotContain(devNull);
+            var persistent = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            persistent.close();
+            assertThat(items.dataStores().persistent().closed()).as("the persistent store outlives its items").isFalse();
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /** An item whose tab cannot open gives its store back: a /dev/null store no item holds then ends. */
+    @Test void anItemWhoseTabCannotOpenReleasesItsStore() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var items = items(host, page -> { });
+            var gone = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            gone.close();
+            DataStore devNull = items.dataStores().newDevNull();
+            assertThatThrownBy(() -> items.open(EXAMPLE, TabPlacement.NEXT_TAB, Optional.empty(), Optional.of(gone.tab()), devNull))
+                .as("a closed tab opens nothing beside it").isInstanceOf(IllegalArgumentException.class);
+            assertThat(devNull.closed()).isTrue();
+            assertThat(items.items()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /** An item that fails before its tab opens gives its store back too: a /dev/null store no item holds ends. */
+    @Test void anItemThatFailsBeforeItsTabOpensReleasesItsStore() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var host = new FakePluginHost();
+            var items = items(host, page -> { });
+            DataStore devNull = items.dataStores().newDevNull();
+            host.close();
+            assertThatThrownBy(() -> items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), devNull))
+                .as("a stopped plugin makes no item").isInstanceOf(IllegalStateException.class);
+            assertThat(devNull.closed()).isTrue();
+            assertThat(items.dataStores().live()).doesNotContain(devNull);
+        });
+    }
+
+    /**
+     * Plan 5's routing (F13): a page's browser is found in its item's store from the moment Chromium names it, on
+     * Chromium's thread, so its document's first query is answered from that store; and no longer once it has closed.
+     */
+    @Test void aPagesBrowserIsFoundInItsStoreFromTheMomentChromiumNamesIt() throws Exception {
+        var host = onUi(FakePluginHost::new);
+        try {
+            var items = onUi(() -> items(host, page -> { }));
+            var item = onUi(() -> items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), items.dataStores().newDevNull()));
+            assertThat(item.page().browserId()).isEmpty();
+            CompletableFuture.runAsync(() -> {
+                PageTestAccess.browserMade(item.page(), 31);
+                assertThat(items.dataStores().forBrowser(31)).as("at once, on Chromium's thread").containsSame(item.store());
+            }).get(10, TimeUnit.SECONDS);
+            assertThat(item.page().browserId()).hasValue(31);
+            CompletableFuture.runAsync(() -> PageTestAccess.browserClosed(item.page())).get(10, TimeUnit.SECONDS);
+            assertThat(items.dataStores().forBrowser(31)).isEmpty();
+            assertThat(item.page().browserId()).isEmpty();
+        } finally {
+            onUi(() -> {
+                host.close();
+                return null;
+            });
+        }
+    }
+
+    /**
+     * Spec section 12: a visit in a /dev/null item is recorded in its group's in-memory stores alone, and nothing reaches
+     * the persistent database, whose file is never even made.
+     */
+    @Test void aDevNullItemsVisitIsRecordedInItsOwnStoresAlone(@TempDir Path data) throws Exception {
+        var persistentStores = new Stores(BrowserDatabase.file(new DataFolder(data), cause -> { }), java.awt.EventQueue::invokeLater);
+        var host = onUi(FakePluginHost::new);
+        try {
+            var items = onUi(() -> items(host, page -> { }, persistentStores));
+            var item = onUi(() -> items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), items.dataStores().newDevNull()));
+            onUi(() -> {
+                PageTestAccess.loadStarted(item.page(), "https://private.example/", Reached.LINK);
+                PageTestAccess.titleChanged(item.page(), "Private");
+                return null;
+            });
+            memory.settle();
+            assertThat(item.store().stores().history().visits(10).get(10, TimeUnit.SECONDS))
+                .extracting(HistoryStore.Visit::url).containsExactly("https://private.example/");
+            try (var files = Files.list(data)) {
+                assertThat(files.map(file -> file.getFileName().toString()).filter(name -> name.startsWith("browser.sqlite")).toList())
+                    .as("the persistent database is never made").isEmpty();
+            }
+            assertThat(MemoryStores.started(persistentStores)).isFalse();
+            onUi(() -> {
+                item.close();
+                return null;
+            });
+            assertThat(persistentStores.history().visits(10).get(10, TimeUnit.SECONDS)).as("no row in the persistent database").isEmpty();
+        } finally {
+            onUi(() -> {
+                host.close();
+                return null;
+            });
+            persistentStores.close();
+            persistentStores.closed().get(30, TimeUnit.SECONDS);
+        }
+    }
+
+    /**
+     * Plan 5's channel answers from the asking browser's store: the history page's list from a /dev/null item's browser
+     * lists that item's visits, and from a persistent item's browser none of them; a browser with no store is refused.
+     */
+    @Test void theHistoryPageListsTheVisitsOfTheAskingBrowsersStoreOnly() throws Exception {
+        var host = onUi(FakePluginHost::new);
+        try {
+            var items = onUi(() -> items(host, page -> { }));
+            var devNull = onUi(() -> items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), items.dataStores().newDevNull()));
+            var persistent = onUi(() -> items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty()));
+            CompletableFuture.runAsync(() -> {
+                PageTestAccess.browserMade(devNull.page(), 41);
+                PageTestAccess.browserMade(persistent.page(), 42);
+            }).get(10, TimeUnit.SECONDS);
+            onUi(() -> {
+                PageTestAccess.loadStarted(devNull.page(), "https://private.example/", Reached.LINK);
+                PageTestAccess.loadStarted(persistent.page(), "https://public.example/", Reached.LINK);
+                return null;
+            });
+            memory.settle();
+            String list = "{\"op\":\"list\",\"query\":\"\"}";
+            String fromDevNull = items.dataStores().answer(41, store -> HistoryPage.answer(store.stores().history(), list)).get(10, TimeUnit.SECONDS);
+            String fromPersistent = items.dataStores().answer(42, store -> HistoryPage.answer(store.stores().history(), list)).get(10, TimeUnit.SECONDS);
+            assertThat(fromDevNull).contains("https://private.example/").doesNotContain("https://public.example/");
+            assertThat(fromPersistent).contains("https://public.example/").doesNotContain("https://private.example/");
+            assertThat(items.dataStores().answer(43, store -> HistoryPage.answer(store.stores().history(), list)))
+                .as("a browser with no store").failsWithin(10, TimeUnit.SECONDS);
+        } finally {
+            onUi(() -> {
+                host.close();
+                return null;
+            });
+        }
+    }
+
+    /**
+     * Spec sections 6 and 12: the menu button lists a Reset item for each permission its store holds for the page's site,
+     * and follows the store as it changes. Choosing one revokes that permission there and reloads the items of that store
+     * that show the site and have shown their page; not the item of another site, of another store or one never shown.
+     */
+    @Test void theMenuResetsAPermissionOfThePagesSiteAndReloadsTheItemsOfItsStoreThatShowIt() throws Exception {
+        var host = onUi(FakePluginHost::new);
+        var parents = new ArrayList<JPanel>();
+        try {
+            var items = onUi(() -> items(host, page -> { }));
+            var reloads = new CopyOnWriteArrayList<String>();
+            List<BrowserItem> opened = onUi(() -> {
+                DataStore devNull = items.dataStores().newDevNull();
+                var all = List.of(items.open(URI.create("https://camera.test/a"), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty()),
+                    items.open(URI.create("https://camera.test/b"), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty()),
+                    items.open(URI.create("https://other.test/"), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty()),
+                    items.open(URI.create("https://camera.test/c"), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), devNull),
+                    items.open(URI.create("https://camera.test/d"), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty()));
+                List<String> names = List.of("Site", "Same", "Other", "DevNull", "Unshown");
+                for (int at = 0; at < all.size(); at++) {
+                    String name = names.get(at);
+                    PageTestAccess.titleChanged(all.get(at).page(), name);
+                    PageTestAccess.useReloader(all.get(at).page(), page -> reloads.add(name));
+                    if (at < 4) parents.add(show(all.get(at)));
+                }
+                return all;
+            });
+            var permissions = opened.getFirst().store().permissions();
+            permissions.set("https://camera.test", Permission.CAMERA, Decision.ALLOWED).get(10, TimeUnit.SECONDS);
+            permissions.set("https://camera.test", Permission.NOTIFICATIONS, Decision.BLOCKED).get(10, TimeUnit.SECONDS);
+            opened.get(3).store().permissions().set("https://camera.test", Permission.CAMERA, Decision.ALLOWED).get(10, TimeUnit.SECONDS);
+            onUi(() -> {
+                assertThat(resets(host, "Site")).containsExactly("Reset Camera Permission (Allowed)", "Reset Notifications Permission (Blocked)");
+                assertThat(resets(host, "Other")).as("another site").isEmpty();
+                host.contentView(ID, "Site").orElseThrow().choose(BrowserToolbar.MENU, "browser.permission.reset.camera");
+                assertThat(reloads).as("the items of its store at the site").containsExactly("Site", "Same");
+                return null;
+            });
+            assertThat(permissions.decision("https://camera.test", Permission.CAMERA)).isEmpty();
+            assertThat(permissions.decision("https://camera.test", Permission.NOTIFICATIONS)).contains(Decision.BLOCKED);
+            assertThat(opened.get(3).store().permissions().decision("https://camera.test", Permission.CAMERA)).as("another store's")
+                .contains(Decision.ALLOWED);
+            onUi(() -> {
+                assertThat(resets(host, "Site")).as("the menu follows the store").containsExactly("Reset Notifications Permission (Blocked)");
+                assertThat(resets(host, "DevNull")).containsExactly("Reset Camera Permission (Allowed)");
+                items.reloadShowing(opened.getFirst().store(), Set.of());
+                items.reloadShowing(opened.getFirst().store(), Set.of("https://other.test"));
+                assertThat(reloads).containsExactly("Site", "Same", "Other");
+                assertThat(host.failures()).isEmpty();
+                return null;
+            });
+        } finally {
+            onUi(() -> {
+                parents.forEach(JPanel::removeNotify);
+                host.close();
+                return null;
+            });
+        }
+    }
+
+    /**
+     * Ruling V17: a Reset item revokes its permission for the site the menu offered it for, though the page has gone on
+     * to another site since. The menu offered first.test's Reset Camera; the page went on to second.test, for which the
+     * menu offers Reset Microphone; the Reset Camera row chosen as it went, its action arriving after, revokes
+     * first.test's camera and keeps second.test's microphone, and second.test's own Reset revokes that.
+     */
+    @Test void aResetRevokesItsPermissionForTheSiteTheMenuOfferedItFor() throws Exception {
+        var host = onUi(FakePluginHost::new);
+        try {
+            var items = onUi(() -> items(host, page -> { }));
+            var item = onUi(() -> items.open(URI.create("https://first.test/"), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty()));
+            var permissions = item.store().permissions();
+            permissions.set("https://first.test", Permission.CAMERA, Decision.ALLOWED).get(10, TimeUnit.SECONDS);
+            permissions.set("https://second.test", Permission.MICROPHONE, Decision.ALLOWED).get(10, TimeUnit.SECONDS);
+            onUi(() -> {
+                assertThat(resets(view(host, item))).containsExactly("Reset Camera Permission (Allowed)");
+                item.load(URI.create("https://second.test/"));
+                assertThat(resets(view(host, item))).as("the menu follows the page").containsExactly("Reset Microphone Permission (Allowed)");
+                view(host, item).emit(new UiEvent.Action("browser.permission.reset.camera"));
+                return null;
+            });
+            assertThat(permissions.decision("https://first.test", Permission.CAMERA)).as("the site the menu offered it for").isEmpty();
+            assertThat(permissions.decision("https://second.test", Permission.MICROPHONE)).contains(Decision.ALLOWED);
+            onUi(() -> {
+                view(host, item).choose(BrowserToolbar.MENU, "browser.permission.reset.microphone");
+                assertThat(host.failures()).isEmpty();
+                return null;
+            });
+            assertThat(permissions.decision("https://second.test", Permission.MICROPHONE)).isEmpty();
+        } finally {
+            onUi(() -> {
+                host.close();
+                return null;
+            });
+        }
+    }
+
+    /** The Reset items of the menu button of the item whose tab is called {@code title}. UI thread. */
+    private static List<String> resets(FakePluginHost host, String title) {
+        return resets(host.contentView(ID, title).orElseThrow());
+    }
+
+    /** The Reset items of {@code view}'s menu button. UI thread. */
+    private static List<String> resets(dev.jasper.sdk.testing.FakeKitView view) {
+        var menu = (Nodes.MenuButton) Views.node(view.spec().root(), BrowserToolbar.MENU);
+        return menu.items().stream().map(MenuItem::label).filter(label -> label.startsWith("Reset ")).toList();
+    }
+
+    /** The view of {@code item}'s tab, found by the title it shows now. UI thread. */
+    private static dev.jasper.sdk.testing.FakeKitView view(FakePluginHost host, BrowserItem item) {
+        return host.contentView(ID, host.contentPresentation(item.tab()).title()).orElseThrow();
+    }
+
+    /**
+     * Spec section 14: a certificate the user went on past in a /dev/null item is allowed in its group alone, and the
+     * allowance ends with the group's store.
+     */
+    @Test void aCertificateAllowedInADevNullItemIsItsGroupsAloneAndEndsWithIt() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var items = items(host, page -> { });
+            DataStore devNull = items.dataStores().newDevNull();
+            var opener = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), devNull);
+            opener.page().openItem("https://example.com/popup", TabPlacement.NEXT_TAB);
+            var popup = items.items().getLast();
+            var persistent = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            var certificate = new dev.jasper.browser.page.ServerCertificate("self-signed.badssl.com",
+                "d53a1b43dbe103e328aa1f2e50c9ee35d35d116b19c8912f86aeff71eda21e61", List.of("CN=*.badssl.com"), true);
+            devNull.allowance().allow(certificate.host(), certificate.sha256());
+            assertThat(opener.page().allowsCertificate(certificate)).isTrue();
+            assertThat(popup.page().allowsCertificate(certificate)).as("its group's").isTrue();
+            assertThat(persistent.page().allowsCertificate(certificate)).as("not the persistent items'").isFalse();
+            opener.close();
+            popup.close();
+            assertThat(devNull.allowance().allows(certificate.host(), certificate.sha256())).as("gone with its store").isFalse();
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /**
      * After a run that ended while Chromium ran, a restored item waits: in place of its page's canvas it says why, with
      * Load Page, and showing it asks for no page. Its toolbar shows, and its tab saves, the saved address, and its tab's
      * focus goes to Load Page.
@@ -479,9 +874,9 @@ class BrowserItemTest {
             var view = host.contentView(ID, "example.com").orElseThrow();
             var root = (Nodes.Split) view.spec().root();
             assertThat(root.children()).extracting(Nodes.Node::id)
-                .containsExactly(BrowserToolbar.BAR, BrowserItem.PAGE, BrowserItem.WAITING, BrowserFindBar.ROOT);
-            assertThat(root.children().get(1).state().visible()).as("the page's canvas").isFalse();
-            assertThat(root.children().get(2)).isInstanceOfSatisfying(Nodes.Empty.class, placeholder -> {
+                .containsExactly(BrowserToolbar.BAR, AudioBar.BAR, BrowserItem.PAGE, BrowserItem.WAITING, BrowserFindBar.ROOT);
+            assertThat(root.children().get(2).state().visible()).as("the page's canvas").isFalse();
+            assertThat(root.children().get(3)).isInstanceOfSatisfying(Nodes.Empty.class, placeholder -> {
                 assertThat(placeholder.state().visible()).isTrue();
                 assertThat(placeholder.title()).isEqualTo("Jasper closed while this page was open.");
                 assertThat(placeholder.actions()).singleElement().isInstanceOfSatisfying(Nodes.Button.class, button -> {
@@ -522,8 +917,9 @@ class BrowserItemTest {
                 assertThat(item.waiting()).isFalse();
                 assertThat(asked).containsExactly(item.page());
                 var root = (Nodes.Split) view.spec().root();
-                assertThat(root.children()).extracting(Nodes.Node::id).containsExactly(BrowserToolbar.BAR, BrowserItem.PAGE, BrowserFindBar.ROOT);
-                assertThat(root.children().get(1).state().visible()).isTrue();
+                assertThat(root.children()).extracting(Nodes.Node::id).containsExactly(BrowserToolbar.BAR, AudioBar.BAR, BrowserItem.PAGE,
+                    BrowserFindBar.ROOT);
+                assertThat(root.children().get(2).state().visible()).isTrue();
                 assertThat(item.page().address()).as("what it loads").isEqualTo("https://example.com");
                 parent.remove(item.pageView());
                 parent.add(item.pageView());
@@ -943,9 +1339,55 @@ class BrowserItemTest {
         }
     }
 
+    /**
+     * Plan 6 Task 11 and rulings F3 and V43: the items' engine suggestions and favicons go through the HTTP proxy the
+     * items are given, whether their fetcher is made after it was given or before, and follow each change; an engine on
+     * this computer goes direct. Loopback stand-ins play the proxies and the engine; names under {@code .invalid} reach a
+     * proxy without being looked up, so nothing leaves this computer.
+     */
+    @Test void theItemsFetchesGoThroughTheProxyTheyAreGivenWhenTheirFetcherIsMadeAndAfter() throws Exception {
+        try (var engine = new dev.jasper.browser.http.StandIn(); var first = new dev.jasper.browser.http.StandIn();
+             var second = new dev.jasper.browser.http.StandIn()) {
+            URI suggest = URI.create("http://suggest.invalid/suggest?q=a"), local = URI.create("http://127.0.0.1:" + engine.port() + "/suggest?q=a");
+            URI icon = URI.create("http://page.invalid/favicon.ico"), page = URI.create("http://page.invalid/");
+            var host = new AtomicReference<FakePluginHost>();
+            var items = new AtomicReference<BrowserItems>();
+            SwingUtilities.invokeAndWait(() -> {
+                host.set(new FakePluginHost());
+                items.set(items(host.get(), started -> { }, new Later(), null));
+                items.get().favicons();
+                items.get().useProxy(Optional.of(first.address()));
+                items.get().suggest(suggest);
+                items.get().favicons().fetch(icon, page);
+                host.get().runBackground();
+            });
+            try {
+                assertThat(List.of(first.next(), first.next())).as("the suggestion fetcher made after, the favicons' before")
+                    .containsExactlyInAnyOrder("GET " + suggest + " HTTP/1.1", "GET " + icon + " HTTP/1.1");
+                SwingUtilities.invokeAndWait(() -> {
+                    items.get().useProxy(Optional.of(second.address()));
+                    items.get().suggest(suggest);
+                    items.get().favicons().fetch(icon, page);
+                    items.get().suggest(local);
+                    host.get().runBackground();
+                });
+                assertThat(List.of(second.next(), second.next())).as("both fetchers follow the change")
+                    .containsExactlyInAnyOrder("GET " + suggest + " HTTP/1.1", "GET " + icon + " HTTP/1.1");
+                assertThat(engine.next()).as("V43: an engine on this computer, direct").isEqualTo("GET /suggest?q=a HTTP/1.1");
+                assertThat(engine.asked() || first.asked() || second.asked()).as("each fetch asked once").isFalse();
+            } finally {
+                SwingUtilities.invokeAndWait(() -> {
+                    items.get().close();
+                    host.get().close();
+                });
+            }
+        }
+    }
+
     /** A waiting item at {@code url}, as a restore after a run that ended while Chromium ran opens it. UI thread. */
     private static BrowserItem waiting(BrowserItems items, URI url) {
-        var item = BrowserItem.open(items, url, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), java.util.OptionalInt.empty(), true);
+        var item = BrowserItem.open(items, url, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), java.util.OptionalInt.empty(), true,
+            items.dataStores().persistent());
         assertThat(item.waiting()).isTrue();
         return item;
     }
@@ -963,18 +1405,33 @@ class BrowserItemTest {
      * fields' suggestion delays wait for {@code later} and their engine suggestions come from {@code fetches}. UI thread.
      */
     private BrowserItems items(FakePluginHost host, Consumer<Page> start, Later later, Fetches fetches) {
+        return items(host, start, later, fetches, memory.make());
+    }
+
+    /**
+     * As {@link #items(FakePluginHost, Consumer, Later, Fetches)}, with {@code persistent} as the persistent store's
+     * history and bookmarks. Each /dev/null store's are in memory, and its context a recording stand-in. UI thread.
+     */
+    private BrowserItems items(FakePluginHost host, Consumer<Page> start, Later later, Fetches fetches, Stores persistent) {
         var context = new AtomicReference<PluginContext>();
         var settings = new AtomicReference<BrowserSettings.Declared>();
         host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(), plugin -> {
             context.set(plugin);
             settings.set(BrowserSettings.declare(plugin.settings()));
         });
-        return new BrowserItems(context.get(), settings.get()::read, memory.make(), start, later, fetches);
+        var stores = new DataStores(persistent, memory::make, () -> PageTestAccess.recordingContext(new AtomicInteger()),
+            () -> settings.get().read().devNullMode());
+        return new BrowserItems(context.get(), settings.get()::read, stores, start, later, fetches);
     }
 
     /** As {@link #items(FakePluginHost, Consumer, Later, Fetches)}, with delays that never end and fetches nobody answers. */
     private BrowserItems items(FakePluginHost host, Consumer<Page> start) {
         return items(host, start, new Later(), new Fetches());
+    }
+
+    /** As {@link #items(FakePluginHost, Consumer)}, with {@code persistent} as the persistent store's history and bookmarks. */
+    private BrowserItems items(FakePluginHost host, Consumer<Page> start, Stores persistent) {
+        return items(host, start, new Later(), new Fetches(), persistent);
     }
 
     /** The UI thread's delays, which wait until the test runs them. UI thread. */

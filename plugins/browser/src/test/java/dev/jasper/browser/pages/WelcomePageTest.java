@@ -29,7 +29,7 @@ class WelcomePageTest {
     @BeforeEach void register() throws Exception {
         fixture = new PagesFixture();
         onboarding = new Onboarding(folder.resolve("onboarding-finished"), Runnable::run);
-        WelcomePage.register(fixture.about, fixture.pages, history, onboarding);
+        WelcomePage.register(fixture.about, fixture.pages, browser -> browser == 1 ? Optional.of(history) : Optional.empty(), onboarding);
     }
 
     @AfterEach void close() throws Exception {
@@ -47,15 +47,31 @@ class WelcomePageTest {
             .doesNotContain("{{");
     }
 
-    @Test void theQuickActionsAreBookmarksHistoryAndSettings() {
+    /** Spec section 14: the Quick Actions are Bookmarks, History, Settings and Permissions, in that order (plan 6's F29). */
+    @Test void theQuickActionsAreBookmarksHistorySettingsAndPermissions() {
         onboarding.finish();
-        assertThat(fixture.html("welcome")).contains("<a class=\"tile\" href=\"jasper-about:bookmarks\">Bookmarks</a>",
-            "<a class=\"tile\" href=\"jasper-about:history\">History</a>", "<a class=\"tile\" href=\"jasper-about:settings\">Settings</a>");
+        String html = fixture.html("welcome");
+        java.util.regex.Matcher tiles = java.util.regex.Pattern.compile("<a class=\"tile\" href=\"([^\"]*)\">([^<]*)</a>").matcher(html);
+        var actions = new java.util.ArrayList<String>();
+        while (tiles.find()) actions.add(tiles.group(2) + " " + tiles.group(1));
+        assertThat(actions).containsExactly("Bookmarks jasper-about:bookmarks", "History jasper-about:history", "Settings jasper-about:settings",
+            "Permissions jasper-about:permissions");
     }
 
     @Test void thePagesScriptComesAfterAboutJs() {
         onboarding.finish();
         assertThat(fixture.html("welcome")).contains(AboutPages.resource("welcome.js").strip()).contains("'top-sites'");
+    }
+
+    /** Plan 6: Top Sites come from the asking browser's history, and a browser with none is refused its answer. */
+    @Test void topSitesComeFromTheAskingBrowsersHistoryAndABrowserWithNoneFails() throws Exception {
+        history.record("https://site.example/", Reached.LINK, 1_000).get(10, TimeUnit.SECONDS);
+        assertThat(sites(fixture.object("welcome", "{\"op\":\"top-sites\"}"))).extracting(site -> site.get("url"))
+            .containsExactly("https://site.example/");
+        String secret = fixture.about.secret("welcome").orElseThrow();
+        CompletableFuture<String> answer = fixture.about.query("jasper-about:welcome", true, 2, secret + "{\"op\":\"top-sites\"}").orElseThrow();
+        assertThatThrownBy(() -> answer.get(10, TimeUnit.SECONDS)).isInstanceOf(ExecutionException.class)
+            .hasCauseInstanceOf(IllegalStateException.class);
     }
 
     @Test void topSitesGiveAtMostEightInTheOrderOfTheHistorysTopSites() throws Exception {

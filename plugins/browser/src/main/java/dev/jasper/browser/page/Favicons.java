@@ -2,6 +2,7 @@ package dev.jasper.browser.page;
 
 import dev.jasper.browser.http.WebFetch;
 import dev.jasper.sdk.ui.PixelImage;
+import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.http.HttpResponse;
 import java.time.Duration;
@@ -62,6 +63,15 @@ public final class Favicons implements AutoCloseable {
         CompletableFuture<Optional<PixelImage>> result = answer.thenApply(response -> response.flatMap(this::decoded));
         result.whenComplete((image, failure) -> answer.cancel(true));
         return result;
+    }
+
+    /**
+     * Has the fetches from now on go through {@code proxy}, as {@link WebFetch#useProxy} says.
+     *
+     * @param proxy the HTTP proxy's address; empty for the JDK's default proxy selector
+     */
+    public void useProxy(Optional<InetSocketAddress> proxy) {
+        web.useProxy(proxy);
     }
 
     /** Ends every fetch under way, which then gives nothing; later fetches give nothing at once. */

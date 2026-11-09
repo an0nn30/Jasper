@@ -1,6 +1,7 @@
 package dev.jasper.app.plugins;
 
 import dev.jasper.app.lifecycle.Subscription;
+import dev.jasper.app.notifications.Notification;
 import dev.jasper.app.notifications.NotificationCenter;
 import dev.jasper.app.notifications.NotificationRequest;
 import dev.jasper.sdk.notifications.DisplayMode;
@@ -30,6 +31,7 @@ import java.util.function.Consumer;
  *   <li>Actions and default actions that run inside the plugin's containment.</li>
  *   <li>A cause recorded as the plugin's incident.</li>
  *   <li>Expiry of everything it posted when it stops.</li>
+ *   <li>Removal, through the {@link Holds} every plugin of the host shares.</li>
  * </ul>
  * The center is reached on the UI thread; the handles' bookkeeping lives there too.
  */
@@ -46,17 +48,16 @@ final class HostedNotifications implements Notifications {
     private final BooleanSupplier onUi;
     private final Group defaultGroup;
     private final Map<String, Group> declared = new ConcurrentHashMap<>();
-    /** The handles of every live notification posted, by the center's id. UI thread. */
-    private final Map<UUID, List<Handle>> posted = new HashMap<>();
-    private final Subscription listening;
+    private final Holds holds;
     private volatile boolean closed;
 
     /** UI thread: declares the plugin's default group and the host's activities group for it. */
-    HostedNotifications(String pluginId, String pluginName, PluginRuntime.NotificationHost host, Containment containment,
+    HostedNotifications(String pluginId, String pluginName, PluginRuntime.NotificationHost host, Holds holds, Containment containment,
                         Consumer<Runnable> ui, BooleanSupplier onUi, java.util.function.Function<String,javax.swing.Icon> icons, Consumer<String> validateIcon) {
         this.icons=icons;this.validateIcon=validateIcon;
         this.pluginId = pluginId;
         this.host = host;
+        this.holds = Objects.requireNonNull(holds, "holds");
         this.containment = containment;
         this.ui = ui;
         this.onUi = onUi;
@@ -65,7 +66,6 @@ final class HostedNotifications implements Notifications {
             dev.jasper.app.notifications.DisplayMode.CARD));
         host.center().register(new dev.jasper.app.notifications.NotificationGroup(pluginId + ACTIVITIES, pluginName + " activities",
             pluginId, dev.jasper.app.notifications.DisplayMode.CARD));
-        listening = host.center().onChange(this::changed);
     }
 
     @Override public NotificationGroup group() { return defaultGroup; }
@@ -85,14 +85,15 @@ final class HostedNotifications implements Notifications {
         return group;
     }
 
-    /** UI thread: the plugin stopped. Everything it posted expires, and later posts are refused. */
+    /**
+     * UI thread: the plugin stopped. Its handles expire, and so does everything it posted, unless another running
+     * plugin's handle holds it too ({@link Holds}); later posts are refused, and removing a handle still takes its entry
+     * out of history.
+     */
     void close() {
         if (closed) return;
         closed = true;
-        listening.close();
-        for (UUID id : List.copyOf(posted.keySet())) host.center().expire(id);
-        posted.values().forEach(handles -> handles.forEach(Handle::markExpired));
-        posted.clear();
+        holds.stopped(this);
     }
 
     private void requireOpen() {
@@ -119,22 +120,87 @@ final class HostedNotifications implements Notifications {
         return request;
     }
 
-    /** UI thread: the center says what became of the plugin's notifications. */
-    private void changed(NotificationCenter.Change change) {
-        switch (change) {
-            case NotificationCenter.Change.Upserted upserted when upserted.notification().expired() -> expired(upserted.notification().id());
-            case NotificationCenter.Change.Removed removed -> expired(removed.id());
-            case NotificationCenter.Change.Cleared cleared -> {
-                posted.values().forEach(handles -> handles.forEach(Handle::markExpired));
-                posted.clear();
-            }
-            default -> { }
-        }
-    }
+    /**
+     * The handles on each entry plugins posted that is still in history, live or expired, by the center's id, oldest
+     * first; one per host, shared by its plugins (ruling V9). The center counts a post with the same text on an earlier
+     * entry (a repeat) and gives the entry the repeat's request, and plugin {@code a} may declare the group {@code a.b},
+     * plugin {@code a.b}'s default group, so an entry can have the handles of several plugins. It leaves history once
+     * each of them has been removed. While it stays, it carries the request of a running plugin's handle (ruling V8):
+     * when the handle whose request it carries is removed, or that handle's plugin stops, the newest handle left of a
+     * running plugin gives it its request ({@link NotificationCenter#restate}), and with none left it expires. UI thread.
+     */
+    static final class Holds {
+        private final NotificationCenter center;
+        private final Map<UUID, List<Handle>> held = new HashMap<>();
+        private Subscription listening;
 
-    private void expired(UUID id) {
-        List<Handle> handles = posted.remove(id);
-        if (handles != null) handles.forEach(Handle::markExpired);
+        Holds(NotificationCenter center) { this.center = Objects.requireNonNull(center, "center"); }
+
+        /** {@code handle}'s post landed in the entry {@code id}, which carries the request it was given just now. */
+        private void landed(UUID id, Handle handle) {
+            if (listening == null) listening = center.onChange(this::changed);
+            handle.carried = center.find(id).map(Notification::request).orElse(null);
+            held.computeIfAbsent(id, key -> new ArrayList<>()).add(handle);
+        }
+
+        /** {@code handle} was removed: its entry leaves history once no handle on it is left. Idempotent. */
+        private void drop(UUID id, Handle handle) {
+            List<Handle> handles = held.get(id);
+            if (handles == null || !handles.remove(handle)) return;
+            if (!handles.isEmpty()) carry(id);
+            else {
+                held.remove(id);
+                center.remove(id);
+            }
+        }
+
+        /** {@code owner} stopped: its handles expire, and each entry they hold is carried by another plugin's, or expires. */
+        private void stopped(HostedNotifications owner) {
+            for (var entry : List.copyOf(held.entrySet())) {
+                boolean ours = false;
+                for (Handle handle : entry.getValue())
+                    if (handle.owner() == owner) { handle.markExpired(); ours = true; }
+                if (ours) carry(entry.getKey());
+            }
+        }
+
+        /**
+         * Unless a running plugin's handle on the live entry {@code id} carries its request, the newest such handle gives it
+         * its request; with none left it expires.
+         */
+        private void carry(UUID id) {
+            Notification entry = center.find(id).orElse(null);
+            List<Handle> handles = held.get(id);
+            if (entry == null || entry.expired() || handles == null) return;
+            Handle newest = null;
+            for (Handle handle : handles) {
+                if (handle.owner().closed) continue;
+                // By identity: the fold and restate store on the entry the very request a handle carries.
+                if (handle.carried == entry.request()) return;
+                newest = handle;
+            }
+            if (newest == null) center.expire(id);
+            else center.restate(id, newest.carried);
+        }
+
+        /** The center says what became of an entry: expired, its handles expire too; gone, it is forgotten. */
+        private void changed(NotificationCenter.Change change) {
+            switch (change) {
+                case NotificationCenter.Change.Upserted upserted when upserted.notification().expired() -> {
+                    List<Handle> handles = held.get(upserted.notification().id());
+                    if (handles != null) handles.forEach(Handle::markExpired);
+                }
+                case NotificationCenter.Change.Removed removed -> {
+                    List<Handle> handles = held.remove(removed.id());
+                    if (handles != null) handles.forEach(Handle::markExpired);
+                }
+                case NotificationCenter.Change.Cleared cleared -> {
+                    held.values().forEach(handles -> handles.forEach(Handle::markExpired));
+                    held.clear();
+                }
+                default -> { }
+            }
+        }
     }
 
     private static dev.jasper.app.notifications.Severity severity(Severity value) {
@@ -169,21 +235,33 @@ final class HostedNotifications implements Notifications {
             var handle = new Handle();
             if (spec.cause().isPresent())
                 host.caused().accept(new PluginRuntime.CausedNotice(pluginId, request, spec.cause().get(), handle::posted));
-            else onUiThread(() -> handle.posted(closed ? Optional.empty() : host.center().post(request)));
+            // A handle removed before its post is made leaves nothing to make: no card shows, and no repeat is counted.
+            else onUiThread(() -> handle.posted(closed || handle.removed ? Optional.empty() : host.center().post(request)));
             return handle;
         }
     }
 
-    /** One post's handle: it learns the center's id on the UI thread, and may be expired before that. */
+    /** One post's handle: it learns the center's id on the UI thread, and may be expired or removed before that. */
     private final class Handle implements NotificationHandle {
         private volatile UUID id;
-        private volatile boolean expired;
+        private volatile boolean expired, removed;
+        /** The request its entry carried when its post landed. UI thread ({@link Holds}). */
+        private NotificationRequest carried;
 
         @Override public void expire() {
             if (expired) return;
             expired = true;
             UUID known = id;
             if (known != null) onUiThread(() -> host.center().expire(known));
+        }
+
+        /** SDK 0.30.0: a handle removed before its post lands is dropped as it lands ({@link #posted}). */
+        @Override public void remove() {
+            if (removed) return;
+            removed = true;
+            expired = true;
+            UUID known = id;
+            if (known != null) onUiThread(() -> holds.drop(known, this));
         }
 
         @Override public boolean expired() { return expired; }
@@ -193,14 +271,17 @@ final class HostedNotifications implements Notifications {
             if (landed.isEmpty()) { expired = true; return; }
             UUID known = landed.get();
             id = known;
-            if (closed || expired) {
+            holds.landed(known, this);
+            if (removed) holds.drop(known, this);
+            else if (closed) {
+                // Landed after its plugin stopped (a post with a cause): another running plugin's handle may carry it.
                 expired = true;
-                host.center().expire(known);
-                return;
-            }
-            posted.computeIfAbsent(known, key -> new ArrayList<>()).add(this);
+                holds.carry(known);
+            } else if (expired) host.center().expire(known);
         }
 
-        void markExpired() { expired = true; }
+        private HostedNotifications owner() { return HostedNotifications.this; }
+
+        private void markExpired() { expired = true; }
     }
 }

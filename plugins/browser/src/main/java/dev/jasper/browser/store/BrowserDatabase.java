@@ -15,9 +15,9 @@ import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 /**
- * The Browser's one database (spec section 12), for history and bookmarks, on a thread of its own. Making one does no
- * I/O and starts no thread: the first {@link #call} starts its thread, {@code jasper-browser-store}, which opens the
- * database and then runs every call in turn.
+ * The Browser's one database (spec section 12), for history, bookmarks and site permissions, on a thread of its own.
+ * Making one does no I/O and starts no thread: the first {@link #call} starts its thread, {@code jasper-browser-store},
+ * which opens the database and then runs every call in turn.
  *
  * <p>A file that cannot be used is left as it was, and the database runs in memory for the rest of the run instead:
  * one the plugin cannot read or write, that fails SQLite's quick check, that a later Jasper wrote ({@code user_version}
@@ -69,7 +69,10 @@ public final class BrowserDatabase implements AutoCloseable {
         "CREATE TABLE IF NOT EXISTS bookmarks (id INTEGER PRIMARY KEY, url TEXT NOT NULL UNIQUE, title TEXT NOT NULL DEFAULT '',"
             + " added_at INTEGER NOT NULL)",
         "CREATE TABLE IF NOT EXISTS bookmark_tags (bookmark INTEGER NOT NULL REFERENCES bookmarks (id) ON DELETE CASCADE,"
-            + " tag TEXT NOT NULL COLLATE NOCASE, PRIMARY KEY (bookmark, tag))");
+            + " tag TEXT NOT NULL COLLATE NOCASE, PRIMARY KEY (bookmark, tag))",
+        // Plan 6: the site permissions, which the permissions package keeps; a file plan 5 made gets the table as it opens.
+        "CREATE TABLE IF NOT EXISTS permissions (origin TEXT NOT NULL, type TEXT NOT NULL, decision TEXT NOT NULL, created INTEGER NOT NULL,"
+            + " updated INTEGER NOT NULL, PRIMARY KEY (origin, type))");
     /** The schema's version; a file with a higher one is a later Jasper's and is left alone. */
     private static final int VERSION = 1;
     private static final String MEMORY = "jdbc:sqlite::memory:";
@@ -85,6 +88,8 @@ public final class BrowserDatabase implements AutoCloseable {
     private boolean opened;
     private Connection connection;
     private Throwable failure;
+    // Set on the store's thread as the database opens, before the first call answers.
+    private volatile boolean fileUnused;
 
     /** Where a file's database lives: its file, in the folder made its owner's alone before the file opens. */
     private record Place(DataFolder folder, Path file) { }
@@ -119,7 +124,7 @@ public final class BrowserDatabase implements AutoCloseable {
     }
 
     /**
-     * A database in memory, gone when it closes.
+     * A database in memory, gone when it closes; its temporary tables and sorts stay in memory too.
      *
      * @return the database, not yet opened
      */
@@ -142,17 +147,28 @@ public final class BrowserDatabase implements AutoCloseable {
      * @param work the work
      * @param <T> what it gives
      * @return what it gave; failed with what it threw, with an {@link SQLException} when no database could open, and with
-     *     an {@link IllegalStateException} once the database is closing
+     *     a {@link DatabaseClosedException} once the database is closing
      */
     public <T> CompletableFuture<T> call(Work<T> work) {
         Objects.requireNonNull(work, "work");
         var result = new CompletableFuture<T>();
         synchronized (lock) {
-            if (closing) return CompletableFuture.failedFuture(new IllegalStateException("The browser's database is closed"));
+            if (closing) return CompletableFuture.failedFuture(new DatabaseClosedException());
             if (thread == null) thread = Executors.newSingleThreadExecutor(Thread.ofPlatform().daemon().name("jasper-browser-store").factory());
             thread.execute(() -> run(work, result));
         }
         return result;
+    }
+
+    /**
+     * Whether the database was asked for a file and uses none: the file could not be used and it runs in memory, or SQLite
+     * cannot run at all (ruling V25). Clear Website Data then cannot erase the file's rows. Known once a call has
+     * answered; false before, and for a database in memory. Any thread.
+     *
+     * @return whether it uses no file it was asked for
+     */
+    public boolean fileUnused() {
+        return fileUnused;
     }
 
     /** Whether the first call has started the database's thread. */
@@ -216,6 +232,7 @@ public final class BrowserDatabase implements AutoCloseable {
                 return;
             } catch (Throwable unusable) { // As in run: an UnsatisfiedLinkError from the native library too.
                 failure = unusable;
+                fileUnused = true;
                 tell(unusable);
             }
         }
@@ -231,6 +248,9 @@ public final class BrowserDatabase implements AutoCloseable {
         Files.createDirectories(folder);
         // H37: no other user may read the history, and SQLite gives its log and shared memory the file's permissions.
         place.folder().restrict();
+        // V27: a file a Clear Website Data marked and that could not be deleted holds rows it cleared, which are never read.
+        if (!place.folder().databaseUsable())
+            throw new IOException("The browser's database is to be deleted, as Clear Website Data asked, and could not be: " + absolute);
         // SQLite opens a file it cannot write for reading only and fails only at the first write, so a folder or file
         // that cannot be written is refused here, before SQLite makes anything beside it.
         if (!Files.isWritable(folder)) throw new AccessDeniedException(folder.toString(), null, "The folder cannot be written");
@@ -268,6 +288,10 @@ public final class BrowserDatabase implements AutoCloseable {
             if (file) {
                 String journal = text(connection, "PRAGMA journal_mode = WAL");
                 if (!"wal".equalsIgnoreCase(journal)) throw new SQLException("SQLite cannot keep a write-ahead log for the database (" + journal + ")");
+            } else {
+                // V11: a database in memory writes nothing to disk, its temporary tables and sort spills neither, which
+                // the bundled SQLite (TEMP_STORE=1) would otherwise put in temporary files.
+                Sql.execute(connection, "PRAGMA temp_store = MEMORY");
             }
             Sql.execute(connection, "PRAGMA synchronous = NORMAL");
             Sql.execute(connection, "PRAGMA foreign_keys = ON");

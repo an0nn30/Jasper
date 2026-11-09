@@ -1,6 +1,8 @@
 package dev.jasper.browser.page;
 
+import dev.jasper.browser.engine.RecordingContext;
 import dev.jasper.browser.store.Reached;
+import org.cef.browser.CefRequestContext;
 
 /** Test-only access to what Chromium's handlers tell a page, for tests outside this package. */
 public final class PageTestAccess {
@@ -87,7 +89,7 @@ public final class PageTestAccess {
      * @param url what it loads
      */
     public static void loadStarted(Page page, String url) {
-        page.loadStarted(url, Reached.OTHER);
+        loadStarted(page, url, Reached.OTHER);
     }
 
     /**
@@ -99,7 +101,19 @@ public final class PageTestAccess {
      * @param reached how the load reached it
      */
     public static void loadStarted(Page page, String url, Reached reached) {
+        page.privacy().documentShown(page.privacy().documents());
         page.loadStarted(url, reached);
+    }
+
+    /**
+     * The page's main frame starts a document in {@code mode}, as its frame scripts set it on Chromium's thread from its
+     * item's store: the mode its sub-frames start in, until the page is muted or unmuted. Any thread.
+     *
+     * @param page a page
+     * @param mode the document's audio mode
+     */
+    public static void audioDocumentStarted(Page page, dev.jasper.browser.permissions.AudioMode mode) {
+        page.privacy().documentStarted(mode);
     }
 
     /**
@@ -168,6 +182,17 @@ public final class PageTestAccess {
      */
     public static void useReturnPresser(Page page, java.util.function.Consumer<Page> presser) {
         page.useReturnPresser(presser);
+    }
+
+    /**
+     * Has {@code page} load again with {@code reloader} from now on, which is told the page each time: a test's recording
+     * one, as a page without Chromium loads nothing.
+     *
+     * @param page a page
+     * @param reloader told each reload
+     */
+    public static void useReloader(Page page, java.util.function.Consumer<Page> reloader) {
+        page.useReloader(reloader);
     }
 
     /**
@@ -287,6 +312,74 @@ public final class PageTestAccess {
     }
 
     /**
+     * Chromium has made the page's browser, as its life span handler tells on Chromium's thread: the browser's identifier
+     * is the page's from now on. Any thread, as Chromium's.
+     *
+     * @param page a page
+     * @param browser the browser's identifier
+     */
+    public static void browserMade(Page page, int browser) {
+        page.browserMade(browser);
+    }
+
+    /**
+     * Chromium has closed the page's browser, as its life span handler tells on Chromium's thread. Any thread.
+     *
+     * @param page a page
+     */
+    public static void browserClosed(Page page) {
+        page.browserClosed();
+    }
+
+    /**
+     * An in-memory context whose kept Chromium context is a stand-in ({@link RecordingContext}), made at once, and whose
+     * each release counts in {@code released} instead of reaching Chromium: for the tests of the stores that hold
+     * contexts, as no context can be made without Chromium.
+     *
+     * @param released counts the releases
+     * @return the context
+     */
+    public static PageContext recordingContext(java.util.concurrent.atomic.AtomicInteger released) {
+        CefRequestContext kept = new RecordingContext(1);
+        return new PageContext(true, chromium -> java.util.concurrent.CompletableFuture.completedFuture(kept),
+            (chromium, context) -> released.incrementAndGet());
+    }
+
+    /**
+     * The page's client and its context object {@code context} are ready, as its start waits for them, with a client
+     * that stands for none: for the cases that make no browser, which a test can reach without Chromium.
+     *
+     * @param page a page
+     * @param chromium the plugin's Chromium
+     * @param context the context object handed out for the page's browser
+     */
+    public static void make(Page page, dev.jasper.browser.engine.Chromium chromium, CefRequestContext context) {
+        page.make(chromium, null, context);
+    }
+
+    /**
+     * Whether the page has made its browser.
+     *
+     * @param page a page
+     * @return whether it has one
+     */
+    public static boolean hasBrowser(Page page) {
+        return page.hasBrowser();
+    }
+
+    /**
+     * Has {@code context} asked for as a page made with it asks, as it starts: a context object of the page's own, over
+     * the group's kept context, which is asked of {@code chromium} the first time.
+     *
+     * @param context a page context
+     * @param chromium the plugin's Chromium
+     * @return the page's context object's future
+     */
+    public static java.util.concurrent.CompletableFuture<?> askContext(PageContext context, dev.jasper.browser.engine.Chromium chromium) {
+        return context.context(chromium);
+    }
+
+    /**
      * Chromium's DevTools browser for {@code tools}, made as {@link #pageBrowser} makes a page's: no page's, drawn on the
      * DevTools' canvas.
      *
@@ -298,6 +391,16 @@ public final class PageTestAccess {
         set(made, "view", tools.canvas());
         set(made, "devTools", tools);
         return made;
+    }
+
+    /**
+     * A Markdown preview's browser as the preview client's handlers meet it, made without Chromium as {@link #pageBrowser}
+     * makes a page's: no page's, and on no preview yet. Every Chromium call on it answers nothing.
+     *
+     * @return the browser
+     */
+    public static PageBrowser previewBrowser() {
+        return withoutConstructor();
     }
 
     /**

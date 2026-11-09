@@ -45,7 +45,6 @@ public final class AboutQueries {
     static final int ANSWER_FAILED = 1, REFUSED = 2;
     /** What a refused query is told. */
     static final String NOT_ITS_OWN = "Jasper's pages answer only themselves.";
-    private static final String UNANSWERED = "Jasper could not answer this request.";
     private static final System.Logger LOG = System.getLogger(AboutQueries.class.getName());
     // The Chromiums given the router, held weakly: each client gets one router, however often a page asks.
     private static final Set<Chromium> PREPARED = Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
@@ -117,7 +116,7 @@ public final class AboutQueries {
             } catch (RuntimeException failure) { // the background no longer takes work, as the plugin stops
                 LOG.log(System.Logger.Level.DEBUG, "A Jasper page's query could not be answered", failure);
                 waiting.remove(queryId, asked);
-                asked.fail(ANSWER_FAILED, UNANSWERED);
+                asked.fail(ANSWER_FAILED, AboutScheme.UNANSWERED);
             }
             return true;
         }
@@ -155,7 +154,7 @@ public final class AboutQueries {
         private static String reason(Throwable failure) {
             Throwable cause = failure instanceof CompletionException && failure.getCause() != null ? failure.getCause() : failure;
             if (cause == null || cause instanceof CancellationException || cause.getMessage() == null || cause.getMessage().isBlank())
-                return UNANSWERED;
+                return AboutScheme.UNANSWERED;
             return cause.getMessage();
         }
     }

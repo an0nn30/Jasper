@@ -146,6 +146,7 @@ final class PluginHost {
     final ActivityHub activities;
     final ConnectionHub connections;
     final ServiceRegistry services = new ServiceRegistry();
+    final HostedNotifications.Holds notificationHolds;
     private final Map<String, HostedContext> contexts = new LinkedHashMap<>();
     private final Map<String, PluginStatus.State> notRunning = new HashMap<>();
 
@@ -168,6 +169,7 @@ final class PluginHost {
             if (event instanceof TerminalEvent.TabClosed closed) environment.contributions().tabNamePieces().forget(closed.tabId());
         });
         this.outcomes = bus.subscribe(EventBus.APP, Activities.TOPIC, this::outcome);
+        this.notificationHolds = new HostedNotifications.Holds(environment.notifications().center());
     }
 
     private void requireUi() {

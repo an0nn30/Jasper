@@ -57,7 +57,7 @@ class PageCloseTest {
      */
     @Test void aPageKeepsItsZoomLevelAndRefusesOneThatIsNotFinite() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            var page = new Page(EXAMPLE, () -> { }, NO_FAVICONS, Runnable::run);
+            var page = new Page(EXAMPLE, () -> { }, NO_FAVICONS, Runnable::run, PageContext.persistent());
             assertThat(page.zoomLevel()).as("100%").isEqualTo(0.0);
             page.setZoomLevel(-1.5);
             assertThat(page.zoomLevel()).isEqualTo(-1.5);
@@ -75,7 +75,7 @@ class PageCloseTest {
     @Test void aMainFrameLoadStartClearsTheTitle() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var changes = new AtomicInteger();
-            var page = new Page(EXAMPLE, changes::incrementAndGet, NO_FAVICONS, Runnable::run);
+            var page = new Page(EXAMPLE, changes::incrementAndGet, NO_FAVICONS, Runnable::run, PageContext.persistent());
             page.titleChanged("Example Domain");
             assertThat(page.title()).isEqualTo("Example Domain");
             var started = new ArrayList<String>();
@@ -94,7 +94,7 @@ class PageCloseTest {
     }
 
     private Page page() {
-        var page = new Page(EXAMPLE, () -> { }, NO_FAVICONS, Runnable::run);
+        var page = new Page(EXAMPLE, () -> { }, NO_FAVICONS, Runnable::run, PageContext.persistent());
         page.onCloseItem(itemCloses::incrementAndGet);
         return page;
     }

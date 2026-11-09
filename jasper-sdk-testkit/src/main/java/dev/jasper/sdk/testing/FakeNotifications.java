@@ -23,18 +23,31 @@ import java.util.function.BooleanSupplier;
  * The host's is {@link FakePluginHost#notifications()}; a component under test that takes a {@link NotificationGroup}
  * gets a recording one from a new instance's {@link #group(String)}. Safe from any thread.
  *
+ * <p>As Jasper counts a repeat on its earlier notification, a post with the same {@link Post#line()} as a post that is
+ * neither expired nor removed, at most 60 seconds after that post's last post ({@link System#nanoTime()}), counts on it:
+ * the post moves last, takes the newer spec and counts one more ({@link Post#count()}), and the new handle shares it.
+ * It leaves history once each of its handles has been removed. While it stays, it has a handle's spec, of a plugin that
+ * is running: when the handle whose spec it has is removed, or that handle's plugin stops, the newest handle left of a
+ * running plugin gives it its spec, and with none left it expires. A post with a cause counts on one whose line names a
+ * cause of the same simple class name, where Jasper counts it on the notification of the same incident.
+ *
  * @since 0.14.0
  */
 public final class FakeNotifications {
     /** The host's group for a plugin's activity outcomes: {@code <plugin-id>.activities}. */
     static final String ACTIVITIES = ".activities";
 
-    /** One post, and whether it has expired since. */
+    /** One post, with the repeats counted on it, and whether it has expired or been removed since. */
     public static final class Post {
         private final String pluginId;
         private final String group;
-        private final NotificationSpec spec;
-        private volatile boolean expired;
+        private volatile NotificationSpec spec;
+        private volatile boolean expired, removed;
+        /** How many posts it counts; written while holding {@code posts}. */
+        private volatile int count = 1;
+        /** When it was last posted, by {@code nanos}, and its handles not yet removed, oldest first. Guarded by {@code posts}. */
+        private long posted;
+        private final List<Handle> handles = new java.util.ArrayList<>();
 
         Post(String pluginId, String group, NotificationSpec spec) { this.pluginId = pluginId; this.group = group; this.spec = spec; }
 
@@ -53,18 +66,37 @@ public final class FakeNotifications {
         public String group() { return group; }
 
         /**
-         * What was posted.
+         * What was posted: the newest repeat's spec, as Jasper's notification takes the newest post's links, or once that
+         * repeat's handle was removed, the newest spec whose handle is left.
          *
          * @return the spec
          */
         public NotificationSpec spec() { return spec; }
 
         /**
-         * Whether it expired: through its handle, an expiring action, or its plugin stopping.
+         * How many posts it counts: 1, and one more for each repeat counted on it, as Jasper's notification shows ×2 and
+         * on.
+         *
+         * @return at least 1
+         * @since 0.30.0
+         */
+        public int count() { return count; }
+
+        /**
+         * Whether it expired: through a handle, an expiring action, its removal, or its plugin stopping.
          *
          * @return true once expired
          */
         public boolean expired() { return expired; }
+
+        /**
+         * Whether it left history: once each handle of it and of the repeats counted on it has been removed. It stays
+         * among {@link FakeNotifications#posts()} and {@link FakeNotifications#lines()}.
+         *
+         * @return true once removed
+         * @since 0.30.0
+         */
+        public boolean removed() { return removed; }
 
         /**
          * The post for assertions: {@code group|SEVERITY|title|content}, then {@code |} and the cause's simple class name
@@ -72,13 +104,20 @@ public final class FakeNotifications {
          *
          * @return the line
          */
-        public String line() {
+        public String line() { return line(group, spec); }
+
+        private static String line(String group, NotificationSpec spec) {
             String line = group + "|" + spec.severity() + "|" + spec.title() + "|" + spec.content();
             return spec.cause().map(cause -> line + "|" + cause.getClass().getSimpleName()).orElse(line);
         }
     }
 
+    /** How long after a post the same text still counts on it, as Jasper's notification center counts a repeat. */
+    private static final long REPEAT_NANOS = java.util.concurrent.TimeUnit.SECONDS.toNanos(60);
+
     private final FakePluginHost host;
+    /** The clock repeats are counted by; a test of this package sets its own. */
+    volatile java.util.function.LongSupplier nanos = System::nanoTime;
     private final List<Post> posts = new CopyOnWriteArrayList<>();
     private final Map<String, String> groups = new LinkedHashMap<>();
 
@@ -100,7 +139,7 @@ public final class FakeNotifications {
     }
 
     /**
-     * Every post, oldest first.
+     * Every post, oldest first: a repeat counts on its earlier post, which moves last, and a removed post stays.
      *
      * @return the posts
      */
@@ -160,9 +199,36 @@ public final class FakeNotifications {
         declare(pluginId + ACTIVITIES, name + " activities", DisplayMode.CARD);
     }
 
-    /** A plugin stopped: everything it posted expires. */
+    /**
+     * A plugin stopped: its handles expire, and so does everything it posted, unless another running plugin's handle has
+     * it too.
+     */
     void stopped(String pluginId) {
-        for (Post post : posts) if (post.pluginId.equals(pluginId)) post.expired = true;
+        synchronized (posts) {
+            for (Post post : posts) {
+                boolean ours = false;
+                for (Handle handle : post.handles)
+                    if (handle.pluginId.equals(pluginId)) { handle.stopped = true; ours = true; }
+                if (ours) carry(post);
+                else if (post.handles.isEmpty() && post.pluginId.equals(pluginId)) post.expired = true;
+            }
+        }
+    }
+
+    /**
+     * Unless a running plugin's handle of the live {@code post} has its spec, the newest such handle gives it its spec;
+     * with none left it expires. Holding {@code posts}.
+     */
+    private void carry(Post post) {
+        if (post.expired) return;
+        Handle newest = null;
+        for (Handle handle : post.handles) {
+            if (handle.stopped) continue;
+            if (handle.spec == post.spec) return;
+            newest = handle;
+        }
+        if (newest == null) post.expired = true;
+        else post.spec = newest.spec;
     }
 
     /** As the host does: an activity that succeeded or failed is posted in its plugin's activities group. */
@@ -171,7 +237,30 @@ public final class FakeNotifications {
         String detail = event.detail();
         var spec = NotificationSpec.of(event.state() == ActivityEvent.State.SUCCEEDED ? Severity.INFO : Severity.ERROR, event.title())
             .withContent(detail.length() <= 4_000 ? detail : detail.substring(0, 3_999) + "…");
-        posts.add(new Post(event.sourcePluginId(), event.sourcePluginId() + ACTIVITIES, activate.map(spec::withActivate).orElse(spec)));
+        record(event.sourcePluginId(), event.sourcePluginId() + ACTIVITIES, activate.map(spec::withActivate).orElse(spec));
+    }
+
+    /**
+     * Records a post, or counts it on the post with the same line that is neither expired nor removed and was last posted
+     * at most 60 seconds before, which then moves last and takes {@code spec}.
+     */
+    private Post record(String pluginId, String group, NotificationSpec spec) {
+        synchronized (posts) {
+            long now = nanos.getAsLong();
+            String line = Post.line(group, spec);
+            Post post = null;
+            for (Post earlier : posts)
+                if (!earlier.expired && earlier.line().equals(line) && now - earlier.posted <= REPEAT_NANOS) post = earlier;
+            if (post == null) post = new Post(pluginId, group, spec);
+            else {
+                posts.remove(post);
+                post.spec = spec;
+                post.count++;
+            }
+            post.posted = now;
+            posts.add(post);
+            return post;
+        }
     }
 
     private void declare(String id, String name, DisplayMode mode) {
@@ -181,7 +270,7 @@ public final class FakeNotifications {
     private Optional<Post> newestLive(String title) {
         List<Post> all = posts();
         for (int i = all.size() - 1; i >= 0; i--)
-            if (all.get(i).spec.title().equals(title)) return all.get(i).expired ? Optional.empty() : Optional.of(all.get(i));
+            if (!all.get(i).removed && all.get(i).spec.title().equals(title)) return all.get(i).expired ? Optional.empty() : Optional.of(all.get(i));
         return Optional.empty();
     }
 
@@ -236,12 +325,40 @@ public final class FakeNotifications {
             Objects.requireNonNull(spec, "spec");
             if (!open.getAsBoolean()) throw new IllegalStateException("Plugin context is closed: " + pluginId);
             spec.icon().ifPresent(validateIcon);
-            var post = new Post(pluginId, id, spec);
-            posts.add(post);
-            return new NotificationHandle() {
-                @Override public void expire() { post.expired = true; }
-                @Override public boolean expired() { return post.expired; }
-            };
+            synchronized (posts) {
+                var post = record(pluginId, id, spec);
+                var handle = new Handle(post, pluginId, spec);
+                post.handles.add(handle);
+                return handle;
+            }
         }
+    }
+
+    /** A post's handle, or a repeat's, which shares the post it counted on and keeps its own spec. */
+    private final class Handle implements NotificationHandle {
+        private final Post post;
+        private final String pluginId;
+        private final NotificationSpec spec;
+        private volatile boolean removed, stopped;
+
+        Handle(Post post, String pluginId, NotificationSpec spec) { this.post = post; this.pluginId = pluginId; this.spec = spec; }
+
+        @Override public void expire() { if (!expired()) post.expired = true; }
+
+        /** SDK 0.30.0: the post leaves history once no handle of it is left; until then a handle left gives it its spec. */
+        @Override public void remove() {
+            synchronized (posts) {
+                if (removed) return;
+                removed = true;
+                post.handles.remove(this);
+                if (!post.handles.isEmpty()) carry(post);
+                else {
+                    post.removed = true;
+                    post.expired = true;
+                }
+            }
+        }
+
+        @Override public boolean expired() { return removed || stopped || post.expired; }
     }
 }

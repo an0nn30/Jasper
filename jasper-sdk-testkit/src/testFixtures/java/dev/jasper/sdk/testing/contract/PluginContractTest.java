@@ -2361,6 +2361,31 @@ public abstract class PluginContractTest {
         });
     }
 
+    /** SDK 0.30.0: a content tab gives the title it is saved with, whatever it shows; empty saves the title it shows. */
+    @Test void aContentTabIsSavedWithTheTitleItGives() {
+        UUID main = h.addTerminalWindow();
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), alpha::set);
+        var state = new dev.jasper.sdk.RestoreState("page", java.util.Map.of());
+        h.ui(() -> {
+            var window = alpha.get().terminals().window(main).orElseThrow();
+            var tab = alpha.get().windows().openTab(new dev.jasper.sdk.ui.ContentSpec("page", "Start").withRestore(state), window,
+                kitView(alpha.get()));
+            UUID id = window.activeTab().orElseThrow().id();
+            assertThat(h.savedTitle(id)).as("the title it shows, by default").isEqualTo("Start");
+            tab.setSavedTitle(Optional.of("Web Browser"));
+            tab.setPresentation(new dev.jasper.sdk.ui.ContentPresentation("Account 1234 - Bank", "", null, false, "", ""));
+            assertThat(window.activeTab().orElseThrow().title()).isEqualTo("Account 1234 - Bank");
+            assertThat(h.savedTitle(id)).as("whatever it shows").isEqualTo("Web Browser");
+            tab.setSavedTitle(Optional.empty());
+            assertThat(h.savedTitle(id)).isEqualTo("Account 1234 - Bank");
+            assertThatNullPointerException().isThrownBy(() -> tab.setSavedTitle(null));
+            tab.close();
+            assertThatCode(() -> tab.setSavedTitle(Optional.of("Ignored once closed"))).as("a closed tab ignores it")
+                .doesNotThrowAnyException();
+        });
+    }
+
     /**
      * Workspace tabs spec 13: a restorer that declines, throws or opens nothing restores no tab; a plugin has one restorer
      * per kind.
@@ -3820,6 +3845,105 @@ public abstract class PluginContractTest {
         h.flush();
         assertThat(h.notifications()).allSatisfy(line -> assertThat(line).endsWith("|expired"));
         assertThatIllegalStateException().as("a closed context refuses posts").isThrownBy(() -> a.notifications().group().info("Late", ""));
+    }
+
+    /** SDK 0.30.0: a removed notification leaves history and reads as expired; removing is idempotent, after expire() too. */
+    @Test void aRemovedNotificationLeavesHistory() throws Exception {
+        PluginContext a = started("test.a", Set.of());
+        var removed = new AtomicReference<NotificationHandle>();
+        var expired = new AtomicReference<NotificationHandle>();
+        var stays = new AtomicReference<NotificationHandle>();
+        h.ui(() -> {
+            removed.set(a.notifications().group().post(NotificationSpec.of(Severity.INFO, "Removed").withActivate(() -> { })));
+            expired.set(a.notifications().group().info("Expired", ""));
+            stays.set(a.notifications().group().info("Stays", ""));
+        });
+        h.flush();
+        Thread worker = Thread.ofPlatform().start(() -> removed.get().remove());
+        worker.join();
+        h.flush();
+        assertThat(removed.get().expired()).as("a removed notification reads as expired").isTrue();
+        assertThat(h.notifications()).containsExactly("test.a|INFO|Expired||-|-|-|live", "test.a|INFO|Stays||-|-|-|live");
+        assertThat(h.clickNotification("Removed")).as("its links stop working").isFalse();
+        removed.get().remove();
+        expired.get().expire();
+        h.flush();
+        expired.get().remove();
+        h.flush();
+        assertThat(expired.get().expired()).isTrue();
+        assertThat(h.notifications()).as("removed twice, and after expire()").containsExactly("test.a|INFO|Stays||-|-|-|live");
+        h.stopAll();
+        h.flush();
+        stays.get().remove();
+        h.flush();
+        assertThat(h.notifications()).as("and after the plugin stopped").isEmpty();
+    }
+
+    /**
+     * SDK 0.30.0: a post with the same text at most a minute after another counts on that notification, which then has
+     * two handles; expiring either expires it, and it leaves history once both have been removed, each removed handle
+     * reading as expired.
+     */
+    @Test void aRepeatedNotificationLeavesHistoryOnceEachOfItsHandlesIsRemoved() {
+        PluginContext a = started("test.a", Set.of());
+        var first = new AtomicReference<NotificationHandle>();
+        var again = new AtomicReference<NotificationHandle>();
+        var twice = new ArrayList<NotificationHandle>();
+        h.ui(() -> {
+            first.set(a.notifications().group().info("Same", "text"));
+            twice.add(a.notifications().group().info("Twice", ""));
+            a.notifications().group().info("Other", "");
+            again.set(a.notifications().group().info("Same", "text"));
+            twice.add(a.notifications().group().info("Twice", ""));
+        });
+        h.flush();
+        assertThat(h.notifications()).as("each repeat counts on its notification, which moves last")
+            .containsExactly("test.a|INFO|Other||-|-|-|live", "test.a|INFO|Same|text|-|-|-|live", "test.a|INFO|Twice||-|-|-|live");
+        first.get().remove();
+        h.flush();
+        assertThat(first.get().expired()).isTrue();
+        assertThat(again.get().expired()).as("the other handle").isFalse();
+        assertThat(h.notifications()).as("it stays for the other handle")
+            .containsExactly("test.a|INFO|Other||-|-|-|live", "test.a|INFO|Same|text|-|-|-|live", "test.a|INFO|Twice||-|-|-|live");
+        again.get().remove();
+        h.flush();
+        assertThat(again.get().expired()).isTrue();
+        assertThat(h.notifications()).containsExactly("test.a|INFO|Other||-|-|-|live", "test.a|INFO|Twice||-|-|-|live");
+        twice.getFirst().expire();
+        h.flush();
+        assertThat(twice).as("expiring one handle expires the notification").allSatisfy(handle -> assertThat(handle.expired()).isTrue());
+        twice.getFirst().remove();
+        h.flush();
+        assertThat(h.notifications()).containsExactly("test.a|INFO|Other||-|-|-|live", "test.a|INFO|Twice||-|-|-|expired");
+        twice.getLast().remove();
+        h.flush();
+        assertThat(h.notifications()).containsExactly("test.a|INFO|Other||-|-|-|live");
+    }
+
+    /**
+     * Ruling V8: a repeat gives the notification its links; once its handle is removed, the remaining handle's links,
+     * body included, are the notification's again, and the removed post's never run.
+     */
+    @Test void aRemovedRepeatsLinksStopWorking() {
+        PluginContext a = started("test.a", Set.of());
+        var ran = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        var again = new AtomicReference<NotificationHandle>();
+        h.ui(() -> {
+            a.notifications().group().post(NotificationSpec.of(Severity.INFO, "Same").withContent("text")
+                .withAction(new NotificationAction("Open", () -> ran.add("first open"), false)).withActivate(() -> ran.add("first body")));
+            again.set(a.notifications().group().post(NotificationSpec.of(Severity.INFO, "Same").withContent("text")
+                .withAction(new NotificationAction("Show", () -> ran.add("again show"), false)).withActivate(() -> ran.add("again body"))));
+        });
+        h.flush();
+        assertThat(h.notifications()).as("the repeat's links").containsExactly("test.a|INFO|Same|text|Show|-|-|live");
+        again.get().remove();
+        h.flush();
+        assertThat(h.notifications()).as("the remaining post's links").containsExactly("test.a|INFO|Same|text|Open|-|-|live");
+        assertThat(h.runNotificationAction("Same", "Show")).as("the removed post's link is gone").isFalse();
+        assertThat(h.runNotificationAction("Same", "Open")).isTrue();
+        assertThat(h.clickNotification("Same")).isTrue();
+        h.flush();
+        assertThat(ran).containsExactly("first open", "first body");
     }
 
     @Test void aPostFromAnyThreadArrivesAndItsCauseIsMarked() throws Exception {

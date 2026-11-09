@@ -24,23 +24,30 @@ import org.cef.browser.CefFrame;
 import org.cef.handler.CefDisplayHandlerAdapter;
 import org.cef.handler.CefKeyboardHandler;
 import org.cef.handler.CefKeyboardHandlerAdapter;
+import org.cef.handler.CefLifeSpanHandlerAdapter;
 import org.cef.handler.CefLoadHandler;
 import org.cef.handler.CefLoadHandlerAdapter;
 import org.cef.network.CefRequest;
 
 /**
- * The client's one display, load and keyboard handler. JCEF keeps the first handler of each kind a client is given,
- * so these serve every page: each callback goes to the {@link Page} of the browser it is about. Chromium calls them
+ * The client's one display, load and keyboard handler, and a life span handler. JCEF keeps the first handler of each
+ * kind a client is given, but every life span handler, so these serve every page: each callback goes to the
+ * {@link Page} of the browser it is about. A page's browser is named to its page as Chromium makes it and as it closes,
+ * there and then on Chromium's thread ({@link Page#onBrowser}), so its documents' queries find its item's store from the
+ * first. Chromium calls them
  * on its own UI thread (on macOS, AppKit's main thread), never Swing's, so what a page shows changes on the UI thread.
  * The hover address goes straight to the canvas, which takes it from any thread. A main frame's load start also goes,
- * at once and on Chromium's thread, to the hooks the {@code links} package gave the client
- * ({@link #onMainFrameLoadStart}), and the main frame then runs {@code detect-favicon.js}, which names the document's
+ * at once and on Chromium's thread, to the hooks the {@code links} package and {@code FrameScripts} gave the client
+ * ({@link #onMainFrameLoadStart}), and a sub-frame's to theirs ({@link #onSubFrameLoadStart}), each once the load's
+ * transition has been read; the main frame then runs {@code detect-favicon.js}, which names the document's
  * icon through the opener bridge's router for the page to fetch ({@link Page#faviconDeclared}). Each main-frame load
  * start shows the page at its own zoom again, there and then, as Chromium keeps one zoom per host. A main frame's failed
  * load goes to its page with Chromium's name for the error ({@link Page#onLoadFailure}), for its item's error page. Each
  * main-frame load start reaches its page with how the load reached it ({@link #reached}), for its item's history
- * ({@link Page#onVisit}). A page that enters fullscreen is told at once to leave it: Jasper refuses fullscreen (spec
- * section 5). A page's {@link DevTools} browser is no page's: none of this reaches it, but for the editing keys.
+ * ({@link Page#onVisit}), and with how many documents its hooks have started, so the page's muting acts on the one it
+ * has heard of ({@link PagePrivacy#mute}). A page that enters fullscreen is told at once to leave it: Jasper refuses
+ * fullscreen (spec section 5). A page's {@link DevTools} browser is no page's: none of this reaches it, but for the
+ * editing keys.
  *
  * <p>JCEF hands every load, on every client, the same six {@link CefRequest.TransitionType} constants, and ORs each
  * load's qualifiers into the constant's own value without ever clearing them, so a flag one load set would be read by
@@ -67,8 +74,11 @@ public final class PageEvents {
     private static final String DETECT_FAVICON = script("detect-favicon.js");
     private static final String DETECT_FAVICON_URL = "jasper-about:detect-favicon.js";
     private static final System.Logger LOG = System.getLogger(PageEvents.class.getName());
-    // The hooks each client was given, which hear its pages' main-frame load starts on Chromium's thread.
+    // The hooks each client was given, which hear its pages' main-frame load starts, and its sub-frames', on Chromium's
+    // thread.
     private static final Map<CefClient, List<BiConsumer<PageBrowser, CefFrame>>> LOAD_STARTS =
+        Collections.synchronizedMap(new WeakHashMap<>());
+    private static final Map<CefClient, List<BiConsumer<PageBrowser, CefFrame>>> SUB_FRAME_LOAD_STARTS =
         Collections.synchronizedMap(new WeakHashMap<>());
 
     private PageEvents() { }
@@ -76,8 +86,8 @@ public final class PageEvents {
     /**
      * Has {@code hook} hear each main-frame load start of the pages made on {@code client}, at once on Chromium's own
      * thread, as Chromium starts loading the new document and before Swing hears of it: for what must reach the document
-     * itself, such as a script Jasper runs in it. Sub-frames' load starts are not told. Give it once, as the client is
-     * made, before any page.
+     * itself, such as a script Jasper runs in it. Sub-frames' load starts go to {@link #onSubFrameLoadStart}'s hooks.
+     * Give it once, as the client is made, before any page.
      *
      * @param client the client the pages are made on
      * @param hook told the page's browser and its main frame, which the hook must not dispose; it must return quickly
@@ -87,6 +97,21 @@ public final class PageEvents {
         Objects.requireNonNull(client, "client");
         Objects.requireNonNull(hook, "hook");
         LOAD_STARTS.computeIfAbsent(client, any -> new CopyOnWriteArrayList<>()).add(hook);
+    }
+
+    /**
+     * Has {@code hook} hear each sub-frame load start of the pages made on {@code client}, as {@link #onMainFrameLoadStart}
+     * has its hook hear their main frames': at once on Chromium's thread, as the frame starts loading its new document,
+     * once the load's transition has been read. Give it once, as the client is made, before any page.
+     *
+     * @param client the client the pages are made on
+     * @param hook told the page's browser and the sub-frame, which the hook must not dispose; it must return quickly
+     *     and must not throw
+     */
+    public static void onSubFrameLoadStart(CefClient client, BiConsumer<PageBrowser, CefFrame> hook) {
+        Objects.requireNonNull(client, "client");
+        Objects.requireNonNull(hook, "hook");
+        SUB_FRAME_LOAD_STARTS.computeIfAbsent(client, any -> new CopyOnWriteArrayList<>()).add(hook);
     }
 
     /**
@@ -110,6 +135,7 @@ public final class PageEvents {
         client.addDisplayHandler(new Display());
         client.addLoadHandler(new Load());
         client.addKeyboardHandler(new Keyboard());
+        client.addLifeSpanHandler(new Lives());
     }
 
     /** The page script {@code name}, one of this package's resources. */
@@ -202,6 +228,26 @@ public final class PageEvents {
     }
 
     /**
+     * A page's browser is made, or closed: its page hears its identifier at once, on Chromium's thread, and a page's or
+     * DevTools' browser Java asked to close before Chromium made it closes now (V13). It decides no popup, which the
+     * {@code links} package's life span handler decides, and holds back no close, which the browser decides.
+     */
+    private static final class Lives extends CefLifeSpanHandlerAdapter {
+        @Override public void onAfterCreated(CefBrowser browser) {
+            if (!(browser instanceof PageBrowser made)) return;
+            Page page = made.owner();
+            if (page != null) page.browserMade(browser.getIdentifier());
+            // A page's or its DevTools' browser Java asked to close before it existed closes now (V13).
+            made.created();
+        }
+
+        @Override public void onBeforeClose(CefBrowser browser) {
+            Page page = page(browser);
+            if (page != null) page.browserClosed();
+        }
+    }
+
+    /**
      * The keys a page and its scripts left alone that are an {@link EditingCommand}: on macOS, Select All, Cut, Undo and
      * Redo, which Chromium leaves to the browser's Edit menu there. Chromium asks only after the page declined the key,
      * so a script that takes Cmd+Z itself undoes once. So it is in a page's DevTools.
@@ -244,10 +290,16 @@ public final class PageEvents {
 
         @Override public void onLoadStart(CefBrowser browser, CefFrame frame, CefRequest.TransitionType transition) {
             Reached reached = reached(transition); // first, before any return: it clears the flags JCEF left
-            if (frame == null || !frame.isMain()) return;
+            if (frame == null) return;
+            if (!frame.isMain()) {
+                if (browser instanceof PageBrowser shown && shown.owner() != null) tell(SUB_FRAME_LOAD_STARTS, shown, frame);
+                return;
+            }
+            long document = 0;
             if (browser instanceof PageBrowser shown && shown.owner() != null) {
-                List<BiConsumer<PageBrowser, CefFrame>> hooks = LOAD_STARTS.get(browser.getClient());
-                if (hooks != null) for (BiConsumer<PageBrowser, CefFrame> hook : hooks) hook.accept(shown, frame);
+                tell(LOAD_STARTS, shown, frame);
+                // The document the hooks just started, which the page's muting acts on once the UI thread hears of it.
+                document = shown.owner().privacy().documents();
                 shown.keepZoom();
                 try {
                     frame.executeJavaScript(DETECT_FAVICON, DETECT_FAVICON_URL, 0);
@@ -256,7 +308,17 @@ public final class PageEvents {
                 }
             }
             String url = frame.getURL();
-            later(browser, page -> page.loadStarted(url, reached));
+            long started = document;
+            later(browser, page -> {
+                page.privacy().documentShown(started);
+                page.loadStarted(url, reached);
+            });
+        }
+
+        /** Tells the hooks {@code browser}'s client gave in {@code given} that {@code frame} starts loading. */
+        private static void tell(Map<CefClient, List<BiConsumer<PageBrowser, CefFrame>>> given, PageBrowser browser, CefFrame frame) {
+            List<BiConsumer<PageBrowser, CefFrame>> hooks = given.get(browser.getClient());
+            if (hooks != null) for (BiConsumer<PageBrowser, CefFrame> hook : hooks) hook.accept(browser, frame);
         }
 
         @Override public void onLoadEnd(CefBrowser browser, CefFrame frame, int httpStatusCode) {

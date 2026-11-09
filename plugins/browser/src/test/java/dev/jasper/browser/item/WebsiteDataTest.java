@@ -1,0 +1,412 @@
+package dev.jasper.browser.item;
+
+import dev.jasper.browser.permissions.Decision;
+import dev.jasper.browser.permissions.Permission;
+import dev.jasper.browser.store.BrowserDatabase;
+import dev.jasper.browser.store.CapturedLog;
+import dev.jasper.browser.store.DataFolder;
+import dev.jasper.browser.store.HistoryStore;
+import dev.jasper.browser.store.MemoryStores;
+import dev.jasper.browser.store.Reached;
+import dev.jasper.browser.store.Stores;
+import java.awt.EventQueue;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * Plan 6 Task 8: Clear Cookies and Clear Website Data for the persistent store. Clear Website Data gathers the sites to
+ * clear first, then has Chromium clear them, then empties the persistent store's history, bookmarks and site
+ * permissions, and compacts the database so nothing cleared stays in its file or its log; /dev/null stores are
+ * untouched. Chromium is a recording stand-in here, as none can start in a test.
+ */
+class WebsiteDataTest {
+    private static final String MARKER = "jasper-cleared-marker-7f3a";
+    @TempDir Path folder;
+    private final MemoryStores memory = new MemoryStores();
+    private final List<Set<String>> chromiumAsked = new CopyOnWriteArrayList<>();
+    // Whether each of Chromium's clearings was asked to mark the database's file too.
+    private final List<Boolean> databaseMarked = new CopyOnWriteArrayList<>();
+    private final List<Set<String>> reloaded = new CopyOnWriteArrayList<>();
+    private final List<String> told = new CopyOnWriteArrayList<>();
+    private final List<URI> open = new CopyOnWriteArrayList<>();
+    private volatile CompletableFuture<Void> chromium = CompletableFuture.completedFuture(null), cookies = CompletableFuture.completedFuture(null);
+    private int cookiesAsked;
+    private DataStores stores;
+    private Stores plugins;
+    // The clearing's warnings, kept off the console.
+    private CapturedLog log;
+
+    @BeforeEach void listen() {
+        log = new CapturedLog(WebsiteData.class.getName());
+    }
+
+    @AfterEach void close() throws Exception {
+        log.close();
+        if (stores != null) onUi(() -> {
+            stores.close();
+            return null;
+        });
+        if (plugins != null) plugins.closed().get(10, TimeUnit.SECONDS);
+        memory.close();
+    }
+
+    /** F20: the newest 1,000 history origins, so {@code origins} gives each scheme and host once, newest first. */
+    @Test void historyGivesEachOriginOnceNewestFirst() throws Exception {
+        var database = BrowserDatabase.memory();
+        try {
+            var history = new HistoryStore(database);
+            done(history.record("https://a.example/one", Reached.LINK, 1_000));
+            done(history.record("https://a.example/two?q=1", Reached.LINK, 2_000));
+            done(history.record("http://a.example/", Reached.TYPED, 3_000));
+            done(history.record("https://B.example:8443/x", Reached.LINK, 4_000));
+            done(history.record("https://a.example/one", Reached.LINK, 5_000));
+            done(history.record("file:///tmp/page.html", Reached.TYPED, 6_000));
+            assertThat(done(history.origins(10))).containsExactly("file://", "https://a.example", "https://b.example:8443", "http://a.example");
+            assertThat(done(history.origins(2))).containsExactly("file://", "https://a.example");
+            assertThat(history.origins(0)).isCompletedExceptionally();
+            done(history.clear());
+            assertThat(done(history.origins(10))).isEmpty();
+        } finally {
+            database.close();
+            database.closed().get(10, TimeUnit.SECONDS);
+        }
+    }
+
+    /**
+     * The sites are gathered before anything is erased, from the history and the persistent store's open items, as web
+     * origins; the re-review's item 3 (ruling V27) then erases the database before Chromium's part, so a quit during
+     * that part leaves no row.
+     */
+    @Test void theSitesAreGatheredFirstAndTheDatabaseIsErasedBeforeChromium() throws Exception {
+        DataStore persistent = persistent(memory.make());
+        Stores kept = persistent.stores();
+        done(kept.history().record("https://visited.example/page", Reached.LINK, 1_000));
+        done(kept.history().record("http://visited.example:8080/", Reached.LINK, 2_000));
+        done(kept.history().record("https://visited.example:443/again", Reached.LINK, 3_000));
+        done(kept.history().record("file:///tmp/local.html", Reached.TYPED, 4_000));
+        done(kept.bookmarks().add("https://bookmarked.example/", "Bookmarked", 1_000));
+        done(persistent.permissions().set("https://camera.example", Permission.CAMERA, Decision.ALLOWED));
+        open.addAll(List.of(URI.create("https://open.example/a?b=c"), URI.create("jasper-about:welcome"), URI.create("file:///tmp/x.html")));
+        chromium = new CompletableFuture<>();
+
+        CompletableFuture<Void> cleared = onUi(() -> data(persistent).clearAll());
+        await(() -> !chromiumAsked.isEmpty());
+        assertThat(chromiumAsked).singleElement().asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.collection(String.class))
+            .as("F20's live set: the history's origins and the open items', web origins only")
+            .containsExactlyInAnyOrder("https://visited.example", "http://visited.example:8080", "https://open.example");
+        memory.settle();
+        assertThat(done(kept.history().visits(10))).as("erased before Chromium is asked").isEmpty();
+        assertThat(done(kept.bookmarks().all())).isEmpty();
+        assertThat(persistent.permissions().all()).isEmpty();
+        assertThat(cleared).as("Chromium has not cleared yet").isNotDone();
+
+        chromium.complete(null);
+        done(cleared);
+        assertThat(done(kept.history().visits(10))).isEmpty();
+        assertThat(done(kept.history().list("", java.util.Optional.empty(), 10)).entries()).isEmpty();
+        assertThat(done(kept.bookmarks().all())).isEmpty();
+        assertThat(persistent.permissions().all()).isEmpty();
+        long permissionRows = done(kept.database().call(connection -> count(connection, "permissions")));
+        assertThat(permissionRows).isZero();
+        assertThat(told).isEmpty();
+    }
+
+    /** Only the persistent store is emptied: a /dev/null group's history, bookmarks and permissions stay. */
+    @Test void aDevNullStoreIsUntouched() throws Exception {
+        DataStore persistent = persistent(memory.make());
+        DataStore devNull = onUi(() -> stores.newDevNull());
+        done(persistent.stores().history().record("https://kept.example/", Reached.LINK, 1_000));
+        done(devNull.stores().history().record("https://private.example/", Reached.LINK, 1_000));
+        done(devNull.stores().bookmarks().add("https://private.example/", "Private", 1_000));
+        done(devNull.permissions().set("https://private.example", Permission.MICROPHONE, Decision.BLOCKED));
+        done(onUi(() -> data(persistent).clearAll()));
+        assertThat(done(persistent.stores().history().visits(10))).isEmpty();
+        assertThat(done(devNull.stores().history().visits(10))).hasSize(1);
+        assertThat(done(devNull.stores().bookmarks().all())).hasSize(1);
+        assertThat(devNull.permissions().all()).hasSize(1);
+        assertThat(chromiumAsked).singleElement().asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.collection(String.class))
+            .as("a /dev/null group's sites are not Chromium's persistent store's").containsExactly("https://kept.example");
+    }
+
+    /**
+     * F17: the database is compacted, and its write-ahead log checkpointed and truncated, so no page of a deleted row
+     * stays in {@code browser.sqlite} or {@code browser.sqlite-wal}.
+     */
+    @Test void nothingClearedStaysInTheDatabaseFileOrItsLog() throws Exception {
+        Path data = Files.createDirectories(folder.resolve("data"));
+        plugins = new Stores(BrowserDatabase.file(new DataFolder(data), cause -> told.add("unavailable: " + cause)), EventQueue::invokeLater);
+        DataStore persistent = persistent(plugins);
+        for (int each = 0; each < 50; each++)
+            done(plugins.history().record("https://" + MARKER + ".example/page" + each, Reached.LINK, 1_000 + each));
+        done(plugins.bookmarks().add("https://" + MARKER + ".example/", MARKER, 1_000));
+        done(persistent.permissions().set("https://" + MARKER + ".example", Permission.CAMERA, Decision.ALLOWED));
+        assertThat(holds(data)).as("the marker is on disk before the clearing").isTrue();
+
+        done(onUi(() -> data(persistent).clearAll()));
+        assertThat(holds(data)).as("nothing cleared stays in the file or its log").isFalse();
+        Path log = data.resolve("browser.sqlite-wal");
+        if (Files.exists(log)) assertThat(Files.size(log)).as("the log is truncated").isZero();
+        long free = done(plugins.database().call(connection -> number(connection, "PRAGMA freelist_count")));
+        assertThat(free).as("VACUUM leaves no free page").isZero();
+        assertThat(told).isEmpty();
+    }
+
+    /**
+     * Ruling V26: a Chromium clearing that fails, as past its bound, still has the database's rows erased once it has
+     * ended, and the failure is told as "Website data could not be cleared" with its cause.
+     */
+    @Test void aFailedChromiumClearingStillErasesTheDatabaseAndIsTold() throws Exception {
+        DataStore persistent = persistent(memory.make());
+        done(persistent.stores().history().record("https://kept.example/", Reached.LINK, 1_000));
+        done(persistent.stores().bookmarks().add("https://kept.example/", "Kept", 1_000));
+        done(persistent.permissions().set("https://kept.example", Permission.CAMERA, Decision.ALLOWED));
+        chromium = new CompletableFuture<>();
+        CompletableFuture<Void> cleared = onUi(() -> data(persistent).clearAll());
+        await(() -> !chromiumAsked.isEmpty());
+        chromium.completeExceptionally(new java.util.concurrent.TimeoutException("Chromium did not clear its data within 60 seconds"));
+        assertThat(failure(cleared)).hasMessage("Chromium did not clear its data within 60 seconds");
+        flushUi();
+        assertThat(told).containsExactly("Website data could not be cleared|Chromium did not clear its data within 60 seconds");
+        assertThat(log.records()).singleElement().satisfies(record -> {
+            assertThat(record.getLevel()).isEqualTo(java.util.logging.Level.WARNING);
+            assertThat(record.getMessage()).isEqualTo("Website data could not be cleared");
+        });
+        assertThat(done(persistent.stores().history().visits(10))).as("erased all the same").isEmpty();
+        assertThat(done(persistent.stores().bookmarks().all())).isEmpty();
+        assertThat(persistent.permissions().all()).isEmpty();
+    }
+
+    /**
+     * The re-review's item 3 (ruling V27): a stop or quit while Chromium clears, which closes the database, leaves no row
+     * of the cleared ones in the file or its log, and the next start's database has none.
+     */
+    @Test void aStopWhileChromiumClearsLeavesNoRowInTheFile() throws Exception {
+        Path data = Files.createDirectories(folder.resolve("data"));
+        plugins = new Stores(BrowserDatabase.file(new DataFolder(data), cause -> told.add("unavailable: " + cause)), EventQueue::invokeLater);
+        DataStore persistent = persistent(plugins);
+        for (int each = 0; each < 20; each++)
+            done(plugins.history().record("https://" + MARKER + ".example/page" + each, Reached.LINK, 1_000 + each));
+        assertThat(holds(data)).isTrue();
+        chromium = new CompletableFuture<>();
+        CompletableFuture<Void> cleared = onUi(() -> data(persistent).clearAll());
+        await(() -> !chromiumAsked.isEmpty());
+        onUi(() -> {
+            stores.close(); // the plugin's stop, as Chromium's part runs
+            return null;
+        });
+        plugins.closed().get(10, TimeUnit.SECONDS);
+        chromium.completeExceptionally(new IllegalStateException("Chromium can start once each time Jasper runs."));
+        assertThat(cleared).failsWithin(10, TimeUnit.SECONDS);
+        assertThat(holds(data)).as("no cleared row in the file or its log").isFalse();
+        var next = BrowserDatabase.file(new DataFolder(data), cause -> told.add("unavailable: " + cause));
+        try {
+            assertThat(done(new HistoryStore(next).list("", java.util.Optional.empty(), 10)).entries()).as("the next start").isEmpty();
+        } finally {
+            next.close();
+            next.closed().get(10, TimeUnit.SECONDS);
+        }
+        plugins = null;
+    }
+
+    /** Review round 1's item 1: the pages showing a site whose permission went load again, as the permissions page has them. */
+    @Test void clearingThePermissionsReloadsThePagesOfTheirSites() throws Exception {
+        DataStore persistent = persistent(memory.make());
+        done(persistent.permissions().set("https://camera.example", Permission.CAMERA, Decision.ALLOWED));
+        done(persistent.permissions().set("https://sound.example", Permission.AUDIO_PLAYBACK, Decision.BLOCKED));
+        done(onUi(() -> data(persistent).clearAll()));
+        flushUi();
+        assertThat(reloaded).singleElement().asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.collection(String.class))
+            .containsExactlyInAnyOrder("https://camera.example", "https://sound.example");
+        done(onUi(() -> data(persistent).clearAll()));
+        flushUi();
+        assertThat(reloaded).as("no site's permission went: nothing loads again").hasSize(1);
+    }
+
+    /**
+     * Ruling V25: a database that runs in memory, as its file could not be used, hides its file's rows: the clearing
+     * erases what it can, has the file marked for deletion with the next start's wipe, and fails, told with why.
+     */
+    @Test void aDatabaseRunningInMemoryMarksItsFileAndFailsTheClearing() throws Exception {
+        Path data = Files.createDirectories(folder.resolve("data"));
+        dev.jasper.browser.store.DatabaseFixtures.notADatabase(data);
+        var unavailable = new CopyOnWriteArrayList<Throwable>();
+        plugins = new Stores(BrowserDatabase.file(new DataFolder(data), unavailable::add), EventQueue::invokeLater);
+        DataStore persistent = persistent(plugins);
+        done(plugins.history().record("https://memory.example/", Reached.LINK, 1_000));
+        assertThat(unavailable).as("the file could not be used").hasSize(1);
+        CompletableFuture<Void> cleared = onUi(() -> data(persistent).clearAll());
+        assertThat(failure(cleared)).hasMessage(WebsiteData.IN_MEMORY);
+        assertThat(databaseMarked).as("the file is marked for the next start").containsExactly(true);
+        assertThat(done(plugins.history().visits(10))).as("what is in memory is erased").isEmpty();
+        flushUi();
+        assertThat(told).containsExactly("Website data could not be cleared|" + WebsiteData.IN_MEMORY);
+        assertThat(data.resolve("browser.sqlite")).as("deleted at the next start, before the database opens").isRegularFile();
+
+        databaseMarked.clear();
+        told.clear();
+        onUi(() -> {
+            stores.close();
+            return null;
+        });
+        DataStore memoryOnly = persistent(memory.make());
+        done(onUi(() -> data(memoryOnly).clearAll()));
+        assertThat(databaseMarked).as("a database never asked for a file marks none").containsExactly(false);
+    }
+
+    /** Review round 1's item 7: a permissions table whose rows cannot be deleted fails the clearing. */
+    @Test void aPermissionsDeleteThatFailsFailsTheClearing() throws Exception {
+        DataStore persistent = persistent(memory.make());
+        done(persistent.permissions().set("https://camera.example", Permission.CAMERA, Decision.ALLOWED));
+        done(persistent.stores().database().call(connection -> {
+            try (var statement = connection.createStatement()) {
+                statement.execute("CREATE TEMP TRIGGER refused BEFORE DELETE ON permissions BEGIN SELECT RAISE(ABORT, 'refused'); END");
+            }
+            return null;
+        }));
+        try (var permissionsLog = new CapturedLog(dev.jasper.browser.permissions.PermissionStore.class.getName())) {
+            CompletableFuture<Void> cleared = onUi(() -> data(persistent).clearAll());
+            assertThat(failure(cleared)).isInstanceOf(java.sql.SQLException.class).hasMessageContaining("refused");
+            flushUi();
+            assertThat(told).singleElement().asString().startsWith("Website data could not be cleared|");
+            assertThat(permissionsLog.records()).as("the store's own warning").hasSize(1);
+            assertThat(databaseMarked).as("V27: an erase that did not complete marks the file for the next start").containsExactly(true);
+        }
+    }
+
+    /**
+     * A database that cannot be used keeps Chromium's clearing from nothing: Chromium clears the open items' sites, the
+     * next start's wipe the rest, and the erase that fails is told.
+     */
+    @Test void aDatabaseThatCannotBeUsedStillHasChromiumClearedAndIsTold() throws Exception {
+        DataStore persistent = persistent(memory.make());
+        persistent.stores().close();
+        open.add(URI.create("https://open.example/"));
+        CompletableFuture<Void> cleared = onUi(() -> data(persistent).clearAll());
+        assertThat(failure(cleared)).isInstanceOf(dev.jasper.browser.store.DatabaseClosedException.class);
+        flushUi();
+        assertThat(chromiumAsked).singleElement().asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.collection(String.class))
+            .containsExactly("https://open.example");
+        assertThat(told).singleElement().asString().startsWith("Website data could not be cleared|");
+        assertThat(log.records()).extracting(java.util.logging.LogRecord::getMessage)
+            .containsExactly("The history's sites could not be read; the next start's wipe clears them", "Website data could not be cleared");
+    }
+
+    @Test void clearCookiesAsksChromiumAndAFailureIsTold() throws Exception {
+        DataStore persistent = persistent(memory.make());
+        done(onUi(() -> data(persistent).clearCookies()));
+        assertThat(cookiesAsked).isEqualTo(1);
+        assertThat(told).isEmpty();
+        cookies = CompletableFuture.failedFuture(new IllegalStateException("Chromium's thread did not take the work"));
+        CompletableFuture<Void> refused = onUi(() -> data(persistent).clearCookies());
+        assertThat(failure(refused)).hasMessage("Chromium's thread did not take the work");
+        flushUi();
+        assertThat(told).containsExactly("Cookies could not be cleared|Chromium's thread did not take the work");
+        assertThat(log.records()).singleElement().extracting(java.util.logging.LogRecord::getMessage).isEqualTo("Cookies could not be cleared");
+        assertThat(chromiumAsked).as("cookies only").isEmpty();
+    }
+
+    /** The persistent data store over {@code persistentStores}, made as the plugin makes it, on the UI thread. */
+    private DataStore persistent(Stores persistentStores) throws Exception {
+        return onUi(() -> {
+            stores = new DataStores(persistentStores, () -> false);
+            return stores.persistent();
+        });
+    }
+
+    /** The clearing of {@code persistent}, with Chromium's two clearings and the reloads recorded. */
+    private WebsiteData data(DataStore persistent) {
+        return new WebsiteData(() -> {
+            cookiesAsked++;
+            return cookies;
+        }, (origins, database) -> {
+            chromiumAsked.add(Set.copyOf(origins));
+            databaseMarked.add(database);
+            return chromium;
+        }, persistent, () -> List.copyOf(open), reloaded::add, Runnable::run, (title, cause) -> told.add(title + "|" + cause.getMessage()));
+    }
+
+    /** Whether the database's file or its log holds the marker's bytes. */
+    private static boolean holds(Path data) throws Exception {
+        byte[] marker = MARKER.getBytes(StandardCharsets.US_ASCII);
+        for (String name : List.of("browser.sqlite", "browser.sqlite-wal")) {
+            Path file = data.resolve(name);
+            if (Files.exists(file) && indexOf(Files.readAllBytes(file), marker) >= 0) return true;
+        }
+        return false;
+    }
+
+    private static int indexOf(byte[] bytes, byte[] part) {
+        outer:
+        for (int at = 0; at <= bytes.length - part.length; at++) {
+            for (int each = 0; each < part.length; each++) if (bytes[at + each] != part[each]) continue outer;
+            return at;
+        }
+        return -1;
+    }
+
+    private static long count(java.sql.Connection connection, String table) throws java.sql.SQLException {
+        return number(connection, "SELECT COUNT(*) FROM " + table);
+    }
+
+    private static long number(java.sql.Connection connection, String sql) throws java.sql.SQLException {
+        try (var statement = connection.createStatement(); var rows = statement.executeQuery(sql)) {
+            rows.next();
+            return rows.getLong(1);
+        }
+    }
+
+    private static <T> T done(CompletableFuture<T> future) throws Exception {
+        return future.get(10, TimeUnit.SECONDS);
+    }
+
+    private static Throwable failure(CompletableFuture<?> future) {
+        try {
+            future.get(10, TimeUnit.SECONDS);
+        } catch (java.util.concurrent.ExecutionException failed) {
+            return failed.getCause();
+        } catch (Exception other) {
+            throw new AssertionError(other);
+        }
+        throw new AssertionError("the clearing did not fail");
+    }
+
+    private static void await(java.util.function.BooleanSupplier condition) throws Exception {
+        long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (!condition.getAsBoolean()) {
+            if (System.nanoTime() > until) throw new AssertionError("not within 10 seconds");
+            Thread.sleep(10);
+        }
+    }
+
+    private static <T> T onUi(Callable<T> work) throws Exception {
+        var result = new AtomicReference<T>();
+        var thrown = new AtomicReference<Exception>();
+        EventQueue.invokeAndWait(() -> {
+            try {
+                result.set(work.call());
+            } catch (Exception failure) {
+                thrown.set(failure);
+            }
+        });
+        if (thrown.get() != null) throw thrown.get();
+        return result.get();
+    }
+
+    private static void flushUi() throws Exception {
+        EventQueue.invokeAndWait(() -> { });
+    }
+}

@@ -289,6 +289,19 @@ class SourcePageTest {
         assertThat(asked).as("nothing fetched").isEmpty();
     }
 
+    /**
+     * Plan 6's F3 and the review's M4: View Source's fetch goes through the HTTP proxy given, a loopback stand-in here,
+     * which a name under {@code .invalid} reaches without being looked up.
+     */
+    @Test void theFetchGoesThroughTheProxyGiven() throws Exception {
+        try (var proxy = new dev.jasper.browser.http.StandIn()) {
+            open((token, page) -> Optional.empty(), SourcePage.TIMEOUT);
+            sources.useProxy(Optional.of(proxy.address()));
+            assertThat(sources.fetch(URI.create("http://page.invalid/")).get(10, TimeUnit.SECONDS)).contains(dev.jasper.browser.http.StandIn.BODY);
+            assertThat(proxy.next()).isEqualTo("GET http://page.invalid/ HTTP/1.1");
+        }
+    }
+
     /** Reads the source page's addresses with a look-up of the item's captures, in the fake host's theme. */
     private void open(BiFunction<String, String, Optional<String>> captured, Duration timeout) throws Exception {
         var made = new AtomicReference<SourcePage>();

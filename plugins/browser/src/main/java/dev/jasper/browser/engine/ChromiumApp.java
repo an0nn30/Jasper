@@ -3,26 +3,44 @@ package dev.jasper.browser.engine;
 import com.jetbrains.cef.JCefAppConfig;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.BiPredicate;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 import org.cef.CefApp;
 import org.cef.CefClient;
 import org.cef.CefSettings;
 import org.cef.SystemBootstrap;
 import org.cef.browser.CefBrowser;
+import org.cef.browser.CefRequestContext;
 import org.cef.callback.CefSchemeRegistrar;
 import org.cef.handler.CefAppHandlerAdapter;
+import org.cef.handler.CefResourceHandler;
+import org.cef.network.CefCookieManager;
+import org.cef.network.CefRequest;
 
 /**
- * The JCEF side of {@link Chromium}: the in-process {@link CefApp}, its pages' client, its previews' client and its
- * dispose. Only Chromium's start loads this class, so a plugin start that never shows a page loads no Chromium class.
+ * The JCEF side of {@link Chromium}: the in-process {@link CefApp}, its pages' client, its previews' client, its
+ * clearing client, which only the helper browser of a live Clear Website Data uses ({@link ProfileClearing}), its
+ * in-memory request contexts, its cookies' deletion, the hand-over to its own UI thread and its dispose. Only Chromium's
+ * start loads this class, so a plugin start that never shows a page loads no Chromium class.
  */
 final class ChromiumApp {
     private final CefApp app;
-    private CefClient client, preview;
+    // Serves jasper-about: to the global context as its scheme handler factory, and to in-memory contexts' pages through
+    // their request handler (F1): the factory is registered on the global context alone.
+    private final AboutSchemeFactory about;
+    private CefClient client, preview, clearing;
     private boolean disposed;
+    // The global cookie manager, got once JCEF has initialized, as the hand-over is.
+    private volatile CefCookieManager cookies;
 
-    private ChromiumApp(CefApp app) { this.app = app; }
+    private ChromiumApp(CefApp app, AboutSchemeFactory about) {
+        this.app = app;
+        this.about = about;
+    }
 
     /**
      * Starts in-process Chromium as the spike does and returns its app, which then initializes on Chromium's own thread.
@@ -35,9 +53,12 @@ final class ChromiumApp {
      * @param previewBrowser whether {@code jasper-preview:} answers a browser's request for an address: a preview's, on
      *     its own origin
      * @param terminated run once Chromium has ended, on the UI thread
+     * @param contextInitialized given Chromium's global context once Chromium's context has initialized, on Chromium's own
+     *     UI thread
      */
     static ChromiumApp start(Path dataDir, AboutScheme about, Predicate<CefBrowser> pageBrowser, PreviewScheme previews,
-            BiPredicate<CefBrowser, String> previewBrowser, Runnable terminated) {
+            BiPredicate<CefBrowser, String> previewBrowser, Runnable terminated,
+            Consumer<CefRequestContext> contextInitialized) {
         JCefAppConfig config = JCefAppConfig.getInstance();
         CefApp.setIsRemoteEnabled(false);
         SystemBootstrap.setLoader(config.getLoader());
@@ -45,12 +66,81 @@ final class ChromiumApp {
         CefSettings settings = config.getCefSettings();
         ChromiumOptions.apply(settings, dataDir);
         String[] args = ChromiumOptions.arguments(List.of(config.getAppArgs())).toArray(String[]::new);
-        CefApp.addAppHandler(new Handler(args, terminated));
+        CefApp.addAppHandler(new Handler(args, terminated, contextInitialized));
         CefApp app = CefApp.getInstance(args, settings, config.getServerExe());
+        var pages = new AboutSchemeFactory(about, pageBrowser);
         // JCEF holds the factories until the app has initialized.
-        app.registerSchemeHandlerFactory(AboutScheme.NAME, "", new AboutSchemeFactory(about, pageBrowser));
+        app.registerSchemeHandlerFactory(AboutScheme.NAME, "", pages);
         app.registerSchemeHandlerFactory(PreviewScheme.NAME, "", new PreviewSchemeFactory(previews, previewBrowser));
-        return new ChromiumApp(app);
+        return new ChromiumApp(app, pages);
+    }
+
+    /**
+     * A new request context in memory: CEF's defaults, whose empty cache path keeps its cookies, cache and storage in
+     * memory. Chromium's own UI thread, where CEF initializes it at once.
+     *
+     * @return the context
+     * @throws IllegalStateException when CEF makes none
+     */
+    static CefRequestContext inMemoryContext() {
+        CefRequestContext made = CefRequestContext.createContext(null);
+        if (made == null) throw new IllegalStateException("Chromium could not make an in-memory request context");
+        return made;
+    }
+
+    /** Releases Java's hold on {@code context}, which CEF destroys once its last browser has let it go too. */
+    static void dispose(CefRequestContext context) {
+        context.dispose();
+    }
+
+    /**
+     * What hands a task to Chromium's own UI thread: the global cookie manager's {@code flushStore}, which has no other
+     * effect, calls back there, and answers whether it will. The manager is got once, now: getting it takes {@code CefApp}'s
+     * class monitor and its initialization listeners' monitor, which JCEF holds as it runs its listeners, so getting it
+     * under {@code ChromiumThread}'s lock, which those listeners take, could deadlock; {@code flushStore} takes neither.
+     * Once JCEF has initialized, in its initialization listener.
+     *
+     * @return the hand-over
+     */
+    Predicate<Runnable> handOver() {
+        CefCookieManager manager = CefCookieManager.getGlobalManager();
+        cookies = manager;
+        return task -> manager != null && manager.flushStore(task::run);
+    }
+
+    /**
+     * Deletes every cookie of the global context, the persistent store's ({@link ProfileClearing#clearCookies}). Any
+     * thread, once JCEF has initialized.
+     *
+     * @return the domains the cookies had, once the deletion is saved; failed when Chromium refuses it
+     */
+    CompletableFuture<Set<String>> clearCookies() {
+        return ProfileClearing.clearCookies(cookies);
+    }
+
+    /**
+     * Clears the browser cache and the storage of each of {@code origins} in the global context, through a helper
+     * browser on the clearing client, which is made the first time ({@link ProfileClearing#clearStorage}). UI thread,
+     * while Chromium runs.
+     *
+     * @param origins the origins
+     * @param running whether Chromium still runs
+     * @return completes once they are cleared
+     */
+    CompletableFuture<Void> clearStorage(List<String> origins, BooleanSupplier running) {
+        if (clearing == null) {
+            clearing = app.createClient();
+            ProfileClearing.install(clearing);
+        }
+        return ProfileClearing.clearStorage(clearing, origins, running);
+    }
+
+    /**
+     * The handler of {@code browser}'s {@code jasper-about:} request, as the scheme handler factory answers it.
+     * Chromium's IO thread.
+     */
+    CefResourceHandler aboutResource(CefBrowser browser, CefRequest request) {
+        return about.handler(browser, request.getResourceType(), request.getURL());
     }
 
     /** Runs {@code then} once the app has initialized, on Chromium's thread. */
@@ -86,8 +176,8 @@ final class ChromiumApp {
     }
 
     /**
-     * Disposes the previews' client and the pages' client, which closes their every browser, then the app; once, on the
-     * UI thread. Chromium ends later, on its own thread.
+     * Disposes the previews' client, the clearing client and the pages' client, which closes their every browser, then
+     * the app; once, on the UI thread. Chromium ends later, on its own thread.
      */
     void dispose() {
         if (disposed) return;
@@ -96,23 +186,34 @@ final class ChromiumApp {
             if (preview != null) preview.dispose();
         } finally {
             try {
-                if (client != null) client.dispose();
+                if (clearing != null) clearing.dispose();
             } finally {
-                app.dispose();
+                try {
+                    if (client != null) client.dispose();
+                } finally {
+                    app.dispose();
+                }
             }
         }
     }
 
     /**
-     * Registers {@code jasper-about} and {@code jasper-preview} and reports Chromium's end. JCEF tells it of each state on
-     * the UI thread.
+     * Registers {@code jasper-about} and {@code jasper-preview}, reports the context's initialization, with Chromium's
+     * global context, on Chromium's own UI thread, and reports Chromium's end. JCEF tells it of each state on the UI
+     * thread.
      */
     private static final class Handler extends CefAppHandlerAdapter {
         private final Runnable terminated;
+        private final Consumer<CefRequestContext> contextInitialized;
 
-        Handler(String[] args, Runnable terminated) {
+        Handler(String[] args, Runnable terminated, Consumer<CefRequestContext> contextInitialized) {
             super(args);
             this.terminated = terminated;
+            this.contextInitialized = contextInitialized;
+        }
+
+        @Override public void onContextInitialized() {
+            contextInitialized.accept(CefRequestContext.getGlobalContext());
         }
 
         @Override public void onRegisterCustomSchemes(CefSchemeRegistrar registrar) {

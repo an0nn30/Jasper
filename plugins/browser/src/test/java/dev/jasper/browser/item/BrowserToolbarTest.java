@@ -1,6 +1,6 @@
 package dev.jasper.browser.item;
 
-import dev.jasper.browser.BrowserPlugin;
+import dev.jasper.browser.OfflinePlugins;
 import dev.jasper.browser.page.NavigationHistory;
 import dev.jasper.browser.page.NavigationHistory.Entry;
 import dev.jasper.browser.page.NavigationHistory.History;
@@ -10,6 +10,7 @@ import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.testing.FakeKitView;
 import dev.jasper.sdk.testing.FakePluginHost;
+import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.MenuItem;
 import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.PixelImage;
@@ -37,6 +38,8 @@ class BrowserToolbarTest {
     private static final BrowserSettings GOOGLE = SearchEngineTest.settings(SearchEngine.GOOGLE, "", "");
     // No bookmark state, as plan 6's /dev/null mode gives: the menu shows no bookmark group.
     private static final Optional<Boolean> NO_GROUP = Optional.empty();
+    // No permission stored for the page's site: the menu shows no privacy group.
+    private static final List<MenuItem> NO_PRIVACY = List.of();
     private final MemoryStores memory = new MemoryStores();
 
     @AfterEach void closeStores() throws Exception {
@@ -58,17 +61,17 @@ class BrowserToolbarTest {
 
     @Test void reloadBecomesStopWhileThePageLoads() {
         var toolbar = new BrowserToolbar(typed -> List.of());
-        Nodes.Button idle = Views.button(toolbar.node(START, false, true, false, Optional.empty(), History.EMPTY, GOOGLE, false, NO_GROUP), BrowserToolbar.RELOAD);
+        Nodes.Button idle = Views.button(toolbar.node(START, false, true, false, Optional.empty(), History.EMPTY, GOOGLE, false, false, NO_GROUP, NO_PRIVACY), BrowserToolbar.RELOAD);
         assertThat(idle.action()).isEqualTo(BrowserToolbar.RELOAD);
         assertThat(idle.icon()).isEqualTo("refresh");
         assertThat(idle.tooltip()).isEqualTo("Reload");
-        Nodes.Button loading = Views.button(toolbar.node(START, true, true, false, Optional.empty(), History.EMPTY, GOOGLE, false, NO_GROUP), BrowserToolbar.RELOAD);
+        Nodes.Button loading = Views.button(toolbar.node(START, true, true, false, Optional.empty(), History.EMPTY, GOOGLE, false, false, NO_GROUP, NO_PRIVACY), BrowserToolbar.RELOAD);
         assertThat(loading.action()).isEqualTo(BrowserToolbar.STOP);
         assertThat(loading.icon()).isEqualTo("close");
         assertThat(loading.tooltip()).isEqualTo("Stop");
-        assertThat(Views.button(toolbar.node(START, true, true, false, Optional.empty(), History.EMPTY, GOOGLE, false, NO_GROUP), BrowserToolbar.BACK).state().enabled())
+        assertThat(Views.button(toolbar.node(START, true, true, false, Optional.empty(), History.EMPTY, GOOGLE, false, false, NO_GROUP, NO_PRIVACY), BrowserToolbar.BACK).state().enabled())
             .as("Back can go").isTrue();
-        assertThat(Views.button(toolbar.node(START, true, true, false, Optional.empty(), History.EMPTY, GOOGLE, false, NO_GROUP), BrowserToolbar.FORWARD).state().enabled()).isFalse();
+        assertThat(Views.button(toolbar.node(START, true, true, false, Optional.empty(), History.EMPTY, GOOGLE, false, false, NO_GROUP, NO_PRIVACY), BrowserToolbar.FORWARD).state().enabled()).isFalse();
     }
 
     /**
@@ -80,7 +83,7 @@ class BrowserToolbarTest {
         var toolbar = new BrowserToolbar(typed -> List.of());
         var history = new History(1, List.of(new Entry(1, "https://example.com/one", "One"), new Entry(2, START, "Here"),
             new Entry(3, "https://example.com/three", "Three"), new Entry(4, "https://example.com/four", "Four")));
-        Nodes.Stack bar = toolbar.node(START, false, true, true, Optional.empty(), history, GOOGLE, false, NO_GROUP);
+        Nodes.Stack bar = toolbar.node(START, false, true, true, Optional.empty(), history, GOOGLE, false, false, NO_GROUP, NO_PRIVACY);
         Nodes.Button back = Views.button(bar, BrowserToolbar.BACK), forward = Views.button(bar, BrowserToolbar.FORWARD);
         assertThat(back.holdMenu()).startsWith(NavigationHistory.backMenu(history).toArray(MenuItem[]::new)).hasSize(3);
         assertThat(back.holdMenu()).extracting(MenuItem::label).containsExactly("One", "", "Show Full History");
@@ -98,9 +101,9 @@ class BrowserToolbarTest {
         }
         assertThat(back.action()).isEqualTo(BrowserToolbar.BACK);
         assertThat(forward.action()).isEqualTo(BrowserToolbar.FORWARD);
-        Nodes.Stack last = toolbar.node(START, false, true, false, Optional.empty(), new History(1, history.entries().subList(0, 2)), GOOGLE, false, NO_GROUP);
+        Nodes.Stack last = toolbar.node(START, false, true, false, Optional.empty(), new History(1, history.entries().subList(0, 2)), GOOGLE, false, false, NO_GROUP, NO_PRIVACY);
         assertThat(Views.button(last, BrowserToolbar.FORWARD).holdMenu()).as("an empty forward list").isEmpty();
-        Nodes.Stack none = toolbar.node(START, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false, NO_GROUP);
+        Nodes.Stack none = toolbar.node(START, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false, false, NO_GROUP, NO_PRIVACY);
         assertThat(Views.button(none, BrowserToolbar.BACK).holdMenu()).isEmpty();
         assertThat(Views.button(none, BrowserToolbar.FORWARD).holdMenu()).isEmpty();
     }
@@ -109,20 +112,20 @@ class BrowserToolbarTest {
     @Test void theFieldsLeadingSlotShowsTheIconGivenElseTheGlobeAndDragsTheAddress() {
         var toolbar = new BrowserToolbar(typed -> List.of());
         var icon = new PixelImage(new byte[] {(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n', 1});
-        Nodes.Field shown = (Nodes.Field) Views.node(toolbar.node(START, false, false, false, Optional.of(icon), History.EMPTY, GOOGLE, false, NO_GROUP), BrowserToolbar.ADDRESS);
+        Nodes.Field shown = (Nodes.Field) Views.node(toolbar.node(START, false, false, false, Optional.of(icon), History.EMPTY, GOOGLE, false, false, NO_GROUP, NO_PRIVACY), BrowserToolbar.ADDRESS);
         assertThat(shown.leadingImage()).contains(icon);
         assertThat(shown.leadingIcon()).isEqualTo(BrowserItems.GLOBE);
         assertThat(shown.leadingName()).isEqualTo("Site icon - drag to copy URL");
         assertThat(shown.leadingDrag()).contains(START);
-        Nodes.Field none = (Nodes.Field) Views.node(toolbar.node(START, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false, NO_GROUP), BrowserToolbar.ADDRESS);
+        Nodes.Field none = (Nodes.Field) Views.node(toolbar.node(START, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false, false, NO_GROUP, NO_PRIVACY), BrowserToolbar.ADDRESS);
         assertThat(none.leadingImage()).isEmpty();
         assertThat(none.leadingIcon()).isEqualTo(BrowserItems.GLOBE);
         assertThat(none.leadingDrag()).contains(START);
         toolbar.edited("typed");
-        Nodes.Field typed = (Nodes.Field) Views.node(toolbar.node(START, false, false, false, Optional.of(icon), History.EMPTY, GOOGLE, false, NO_GROUP), BrowserToolbar.ADDRESS);
+        Nodes.Field typed = (Nodes.Field) Views.node(toolbar.node(START, false, false, false, Optional.of(icon), History.EMPTY, GOOGLE, false, false, NO_GROUP, NO_PRIVACY), BrowserToolbar.ADDRESS);
         assertThat(typed.value()).isEqualTo("typed");
         assertThat(typed.leadingDrag()).as("the page's address, not the text").contains(START);
-        Nodes.Field blank = (Nodes.Field) Views.node(toolbar.node("", false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false, NO_GROUP), BrowserToolbar.ADDRESS);
+        Nodes.Field blank = (Nodes.Field) Views.node(toolbar.node("", false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false, false, NO_GROUP, NO_PRIVACY), BrowserToolbar.ADDRESS);
         assertThat(blank.leadingDrag()).as("nothing to drag").isEmpty();
     }
 
@@ -130,7 +133,7 @@ class BrowserToolbarTest {
     @Test void notSecureStandsInPlaceOfTheSiteIcon() {
         var toolbar = new BrowserToolbar(typed -> List.of());
         var icon = new PixelImage(new byte[] {(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n', 1});
-        Nodes.Stack bar = toolbar.node(START, false, false, false, Optional.of(icon), History.EMPTY, GOOGLE, true, NO_GROUP);
+        Nodes.Stack bar = toolbar.node(START, false, false, false, Optional.of(icon), History.EMPTY, GOOGLE, true, false, NO_GROUP, NO_PRIVACY);
         Nodes.Text notSecure = (Nodes.Text) Views.node(bar, BrowserToolbar.NOT_SECURE);
         assertThat(notSecure.text()).isEqualTo("Not secure");
         assertThat(notSecure.severity()).contains(Nodes.Severity.WARNING);
@@ -141,7 +144,7 @@ class BrowserToolbarTest {
         assertThat(field.leadingName()).isEmpty();
         assertThat(field.leadingDrag()).isEmpty();
         assertThat(field.value()).isEqualTo(START);
-        assertThat(Views.node(toolbar.node(START, false, false, false, Optional.of(icon), History.EMPTY, GOOGLE, false, NO_GROUP), BrowserToolbar.NOT_SECURE))
+        assertThat(Views.node(toolbar.node(START, false, false, false, Optional.of(icon), History.EMPTY, GOOGLE, false, false, NO_GROUP, NO_PRIVACY), BrowserToolbar.NOT_SECURE))
             .as("a secure page").isNull();
     }
 
@@ -152,7 +155,7 @@ class BrowserToolbarTest {
     @Test void theFieldListsTheTypedTextsSuggestionsAndShowsAResultsPagesTerms() {
         var toolbar = new BrowserToolbar(typed -> List.of());
         String results = "https://duckduckgo.com/?q=what+is+jcef";
-        Nodes.Field idle = (Nodes.Field) Views.node(toolbar.node(results, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false, NO_GROUP),
+        Nodes.Field idle = (Nodes.Field) Views.node(toolbar.node(results, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false, false, NO_GROUP, NO_PRIVACY),
             BrowserToolbar.ADDRESS);
         assertThat(idle.value()).isEqualTo("what is jcef");
         assertThat(idle.leadingDrag()).contains(results);
@@ -161,18 +164,18 @@ class BrowserToolbarTest {
         assertThat(idle.suggestionsLoading()).isFalse();
         toolbar.edited("jc");
         toolbar.suggesting();
-        Nodes.Field typing = (Nodes.Field) Views.node(toolbar.node(results, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false, NO_GROUP),
+        Nodes.Field typing = (Nodes.Field) Views.node(toolbar.node(results, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false, false, NO_GROUP, NO_PRIVACY),
             BrowserToolbar.ADDRESS);
         assertThat(typing.value()).isEqualTo("jc");
         assertThat(typing.suggestions()).isEqualTo(Suggestions.rank("jc", GOOGLE, List.of(), List.of()));
         assertThat(typing.suggestionsLoading()).isTrue();
         toolbar.suggested(List.of("jcef"));
-        Nodes.Field answered = (Nodes.Field) Views.node(toolbar.node(results, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false, NO_GROUP),
+        Nodes.Field answered = (Nodes.Field) Views.node(toolbar.node(results, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false, false, NO_GROUP, NO_PRIVACY),
             BrowserToolbar.ADDRESS);
         assertThat(answered.suggestions()).isEqualTo(Suggestions.rank("jc", GOOGLE, List.of("jcef"), List.of()));
         assertThat(answered.suggestionsLoading()).isFalse();
         toolbar.restore();
-        Nodes.Field restored = (Nodes.Field) Views.node(toolbar.node(results, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false, NO_GROUP),
+        Nodes.Field restored = (Nodes.Field) Views.node(toolbar.node(results, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false, false, NO_GROUP, NO_PRIVACY),
             BrowserToolbar.ADDRESS);
         assertThat(restored.value()).isEqualTo("what is jcef");
         assertThat(restored.suggestions()).isEmpty();
@@ -186,7 +189,7 @@ class BrowserToolbarTest {
             asked.add(typed);
             return List.of(stored);
         });
-        Nodes.Field idle = (Nodes.Field) Views.node(toolbar.node(START, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false, NO_GROUP),
+        Nodes.Field idle = (Nodes.Field) Views.node(toolbar.node(START, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false, false, NO_GROUP, NO_PRIVACY),
             BrowserToolbar.ADDRESS);
         assertThat(idle.suggestions()).isEmpty();
         assertThat(asked).as("nothing typed").isEmpty();
@@ -194,7 +197,7 @@ class BrowserToolbarTest {
         toolbar.edited("jc");
         toolbar.suggested(List.of("jcef"));
         assertThat(toolbar.typing()).isTrue();
-        Nodes.Field typing = (Nodes.Field) Views.node(toolbar.node(START, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false, NO_GROUP),
+        Nodes.Field typing = (Nodes.Field) Views.node(toolbar.node(START, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false, false, NO_GROUP, NO_PRIVACY),
             BrowserToolbar.ADDRESS);
         assertThat(typing.suggestions()).isEqualTo(Suggestions.rank("jc", GOOGLE, List.of("jcef"), List.of(stored)));
         assertThat(typing.suggestions().getLast()).isEqualTo(stored);
@@ -255,14 +258,14 @@ class BrowserToolbarTest {
      */
     @Test void theMenuButtonsBookmarkItemsFollowWhetherTheAddressIsBookmarked() {
         var toolbar = new BrowserToolbar(typed -> List.of());
-        List<MenuItem> notBookmarked = menu(toolbar.node(START, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false, Optional.of(false)));
+        List<MenuItem> notBookmarked = menu(toolbar.node(START, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false, false, Optional.of(false), NO_PRIVACY));
         assertThat(notBookmarked).extracting(MenuItem::label, MenuItem::action, MenuItem::enabled, MenuItem::separator).containsExactly(
             tuple("Add Bookmark", BrowserToolbar.BOOKMARK_ADD, true, false), tuple("", "", true, true),
             tuple("Manage Bookmarks", BrowserToolbar.BOOKMARKS, true, false), tuple("History", BrowserToolbar.HISTORY, true, false),
             tuple("", "", true, true), tuple("Settings", BrowserToolbar.SETTINGS, true, false));
         assertThat(notBookmarked).allSatisfy(item -> { if (!item.separator()) assertThat(item.id()).isEqualTo(item.action()); });
 
-        List<MenuItem> bookmarked = menu(toolbar.node(START, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false, Optional.of(true)));
+        List<MenuItem> bookmarked = menu(toolbar.node(START, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false, false, Optional.of(true), NO_PRIVACY));
         assertThat(bookmarked).extracting(MenuItem::label).containsExactly("Remove Bookmark", "", "Manage Bookmarks", "History", "", "Settings");
         assertThat(bookmarked.getFirst()).satisfies(remove -> {
             assertThat(remove.action()).isEqualTo(BrowserToolbar.BOOKMARK_REMOVE);
@@ -270,7 +273,7 @@ class BrowserToolbarTest {
         });
 
         for (String unstorable : List.of("jasper-about:welcome", "data:text/html,page", "about:blank")) {
-            List<MenuItem> refused = menu(toolbar.node(unstorable, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false, Optional.of(false)));
+            List<MenuItem> refused = menu(toolbar.node(unstorable, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false, false, Optional.of(false), NO_PRIVACY));
             assertThat(refused.getFirst()).as(unstorable).satisfies(add -> {
                 assertThat(add.action()).isEqualTo(BrowserToolbar.BOOKMARK_ADD);
                 assertThat(add.enabled()).as("bookmarks never keep it").isFalse();
@@ -278,8 +281,26 @@ class BrowserToolbarTest {
             assertThat(refused.subList(1, refused.size())).extracting(MenuItem::enabled).as("the rest stay enabled").containsOnly(true);
         }
 
-        assertThat(menu(toolbar.node(START, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false, NO_GROUP)))
+        assertThat(menu(toolbar.node(START, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false, false, NO_GROUP, NO_PRIVACY)))
             .extracting(MenuItem::label).as("no bookmark state").containsExactly("Settings");
+    }
+
+    /**
+     * Plan 6: an item in /dev/null mode shows the indicator, between the address field and the menu button, and its
+     * menu holds no bookmark group; any other item shows no indicator.
+     */
+    @Test void theDevNullIndicatorStandsBetweenTheFieldAndTheMenuInDevNullItemsOnly() {
+        var toolbar = new BrowserToolbar(typed -> List.of());
+        Nodes.Stack ordinary = toolbar.node(START, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false, false, Optional.of(false), NO_PRIVACY);
+        assertThat(ordinary.children()).extracting(Nodes.Node::id).doesNotContain(BrowserToolbar.DEVNULL);
+
+        Nodes.Stack devNull = toolbar.node(START, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false, true, NO_GROUP, NO_PRIVACY);
+        var ids = devNull.children().stream().map(Nodes.Node::id).toList();
+        assertThat(ids.indexOf(BrowserToolbar.DEVNULL)).isEqualTo(ids.indexOf(BrowserToolbar.ADDRESS) + 1)
+            .isEqualTo(ids.indexOf(BrowserToolbar.MENU) - 1);
+        assertThat(Views.button(devNull, BrowserToolbar.DEVNULL)).isEqualTo(new Nodes.Button("browser.devnull", ControlState.READY, "",
+            "hidden", Nodes.ButtonKind.GHOST, "browser.devnull", "/dev/null Mode"));
+        assertThat(menu(devNull)).extracting(MenuItem::label).as("no bookmark group").containsExactly("Settings");
     }
 
     /** Spec section 6: Manage Bookmarks loads the bookmarks page, and History the history page. */
@@ -310,7 +331,7 @@ class BrowserToolbarTest {
             context.set(plugin);
             settings.set(BrowserSettings.declare(plugin.settings()));
         });
-        new BrowserItems(context.get(), settings.get()::read, memory.make(), page -> { })
+        new BrowserItems(context.get(), settings.get()::read, new DataStores(memory.make(), () -> false), page -> { })
             .open(URI.create(START), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
         return host.contentView(ID, "example.com").orElseThrow();
     }
@@ -320,7 +341,7 @@ class BrowserToolbarTest {
         UUID window = host.addTerminalWindow();
         host.activateTerminalWindow(window);
         host.setSetting(ID, "start_page", START);
-        host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of("browser.provide", "palette.contribute")), Set.of(), Set.of(), new BrowserPlugin());
+        host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of("browser.provide", "palette.contribute")), Set.of(), Set.of(), OfflinePlugins.plugin());
         assertThat(host.invoke("dev.jasper.browser.new_tab", window, null)).isTrue();
         assertThat(host.contentTabs()).singleElement();
         assertThat(URI.create(host.contentPresentation(host.contentTabs().getFirst()).location())).isEqualTo(URI.create(START));

@@ -1,5 +1,6 @@
 package dev.jasper.browser.page;
 
+import dev.jasper.browser.permissions.AudioMode;
 import java.awt.Point;
 import java.lang.reflect.Proxy;
 import java.net.URI;
@@ -64,6 +65,29 @@ class PageEventsTest {
         });
     }
 
+    /**
+     * Review round 1, item 2: a main frame's load start hands its page, on the UI thread, the document its hooks just
+     * started on Chromium's thread, which the page's muting then acts on; a muting meant for that document changes nothing
+     * once Chromium has started the next, before the UI thread hears of it.
+     */
+    @Test void aMainFramesLoadStartHandsThePageTheDocumentItsHooksStarted() throws Exception {
+        var made = new AtomicReference<Page>();
+        onUiThread(() -> made.set(page()));
+        Page page = made.get();
+        // As FrameScripts' hook starts the document's audio, inside the load start, on Chromium's thread.
+        PageTestAccess.audioDocumentStarted(page, AudioMode.ASK);
+        new PageEvents.Load().onLoadStart(PageTestAccess.pageBrowser(page), recording(new ArrayList<>()), null);
+        onUiThread(() -> {
+            page.privacy().mute(false);
+            assertThat(page.privacy().audioMode()).as("the document the UI thread heard of").isEqualTo(AudioMode.ALLOW);
+        });
+        PageTestAccess.audioDocumentStarted(page, AudioMode.ASK);
+        onUiThread(() -> {
+            page.privacy().mute(true);
+            assertThat(page.privacy().audioMode()).as("the next, which it has not heard of").isEqualTo(AudioMode.ASK);
+        });
+    }
+
     /** On macOS Chromium leaves these keys to the Edit menu: they reach a page's focused frame and its DevTools'. */
     @Test void theEditingKeysReachAPagesBrowserAndItsDevToolsAndNoOtherBrowser() throws Exception {
         onUiThread(() -> {
@@ -111,7 +135,7 @@ class PageEventsTest {
     }
 
     private static Page page() {
-        return new Page(URI.create("https://example.com/"), () -> { }, PageTestAccess.noFavicons(), Runnable::run);
+        return new Page(URI.create("https://example.com/"), () -> { }, PageTestAccess.noFavicons(), Runnable::run, PageContext.persistent());
     }
 
     /** A frame that answers only whether it is the main one. */

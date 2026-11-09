@@ -1,0 +1,384 @@
+package dev.jasper.browser.adblock;
+
+import dev.jasper.browser.store.CapturedLog;
+import java.time.Duration;
+import java.util.List;
+import java.util.Optional;
+import java.util.Random;
+import java.util.regex.Pattern;
+import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
+
+/**
+ * A content-blocker rule's {@code url-filter}: WebKit's grammar alone, the longest run of literal characters every
+ * match holds, and a match that reads at most 8 KiB of an address within a bounded number of steps.
+ */
+class UrlFilterTest {
+    @Test void theLiteralIsTheLongestRunOfTopLevelLiteralAtoms() {
+        assertThat(literal("^https?://([^/]+\\.)?doubleclick\\.net")).contains("doubleclick.net");
+        assertThat(literal("ads\\.js")).contains("ads.js");
+        assertThat(literal("ab+c")).as("an atom followed by + stays in its run and ends it").contains("ab");
+        assertThat(literal("abc*de")).as("an atom followed by * is left out").contains("ab");
+        assertThat(literal("abc?d")).as("an atom followed by ? is left out").contains("ab");
+        assertThat(literal(".*")).isEmpty();
+        assertThat(literal("^$")).isEmpty();
+        assertThat(literal("a.bcd[x]ef(ghijk)lm")).as("a dot, a class and a group end runs").contains("bcd");
+        assertThat(literal("x(abcdefg)+y")).as("a group's own characters are not top-level").contains("x");
+        assertThat(literal("\\/ads\\/")).contains("/ads/");
+        assertThat(literal("^abc$")).contains("abc");
+        assertThat(literal("ab.cd")).as("on a tie, the first run").contains("ab");
+    }
+
+    @Test void theLiteralIsLowerCaseUnlessTheRuleIsCaseSensitive() {
+        assertThat(UrlFilter.of("/AdBanner/", false).flatMap(UrlFilter::literal)).contains("/adbanner/");
+        assertThat(UrlFilter.of("/AdBanner/", true).flatMap(UrlFilter::literal)).contains("/AdBanner/");
+    }
+
+    @Test void filtersOutsideWebKitsGrammarAreRefused() {
+        for (String source : List.of("(a+)+", "(a*)*", "(a?)+", "(ab+c)*", "((a+))+", "(a(b?))*", "\\d", "\\w+", "\\s", "\\b",
+            "\\Q.\\E", "\\p{L}", "\\1", "(a)\\1", "\\ ", "\\", "a\\", "(a|aa)+", "a|b", "a{2}", "a{2,}", "a{", "a}", "(?:a)", "(?i)a",
+            "(?=a)", "(?!a)", "(", "a)", "(a", "()", "()+", "[", "[a", "[]", "[^]", "[z-a]", "[a-\\d]", "]", "*a", "+a", "?a", "a**",
+            "a*+", "a*?", "a+?", "a??", "^*", "^+", "a^", "a$b", "$$", "(^a)", "(a$)", "(a)$+", "\\a", "\\0"))
+            assertThat(UrlFilter.of(source, false)).as(source).isEmpty();
+    }
+
+    @Test void aGroupMayHoldAQuantifierOnlyWhenItRepeatsAtMostOnce() {
+        assertThat(UrlFilter.of("(a+)?", false)).isPresent();
+        assertThat(UrlFilter.of("([^/]+\\.)?x", false)).isPresent();
+        assertThat(UrlFilter.of("(ab)+", false)).as("a repeated group without a quantifier").isPresent();
+        assertThat(UrlFilter.of("((ab)c)*", false)).isPresent();
+        assertThat(UrlFilter.of("((a+)?)+", false)).as("a repeated group holding one, however deep").isEmpty();
+    }
+
+    /** Review C1 (V29): a quantified group that can match nothing branches without a read, which no budget counts. */
+    @Test void aQuantifiedGroupThatCanMatchNothingIsRefused() {
+        for (String source : List.of("(x?)?", "((a)?)?", "(a?b?)?", "(a*)?", "(a*b?)?", "((x?))?", "x(y*)?z"))
+            assertThat(UrlFilter.of(source, false)).as(source).isEmpty();
+        for (String source : List.of("([^/]+\\.)?", "(a+)?", "^https?://([^/]+\\.)?doubleclick\\.net", "(x?)", "(a?b)?", "((a)?b)?",
+            "(ab)*"))
+            assertThat(UrlFilter.of(source, false)).as(source).isPresent();
+        assertThat(UrlFilter.of("http.*" + "(x?)?".repeat(40) + "y", false)).isEmpty();
+    }
+
+    /** Review M3 (V29): at most 256 quantified atoms, so the matcher's recursion stays shallow. */
+    @Test void atMost256QuantifiedAtoms() {
+        assertThat(UrlFilter.of("a?".repeat(256), false)).isPresent();
+        assertThat(UrlFilter.of("a?".repeat(257), false)).isEmpty();
+        assertThat(UrlFilter.of("http.*" + "(xy)?".repeat(256) + "y", false)).as("257 quantified atoms").isEmpty();
+        UrlFilter groups = filter("http.*" + "(xy)?".repeat(255) + "y", false);
+        assertTimeoutPreemptively(Duration.ofSeconds(5), () -> {
+            assertThat(groups.matches("http://a.test/xyxyy")).isTrue();
+            assertThat(groups.matches("http://a.test/" + "x".repeat(8 * 1024))).isFalse();
+            assertThat(groups.matches("http://a.test/" + "xz".repeat(4 * 1024))).isFalse();
+        });
+    }
+
+    @Test void atMostFourUnboundedQuantifiers() {
+        assertThat(UrlFilter.of("a*b+c*d+", false)).isPresent();
+        assertThat(UrlFilter.of("a*b+c*d+e*", false)).isEmpty();
+        assertThat(UrlFilter.of("a?b?c?d?e?f?", false)).as("? is bounded").isPresent();
+        assertThat(UrlFilter.of(".*.*.*.*.*", false)).isEmpty();
+    }
+
+    @Test void atMostEightGroupsOneInsideAnother() {
+        assertThat(UrlFilter.of("(".repeat(8) + "a" + ")".repeat(8), false)).isPresent();
+        assertThat(UrlFilter.of("(".repeat(9) + "a" + ")".repeat(9), false)).isEmpty();
+        assertThat(UrlFilter.of("x(a(b)c)y(d)".repeat(100), false)).as("side by side").isPresent();
+    }
+
+    @Test void aFilterOfTheLongestLengthCompilesAndMatches() {
+        UrlFilter longest = filter("a.".repeat(1_024), false);
+        assertThat(longest.matches("ab".repeat(1_024))).isTrue();
+        assertThat(longest.matches("ab".repeat(1_023))).isFalse();
+        UrlFilter groups = filter("(a)b".repeat(512), false);
+        assertThat(groups.matches("ab".repeat(512))).isTrue();
+    }
+
+    /** Review I1 (V31): a class is written out as its members, which Java reads in one step however many there are. */
+    @Test void aClassIsWrittenOutAsItsMemberCharacters() {
+        assertThat(filter("[a-cx-z0-9]", false).expression()).isEqualTo("[0123456789abcxyz]");
+        assertThat(filter("[^a-c/]x", false).expression()).isEqualTo("[^\\/abc]x");
+        assertThat(filter("[ -~]", false).expression()).as("every printable character, the 33 that are no letter or digit escaped")
+            .hasSize(2 + 62 + 33 * 2).doesNotContain("-~");
+        UrlFilter negated = filter("[^a-c]x", false);
+        assertThat(negated.matches("bx")).isFalse();
+        assertThat(negated.matches("Bx")).as("either case").isFalse();
+        assertThat(negated.matches("dx")).isTrue();
+        assertThat(filter("[a-c]x", false).matches("BX")).isTrue();
+        assertThat(filter("[a-c]x", true).matches("BX")).isFalse();
+        assertThat(filter("[-a]", false).matches("-")).isTrue();
+    }
+
+    /** Final review B (V48): a class of one member is written as its character, which Java keeps without a bitmap. */
+    @Test void aClassOfOneMemberIsWrittenAsItsCharacter() {
+        assertThat(filter("[a]b[\\/][.]", false).expression()).isEqualTo("ab\\/\\.");
+        assertThat(filter("[a]+x", true).expression()).isEqualTo("a+x");
+        assertThat(filter("[aa]", false).expression()).as("one member, written twice").isEqualTo("a");
+        assertThat(filter("[a-a]", false).expression()).isEqualTo("a");
+        assertThat(filter("[^a]", false).expression()).as("a negated class has many members").isEqualTo("[^a]");
+        assertThat(literal("x[a]yz")).as("the class still ends a run of the literal").contains("yz");
+        assertThat(filter("[a]", false).matches("A")).isTrue();
+        assertThat(filter("[a]", true).matches("A")).isFalse();
+        assertThat(filter("[a]".repeat(682), false).weight()).as("no bitmap").isEqualTo(filter("a".repeat(682), false).weight());
+    }
+
+    /**
+     * Final review B (V48): what a filter's compiled expression keeps is estimated from its parse: its text, each of
+     * its nodes, each class's bitmap, and the table Java builds for a case-sensitive expression that begins with a run
+     * of 4 characters or more.
+     */
+    @Test void theWeightOfACompiledExpressionIsEstimatedFromItsParse() {
+        int node = UrlFilter.NODE_BYTES, base = UrlFilter.PATTERN_BYTES;
+        assertThat(filter("ab", false).weight()).isEqualTo(base + 2 + 2 * node);
+        assertThat(filter("a.b", false).weight()).isEqualTo(base + 3 + 3 * node);
+        assertThat(filter("[^a]", false).weight()).isEqualTo(base + 4 + node + UrlFilter.CLASS_BYTES);
+        assertThat(filter("(a)?", false).weight()).as("(?:a)?: a group's two ends, its atom and the ?").isEqualTo(base + 6 + 4 * node);
+        assertThat(filter("^a$", false).weight()).as("^a\\z").isEqualTo(base + 4 + 3 * node);
+        assertThat(filter(".*ads.*", false).weight()).isEqualTo(filter("ads", false).weight());
+        assertThat(filter("/ads/", false).weight()).isEqualTo(base + 7 + 5 * node);
+        assertThat(filter("/ads/", true).weight()).as("Java's Boyer-Moore table").isEqualTo(base + 7 + 5 * node + UrlFilter.TABLE_BYTES + 4 * 5);
+        for (String noTable : List.of("abc", "abcd*", "^abcd", ".abcd", "ab[cd]ef"))
+            assertThat(filter(noTable, true).weight()).as(noTable).isEqualTo(filter(noTable, false).weight());
+    }
+
+    /**
+     * Final review B (V48): a compile is charged by the size of what it reads, its source parsed again and its
+     * expression, the longer of the two, as its time grows, and for a case-sensitive run of 4 characters or more at
+     * the expression's start by the square of the run, as Java's table for it does.
+     */
+    @Test void aCompileIsChargedByTheLongerOfItsSourceAndExpression() {
+        int each = UrlFilter.COMPILE_CHARGE, base = UrlFilter.COMPILE_BASE;
+        assertThat(filter("ab", false).compileCost()).isEqualTo(base + 2 * each);
+        assertThat(filter("[ -~]", false).compileCost()).as("130 characters written out").isEqualTo(base + 130 * each);
+        assertThat(filter("[a]".repeat(682), false).compileCost()).as("a source written out shorter").isEqualTo(base + 2_046 * each);
+        assertThat(filter("[" + "a".repeat(2_046) + "]", false).compileCost()).isEqualTo(base + 2_048 * each);
+        assertThat(filter(".*ads.*", false).compileCost()).isEqualTo(base + 7 * each);
+        assertThat(filter("a".repeat(2_048), false).compileCost()).isEqualTo(base + 2_048 * each);
+        assertThat(filter("a".repeat(2_048), true).compileCost()).isEqualTo(base + 2_048 * each + 2_048 * 2_048 / UrlFilter.RUN_SQUARE);
+        assertThat(filter("x?" + "a".repeat(2_046), true).compileCost()).as("no run at the start").isEqualTo(base + 2_048 * each);
+        assertThat(filter("abc", true).compileCost()).isEqualTo(base + 3 * each);
+    }
+
+    /**
+     * W1's re-review (V58): a space is written escaped, as every character but a letter or digit is, and Java reads it
+     * in the run, so a case-sensitive leading run of spaces is charged its square, and weighs Java's table for it.
+     */
+    @Test void aLeadingRunOfSpacesIsChargedAsJavaReadsIt() {
+        int each = UrlFilter.COMPILE_CHARGE, base = UrlFilter.COMPILE_BASE;
+        UrlFilter spaces = filter("abc" + " ".repeat(2_045), true);
+        assertThat(spaces.expression()).isEqualTo("abc" + "\\ ".repeat(2_045));
+        assertThat(spaces.compileCost()).as("the run of 2,048").isEqualTo(base + 4_093 * each + 2_048 * 2_048 / UrlFilter.RUN_SQUARE);
+        assertThat(spaces.weight()).isEqualTo(UrlFilter.PATTERN_BYTES + 4_093 + 2_048 * UrlFilter.NODE_BYTES + UrlFilter.TABLE_BYTES + 4 * 2_048);
+        UrlFilter mixed = filter(" a b~c" + ".".repeat(10), true);
+        assertThat(mixed.compileCost()).as("spaces and ~ in the run").isEqualTo(base + 19 * each + 6 * 6 / UrlFilter.RUN_SQUARE);
+        assertThat(filter(" ".repeat(2_048), false).compileCost()).as("not case-sensitive: no table").isEqualTo(base + 4_096 * each);
+        assertThat(filter("abcd$", true).compileCost()).as("\\z ends the run").isEqualTo(base + 6 * each + 4 * 4 / UrlFilter.RUN_SQUARE);
+    }
+
+    @Test void onlyPrintableAsciiAndPunctuationEscapes() {
+        assertThat(UrlFilter.of("caf" + (char) 0xE9, false)).isEmpty();
+        assertThat(UrlFilter.of("a" + (char) 0x09 + "b", false)).isEmpty();
+        assertThat(UrlFilter.of("a" + (char) 0x7F, false)).isEmpty();
+        assertThat(UrlFilter.of("[a" + (char) 0xE9 + "]", false)).isEmpty();
+        for (char c : "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~".toCharArray())
+            assertThat(UrlFilter.of("\\" + c, false)).as("an escaped " + c).isPresent()
+                .hasValueSatisfying(filter -> assertThat(filter.matches("x" + c + "y")).isTrue());
+        assertThat(UrlFilter.of("a b'\"#%&,-/:;<=>@_`~", false)).isPresent();
+        assertThat(UrlFilter.of("[\\]a-c^[-]", false)).isPresent();
+    }
+
+    @Test void anEmptyFilterAndOneLongerThan2048CharactersAreRefused() {
+        assertThat(UrlFilter.of("", false)).isEmpty();
+        assertThat(UrlFilter.of(null, false)).isEmpty();
+        assertThat(UrlFilter.of("a".repeat(2_048), false)).isPresent();
+        assertThat(UrlFilter.of("a".repeat(2_049), false)).isEmpty();
+    }
+
+    @Test void matchesFindsTheFilterAnywhereCaseInsensitivelyUnlessTheRuleSaysOtherwise() {
+        UrlFilter ads = filter("/ads/", false);
+        assertThat(ads.matches("https://a.test/ads/x.js")).isTrue();
+        assertThat(ads.matches("https://a.test/ADS/x.js")).isTrue();
+        assertThat(ads.matches("https://a.test/adsx/")).isFalse();
+        UrlFilter banner = filter("/AdBanner/", true);
+        assertThat(banner.matches("https://a.test/AdBanner/1.png")).isTrue();
+        assertThat(banner.matches("https://a.test/adbanner/1.png")).isFalse();
+    }
+
+    @Test void theAnchorsTheDotAndTheClasses() {
+        UrlFilter anchored = filter("^https?://([^/]+\\.)?doubleclick\\.net[/:]", false);
+        assertThat(anchored.matches("https://doubleclick.net/x")).isTrue();
+        assertThat(anchored.matches("http://ad.g.doubleclick.net:443/x")).isTrue();
+        assertThat(anchored.matches("https://notdoubleclick.net/x")).isFalse();
+        assertThat(anchored.matches("https://a.test/?u=https://doubleclick.net/")).isFalse();
+        UrlFilter end = filter("\\.swf$", false);
+        assertThat(end.matches("https://a.test/x.swf")).isTrue();
+        assertThat(end.matches("https://a.test/x.swf?y")).isFalse();
+        assertThat(filter("a.c", false).matches("abc")).isTrue();
+        assertThat(filter("[^a-c]x", false).matches("bx")).isFalse();
+        assertThat(filter("[^a-c]x", false).matches("dx")).isTrue();
+        assertThat(filter("(ab)+c", false).matches("xababc")).isTrue();
+        assertThat(filter("^$", false).matches("")).isTrue();
+        assertThat(filter("^$", false).matches("a")).isFalse();
+    }
+
+    @Test void aFilterThatMatchesEveryAddressMatchesWithoutAnExpression() {
+        for (String source : List.of(".*", "^.*", ".*$", "^.*$", ".*.*", "^", "$")) {
+            UrlFilter filter = filter(source, false);
+            assertThat(filter.matchesEverything()).as(source).isTrue();
+            assertThat(filter.matches("")).as(source).isTrue();
+            assertThat(filter.matches("https://a.test/")).as(source).isTrue();
+        }
+        assertThat(filter("^$", false).matchesEverything()).isFalse();
+        assertThat(filter(".*a", false).matchesEverything()).isFalse();
+    }
+
+    @Test void aMatchReadsAtMostTheFirst8KiBOfAnAddress() {
+        String head = "https://a.test/" + "p".repeat(8 * 1024 - "https://a.test/".length() - 4);
+        String url = head + "ads/" + "q".repeat(2 * 1024 * 1024);
+        assertThat(filter("ads/", false).matches(url)).as("within the first 8 KiB").isTrue();
+        assertThat(filter("ads/q", false).matches(url)).as("one character past it").isFalse();
+        assertThat(filter("q$", false).matches(url)).isFalse();
+        assertThat(filter("p$", false).matches(head + "pppp" + "x".repeat(10))).as("$ is the end of what is read").isTrue();
+    }
+
+    @Test void aMatchOverItsStepBudgetCountsAsNoMatchAndLogsNothingItself() {
+        UrlFilter heavy = filter("a.*.*.*.*x", false);
+        String url = "https://a.test/" + "a".repeat(2 * 1024 * 1024);
+        try (var log = new CapturedLog(UrlFilter.class.getName())) {
+            assertTimeoutPreemptively(Duration.ofSeconds(10), () -> {
+                assertThat(heavy.matches(url)).isFalse();
+                assertThat(heavy.matches(url)).as("no filter is disabled: it runs again").isFalse();
+            });
+            UrlFilter exponential = filter("a?".repeat(30) + "a".repeat(30), false);
+            assertTimeoutPreemptively(Duration.ofSeconds(10), () -> assertThat(exponential.matches("a".repeat(30))).isFalse());
+            assertThat(log.records()).as("the rule set logs, once a list").isEmpty();
+        }
+        assertThat(heavy.matches("https://a.test/ax")).as("a short address is within the budget").isTrue();
+    }
+
+    /**
+     * Re-review (V33): a read is charged 1, and 1 for each of the filter's atoms quantified by {@code *} or {@code ?},
+     * which may each run a step without one, against the match's 100,000 and the call's reads.
+     */
+    @Test void aReadIsChargedOnePlusTheFiltersOptionalAtoms() {
+        String optional = "http.*" + "(x)?".repeat(255) + "y";
+        var charges = new java.util.LinkedHashMap<String, Integer>();
+        charges.put("ads", 1);
+        charges.put("a.*b?c", 3);
+        charges.put("((a)?b)?c", 3);
+        charges.put(".*ads.*", 1);
+        charges.put("^https?://.*", 2);
+        charges.put("a[^/]*b+c", 2);
+        charges.put(optional, 257);
+        for (var charge : charges.entrySet()) {
+            var reads = new UrlFilter.Reads(Integer.MAX_VALUE);
+            filter(charge.getKey(), false).matches("http://a.test/abc?" + "x".repeat(40), reads);
+            assertThat(reads.characters()).as(charge.getKey()).isPositive();
+            assertThat(reads.used()).as(charge.getKey()).isEqualTo(charge.getValue() * reads.characters());
+        }
+        var reads = new UrlFilter.Reads(Integer.MAX_VALUE);
+        assertThat(filter(optional, false).matches("http://a.test/" + "x".repeat(8 * 1024), reads)).isFalse();
+        assertThat(reads.overran()).as("past the match's own budget").isPresent();
+        assertThat(reads.used()).isLessThanOrEqualTo(UrlFilter.STEPS);
+        assertThat(reads.characters()).isLessThanOrEqualTo(UrlFilter.STEPS / 257);
+    }
+
+    /** Review I1 (V30): a match spends the reads of the call it is part of, and ends the call once they are gone. */
+    @Test void aMatchSpendsItsCallsReads() {
+        UrlFilter heavy = filter("a.*.*.*.*x", false);
+        String url = "https://a.test/" + "a".repeat(8 * 1024);
+        var reads = new UrlFilter.Reads(1_000_000);
+        assertThat(heavy.matches(url, reads)).as("over its own 100,000").isFalse();
+        assertThat(reads.used()).isEqualTo(100_000);
+        assertThat(reads.overran()).containsSame(heavy);
+        assertThatThrownBy(() -> heavy.matches(url, new UrlFilter.Reads(5_000))).isInstanceOf(UrlFilter.Reads.Exhausted.class);
+        var light = new UrlFilter.Reads(1_000);
+        assertThat(filter("ads", false).matches("https://a.test/ads", light)).isTrue();
+        assertThat(light.used()).isPositive().isLessThan(100);
+        assertThat(light.overran()).isEmpty();
+    }
+
+    @Test void equalWhenTheSourceAndTheCaseRuleAreEqual() {
+        assertThat(filter("ads", false)).isEqualTo(filter("ads", false)).hasSameHashCodeAs(filter("ads", false))
+            .isNotEqualTo(filter("ads", true)).isNotEqualTo(filter("adz", false));
+        assertThat(filter("ads", true).source()).isEqualTo("ads");
+        assertThat(filter("ads", true).caseSensitive()).isTrue();
+    }
+
+    /**
+     * Over random filters in WebKit's alphabet, some built from groups that can match nothing, every filter that is
+     * accepted compiles, quantifies no group that can match nothing, and every address it matches holds its literal:
+     * the invariants the budget and the rule set's index stand on.
+     */
+    @Test void everyAcceptedFilterCompilesAndEveryMatchHoldsItsLiteral() {
+        var random = new Random(20_261_106L);
+        String alphabet = "abcAB.*+?()[]^$\\-/", text = "abcAB./-";
+        String[] atoms = {"a", "b", "A", ".", "[ab]", "(a?)", "(b*)", "(ab)", "(a?b?)", "(a)", "(.)", "((a)?)", "(a?b)"};
+        String[] quantifiers = {"", "", "*", "+", "?"};
+        int accepted = 0, matched = 0, nullable = 0;
+        for (int round = 0; round < 40_000; round++) {
+            var source = new StringBuilder();
+            if (round % 2 == 0) {
+                for (int at = 1 + random.nextInt(9); at > 0; at--) source.append(alphabet.charAt(random.nextInt(alphabet.length())));
+            } else {
+                for (int at = 1 + random.nextInt(4); at > 0; at--)
+                    source.append(atoms[random.nextInt(atoms.length)]).append(quantifiers[random.nextInt(quantifiers.length)]);
+            }
+            boolean caseSensitive = random.nextBoolean();
+            boolean quantifiesNullable = quantifiesANullableGroup(source.toString());
+            if (quantifiesNullable) nullable++;
+            Optional<UrlFilter> parsed = UrlFilter.of(source.toString(), caseSensitive);
+            if (parsed.isEmpty()) continue;
+            assertThat(quantifiesNullable).as("%s quantifies a group that can match nothing", source).isFalse();
+            accepted++;
+            UrlFilter filter = parsed.get();
+            for (int sample = 0; sample < 8; sample++) {
+                var url = new StringBuilder();
+                for (int at = random.nextInt(12); at > 0; at--) url.append(text.charAt(random.nextInt(text.length())));
+                if (!filter.matches(url.toString())) continue;
+                matched++;
+                String literal = filter.literal().orElse(""), haystack = caseSensitive ? url.toString() : UrlFilter.fold(url.toString());
+                assertThat(haystack).as("%s matched by %s", url, filter).contains(literal);
+            }
+        }
+        assertThat(accepted).as("filters accepted").isGreaterThan(2_000);
+        assertThat(matched).as("matches checked").isGreaterThan(2_000);
+        assertThat(nullable).as("filters quantifying a group that can match nothing").isGreaterThan(1_000);
+    }
+
+    /**
+     * Whether a group of {@code source} that a quantifier follows holds what matches the empty text, as Java's own
+     * expressions read the group; a filter it cannot read holds none.
+     */
+    private static boolean quantifiesANullableGroup(String source) {
+        var opens = new java.util.ArrayDeque<Integer>();
+        boolean inClass = false;
+        try {
+            for (int at = 0; at < source.length(); at++) {
+                char c = source.charAt(at);
+                if (c == '\\') at++;
+                else if (inClass) inClass = c != ']';
+                else if (c == '[') inClass = true;
+                else if (c == '(') opens.push(at);
+                else if (c == ')') {
+                    int open = opens.pop();
+                    if (at + 1 < source.length() && "*+?".indexOf(source.charAt(at + 1)) >= 0
+                        && Pattern.compile("(?:" + source.substring(open + 1, at) + ")").matcher("").matches()) return true;
+                }
+            }
+        } catch (RuntimeException unreadable) {
+            return false;
+        }
+        return false;
+    }
+
+    private static Optional<String> literal(String source) {
+        return filter(source, false).literal();
+    }
+
+    private static UrlFilter filter(String source, boolean caseSensitive) {
+        return UrlFilter.of(source, caseSensitive).orElseThrow(() -> new AssertionError("refused: " + source));
+    }
+}
