@@ -6,6 +6,7 @@ import dev.jasper.browser.item.DataStores;
 import dev.jasper.browser.item.ItemTestAccess;
 import dev.jasper.browser.settings.BrowserSettings;
 import dev.jasper.browser.store.MemoryStores;
+import dev.jasper.browser.tools.ToolScripts;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.testing.FakePluginHost;
 import dev.jasper.sdk.ui.ContentTab;
@@ -67,7 +68,7 @@ class PageMenuTest {
                 "item:page-menu.copy", "item:page-menu.search", "item:page-menu.select-all", "---", "host:Split");
             assertThat(lines).contains("host:Move Pane to Tab (disabled)", "host:Close Pane");
             assertThat(lines).endsWith("host:Close Pane", "---", "item:page-menu.print", "item:page-menu.copy-title (disabled)", "---",
-                "item:page-menu.view-source", "item:page-menu.inspect-element");
+                "item:page-menu.view-source", "item:page-menu.remove-element", "item:page-menu.inspect-element");
             assertThat(ended).as("Chromium's menu ends once the menu closes").hasValue(0);
             assertThat(host.dismissContentMenu(item.tab())).isTrue();
             show(plain());
@@ -301,7 +302,7 @@ class PageMenuTest {
             for (var choice : List.of(Map.entry("page-menu.back", bare), Map.entry("page-menu.forward", bare), Map.entry("page-menu.reload", bare),
                 Map.entry("page-menu.cut", field), Map.entry("page-menu.copy", field), Map.entry("page-menu.paste", field),
                 Map.entry("page-menu.select-all", field), Map.entry("page-menu.print", field), Map.entry("page-menu.view-source", field),
-                Map.entry("page-menu.inspect-element", field))) {
+                Map.entry("page-menu.remove-element", field), Map.entry("page-menu.inspect-element", field))) {
                 show(choice.getValue());
                 assertThat(host.chooseFromContentMenu(item.tab(), "item:" + choice.getKey())).as(choice.getKey()).isTrue();
                 assertThat(ended).as(choice.getKey()).hasValue(++count);
@@ -338,10 +339,45 @@ class PageMenuTest {
             var inspected = new ArrayList<Point>();
             var page = new Page(URI.create(PAGE), () -> { }, PageTestAccess.noFavicons(), Runnable::run, PageContext.persistent());
             var place = new MenuPlace(tab((proxy, method, args) -> null), copied -> { }, () -> "Google", terms -> URI.create(PAGE),
-                () -> false, () -> { }, () -> { }, () -> { }, inspected::add);
+                () -> false, () -> { }, () -> { }, () -> { }, at -> { }, inspected::add);
             var pointed = new PageMenu.Pointed(new Point(40, 70), NONE, NONE, NONE, NONE, false, NONE);
             PageMenu.run(page, place, pointed, PAGE, PageMenuItems.INSPECT_ELEMENT);
             assertThat(inspected).containsExactly(new Point(40, 70));
+        });
+    }
+
+    /**
+     * Spec section 10 and plan 7's Task 6: Remove Element is its item's, at the point on the page's canvas where the menu
+     * was asked for, as Inspect Element's.
+     */
+    @Test void removeElementIsTheItemsAtThePointOnThePagesCanvas() throws Exception {
+        onUiThread(() -> {
+            var removed = new ArrayList<Point>();
+            var inspected = new ArrayList<Point>();
+            var page = new Page(URI.create(PAGE), () -> { }, PageTestAccess.noFavicons(), Runnable::run, PageContext.persistent());
+            var place = new MenuPlace(tab((proxy, method, args) -> null), copied -> { }, () -> "Google", terms -> URI.create(PAGE),
+                () -> false, () -> { }, () -> { }, () -> { }, removed::add, inspected::add);
+            var pointed = new PageMenu.Pointed(new Point(40, 70), NONE, NONE, NONE, NONE, false, NONE);
+            PageMenu.run(page, place, pointed, PAGE, PageMenuItems.REMOVE_ELEMENT);
+            assertThat(removed).containsExactly(new Point(40, 70));
+            assertThat(inspected).isEmpty();
+        });
+    }
+
+    /**
+     * Plan 7's Task 6: chosen from the menu over an item's page, Remove Element ends Chromium's menu and runs
+     * {@code distractions.js}'s removeAt in the page at the menu's point, in CSS pixels at the item's zoom.
+     */
+    @Test void removeElementFromTheMenuRunsRemoveAtInThePage() throws Exception {
+        onUiThread(() -> {
+            open();
+            var ran = new ArrayList<String>();
+            PageTestAccess.useScriptRunner(page, (script, url) -> ran.add(url + " " + script));
+            show(new PageMenu.Pointed(new Point(300, 150), NONE, NONE, NONE, NONE, false, NONE));
+            assertThat(host.chooseFromContentMenu(item.tab(), "item:page-menu.remove-element")).isTrue();
+            assertThat(ended).hasValue(1);
+            assertThat(ran).containsExactly(ToolScripts.DISTRACTIONS_URL + " " + ToolScripts.distractionsRemoveAt(300.0, 150.0));
+            assertThat(host.failures()).isEmpty();
         });
     }
 
@@ -519,7 +555,7 @@ class PageMenuTest {
     private static Page placed(ContentTab tab, List<String> copies) {
         var page = new Page(URI.create(PAGE), () -> { }, PageTestAccess.noFavicons(), Runnable::run, PageContext.persistent());
         page.setMenuPlace(new MenuPlace(tab, copies::add, () -> "Google", terms -> URI.create("https://google.com/search?q=" + terms),
-            page::canGoBack, page::back, page::reload, () -> { }, at -> { }));
+            page::canGoBack, page::back, page::reload, () -> { }, at -> { }, at -> { }));
         return page;
     }
 

@@ -12,9 +12,9 @@ import java.util.regex.Pattern;
  * items Jasper adds, in groups: over a bare page, Back, Forward and Reload, as in Chrome; with a link, Open Link in New
  * Tab, Copy Link and Save Link As…; with an image, Open Image in New Tab, Save Image As… and Copy Image Address, in
  * Chrome's order; then, in an editable field, Cut, Copy and Paste, or else, with a selection, Copy and Search with
- * ⟨engine⟩, and Select All last. Below them: Print… and Copy Page Title, then View Source and Inspect Element. A
- * separator parts each group from the next. Each item's id is what the menu reports when it is chosen, and its action.
- * It names no Chromium type.
+ * ⟨engine⟩, and Select All last. Below them: Print… and Copy Page Title, then View Source, Remove Element and Inspect
+ * Element. A separator parts each group from the next. Each item's id is what the menu reports when it is chosen, and
+ * its action. It names no Chromium type.
  *
  * @param leading the items above Jasper's pane items
  * @param trailing the items below them
@@ -25,7 +25,7 @@ record PageMenuItems(List<MenuItem> leading, List<MenuItem> trailing) {
         COPY_IMAGE_ADDRESS = "page-menu.copy-image-address", CUT = "page-menu.cut", COPY = "page-menu.copy",
         PASTE = "page-menu.paste", SEARCH = "page-menu.search", SELECT_ALL = "page-menu.select-all", PRINT = "page-menu.print",
         COPY_TITLE = "page-menu.copy-title", VIEW_SOURCE = "page-menu.view-source", INSPECT_ELEMENT = "page-menu.inspect-element",
-        SAVE_LINK = "page-menu.save-link", SAVE_IMAGE = "page-menu.save-image";
+        SAVE_LINK = "page-menu.save-link", SAVE_IMAGE = "page-menu.save-image", REMOVE_ELEMENT = "page-menu.remove-element";
     /** The most of a selection Search with searches for, as find cuts its query. */
     static final int LONGEST_SEARCH = 1_000;
     // The separators, each named by the group it comes before.
@@ -108,7 +108,8 @@ record PageMenuItems(List<MenuItem> leading, List<MenuItem> trailing) {
         editing.add(item(SELECT_ALL, "Select All", true));
         group(leading, BEFORE_EDITING, editing);
         var trailing = new ArrayList<MenuItem>(List.of(item(PRINT, "Print…", true), item(COPY_TITLE, "Copy Page Title", context.titled())));
-        group(trailing, BEFORE_TOOLS, List.of(item(VIEW_SOURCE, "View Source", true), item(INSPECT_ELEMENT, "Inspect Element", true)));
+        group(trailing, BEFORE_TOOLS, List.of(item(VIEW_SOURCE, "View Source", true), item(REMOVE_ELEMENT, "Remove Element", true),
+            item(INSPECT_ELEMENT, "Inspect Element", true)));
         return new PageMenuItems(leading, trailing);
     }
 

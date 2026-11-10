@@ -14,11 +14,15 @@ import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 
 /**
- * One page's tools in the item's menu (spec sections 6 and 10): reader mode, and distraction removal's state. As each of
- * the page's documents finishes loading, {@code reader.js}'s check runs in its top frame ({@link ToolScripts}), and the
- * document's report of more than {@value #OFFER_LENGTH} characters of reader text offers Reader Mode and Remove
- * Distractions; they show while the offer stands or a mode is on ({@link #menuItems}). Reader Mode lays the article
- * over the page in the theme's colours, and Exit Reader Mode, or Escape in the page, takes it away.
+ * One page's tools (spec sections 6, 10 and 11): reader mode and distraction removal in the item's menu, and Remove
+ * Element in the page's right-click menu. As each of the page's documents finishes loading, {@code reader.js}'s check
+ * runs in its top frame ({@link ToolScripts}), and the document's report of more than {@value #OFFER_LENGTH} characters
+ * of reader text offers Reader Mode and Remove Distractions; they show while the offer stands or a mode is on
+ * ({@link #menuItems}). Reader Mode lays the article over the page in the theme's colours, and Exit Reader Mode, or
+ * Escape in the page, takes it away. Remove Distractions runs {@code distractions.js}: a crosshair, and a red outline on
+ * the overlay under the pointer, which a click hides with its backdrops, until Exit Distraction Removal or Escape in the
+ * page; what it hid stays hidden. Starting either mode ends the other. Remove Element hides the overlay under the
+ * menu's point, at the zoom the page shows at.
  *
  * <p>The check runs once a document's load ends, and again a second after the last of its same-document address
  * changes, as a single-page app's route changes, which withdraw the offer meanwhile; a change of the fragment alone, as
@@ -51,7 +55,7 @@ public final class PageTools implements AutoCloseable {
     private static final Runnable NOTHING = () -> { };
     private final BiConsumer<String, String> scripts;
     private final Supplier<String> readerCss;
-    // The zoom the page shows at, in percent, as its item shows it.
+    // The zoom the page shows at, in percent, as its item shows it, which Remove Element's point is divided by.
     private final IntSupplier zoom;
     private final BooleanSupplier showing;
     private final BiFunction<Duration, Runnable, Runnable> later;
@@ -183,8 +187,9 @@ public final class PageTools implements AutoCloseable {
 
     /**
      * Reader Mode or Exit Reader Mode: the article is laid over the page, in the theme's colours as they are now, or
-     * taken away; then the page takes the keyboard focus. Nothing while the items are not offered. Reader mode is on
-     * only once its script is made, so a show whose CSS cannot be read leaves it off.
+     * taken away; then the page takes the keyboard focus. Showing it ends distraction removal, which stops first.
+     * Nothing while the items are not offered. Reader mode is on only once its scripts are made, so a show whose CSS
+     * cannot be read leaves both modes as they were.
      */
     public void toggleReader() {
         if (closed || skipped) return;
@@ -193,7 +198,11 @@ public final class PageTools implements AutoCloseable {
             reading = false;
             scripts.accept(script, ToolScripts.READER_URL);
         } else if (offered) {
-            String script = ToolScripts.readerShow(readerCss.get(), checks);
+            String stop = removing ? ToolScripts.distractionsStop() : null, script = ToolScripts.readerShow(readerCss.get(), checks);
+            if (stop != null) {
+                removing = false;
+                scripts.accept(stop, ToolScripts.DISTRACTIONS_URL);
+            }
             reading = true;
             scripts.accept(script, ToolScripts.READER_URL);
         } else {
@@ -201,6 +210,49 @@ public final class PageTools implements AutoCloseable {
         }
         focus.run();
         changed.run();
+    }
+
+    /**
+     * Remove Distractions or Exit Distraction Removal: the page shows a crosshair, outlines the overlay under the pointer
+     * and hides the one clicked, until Escape there or Exit Distraction Removal, which leave what it hid hidden; then the
+     * page takes the keyboard focus, so Escape reaches it. Starting it ends reader mode, whose overlay goes first.
+     * Nothing while the items do not show. Distraction removal is on only once its scripts are made.
+     */
+    public void toggleDistractions() {
+        if (closed || skipped) return;
+        if (removing) {
+            String script = ToolScripts.distractionsStop();
+            removing = false;
+            scripts.accept(script, ToolScripts.DISTRACTIONS_URL);
+        } else if (offered || reading) {
+            String hide = reading ? ToolScripts.readerHide() : null, script = ToolScripts.distractionsStart(checks);
+            if (hide != null) {
+                reading = false;
+                scripts.accept(hide, ToolScripts.READER_URL);
+            }
+            removing = true;
+            scripts.accept(script, ToolScripts.DISTRACTIONS_URL);
+        } else {
+            return;
+        }
+        focus.run();
+        changed.run();
+    }
+
+    /**
+     * Remove Element, from the page's right-click menu: the overlay of the element at {@code x}, {@code y} on the page's
+     * canvas is hidden. The canvas's pixels are the page's CSS pixels times the zoom the page shows at as this runs
+     * (plan 7's F25), so the point is divided by that zoom. Any page of the web, offered or not; nothing on one of
+     * Jasper's own pages or a challenge provider's, and nothing at a zoom that is no percentage.
+     *
+     * @param x the point's distance from the canvas's left
+     * @param y its distance from the canvas's top
+     */
+    public void removeElementAt(int x, int y) {
+        if (closed || skipped) return;
+        int percent = zoom.getAsInt();
+        if (percent <= 0) return;
+        scripts.accept(ToolScripts.distractionsRemoveAt(x * 100.0 / percent, y * 100.0 / percent), ToolScripts.DISTRACTIONS_URL);
     }
 
     /**

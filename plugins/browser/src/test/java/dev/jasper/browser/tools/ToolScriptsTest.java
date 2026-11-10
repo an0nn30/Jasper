@@ -11,7 +11,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /**
  * The page scripts of reader mode (spec section 10, plan 7's Task 5), as Java can check them without a JavaScript
  * engine: Readability.js verbatim inside a function whose {@code module} is undefined, kept under its symbol, then
- * {@code reader.js} called with a command, the check's token and, to show, the CSS as one string literal (F11, F24).
+ * {@code reader.js} called with a command, the check's token and, to show, the CSS as one string literal (F11, F24); and
+ * Task 6's distraction removal, {@code distractions.js} called with a command, a token or a point.
  */
 class ToolScriptsTest {
     private static final String WRAPPER_START = "(function (module) {\n",
@@ -122,5 +123,60 @@ class ToolScriptsTest {
     @Test void theReaderScriptIsAsciiWithNoControlCharacterButTheNewline() {
         assertThat(ToolScripts.reader().chars().filter(c -> (c < 0x20 && c != '\n') || c >= 0x7F)).isEmpty();
         assertThat(ToolScripts.reader()).startsWith("/*").endsWith("})\n");
+    }
+
+    /**
+     * Task 6: distraction removal's scripts are {@code distractions.js} called with a command: start with the token its
+     * Escape reports, stop, and removeAt with a point in CSS pixels, each number as Java writes a double, whatever the
+     * locale, so a comma never splits one. They need no Readability.
+     */
+    @Test void distractionRemovalsScriptsCallDistractionsJsWithTheirCommand() {
+        assertThat(ToolScripts.DISTRACTIONS_URL).isEqualTo("jasper-about:distractions.js");
+        assertThat(ToolScripts.distractionsStart(7)).isEqualTo(ToolScripts.distractions() + "\n(\"start\", 7);");
+        assertThat(ToolScripts.distractionsStart(9_007_199_254_740_991L)).endsWith("\n(\"start\", 9007199254740991);");
+        assertThat(ToolScripts.distractionsStop()).isEqualTo(ToolScripts.distractions() + "\n(\"stop\");");
+        assertThat(ToolScripts.distractionsRemoveAt(200.0, 100.0)).isEqualTo(ToolScripts.distractions() + "\n(\"removeAt\", 200.0, 100.0);");
+        assertThat(ToolScripts.distractionsRemoveAt(0.5, -3.25)).endsWith("\n(\"removeAt\", 0.5, -3.25);");
+        assertThat(ToolScripts.distractionsRemoveAt(1e21, 2.0)).as("JavaScript reads Java's exponent").endsWith("\n(\"removeAt\", 1.0E21, 2.0);");
+        for (String script : List.of(ToolScripts.distractionsStart(1), ToolScripts.distractionsStop(), ToolScripts.distractionsRemoveAt(1, 2)))
+            assertThat(script).doesNotContain("Arc90");
+        for (long bad : new long[] {0, -1, 9_007_199_254_740_992L, Long.MAX_VALUE})
+            assertThatThrownBy(() -> ToolScripts.distractionsStart(bad)).as(Long.toString(bad)).isInstanceOf(IllegalArgumentException.class);
+        for (double bad : new double[] {Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY}) {
+            assertThatThrownBy(() -> ToolScripts.distractionsRemoveAt(bad, 1)).as(Double.toString(bad)).isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> ToolScripts.distractionsRemoveAt(1, bad)).as(Double.toString(bad)).isInstanceOf(IllegalArgumentException.class);
+        }
+    }
+
+    /**
+     * F11: distraction removal's crosshair is a constructed sheet the document adopts, which also keeps the pointer out
+     * of the page's frames; its outline and its hiding are inline declarations set through {@code setProperty} with the
+     * important priority, never a style element, which a strict {@code style-src} would refuse, and never HTML text.
+     */
+    @Test void distractionRemovalMakesNoStyleElement() {
+        assertThat(ToolScripts.distractions()).doesNotContainIgnoringCase("<style").doesNotContainIgnoringCase("createElement('style'")
+            .doesNotContainIgnoringCase("createElement(\"style\"").doesNotContain("createElement", "innerHTML", "insertAdjacentHTML", "outerHTML",
+                "document.write", ".cssText")
+            .contains("replaceSync", "adoptedStyleSheets", "'*{cursor:crosshair!important}'", "'2px solid #FF0000'", "'important'",
+                "['display', 'none', 'important']");
+        // A click over a frame, as a cookie banner's, reaches the element holding it in the page, not the frame's document.
+        assertThat(ToolScripts.distractions()).contains("'iframe,frame,object,embed{pointer-events:none!important}'",
+            "[CROSSHAIR + '\\n' + FRAMES]");
+    }
+
+    /**
+     * Task 6's {@code distractions.js}, as far as Java can see it: kept under its symbol, made once with the built-ins it
+     * calls; a pointer's press, release and click stop at the window's capture listeners; Escape reports the mode off with
+     * its token; and {@code removeAt} looks at {@code document.elementFromPoint}. The stub harness and Task 9 check the
+     * behaviour.
+     */
+    @Test void distractionRemovalStopsThePagesClicksAndReportsEscape() {
+        assertThat(ToolScripts.distractions()).contains("Symbol.for('dev.jasper.browser.distractions')", "op: 'distractions'",
+            "state: 'off'", "'Escape'", "elementFromPoint", "getComputedStyle", "'fixed'", "'sticky'", "['pointerdown', onPress, true]",
+            "['pointerup', onPress, true]", "['mousedown', onPress, true]", "['mouseup', onPress, true]", "['click', onClick, true]",
+            "['keydown', onKeyDown, true]", "['pagehide', onPageHide, true]", "stopImmediatePropagation", "preventDefault",
+            "Symbol.for('dev.jasper.browser.reader')", "const COVERING = 0.9;");
+        assertThat(ToolScripts.distractions().chars().filter(c -> (c < 0x20 && c != '\n') || c >= 0x7F)).isEmpty();
+        assertThat(ToolScripts.distractions()).startsWith("/*").endsWith("})\n");
     }
 }

@@ -59,7 +59,8 @@ import org.cef.network.CefResponse;
  * {@code detect-favicon.js}, tells the page the icon its document names (spec section 5); {@code find}, from
  * {@code find.js}, tells the page's find what a frame found, or the text selected there (spec section 10); and
  * {@code reader} and {@code distractions} go to the page's tools as the page sent them: from the {@code tools}
- * package's {@code reader.js}, what a check found and that the reader closed (plan 7).
+ * package's {@code reader.js}, what a check found and that the reader closed, and from its {@code distractions.js},
+ * that distraction removal ended (plan 7).
  *
  * <p>Every frame and every script of a page can call the page function, so each request is untrusted, and the bridge
  * keeps the limits Chromium would:

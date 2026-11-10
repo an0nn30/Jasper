@@ -107,7 +107,10 @@ import javax.swing.JComponent;
  * download keeps its browser (plan 7's F28); one the user opened never does. Its menu button's first group is its page's
  * tools ({@link PageToolsHost}): Reader Mode and Remove Distractions, offered once a check of the page's document finds
  * more than 10 characters of reader text, and Reader Mode lays the article over the page in the theme's colours until
- * Exit Reader Mode, Escape in the page or the page's next load (spec section 10). UI thread.
+ * Exit Reader Mode, Escape in the page or the page's next load (spec section 10); Remove Distractions hides the overlays
+ * the user clicks until Exit Distraction Removal, Escape or the next load, and either mode ends the other. Remove
+ * Element, from the page's right-click menu, hides the overlay under the pointer, its point divided by the zoom the page
+ * shows at. UI thread.
  */
 public final class BrowserItem implements AutoCloseable {
     static final String ROOT = "browser", PAGE = "browser.page", CONTENT = "browser.page.content";
@@ -303,7 +306,7 @@ public final class BrowserItem implements AutoCloseable {
         // right-click menu, which copies with the plugin's clipboard and searches with the engine chosen as it opens.
         page.setDialogPlace(new DialogPlace(items.context().kit(), items.context().windows(), tab));
         page.setMenuPlace(new MenuPlace(tab, items.context().platform()::copy, this::engineName, this::search, errors::canGoBack,
-            this::goBack, this::reload, this::viewSource, this::inspect));
+            this::goBack, this::reload, this::viewSource, this::removeElement, this::inspect));
         items.opened(this);
         present();
     }
@@ -532,6 +535,14 @@ public final class BrowserItem implements AutoCloseable {
      */
     void viewSource() {
         if (!closed) sources.show();
+    }
+
+    /**
+     * Remove Element at {@code at} on the page's canvas: the overlay of the element there is hidden, the point divided
+     * by the zoom the page shows at ({@link PageToolsHost#removeElementAt}).
+     */
+    void removeElement(Point at) {
+        if (!closed) pageTools.removeElementAt(at.x, at.y);
     }
 
     /**

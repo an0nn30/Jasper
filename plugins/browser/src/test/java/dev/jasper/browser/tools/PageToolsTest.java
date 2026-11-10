@@ -15,7 +15,8 @@ import static org.assertj.core.api.Assertions.tuple;
  * the offer; a page with 10 characters of reader text, a {@code jasper-about:} page or a malformed report offers
  * nothing. F24: no check on a challenge address or a hidden page, and a same-document address change checks again
  * once it has settled for a second, but not one that changes only the fragment (D30). D28: a check gets one answer,
- * its own token's, so a forged token or a replayed answer counts for nothing.
+ * its own token's, so a forged token or a replayed answer counts for nothing. Task 6: distraction removal's toggle and
+ * exit, each mode ending the other, and Remove Element's point divided by the zoom the page shows at (F25).
  */
 class PageToolsTest {
     private static final String ARTICLE = "https://news.example/2026/article", CSS = ".reader { --text: #222; }";
@@ -371,6 +372,173 @@ class PageToolsTest {
         reported("distractions", "{\"op\":\"distractions\",\"check\":1,\"state\":\"off\"}");
         assertThat(tools.removing()).isFalse();
         assertThat(changes).isEqualTo(changed);
+    }
+
+    /**
+     * Task 6: Remove Distractions runs {@code distractions.js}'s start, with the token of the check that offered it, and
+     * Exit Distraction Removal its stop; the page takes the keyboard focus after each, so Escape reaches it.
+     */
+    @Test void theDistractionsToggleRunsStartThenStop() {
+        offer();
+        tools.toggleDistractions();
+        assertThat(scripts.getLast()).isEqualTo(ToolScripts.distractionsStart(1));
+        assertThat(urls.getLast()).isEqualTo(ToolScripts.DISTRACTIONS_URL);
+        assertThat(tools.removing()).isTrue();
+        assertThat(tools.reading()).isFalse();
+        assertThat(focuses).isEqualTo(1);
+        tools.toggleDistractions();
+        assertThat(scripts.getLast()).isEqualTo(ToolScripts.distractionsStop());
+        assertThat(urls.getLast()).isEqualTo(ToolScripts.DISTRACTIONS_URL);
+        assertThat(tools.removing()).isFalse();
+        assertThat(scripts).hasSize(3);
+        assertThat(changes).isEqualTo(3);
+        assertThat(focuses).isEqualTo(2);
+    }
+
+    /** Task 6's call: starting either mode ends the other, whose script runs first. */
+    @Test void startingOneModeEndsTheOther() {
+        offer();
+        tools.toggleReader();
+        int ran = scripts.size();
+        tools.toggleDistractions();
+        assertThat(scripts.subList(ran, scripts.size())).containsExactly(ToolScripts.readerHide(), ToolScripts.distractionsStart(1));
+        assertThat(urls.subList(ran, urls.size())).containsExactly(ToolScripts.READER_URL, ToolScripts.DISTRACTIONS_URL);
+        assertThat(tools.reading()).isFalse();
+        assertThat(tools.removing()).isTrue();
+        assertThat(labels()).containsExactly("Reader Mode", "Exit Distraction Removal", "");
+        ran = scripts.size();
+        tools.toggleReader();
+        assertThat(scripts.subList(ran, scripts.size())).containsExactly(ToolScripts.distractionsStop(), ToolScripts.readerShow(CSS, 1));
+        assertThat(urls.subList(ran, urls.size())).containsExactly(ToolScripts.DISTRACTIONS_URL, ToolScripts.READER_URL);
+        assertThat(tools.removing()).isFalse();
+        assertThat(tools.reading()).isTrue();
+        assertThat(labels()).containsExactly("Exit Reader Mode", "Remove Distractions", "");
+        assertThat(changes).as("the offer, then one each toggle").isEqualTo(4);
+        assertThat(focuses).isEqualTo(3);
+    }
+
+    /** D28's order: a mode that cannot be built leaves both as they were, and runs no script, the other's stop included. */
+    @Test void aShowThatCannotBeBuiltLeavesDistractionRemovalOn() {
+        var failing = new PageTools((script, url) -> scripts.add(script), () -> {
+            throw new IllegalStateException("no theme");
+        }, () -> 100, () -> true, this::later, () -> focuses++, () -> changes++);
+        failing.loadStarted(ARTICLE);
+        failing.loaded();
+        failing.reported("reader", "{\"op\":\"reader\",\"check\":1,\"length\":400}");
+        failing.toggleDistractions();
+        int ran = scripts.size(), changed = changes, focused = focuses;
+        assertThatThrownBy(failing::toggleReader).isInstanceOf(IllegalStateException.class);
+        assertThat(failing.removing()).isTrue();
+        assertThat(failing.reading()).isFalse();
+        assertThat(scripts).hasSize(ran);
+        assertThat(changes).isEqualTo(changed);
+        assertThat(focuses).isEqualTo(focused);
+    }
+
+    /**
+     * Escape in the page, as {@code distractions.js} reports it, ends distraction removal once, and the label follows,
+     * without a script; an exit of another shape, token or mode ends nothing.
+     */
+    @Test void aReportedExitEndsDistractionRemoval() {
+        offer();
+        tools.toggleDistractions();
+        int ran = scripts.size(), changed = changes;
+        for (String json : List.of("{\"op\":\"distractions\",\"check\":1,\"state\":\"on\"}",
+                "{\"op\":\"distractions\",\"check\":2,\"state\":\"off\"}", "{\"op\":\"distractions\",\"check\":0,\"state\":\"off\"}",
+                "{\"op\":\"distractions\",\"state\":\"off\"}", "{\"op\":\"distractions\",\"check\":1,\"length\":0}",
+                "{\"op\":\"distractions\",\"check\":1,\"state\":\"off\",\"x\":1}", "{\"op\":\"distractions\",\"check\":\"1\",\"state\":\"off\"}",
+                "{\"op\":\"reader\",\"check\":1,\"state\":\"off\"}"))
+            reported("distractions", json);
+        reported("reader", "{\"op\":\"reader\",\"check\":1,\"state\":\"off\"}");
+        assertThat(tools.removing()).as("still removing").isTrue();
+        assertThat(changes).isEqualTo(changed);
+        reported("distractions", "{\"op\":\"distractions\",\"check\":1,\"state\":\"off\"}");
+        assertThat(tools.removing()).isFalse();
+        assertThat(tools.offered()).isTrue();
+        assertThat(labels()).containsExactly("Reader Mode", "Remove Distractions", "");
+        assertThat(changes).isEqualTo(changed + 1);
+        assertThat(scripts).as("the page ended it itself").hasSize(ran);
+        reported("distractions", "{\"op\":\"distractions\",\"check\":1,\"state\":\"off\"}");
+        assertThat(changes).as("once").isEqualTo(changed + 1);
+    }
+
+    /**
+     * The labels follow the state: Remove Distractions, then Exit Distraction Removal, which stays while the offer is
+     * withdrawn by an address change in its document; a load start ends it, without a script, as it went with the document.
+     */
+    @Test void theDistractionLabelsFollowTheState() {
+        offer();
+        assertThat(labels()).containsExactly("Reader Mode", "Remove Distractions", "");
+        tools.toggleDistractions();
+        assertThat(labels()).containsExactly("Reader Mode", "Exit Distraction Removal", "");
+        tools.addressChanged(ARTICLE + "?section=2");
+        assertThat(tools.offered()).isFalse();
+        assertThat(labels()).as("while it is on").containsExactly("Reader Mode", "Exit Distraction Removal", "");
+        int ran = scripts.size();
+        tools.loadStarted("https://news.example/next");
+        assertThat(tools.removing()).isFalse();
+        assertThat(tools.menuItems()).isEmpty();
+        assertThat(scripts).hasSize(ran);
+        reported("distractions", "{\"op\":\"distractions\",\"check\":1,\"state\":\"off\"}");
+        assertThat(tools.removing()).isFalse();
+    }
+
+    /** Without the items, as before any check or on one of Jasper's pages, the toggle starts nothing. */
+    @Test void theDistractionsToggleDoesNothingWithoutTheItems() {
+        tools.toggleDistractions();
+        tools.loadStarted(ARTICLE);
+        tools.loaded();
+        length(1, 3);
+        tools.toggleDistractions();
+        tools.loadStarted("jasper-about:welcome");
+        tools.loaded();
+        tools.toggleDistractions();
+        assertThat(scripts).containsExactly(ToolScripts.readerCheck(1));
+        assertThat(tools.removing()).isFalse();
+        assertThat(changes).isZero();
+        assertThat(focuses).isZero();
+    }
+
+    /**
+     * F25: Remove Element's point, on the page's canvas, is divided by the zoom the page shows at as it runs, so
+     * {@code removeAt} looks in CSS pixels: (300, 150) at 150% is (200.0, 100.0), written as Java writes a double.
+     */
+    @Test void removeElementDividesThePointByTheZoom() {
+        var zoomed = new int[] {150};
+        var tools = new PageTools((script, url) -> {
+            scripts.add(script);
+            urls.add(url);
+        }, () -> CSS, () -> zoomed[0], () -> true, this::later, () -> focuses++, () -> changes++);
+        tools.loadStarted(ARTICLE);
+        tools.removeElementAt(300, 150);
+        assertThat(scripts).containsExactly(ToolScripts.distractionsRemoveAt(200.0, 100.0));
+        assertThat(urls).containsExactly(ToolScripts.DISTRACTIONS_URL);
+        assertThat(scripts.getLast()).endsWith("\n(\"removeAt\", 200.0, 100.0);");
+        zoomed[0] = 300;
+        tools.removeElementAt(100, 0);
+        assertThat(scripts.getLast()).endsWith("\n(\"removeAt\", 33.333333333333336, 0.0);");
+        zoomed[0] = 100;
+        tools.removeElementAt(7, 9);
+        assertThat(scripts.getLast()).isEqualTo(ToolScripts.distractionsRemoveAt(7.0, 9.0));
+        zoomed[0] = 0;
+        tools.removeElementAt(7, 9);
+        assertThat(scripts).as("no zoom, no point").hasSize(3);
+        assertThat(changes).isZero();
+        assertThat(focuses).isZero();
+        assertThat(tools.removing()).isFalse();
+    }
+
+    /** Remove Element runs on any page of the web, offered or not, but not on Jasper's own pages or once the item closed. */
+    @Test void removeElementNeedsNoOfferButRunsNotOnJaspersPagesOrAfterClosing() {
+        tools.loadStarted("jasper-about:welcome");
+        tools.removeElementAt(30, 15);
+        assertThat(scripts).isEmpty();
+        tools.loadStarted(ARTICLE);
+        tools.removeElementAt(30, 15);
+        assertThat(scripts).containsExactly(ToolScripts.distractionsRemoveAt(20.0, 10.0));
+        tools.close();
+        tools.removeElementAt(30, 15);
+        assertThat(scripts).hasSize(1);
     }
 
     /** The item closes: the wait ends, and nothing runs or changes after. */

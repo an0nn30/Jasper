@@ -15,6 +15,7 @@ import dev.jasper.browser.store.HistoryStore;
 import dev.jasper.browser.store.MemoryStores;
 import dev.jasper.browser.store.Reached;
 import dev.jasper.browser.store.Stores;
+import dev.jasper.browser.tools.ToolScripts;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.testing.FakeKit;
@@ -25,6 +26,7 @@ import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.PixelImage;
 import dev.jasper.sdk.ui.TabPlacement;
 import dev.jasper.sdk.ui.UiEvent;
+import java.awt.Point;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -368,6 +370,40 @@ class BrowserItemTest {
             });
             assertThat(host.failures()).isEmpty();
         } });
+    }
+
+    /**
+     * Plan 7's F25: Remove Element divides the menu's point by the zoom the item shows its page at: its own zoom, or the
+     * Page zoom it opened at or was reset to, so an item reset to a 150% Page zoom passes 150; a later change of the Page
+     * zoom setting does not reach an open item.
+     */
+    @Test void removeElementDividesByTheZoomTheItemShowsItsPageAt() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var item = items(host, page -> { }).open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            Page page = ItemTestAccess.page(item);
+            var ran = new ArrayList<String>();
+            PageTestAccess.useScriptRunner(page, (script, url) -> ran.add(script));
+            var removeElement = page.menuPlace().orElseThrow().removeElement();
+            removeElement.accept(new Point(300, 150));
+            assertThat(ran.getLast()).as("at 100%").isEqualTo(ToolScripts.distractionsRemoveAt(300.0, 150.0));
+            command(host, item, "font-bigger");
+            command(host, item, "font-bigger");
+            removeElement.accept(new Point(330, 165));
+            assertThat(ran.getLast()).as("its own 110%").isEqualTo(ToolScripts.distractionsRemoveAt(300.0, 150.0));
+            host.setSetting(ID, "page_zoom", 150L);
+            command(host, item, "font-reset");
+            removeElement.accept(new Point(300, 150));
+            assertThat(ran.getLast()).as("reset to a 150% Page zoom").isEqualTo(ToolScripts.distractionsRemoveAt(200.0, 100.0));
+            host.setSetting(ID, "page_zoom", 200L);
+            removeElement.accept(new Point(300, 150));
+            assertThat(ran.getLast()).as("the setting's change does not reach it").isEqualTo(ToolScripts.distractionsRemoveAt(200.0, 100.0));
+            assertThat(ran).hasSize(4);
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    private static void command(FakePluginHost host, BrowserItem item, String id) {
+        host.contentCommands(item.tab()).stream().filter(each -> each.id().equals(id)).findFirst().orElseThrow().run().run();
     }
 
     @Test void theItemsViewIsTheToolbarAboveTheCanvasAsPreviewContent() throws Exception {

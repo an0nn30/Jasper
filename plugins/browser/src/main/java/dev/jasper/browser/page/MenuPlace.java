@@ -12,8 +12,8 @@ import java.util.function.Supplier;
 /**
  * Where a page's right-click menu shows, and what its items reach outside the page, in plain types: over its item's tab,
  * with the plugin's clipboard, with the search engine the settings choose each time the menu opens, with its item's
- * Back and Reload, which know the item's error pages, and with its item's View Source and Inspect Element. The page's
- * item gives it.
+ * Back and Reload, which know the item's error pages, and with its item's View Source, Remove Element and Inspect
+ * Element. The page's item gives it.
  *
  * @param tab the item's tab, over whose content the menu shows
  * @param clipboard puts text on the system clipboard, as the SDK's {@code Platform.copy} does
@@ -23,10 +23,12 @@ import java.util.function.Supplier;
  * @param back the item's Back
  * @param reload the item's Reload
  * @param viewSource the item's View Source, which shows the page's source in the item
+ * @param removeElement the item's Remove Element, which hides the overlay of the element at a point on the page's canvas
  * @param inspect the item's Inspect Element, which shows the page's DevTools for the element at a point on its canvas
  */
 public record MenuPlace(ContentTab tab, Consumer<String> clipboard, Supplier<String> engineName, Function<String, URI> search,
-                        BooleanSupplier canGoBack, Runnable back, Runnable reload, Runnable viewSource, Consumer<Point> inspect) {
+                        BooleanSupplier canGoBack, Runnable back, Runnable reload, Runnable viewSource, Consumer<Point> removeElement,
+                        Consumer<Point> inspect) {
     /** Rejects nulls. */
     public MenuPlace {
         Objects.requireNonNull(tab, "tab");
@@ -37,6 +39,7 @@ public record MenuPlace(ContentTab tab, Consumer<String> clipboard, Supplier<Str
         Objects.requireNonNull(back, "back");
         Objects.requireNonNull(reload, "reload");
         Objects.requireNonNull(viewSource, "viewSource");
+        Objects.requireNonNull(removeElement, "removeElement");
         Objects.requireNonNull(inspect, "inspect");
     }
 }

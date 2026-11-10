@@ -12,15 +12,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * The page's right-click menu for what is under the pointer (spec section 11), as the SDK's menu items: above Jasper's
  * pane items, Back, Forward and Reload over a bare page only, as in Chrome (P38), the link's items, the image's, then the
- * editing or selection items with Select All last; below them, Print… and Copy Page Title, then View Source and Inspect
- * Element, a separator between groups. The link's and image's items include Save Link As… and Save Image As… (plan 7's
- * F10). Pure: no Chromium, no host.
+ * editing or selection items with Select All last; below them, Print… and Copy Page Title, then View Source, Remove
+ * Element (plan 7's Task 6) and Inspect Element, a separator between groups. The link's and image's items include Save
+ * Link As… and Save Image As… (plan 7's F10). Pure: no Chromium, no host.
  */
 class PageMenuItemsTest {
     private static final Optional<String> NONE = Optional.empty();
     private static final String PAGE = "https://example.com/";
     private static final List<String> TRAILING = List.of("page-menu.print Print…", "page-menu.copy-title Copy Page Title", "---",
-        "page-menu.view-source View Source", "page-menu.inspect-element Inspect Element");
+        "page-menu.view-source View Source", "page-menu.remove-element Remove Element", "page-menu.inspect-element Inspect Element");
 
     @Test void aBarePageGivesBackForwardAndReloadThenSelectAllAboveAndThePageItemsBelow() {
         var menu = PageMenuItems.of(context(true, false, NONE, NONE, NONE, false));
@@ -113,7 +113,22 @@ class PageMenuItemsTest {
     @Test void copyPageTitleIsDisabledOnAnUntitledPage() {
         var menu = PageMenuItems.of(new Context(true, true, NONE, NONE, NONE, false, "Google", PAGE, false));
         assertThat(lines(menu.trailing())).containsExactly("page-menu.print Print…", "page-menu.copy-title Copy Page Title (disabled)",
-            "---", "page-menu.view-source View Source", "page-menu.inspect-element Inspect Element");
+            "---", "page-menu.view-source View Source", "page-menu.remove-element Remove Element",
+            "page-menu.inspect-element Inspect Element");
+    }
+
+    /**
+     * Spec section 11 and plan 7's Task 6: the last group is View Source, Remove Element and Inspect Element, whatever is
+     * under the pointer, Remove Element always enabled.
+     */
+    @Test void theLastGroupIsViewSourceRemoveElementAndInspectElement() {
+        for (var context : List.of(context(true, true, NONE, NONE, NONE, false), context(false, false, Optional.of("https://example.com/a"),
+            Optional.of("https://example.com/a.png"), Optional.of("text"), true))) {
+            var groups = groups(PageMenuItems.of(context).trailing());
+            assertThat(groups.getLast()).containsExactly("page-menu.view-source View Source", "page-menu.remove-element Remove Element",
+                "page-menu.inspect-element Inspect Element");
+        }
+        assertThat(PageMenuItems.REMOVE_ELEMENT).isEqualTo("page-menu.remove-element");
     }
 
     /**

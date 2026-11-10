@@ -17,8 +17,9 @@ import java.util.function.IntSupplier;
 
 /**
  * One browser item's page tools (spec section 10, plan 7's F38): its page's {@link PageTools}, wired to the page's load
- * starts, load ends, address changes and tools reports, and their items first in the menu button. Reader Mode runs
- * through it, and shows the article in the workspace theme's colours as they are when it shows, as Jasper's own pages
+ * starts, load ends, address changes and tools reports, and their items first in the menu button. Reader Mode, Remove
+ * Distractions and the page's right-click menu's Remove Element run through it, at the zoom the item shows its page at;
+ * Reader Mode shows the article in the workspace theme's colours as they are when it shows, as Jasper's own pages
  * take them ({@link PageHtml#colours(WorkspacePalette, String)}). While the article shows, the page's find searches its
  * top frame alone, where the overlay is, and the find starts again as reader mode opens and closes. Its item tells it
  * each time its page shows, so a page that finished loading in a background tab is checked then. UI thread.
@@ -36,7 +37,7 @@ final class PageToolsHost implements AutoCloseable {
      *
      * @param page the item's page, whose top frame the tools' scripts run in
      * @param appearance the plugin's appearance, whose workspace theme the reader takes
-     * @param zoom the zoom the page shows at, in percent, as the item shows it
+     * @param zoom the zoom the page shows at, in percent, as the item shows it, which Remove Element divides by
      * @param later runs a task on the UI thread after a delay, answering what cancels it
      * @param render draws the item again, as the tools' items change
      */
@@ -61,8 +62,8 @@ final class PageToolsHost implements AutoCloseable {
     }
 
     /**
-     * The menu reported {@code action}: Reader Mode's shows or hides the article, and the page takes the keyboard focus;
-     * Remove Distractions' is taken and does nothing.
+     * The menu reported {@code action}: Reader Mode's shows or hides the article, and Remove Distractions' starts or
+     * stops distraction removal, each ending the other; then the page takes the keyboard focus.
      *
      * @param action the action
      * @return whether it was one of the tools' items
@@ -70,7 +71,7 @@ final class PageToolsHost implements AutoCloseable {
     boolean choose(String action) {
         switch (action) {
             case PageTools.READER -> tools.toggleReader();
-            case PageTools.DISTRACTIONS -> { }
+            case PageTools.DISTRACTIONS -> tools.toggleDistractions();
             default -> {
                 return false;
             }
@@ -88,6 +89,17 @@ final class PageToolsHost implements AutoCloseable {
             page.restartFind();
         }
         render.run();
+    }
+
+    /**
+     * Remove Element, from the page's right-click menu, at {@code x}, {@code y} on the page's canvas: the overlay of the
+     * element there is hidden, the point divided by the zoom the item shows its page at.
+     *
+     * @param x the point's distance from the canvas's left
+     * @param y its distance from the canvas's top
+     */
+    void removeElementAt(int x, int y) {
+        tools.removeElementAt(x, y);
     }
 
     /** The item's page shows: a check that waited for it runs. */

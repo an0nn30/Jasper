@@ -17,6 +17,7 @@ import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.TabPlacement;
 import dev.jasper.sdk.ui.WorkspacePalette;
 import java.awt.Color;
+import java.awt.Point;
 import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -34,7 +35,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * A browser item's page tools (plan 7's Task 5, F38): its {@link PageToolsHost} runs reader mode's check in the page's
  * top frame as its load ends, offers Reader Mode and Remove Distractions first in the menu once the page reports enough
- * reader text, shows and hides the article in the theme's colours, and follows the page's reports and load starts. The
+ * reader text, shows and hides the article in the theme's colours, starts and stops distraction removal (Task 6), and
+ * follows the page's reports and load starts; the page's right-click menu's Remove Element runs through it too. The
  * page is a stand-in's, as one cannot be made without Chromium: its scripts are recorded, and its load starts, load
  * ends and reports are told by the test.
  */
@@ -84,7 +86,11 @@ class PageToolsHostTest {
             page.toolReported("reader", "{\"op\":\"reader\",\"check\":1,\"state\":\"off\"}");
             assertThat(menu().getFirst().label()).isEqualTo("Reader Mode");
             view().choose(BrowserToolbar.MENU, PageTools.DISTRACTIONS);
-            assertThat(ran).as("distraction removal is plan 7's Task 6").hasSize(2);
+            assertThat(ran.getLast()).isEqualTo(ToolScripts.DISTRACTIONS_URL + " " + ToolScripts.distractionsStart(1));
+            assertThat(menu().subList(0, 2)).extracting(MenuItem::label).containsExactly("Reader Mode", "Exit Distraction Removal");
+            page.toolReported("distractions", "{\"op\":\"distractions\",\"check\":1,\"state\":\"off\"}");
+            assertThat(menu().get(1).label()).isEqualTo("Remove Distractions");
+            assertThat(ran).as("Escape ended it in the page").hasSize(3);
 
             PageTestAccess.loadStarted(page, "https://news.example/next");
             assertThat(menu()).extracting(MenuItem::id).doesNotContain(PageTools.READER, PageTools.DISTRACTIONS);
@@ -122,6 +128,25 @@ class PageToolsHostTest {
             found.clear();
             find.find("needle", false, false);
             assertThat(frames(found)).containsExactly("main", "ad");
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * Task 6: the page's right-click menu's Remove Element runs {@code distractions.js}'s removeAt in the page, at the
+     * menu's point divided by the zoom the item shows its page at; on an item that closed, nothing.
+     */
+    @Test void removeElementRunsRemoveAtAtTheItemsZoom() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            BrowserItem item = open("https://news.example/article");
+            Page page = item.page();
+            PageTestAccess.loadStarted(page, "https://news.example/article");
+            page.menuPlace().orElseThrow().removeElement().accept(new Point(300, 150));
+            assertThat(ran).containsExactly(ToolScripts.DISTRACTIONS_URL + " " + ToolScripts.distractionsRemoveAt(300.0, 150.0));
+            var place = page.menuPlace().orElseThrow();
+            item.close();
+            place.removeElement().accept(new Point(300, 150));
+            assertThat(ran).hasSize(1);
             assertThat(host.failures()).isEmpty();
         });
     }

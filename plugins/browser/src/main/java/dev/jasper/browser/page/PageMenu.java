@@ -32,10 +32,10 @@ import org.cef.handler.CefContextMenuHandlerAdapter;
  * downloads a web address the frame could open, or a {@code data:} one ({@link LinkSchemes#saves}), asking where it goes
  * in Jasper's save chooser (plan 7's F10); Cut, Copy, Paste and Select All as the page's Edit menu runs
  * them, on its focused frame, as Chrome's menu does; Search with ⟨engine⟩ in the next tab with the engine the settings
- * choose; Print… with Chromium's print dialog; the copies with the plugin's clipboard; and View Source and Inspect
- * Element as the page's item runs them, showing the page's source in the item and the page's DevTools, inspecting the
- * element under the pointer, in a pane below the page (spec section 10). Chromium's DevTools browser is no page's, so
- * it gets no menu.
+ * choose; Print… with Chromium's print dialog; the copies with the plugin's clipboard; and View Source, Remove Element
+ * and Inspect Element as the page's item runs them, showing the page's source in the item, hiding the overlay under the
+ * pointer (plan 7), and showing the page's DevTools, inspecting the element under the pointer, in a pane below the page
+ * (spec section 10). Chromium's DevTools browser is no page's, so it gets no menu.
  *
  * <p><b>Chromium's callback is never continued</b> (P37): it is always cancelled, exactly once, as the menu closes and
  * before the item chosen runs, whether one of the page's items is chosen, one of Jasper's runs or the menu is dismissed,
@@ -212,6 +212,7 @@ final class PageMenu {
                 if (!page.title().isEmpty()) place.clipboard().accept(page.title());
             }
             case PageMenuItems.VIEW_SOURCE -> place.viewSource().run();
+            case PageMenuItems.REMOVE_ELEMENT -> place.removeElement().accept(pointed.at());
             case PageMenuItems.INSPECT_ELEMENT -> place.inspect().accept(pointed.at());
             default -> { }
         }
