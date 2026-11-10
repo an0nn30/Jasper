@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
 /**
@@ -13,18 +14,19 @@ import static org.assertj.core.api.Assertions.tuple;
  * scripts' reports drive them, over a recording stand-in for the page. Review Focus 5: a load start resets the modes and
  * the offer; a page with 10 characters of reader text, a {@code jasper-about:} page or a malformed report offers
  * nothing. F24: no check on a challenge address or a hidden page, and a same-document address change checks again
- * once it has settled for a second.
+ * once it has settled for a second, but not one that changes only the fragment (D30). D28: a check gets one answer,
+ * its own token's, so a forged token or a replayed answer counts for nothing.
  */
 class PageToolsTest {
     private static final String ARTICLE = "https://news.example/2026/article", CSS = ".reader { --text: #222; }";
     private final List<String> scripts = new ArrayList<>(), urls = new ArrayList<>();
     private final List<Delayed> waiting = new ArrayList<>();
     private boolean showing = true;
-    private int changes;
+    private int changes, focuses;
     private final PageTools tools = new PageTools((script, url) -> {
         scripts.add(script);
         urls.add(url);
-    }, () -> CSS, () -> 150, () -> showing, this::later, () -> changes++);
+    }, () -> CSS, () -> 150, () -> showing, this::later, () -> focuses++, () -> changes++);
 
     private record Delayed(Duration delay, Runnable task) { }
 
@@ -37,14 +39,69 @@ class PageToolsTest {
         assertThat(tools.offered()).isFalse();
         assertThat(tools.menuItems()).isEmpty();
         assertThat(changes).isZero();
-        length(1, 11);
+        tools.addressChanged(ARTICLE + "?page=2");
+        end();
+        assertThat(scripts).as("a fresh check").containsExactly(ToolScripts.readerCheck(1), ToolScripts.readerCheck(2));
+        length(2, 11);
         assertThat(tools.offered()).isTrue();
         assertThat(tools.menuItems()).isNotEmpty();
         assertThat(changes).isEqualTo(1);
-        length(1, 0);
-        assertThat(tools.offered()).as("a later answer withdraws it").isFalse();
-        assertThat(changes).isEqualTo(2);
-        assertThat(scripts).as("answers run nothing").hasSize(1);
+        assertThat(scripts).as("answers run nothing").hasSize(2);
+    }
+
+    /**
+     * D28: a page's forged {@code check: 0}, while no check waits for an answer, on its first document or a later one,
+     * offers nothing, and choosing the item then throws nothing and shows nothing.
+     */
+    @Test void aForgedCheckZeroOffersNothing() {
+        tools.loadStarted("https://hostile.example/");
+        length(0, 99);
+        assertThat(tools.offered()).as("while the first document loads").isFalse();
+        tools.toggleReader();
+        assertThat(tools.reading()).isFalse();
+        tools.loaded();
+        length(1, 3);
+        length(0, 99);
+        assertThat(tools.offered()).as("once its one check has answered").isFalse();
+        tools.loadStarted("https://hostile.example/next");
+        length(0, 99);
+        tools.loaded();
+        length(0, 99);
+        assertThat(tools.offered()).as("on a later document").isFalse();
+        showing = false;
+        tools.addressChanged("https://hostile.example/next?page=2");
+        end();
+        length(0, 99);
+        assertThat(tools.offered()).as("while its check waits for the page to show").isFalse();
+        assertThat(scripts).hasSize(2);
+        assertThat(changes).isZero();
+        assertThat(focuses).isZero();
+    }
+
+    /** D28: one check gets one answer, so a page that alternates its answer to one token draws its item once. */
+    @Test void aCheckGetsOneAnswer() {
+        tools.loadStarted(ARTICLE);
+        tools.loaded();
+        for (int at = 0; at < 1_000; at++) length(1, at % 2 == 0 ? 99 : 0);
+        assertThat(tools.offered()).isTrue();
+        assertThat(changes).as("one render").isEqualTo(1);
+    }
+
+    /** D28: a show whose script cannot be built, as when the theme cannot be read, leaves reader mode off. */
+    @Test void aShowThatCannotBeBuiltLeavesReaderModeOff() {
+        var failing = new PageTools((script, url) -> scripts.add(script), () -> {
+            throw new IllegalStateException("no theme");
+        }, () -> 100, () -> true, this::later, () -> focuses++, () -> changes++);
+        failing.loadStarted(ARTICLE);
+        failing.loaded();
+        failing.reported("reader", "{\"op\":\"reader\",\"check\":1,\"length\":400}");
+        int changed = changes;
+        assertThatThrownBy(failing::toggleReader).isInstanceOf(IllegalStateException.class);
+        assertThat(failing.reading()).isFalse();
+        assertThat(failing.menuItems()).first().extracting(MenuItem::label).isEqualTo("Reader Mode");
+        assertThat(scripts).hasSize(1);
+        assertThat(changes).isEqualTo(changed);
+        assertThat(focuses).isZero();
     }
 
     /** Jasper's own pages, in any case, get no check, and their reports offer nothing. */
@@ -68,7 +125,7 @@ class PageToolsTest {
     @Test void aChallengeAddressRunsNoCheck() {
         tools.loadStarted("https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/b/turnstile");
         tools.loaded();
-        tools.addressChanged("https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/b/turnstile#next");
+        tools.addressChanged("https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/b/turnstile?next");
         end();
         assertThat(scripts).isEmpty();
         assertThat(waiting).isEmpty();
@@ -113,6 +170,19 @@ class PageToolsTest {
         assertThat(changes).isEqualTo(3);
     }
 
+    /** D29: the page takes the keyboard focus after the menu shows or hides the article, so keys reach the overlay. */
+    @Test void thePageTakesTheFocusAfterAShowAndAHide() {
+        offer();
+        assertThat(focuses).isZero();
+        tools.toggleReader();
+        assertThat(focuses).isEqualTo(1);
+        tools.toggleReader();
+        assertThat(focuses).isEqualTo(2);
+        tools.loadStarted(ARTICLE);
+        tools.toggleReader();
+        assertThat(focuses).as("not for a toggle that does nothing").isEqualTo(2);
+    }
+
     /** Without the offer, or before any check, the toggle shows nothing. */
     @Test void theToggleDoesNothingWhileNothingIsOffered() {
         tools.toggleReader();
@@ -123,6 +193,7 @@ class PageToolsTest {
         assertThat(scripts).containsExactly(ToolScripts.readerCheck(1));
         assertThat(tools.reading()).isFalse();
         assertThat(changes).isZero();
+        assertThat(focuses).isZero();
     }
 
     /** Escape in the page, as {@code reader.js} reports it, ends reader mode, and the menu's label follows. */
@@ -208,7 +279,7 @@ class PageToolsTest {
         assertThat(waiting).as("the document's own commit").isEmpty();
         tools.loaded();
         length(1, 400);
-        tools.addressChanged(ARTICLE + "#comments");
+        tools.addressChanged(ARTICLE + "?comments");
         assertThat(tools.offered()).isFalse();
         assertThat(tools.menuItems()).isEmpty();
         assertThat(waiting).extracting(Delayed::delay).containsExactly(Duration.ofSeconds(1));
@@ -223,10 +294,36 @@ class PageToolsTest {
         assertThat(tools.offered()).isTrue();
     }
 
+    /**
+     * D30: an address change of the fragment alone, as a link to a heading, leaves the document's offer and checks
+     * nothing again; any other part's change does.
+     */
+    @Test void aFragmentOnlyChangeChecksNothing() {
+        tools.loadStarted(ARTICLE + "#intro");
+        tools.addressChanged(ARTICLE + "#intro");
+        tools.loaded();
+        length(1, 400);
+        for (String fragment : List.of(ARTICLE, ARTICLE + "#comments", ARTICLE + "#", ARTICLE + "#comments"))
+            tools.addressChanged(fragment);
+        assertThat(tools.offered()).isTrue();
+        assertThat(waiting).isEmpty();
+        assertThat(changes).isEqualTo(1);
+        tools.addressChanged(ARTICLE + "?ref=home#comments");
+        assertThat(tools.offered()).isFalse();
+        assertThat(waiting).hasSize(1);
+        end();
+        assertThat(scripts).containsExactly(ToolScripts.readerCheck(1), ToolScripts.readerCheck(2));
+        tools.loadStarted("https://news.example/redirected");
+        tools.addressChanged("https://news.example/final");
+        tools.loaded();
+        tools.addressChanged("https://news.example/final#top");
+        assertThat(waiting).as("the fragment of the address the document committed at").isEmpty();
+    }
+
     @Test void aLoadStartEndsTheWait() {
         tools.loadStarted(ARTICLE);
         tools.loaded();
-        tools.addressChanged(ARTICLE + "#top");
+        tools.addressChanged(ARTICLE + "?top");
         assertThat(waiting).hasSize(1);
         tools.loadStarted("https://news.example/next");
         assertThat(waiting).isEmpty();
@@ -238,7 +335,7 @@ class PageToolsTest {
         showing = false;
         tools.loadStarted(ARTICLE);
         tools.loaded();
-        tools.addressChanged(ARTICLE + "#a");
+        tools.addressChanged(ARTICLE + "?a");
         end();
         assertThat(scripts).isEmpty();
         showing = true;
@@ -259,7 +356,7 @@ class PageToolsTest {
     @Test void readerModeOutlivesAnAddressChangeInItsDocument() {
         offer();
         tools.toggleReader();
-        tools.addressChanged(ARTICLE + "#section-2");
+        tools.addressChanged(ARTICLE + "?section=2");
         assertThat(tools.offered()).isFalse();
         assertThat(labels()).containsExactly("Exit Reader Mode", "Remove Distractions", "");
         end();
@@ -281,7 +378,7 @@ class PageToolsTest {
         tools.loadStarted(ARTICLE);
         tools.loaded();
         length(1, 400);
-        tools.addressChanged(ARTICLE + "#b");
+        tools.addressChanged(ARTICLE + "?b");
         int changed = changes;
         tools.close();
         assertThat(waiting).isEmpty();

@@ -88,6 +88,16 @@ class ToolScriptsTest {
         assertThat(ToolScripts.READER_URL).isEqualTo("jasper-about:reader.js");
     }
 
+    /**
+     * D29 and D30, as far as Java can see them: while the reader shows, keys stop at its window's capture listeners and
+     * the page's body is inert; the article drops SMIL's {@code animate} and {@code set}, and its custom elements are
+     * unwrapped, so none of the page's code runs inside the overlay. The stub harness and Task 9 check the behaviour.
+     */
+    @Test void theReaderKeepsThePageOutOfTheOverlay() {
+        assertThat(ToolScripts.reader()).contains("['keydown', onKeyDown, true]", "['keypress', onKey, true]", "['keyup', onKey, true]",
+            "inertOf.set", "animate, set", "replaceWith", "'is'", "preventScroll: true");
+    }
+
     @Test void theReaderScriptIsAsciiWithNoControlCharacterButTheNewline() {
         assertThat(ToolScripts.reader().chars().filter(c -> (c < 0x20 && c != '\n') || c >= 0x7F)).isEmpty();
         assertThat(ToolScripts.reader()).startsWith("/*").endsWith("})\n");

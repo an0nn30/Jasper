@@ -57,6 +57,8 @@ public final class Page implements AutoCloseable {
     /** How long after a title change the page reads its history, once for the title changes meanwhile. */
     static final int TITLE_READ_MILLIS = 250;
     private static final System.Logger LOG = System.getLogger(Page.class.getName());
+    // Jasper's own pages' scheme, which the tools' scripts stay out of.
+    private static final String JASPER_ABOUT = "jasper-about:";
     private final PageView view = new PageView();
     private final PagePrivacy privacy = new PagePrivacy(this::inEveryFrame);
     private final Runnable changed;
@@ -848,9 +850,9 @@ public final class Page implements AutoCloseable {
     }
 
     /**
-     * Tells {@code listener} each report the page's tools' scripts send through the {@code links} package's opener bridge
-     * from the page's top frame (plan 7: {@code reader.js}'s and {@code distractions.js}'s), as {@link #toolReported}
-     * hands them on. Any script of the page can send one, so each is untrusted.
+     * Tells {@code listener} each report the {@code tools} package's scripts, such as {@code reader.js}, send through the
+     * {@code links} package's opener bridge from the page's top frame, as {@link #toolReported} hands them on. Any script
+     * of the page can send one, so each is untrusted.
      *
      * @param listener told the bridge op and the request as the page sent it, a JSON object, on the UI thread
      * @return the registration; the page's close ends it
@@ -880,7 +882,8 @@ public final class Page implements AutoCloseable {
      * Runs {@code script}, which Jasper wrote, in the document the page's main frame shows now, under the name
      * {@code url} in the page's console and stack traces, then releases the frame: as the {@code tools} package's page
      * scripts run. Nothing before the page's browser is ready, after {@link #close()}, or in a main frame at a challenge
-     * provider's address ({@link ChallengeFrames}), which Jasper's page scripts stay out of.
+     * provider's address ({@link ChallengeFrames}) or on one of Jasper's own pages, which Jasper's page scripts stay out
+     * of.
      *
      * @param script the script
      * @param url the address it goes by, such as {@code jasper-about:reader.js}
@@ -1308,17 +1311,29 @@ public final class Page implements AutoCloseable {
 
     /**
      * Runs {@code script} in the main frame of the page's browser, then releases only this handle to the frame; nothing
-     * before the browser is ready, and nothing in a challenge provider's frame.
+     * before the browser is ready, and nothing in a frame {@link #runsScriptsIn} refuses.
      */
     private void runInMainFrame(String script, String url) {
         PageBrowser ready = readyBrowser();
         CefFrame frame = ready == null ? null : ready.getMainFrame();
         if (frame == null) return;
         try {
-            if (frame.isValid() && !ChallengeFrames.is(frame.getURL())) frame.executeJavaScript(script, url, 0);
+            if (frame.isValid() && runsScriptsIn(frame.getURL())) frame.executeJavaScript(script, url, 0);
         } finally {
             frame.dispose();
         }
+    }
+
+    /**
+     * Whether {@link #run} runs a script in a main frame at {@code address}: not at a challenge provider's address
+     * ({@link ChallengeFrames}), and not on one of Jasper's own {@code jasper-about:} pages, in any case, which Jasper's
+     * page scripts stay out of.
+     *
+     * @param address the main frame's address, as Chromium names it
+     * @return whether it does; false for none
+     */
+    static boolean runsScriptsIn(String address) {
+        return address != null && !address.regionMatches(true, 0, JASPER_ABOUT, 0, JASPER_ABOUT.length()) && !ChallengeFrames.is(address);
     }
 
     /** Jasper sends the page elsewhere. */

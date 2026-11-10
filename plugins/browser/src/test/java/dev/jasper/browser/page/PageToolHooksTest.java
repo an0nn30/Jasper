@@ -38,6 +38,20 @@ class PageToolHooksTest {
         });
     }
 
+    /**
+     * D30: the page's own runner runs a script in no main frame at a challenge provider's address and none of Jasper's
+     * own pages, in any case; any other address it runs in.
+     */
+    @Test void aScriptRunsInNoChallengeFrameAndNoJasperPage() {
+        for (String address : List.of("jasper-about:welcome", "JASPER-ABOUT:source?token=1", "Jasper-About:error",
+                "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/b/turnstile", "https://www.google.com/recaptcha/api2/anchor"))
+            assertThat(Page.runsScriptsIn(address)).as(address).isFalse();
+        assertThat(Page.runsScriptsIn(null)).isFalse();
+        for (String address : List.of("https://news.example/article", "http://localhost:8080/", "file:///tmp/a.html", "about:blank",
+                "data:text/html,<p>x</p>", "https://www.google.com/search?q=jasper-about%3A"))
+            assertThat(Page.runsScriptsIn(address)).as(address).isTrue();
+    }
+
     @Test void eachLoadEndIsToldUntilThePageCloses() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             Page page = page();

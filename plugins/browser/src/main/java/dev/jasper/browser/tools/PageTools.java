@@ -21,15 +21,17 @@ import java.util.function.Supplier;
  * over the page in the theme's colours, and Exit Reader Mode, or Escape in the page, takes it away.
  *
  * <p>The check runs once a document's load ends, and again a second after the last of its same-document address
- * changes, as a single-page app's route changes, which withdraw the offer meanwhile. It never runs on Jasper's own
- * {@code jasper-about:} pages or on a challenge provider's address ({@link ChallengeFrames}), which Jasper's page
- * scripts stay out of; and while the page is not showing, as a background tab's, it waits until the page shows. A
- * load start ends both modes and withdraws the offer, as the overlay goes with its document.
+ * changes, as a single-page app's route changes, which withdraw the offer meanwhile; a change of the fragment alone, as
+ * a link to a heading makes, changes nothing. It never runs on Jasper's own {@code jasper-about:} pages or on a
+ * challenge provider's address ({@link ChallengeFrames}), which Jasper's page scripts stay out of; and while the page
+ * is not showing, as a background tab's, it waits until the page shows. A load start ends both modes and withdraws the
+ * offer, as the overlay goes with its document.
  *
  * <p>Each check carries a token, the count of checks so far, which its report carries back: only the latest check's
- * answer offers anything, and an exit counts only from the current document, so an old document's late answer never
- * acts on the next one. What a page reports is untrusted (4a's R38): a report that is not one of its op's shapes, or
- * longer than {@value #REPORT_LIMIT} characters, is ignored. UI thread.
+ * answer counts, once (ruling D28), so neither a forged token, an old document's late answer nor a replayed one offers
+ * anything; and an exit counts only from the current document. After the menu shows or hides the article, the page
+ * takes the keyboard focus, so the keys reach the overlay. What a page reports is untrusted (4a's R38): a report that
+ * is not one of its op's shapes, or longer than {@value #REPORT_LIMIT} characters, is ignored. UI thread.
  */
 public final class PageTools implements AutoCloseable {
     /** What Reader Mode and Exit Reader Mode report, and their id. */
@@ -49,19 +51,21 @@ public final class PageTools implements AutoCloseable {
     private static final Runnable NOTHING = () -> { };
     private final BiConsumer<String, String> scripts;
     private final Supplier<String> readerCss;
-    // The zoom the page shows at, in percent, as its item shows it: what Remove Element divides by (plan 7's F25, Task 6).
+    // The zoom the page shows at, in percent, as its item shows it.
     private final IntSupplier zoom;
     private final BooleanSupplier showing;
     private final BiFunction<Duration, Runnable, Runnable> later;
-    private final Runnable changed;
+    private final Runnable focus, changed;
     // Whether the offer stands, and whether reader mode and distraction removal are on.
     private boolean offered, reading, removing;
     // Whether the document is one no check runs on; whether its load has ended; whether its check waits for the page to
     // show; and whether the tools have closed.
     private boolean skipped, documentLoaded, pending, closed;
     // How many checks have run; how many had when the document started, so its own tokens are the ones above; and the
-    // token whose answer counts, 0 for none.
+    // token whose answer counts, 0 for none, as before any check, after an answer and after an address change.
     private long checks, documentStart, answerable;
+    // The page's address as last heard, from its load start or an address change: a change of its fragment alone is none.
+    private String address = "";
     // Ends the wait for the document's address to settle.
     private Runnable settle = NOTHING;
 
@@ -73,15 +77,17 @@ public final class PageTools implements AutoCloseable {
      * @param zoom the zoom the page shows at, in percent, as its item shows it
      * @param showing whether the page shows now
      * @param later runs a task on the UI thread after a delay, answering what cancels it
+     * @param focus gives the page the keyboard focus
      * @param changed told each time the menu's items change
      */
     public PageTools(BiConsumer<String, String> scripts, Supplier<String> readerCss, IntSupplier zoom, BooleanSupplier showing,
-                     BiFunction<Duration, Runnable, Runnable> later, Runnable changed) {
+                     BiFunction<Duration, Runnable, Runnable> later, Runnable focus, Runnable changed) {
         this.scripts = Objects.requireNonNull(scripts, "scripts");
         this.readerCss = Objects.requireNonNull(readerCss, "readerCss");
         this.zoom = Objects.requireNonNull(zoom, "zoom");
         this.showing = Objects.requireNonNull(showing, "showing");
         this.later = Objects.requireNonNull(later, "later");
+        this.focus = Objects.requireNonNull(focus, "focus");
         this.changed = Objects.requireNonNull(changed, "changed");
     }
 
@@ -99,6 +105,7 @@ public final class PageTools implements AutoCloseable {
         endSettling();
         documentStart = checks;
         answerable = 0;
+        address = url == null ? "" : url;
         skipped = skipped(url);
         if (had) changed.run();
     }
@@ -113,12 +120,16 @@ public final class PageTools implements AutoCloseable {
     /**
      * The page's main frame has a new address: once its document has loaded, a same-document change, which withdraws
      * the offer and checks the document again once its address has stayed put for a second. A change before the load
-     * ends, the commit of a new document among them, does nothing: the load end checks.
+     * ends, the commit of a new document among them, does nothing: the load end checks. Nor does a change of the
+     * fragment alone (ruling D30).
      *
      * @param url the new address
      */
     public void addressChanged(String url) {
-        if (closed || !documentLoaded) return;
+        if (closed || url == null) return;
+        String before = address;
+        address = url;
+        if (!documentLoaded || withoutFragment(before).equals(withoutFragment(url))) return;
         endSettling();
         answerable = 0;
         skipped = skipped(url);
@@ -151,7 +162,10 @@ public final class PageTools implements AutoCloseable {
         switch (op) {
             case READER_OP -> {
                 if (report.get("length") instanceof Long length && length >= 0) {
-                    if (token == answerable && !skipped) offer(length > OFFER_LENGTH);
+                    if (answerable > 0 && token == answerable && !skipped) {
+                        answerable = 0;
+                        offer(length > OFFER_LENGTH);
+                    }
                 } else if (exit && current && reading) {
                     reading = false;
                     changed.run();
@@ -169,19 +183,23 @@ public final class PageTools implements AutoCloseable {
 
     /**
      * Reader Mode or Exit Reader Mode: the article is laid over the page, in the theme's colours as they are now, or
-     * taken away. Nothing while the items are not offered.
+     * taken away; then the page takes the keyboard focus. Nothing while the items are not offered. Reader mode is on
+     * only once its script is made, so a show whose CSS cannot be read leaves it off.
      */
     public void toggleReader() {
         if (closed || skipped) return;
         if (reading) {
+            String script = ToolScripts.readerHide();
             reading = false;
-            scripts.accept(ToolScripts.readerHide(), ToolScripts.READER_URL);
+            scripts.accept(script, ToolScripts.READER_URL);
         } else if (offered) {
+            String script = ToolScripts.readerShow(readerCss.get(), checks);
             reading = true;
-            scripts.accept(ToolScripts.readerShow(readerCss.get(), checks), ToolScripts.READER_URL);
+            scripts.accept(script, ToolScripts.READER_URL);
         } else {
             return;
         }
+        focus.run();
         changed.run();
     }
 
@@ -258,6 +276,11 @@ public final class PageTools implements AutoCloseable {
         if (offered == now) return;
         offered = now;
         changed.run();
+    }
+
+    private static String withoutFragment(String url) {
+        int hash = url.indexOf('#');
+        return hash < 0 ? url : url.substring(0, hash);
     }
 
     /** Whether no check runs on a document at {@code url}: one of Jasper's own pages, or a challenge provider's. */

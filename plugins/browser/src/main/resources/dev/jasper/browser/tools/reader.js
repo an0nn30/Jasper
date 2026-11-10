@@ -7,16 +7,23 @@
  * - "check": once the page is idle, Readability parses a copy of the document, and Jasper is told, through
  *   jasperBridgeQuery (op "reader"), {check: token, length: n}, the length of the article's text with its white space
  *   collapsed. It is 0 when the document has more than 50,000 elements, which are then not copied; when Readability
- *   finds no article; and when it fails, as on a page that enforces Trusted Types.
+ *   finds no article; and when it fails. On a page that enforces Trusted Types, Readability fails where it parses HTML
+ *   text into its copy, which it does only on a retry pass over a page whose first pass found too little text, and for
+ *   an image inside a noscript element.
  * - "show": Readability parses a copy of the document again, and the article is laid over the page in an element fixed
- *   over the whole viewport, topmost, on the document's root element. Its open shadow root holds the article's title,
- *   or "Article", then its content, styled by the CSS given and the overlay's own on a sheet the shadow root adopts,
- *   which no content security policy governs. The content is Readability's own node, never HTML text, without what
- *   would run anything or restyle the overlay: script, iframe, object, embed, form and the like, every on* attribute
- *   and every javascript: address. The overlay scrolls by itself, and the page's own scrolling is held until it
- *   closes. A capture-phase Escape closes it, is stopped, and tells Jasper {check: token, state: "off"}; so does a show
- *   that finds no article.
- * - "hide": the overlay closes, and the page scrolls again.
+ *   over the whole viewport, topmost, on the document's root element, outside its body. Its open shadow root holds the
+ *   article's title, or "Article", then its content, styled by the CSS given and the overlay's own on a sheet the
+ *   shadow root adopts, which no content security policy governs. The content is Readability's own node, never HTML
+ *   text, without what would run anything or restyle the overlay: script, iframe, object, embed, form, SMIL's animate
+ *   and set and the like, every on* attribute and every javascript: address; a custom element, or one with an is
+ *   attribute, gives way to its children, so none of the page's element definitions runs inside the overlay. The
+ *   overlay scrolls by itself and takes the focus, and a link to a fragment of the document scrolls the overlay to its
+ *   target there. Until the overlay closes, the page's own scrolling is held, its body is inert, so neither Tab nor a
+ *   click nor find reaches it, and every key the user presses stops at the window's capture listeners, its default
+ *   action kept, so the page's own shortcuts do not act behind the overlay. A capture listener the page added to the
+ *   window earlier still hears the keys first. Escape closes the overlay, is stopped and prevented, its keyup is
+ *   swallowed, and Jasper is told {check: token, state: "off"}; so is a show that finds no article.
+ * - "hide": the overlay closes; the page scrolls, takes keys and clicks again, and its earlier focus comes back.
  *
  * The reader is made once per document, kept under window[Symbol.for('dev.jasper.browser.reader')], and calls the
  * built-ins as they were when it was made. The page's own scripts share this world, so they can see and undo all of
@@ -51,7 +58,7 @@
     const IDLE_WAIT = 2000;
     // The class of the overlay's root, which the CSS Jasper gives selects for the theme's colours.
     const ROOT = 'reader';
-    const DROPPED = 'script, iframe, frame, frameset, object, embed, form, style, link, meta, base';
+    const DROPPED = 'script, iframe, frame, frameset, object, embed, form, style, link, meta, base, animate, set';
     const DIRECTIONS = ['ltr', 'rtl', 'auto'];
     const OVERFLOW = ['overflow-x', 'overflow-y'];
     const WHITE = /\s+/g, IGNORED = /[\x00-\x20\x7f]+/g, SCRIPTED = /^javascript:/i;
@@ -87,34 +94,54 @@ hr { border: 0; border-top: 1px solid var(--border); }
     const query = window.jasperBridgeQuery, idle = window.requestIdleCallback, later = window.setTimeout;
     // The page's interfaces, by their constructors.
     const Sheets = window.CSSStyleSheet, ShadowRoots = window.ShadowRoot, Documents = window.Document, Elements = window.Element;
-    const HtmlElements = window.HTMLElement, Nodes = window.Node, Targets = window.EventTarget, KeyEvents = window.KeyboardEvent;
-    const Styles = window.CSSStyleDeclaration, Events = window.Event;
-    const constructors = [Sheets, ShadowRoots, Documents, Elements, HtmlElements, Nodes, Targets, KeyEvents, Styles, Events];
+    const HtmlElements = window.HTMLElement, Anchors = window.HTMLAnchorElement, Nodes = window.Node, Targets = window.EventTarget;
+    const KeyEvents = window.KeyboardEvent, MouseEvents = window.MouseEvent, Styles = window.CSSStyleDeclaration, Events = window.Event;
+    const constructors = [Sheets, ShadowRoots, Documents, Elements, HtmlElements, Anchors, Nodes, Targets, KeyEvents, MouseEvents, Styles,
+      Events];
     if (typeof query !== 'function') return null;
     for (let at = 0; at < constructors.length; at++) if (typeof constructors[at] !== 'function') return null;
+    // A getter of {@code type}'s prototype, as it is now; null for none.
+    const getter = (type, name) => {
+      const property = describe(type.prototype, name);
+      return property && typeof property.get === 'function' ? property.get : null;
+    };
     const replaceSync = Sheets.prototype.replaceSync, adopted = describe(ShadowRoots.prototype, 'adoptedStyleSheets');
     const getElementsByTagName = Documents.prototype.getElementsByTagName, createElement = Documents.prototype.createElement;
-    const rootOf = describe(Documents.prototype, 'documentElement'), bodyOf = describe(Documents.prototype, 'body');
+    const rootOf = getter(Documents, 'documentElement'), bodyOf = getter(Documents, 'body'),
+      activeOf = getter(Documents, 'activeElement'), urlOf = getter(Documents, 'URL');
     const attachShadow = Elements.prototype.attachShadow, querySelectorAll = Elements.prototype.querySelectorAll,
       getAttributeNames = Elements.prototype.getAttributeNames, getAttribute = Elements.prototype.getAttribute,
       setAttribute = Elements.prototype.setAttribute, removeAttribute = Elements.prototype.removeAttribute,
-      remove = Elements.prototype.remove;
-    const styleOf = describe(HtmlElements.prototype, 'style'), focus = HtmlElements.prototype.focus;
+      remove = Elements.prototype.remove, replaceWith = Elements.prototype.replaceWith, closest = Elements.prototype.closest,
+      boundsOf = Elements.prototype.getBoundingClientRect, localNameOf = getter(Elements, 'localName');
+    const scrollTop = describe(Elements.prototype, 'scrollTop'), inertOf = describe(HtmlElements.prototype, 'inert');
+    const styleOf = getter(HtmlElements, 'style'), focus = HtmlElements.prototype.focus, hrefOf = getter(Anchors, 'href');
     const cloneNode = Nodes.prototype.cloneNode, appendChild = Nodes.prototype.appendChild,
-      textOf = describe(Nodes.prototype, 'textContent');
+      textOf = describe(Nodes.prototype, 'textContent'), childrenOf = getter(Nodes, 'childNodes'),
+      connectedOf = getter(Nodes, 'isConnected');
     const listen = Targets.prototype.addEventListener, unlisten = Targets.prototype.removeEventListener;
-    const keyOf = describe(KeyEvents.prototype, 'key');
-    const stop = Events.prototype.stopImmediatePropagation, prevent = Events.prototype.preventDefault;
+    const keyOf = getter(KeyEvents, 'key'), buttonOf = getter(MouseEvents, 'button');
+    const modifiers = [getter(MouseEvents, 'ctrlKey'), getter(MouseEvents, 'metaKey'), getter(MouseEvents, 'shiftKey'),
+      getter(MouseEvents, 'altKey')];
+    const stop = Events.prototype.stopImmediatePropagation, prevent = Events.prototype.preventDefault, targetOf = getter(Events, 'target');
     const setProperty = Styles.prototype.setProperty, removeProperty = Styles.prototype.removeProperty,
       getPropertyValue = Styles.prototype.getPropertyValue, getPropertyPriority = Styles.prototype.getPropertyPriority;
     const replace = String.prototype.replace, trim = String.prototype.trim, slice = String.prototype.slice,
-      toLowerCase = String.prototype.toLowerCase, test = RegExp.prototype.test, includes = Array.prototype.includes;
+      indexOf = String.prototype.indexOf, toLowerCase = String.prototype.toLowerCase, test = RegExp.prototype.test,
+      includes = Array.prototype.includes, decode = decodeURIComponent;
     const page = document;
-    if (typeof replaceSync !== 'function' || !adopted || typeof adopted.set !== 'function' || !rootOf || !bodyOf
-        || !styleOf || !textOf || !keyOf || typeof attachShadow !== 'function') return null;
+    const needed = [replaceSync, rootOf, bodyOf, activeOf, urlOf, attachShadow, replaceWith, closest, boundsOf, localNameOf, styleOf,
+      hrefOf, childrenOf, connectedOf, keyOf, buttonOf, targetOf, modifiers[0], modifiers[1], modifiers[2], modifiers[3]];
+    for (let at = 0; at < needed.length; at++) if (typeof needed[at] !== 'function') return null;
+    if (!adopted || typeof adopted.set !== 'function' || !textOf || typeof textOf.set !== 'function' || !scrollTop
+        || typeof scrollTop.get !== 'function' || typeof scrollTop.set !== 'function' || !inertOf || typeof inertOf.get !== 'function'
+        || typeof inertOf.set !== 'function') return null;
 
-    // The overlay while it shows: its element, the token its Escape reports and the page's scrolling it holds.
+    // The overlay while it shows: its element, its shadow root's scroller, the token its Escape reports, and what it
+    // changed in the page, each with what undoes it.
     let shown = null;
+    // Whether Escape closed the overlay and its keyup is still to come.
+    let escaping = false;
 
     /** Tells Jasper {@code fields}, through the opener bridge; a failure tells nothing, and the page goes on. */
     function report(fields) {
@@ -180,6 +207,7 @@ hr { border: 0; border-top: 1px solid var(--border); }
         report({op: 'reader', check: token, state: 'off'});
         return;
       }
+      endEscaping();
       let host = null;
       const held = [];
       try {
@@ -200,10 +228,13 @@ hr { border: 0; border-top: 1px solid var(--border); }
         apply(appendChild, body, [cleaned(article.content)]);
         apply(appendChild, scroller, [body]);
         apply(appendChild, root, [scroller]);
+        apply(listen, scroller, ['click', onClick, false]);
         hold(held);
-        apply(appendChild, apply(rootOf.get, page, []), [host]);
-        shown = {host, token, held};
-        apply(listen, window, ['keydown', onKey, true]);
+        apply(appendChild, apply(rootOf, page, []), [host]);
+        shown = {host, scroller, token, held};
+        apply(listen, window, ['keydown', onKeyDown, true]);
+        apply(listen, window, ['keypress', onKey, true]);
+        apply(listen, window, ['keyup', onKey, true]);
         apply(listen, window, ['pagehide', hide, true]);
         apply(focus, scroller, [{preventScroll: true}]);
       } catch (failed) {
@@ -213,7 +244,7 @@ hr { border: 0; border-top: 1px solid var(--border); }
       }
     }
 
-    /** The overlay closes, and the page scrolls again. */
+    /** The overlay closes, and the page has its scrolling, keys, clicks and earlier focus again. */
     function hide() {
       const now = shown;
       if (now === null) return;
@@ -223,7 +254,9 @@ hr { border: 0; border-top: 1px solid var(--border); }
 
     function end(host, held) {
       try {
-        apply(unlisten, window, ['keydown', onKey, true]);
+        apply(unlisten, window, ['keydown', onKeyDown, true]);
+        apply(unlisten, window, ['keypress', onKey, true]);
+        apply(unlisten, window, ['keyup', onKey, true]);
         apply(unlisten, window, ['pagehide', hide, true]);
       } catch (kept) {
         // A listener the page took away is gone already.
@@ -236,14 +269,102 @@ hr { border: 0; border-top: 1px solid var(--border); }
       restore(held);
     }
 
-    /** Escape closes the overlay, the page hears nothing of it, and Jasper is told. */
-    function onKey(event) {
-      if (shown === null || event.isTrusted !== true || apply(keyOf.get, event, []) !== 'Escape') return;
+    /**
+     * A key the user pressed while the overlay shows stops here, its default action kept, so the page's own handlers
+     * never hear it; Escape is prevented too, closes the overlay, and Jasper is told.
+     */
+    function onKeyDown(event) {
+      if (shown === null || event.isTrusted !== true) return;
       apply(stop, event, []);
+      if (apply(keyOf, event, []) !== 'Escape') return;
       apply(prevent, event, []);
       const token = shown.token;
       hide();
+      escaping = true;
+      apply(listen, window, ['keydown', onAfterEscape, true]);
+      apply(listen, window, ['keyup', onAfterEscape, true]);
       report({op: 'reader', check: token, state: 'off'});
+    }
+
+    /** A keypress or keyup the user made while the overlay shows stops here, its default action kept. */
+    function onKey(event) {
+      if (shown !== null && event.isTrusted === true) apply(stop, event, []);
+    }
+
+    /**
+     * After Escape closed the overlay: its keyup stops here too, as its keydown did; the first key event after it, that
+     * keyup or another key's, ends the wait.
+     */
+    function onAfterEscape(event) {
+      if (!escaping || event.isTrusted !== true) return;
+      if (apply(keyOf, event, []) === 'Escape' && event.type === 'keyup') apply(stop, event, []);
+      endEscaping();
+    }
+
+    function endEscaping() {
+      if (!escaping) return;
+      escaping = false;
+      try {
+        apply(unlisten, window, ['keydown', onAfterEscape, true]);
+        apply(unlisten, window, ['keyup', onAfterEscape, true]);
+      } catch (kept) {
+        // A listener the page took away is gone already.
+      }
+    }
+
+    /**
+     * A plain click on a link to a fragment of this document, in the overlay, scrolls the overlay to the fragment's
+     * target there, as the page behind would scroll to its own; any other click is the browser's.
+     */
+    function onClick(event) {
+      const now = shown;
+      if (now === null || event.isTrusted !== true || apply(buttonOf, event, []) !== 0) return;
+      for (let at = 0; at < modifiers.length; at++) if (apply(modifiers[at], event, []) === true) return;
+      const target = apply(targetOf, event, []);
+      if (!(target instanceof Elements)) return;
+      const link = apply(closest, target, ['a[href]']);
+      if (!(link instanceof Anchors)) return;
+      const fragment = fragmentOf(link);
+      if (fragment === null) return;
+      apply(prevent, event, []);
+      scrollTo(now.scroller, fragment);
+    }
+
+    /** The fragment {@code link} goes to in this document, decoded; null for a link to another document. */
+    function fragmentOf(link) {
+      const address = apply(hrefOf, link, []), here = apply(urlOf, page, []);
+      const hash = apply(indexOf, address, ['#']);
+      if (hash < 0 || apply(slice, address, [0, hash]) !== withoutFragment(here)) return null;
+      const fragment = apply(slice, address, [hash + 1]);
+      try {
+        return decode(fragment);
+      } catch (undecodable) {
+        return fragment;
+      }
+    }
+
+    function withoutFragment(address) {
+      const hash = apply(indexOf, address, ['#']);
+      return hash < 0 ? address : apply(slice, address, [0, hash]);
+    }
+
+    /**
+     * Scrolls the overlay to the element of the article whose id is {@code fragment}, else to the first link it names;
+     * to the top for an empty fragment and for "top" with no such element; and not at all for a fragment it lacks.
+     */
+    function scrollTo(scroller, fragment) {
+      const candidates = apply(querySelectorAll, scroller, ['[id], [name]']);
+      let target = null;
+      for (let at = 0; target === null && at < candidates.length; at++)
+        if (apply(getAttribute, candidates[at], ['id']) === fragment) target = candidates[at];
+      for (let at = 0; target === null && fragment !== '' && at < candidates.length; at++)
+        if (candidates[at] instanceof Anchors && apply(getAttribute, candidates[at], ['name']) === fragment) target = candidates[at];
+      if (target === null) {
+        if (fragment === '' || apply(toLowerCase, fragment, []) === 'top') apply(scrollTop.set, scroller, [0]);
+        return;
+      }
+      const offset = apply(boundsOf, target, []).top - apply(boundsOf, scroller, []).top;
+      apply(scrollTop.set, scroller, [apply(scrollTop.get, scroller, []) + offset]);
     }
 
     /** {@code value} trimmed, or "Article" for none. */
@@ -252,14 +373,31 @@ hr { border: 0; border-top: 1px solid var(--border); }
       return text === '' ? 'Article' : text;
     }
 
-    /** {@code content} without what would run or restyle anything: the dropped elements, on* attributes and javascript: addresses. */
+    /**
+     * {@code content} without what would run or restyle anything: the dropped elements, custom elements, which give way
+     * to their children, on* attributes and javascript: addresses.
+     */
     function cleaned(content) {
       const dropped = apply(querySelectorAll, content, [DROPPED]);
       for (let at = 0; at < dropped.length; at++) apply(remove, dropped[at], []);
-      attributes(content);
       const all = apply(querySelectorAll, content, ['*']);
-      for (let at = 0; at < all.length; at++) attributes(all[at]);
+      for (let at = 0; at < all.length; at++) if (custom(all[at])) unwrap(all[at]);
+      attributes(content);
+      const kept = apply(querySelectorAll, content, ['*']);
+      for (let at = 0; at < kept.length; at++) attributes(kept[at]);
       return content;
+    }
+
+    /** Whether {@code element} is one a page's element definition could take: a name with a hyphen, or an is attribute. */
+    function custom(element) {
+      return apply(indexOf, apply(localNameOf, element, []), ['-']) >= 0 || apply(getAttribute, element, ['is']) !== null;
+    }
+
+    /** {@code element} gives way to its children, in its place. */
+    function unwrap(element) {
+      const children = apply(childrenOf, element, []), moved = [];
+      for (let at = 0; at < children.length; at++) moved[moved.length] = children[at];
+      apply(replaceWith, element, moved);
     }
 
     function attributes(element) {
@@ -273,31 +411,43 @@ hr { border: 0; border-top: 1px solid var(--border); }
     }
 
     /**
-     * Holds the page's own scrolling, on its root and body elements, each property kept in {@code held} before it is
-     * set, so a failure part way restores what it set.
+     * Holds the page while the overlay shows: its earlier focus kept, its own scrolling held on its root and body
+     * elements, and its body inert. Each change goes into {@code held} with what undoes it before it is made, so a
+     * failure part way undoes what was done.
      */
     function hold(held) {
-      const elements = [apply(rootOf.get, page, []), apply(bodyOf.get, page, [])];
+      const earlier = apply(activeOf, page, []);
+      held[held.length] = () => {
+        if (earlier instanceof HtmlElements && apply(connectedOf, earlier, []) === true) apply(focus, earlier, [{preventScroll: true}]);
+      };
+      const elements = [apply(rootOf, page, []), apply(bodyOf, page, [])];
       for (let at = 0; at < elements.length; at++) {
         if (!(elements[at] instanceof HtmlElements)) continue;
-        const style = apply(styleOf.get, elements[at], []);
+        const style = apply(styleOf, elements[at], []);
         for (let each = 0; each < OVERFLOW.length; each++) {
-          const name = OVERFLOW[each];
-          held[held.length] = {style, name, value: apply(getPropertyValue, style, [name]), priority: apply(getPropertyPriority, style, [name])};
+          const name = OVERFLOW[each], value = apply(getPropertyValue, style, [name]), priority = apply(getPropertyPriority, style, [name]);
+          held[held.length] = () => {
+            if (value === '') apply(removeProperty, style, [name]);
+            else apply(setProperty, style, [name, value, priority]);
+          };
           apply(setProperty, style, [name, 'hidden', 'important']);
         }
       }
+      const body = elements[1];
+      if (body instanceof HtmlElements) {
+        const was = apply(inertOf.get, body, []);
+        held[held.length] = () => apply(inertOf.set, body, [was]);
+        apply(inertOf.set, body, [true]);
+      }
     }
 
-    /** The page's own scrolling as it was before {@code hold}, the last property set restored first. */
+    /** Undoes what {@code hold} did, the last change first. */
     function restore(held) {
       for (let at = held.length - 1; at >= 0; at--) {
-        const kept = held[at];
         try {
-          if (kept.value === '') apply(removeProperty, kept.style, [kept.name]);
-          else apply(setProperty, kept.style, [kept.name, kept.value, kept.priority]);
+          held[at]();
         } catch (changed) {
-          // A style the page replaced keeps the page's.
+          // What the page changed since keeps the page's.
         }
       }
     }

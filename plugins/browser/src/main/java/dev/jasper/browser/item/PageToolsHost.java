@@ -39,7 +39,7 @@ final class PageToolsHost implements AutoCloseable {
         Objects.requireNonNull(page, "page");
         Objects.requireNonNull(appearance, "appearance");
         tools = new PageTools(page::run, () -> readerCss(appearance.workspacePalette(), appearance.workspaceVariant() == Variant.DARK),
-            zoom, page.view()::isShowing, later, render);
+            zoom, page.view()::isShowing, later, page::focus, render);
         heard = List.of(page.onLoadStart(tools::loadStarted), page.onLoadEnd(tools::loaded), page.onAddressChange(tools::addressChanged),
             page.onToolReport(tools::reported));
     }
@@ -54,8 +54,8 @@ final class PageToolsHost implements AutoCloseable {
     }
 
     /**
-     * The menu reported {@code action}: Reader Mode's shows or hides the article. Remove Distractions' does nothing yet:
-     * plan 7's Task 6 runs distraction removal.
+     * The menu reported {@code action}: Reader Mode's shows or hides the article, and the page takes the keyboard focus;
+     * Remove Distractions' is taken and does nothing.
      *
      * @param action the action
      * @return whether it was one of the tools' items
