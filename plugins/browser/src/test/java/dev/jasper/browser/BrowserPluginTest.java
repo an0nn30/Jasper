@@ -3,6 +3,7 @@ package dev.jasper.browser;
 import dev.jasper.browser.adblock.FilterList;
 import dev.jasper.browser.api.MarkdownPreviews;
 import dev.jasper.browser.api.PreviewEvent;
+import dev.jasper.browser.downloads.DownloadsTestAccess;
 import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.engine.EngineTestAccess;
 import dev.jasper.browser.engine.RecordingContext;
@@ -111,7 +112,7 @@ class BrowserPluginTest {
         var plugin = new BrowserPlugin(proxy -> {
             asked.add("a client");
             throw new IllegalStateException("no network in tests");
-        }, settings -> LIST);
+        }, settings -> LIST, DownloadsTestAccess::refusingFiles);
         var host = new AtomicReference<FakePluginHost>();
         SwingUtilities.invokeAndWait(() -> {
             host.set(new FakePluginHost(root));
@@ -145,7 +146,8 @@ class BrowserPluginTest {
         try (var origin = new StandIn(); var first = new StandIn(); var second = new StandIn()) {
             URI remote = URI.create("https://list.invalid/list.json"), local = URI.create("http://127.0.0.1:" + origin.port() + "/list.json");
             var list = new AtomicReference<>(remote);
-            var plugin = new BrowserPlugin(dev.jasper.browser.adblock.ListDownload::client, settings -> list.get());
+            var plugin = new BrowserPlugin(dev.jasper.browser.adblock.ListDownload::client, settings -> list.get(),
+                DownloadsTestAccess::refusingFiles);
             var host = new AtomicReference<FakePluginHost>();
             SwingUtilities.invokeAndWait(() -> {
                 host.set(new FakePluginHost(root));
@@ -507,6 +509,30 @@ class BrowserPluginTest {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
             host.start(INFO, Set.of(), Set.of(), plugin());
             assertThat(host.notifications().groups()).contains("dev.jasper.browser.pages|Page notifications|CARD");
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /**
+     * Plan 7 (spec section 10, rulings F3, F15 and F35): the start declares the Downloads notifications group and costs
+     * nothing more for downloads: no Downloads menu, no Downloads folder read or made, a change of the setting before any
+     * page included, and no use of the file manager, which here fails the test if it is used.
+     */
+    @Test void theStartDeclaresTheDownloadsGroupAndMakesNoMenuReadsNoFolderAndUsesNoFileManager(@TempDir Path root) throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost(root)) {
+            Path folder = root.resolve("Downloads"), changed = root.resolve("Changed");
+            host.setDownloadsFolder(folder);
+            host.start(INFO, Set.of(), Set.of(), plugin());
+            host.setSetting(ID, "downloads_folder", changed.toString());
+            host.runBackground();
+            assertThat(host.notifications().groups()).contains("dev.jasper.browser.downloads|Downloads|CARD");
+            assertThat(host.menu("top:dev.jasper.browser.downloads")).isEmpty();
+            assertThat(folder).doesNotExist();
+            assertThat(changed).doesNotExist();
+            host.stopAll();
+            host.runBackground();
+            assertThat(host.menu("top:dev.jasper.browser.downloads")).isEmpty();
+            assertThat(DownloadsTestAccess.filesUsed()).isZero();
             assertThat(host.failures()).isEmpty();
         } });
     }

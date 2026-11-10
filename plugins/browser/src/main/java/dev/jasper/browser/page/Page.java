@@ -283,6 +283,16 @@ public final class Page implements AutoCloseable {
         return context.inMemory();
     }
 
+    /**
+     * The request context of the page's browsing group, which says whether it keeps its data in memory and tells as its
+     * group's store closes it ({@link PageContext#onClosed}). Any thread.
+     *
+     * @return the context the page's browser is made in
+     */
+    public PageContext context() {
+        return context;
+    }
+
     /** Chromium made the page's browser, whose identifier is {@code id}. Chromium's thread. */
     void browserMade(int id) {
         browserId = OptionalInt.of(id);

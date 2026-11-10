@@ -4,6 +4,8 @@ import dev.jasper.browser.adblock.FilterList;
 import dev.jasper.browser.adblock.ListDownload;
 import dev.jasper.browser.api.MarkdownPreviews;
 import dev.jasper.browser.dialogs.PageDialogs;
+import dev.jasper.browser.downloads.Downloads;
+import dev.jasper.browser.downloads.FileManager;
 import dev.jasper.browser.engine.AboutQueries;
 import dev.jasper.browser.engine.AboutScheme;
 import dev.jasper.browser.engine.Chromium;
@@ -20,6 +22,10 @@ import dev.jasper.browser.item.SourcePage;
 import dev.jasper.browser.item.WebMenu;
 import dev.jasper.browser.item.WebsiteData;
 import dev.jasper.browser.links.PageNavigation;
+import dev.jasper.browser.page.DownloadProgress;
+import dev.jasper.browser.page.DownloadStart;
+import dev.jasper.browser.page.DownloadTarget;
+import dev.jasper.browser.page.PageDownloads;
 import dev.jasper.browser.palette.BookmarksScope;
 import dev.jasper.browser.palette.PaletteOpener;
 import dev.jasper.browser.palette.VisitedScope;
@@ -41,6 +47,7 @@ import dev.jasper.browser.store.BrowserDatabase;
 import dev.jasper.browser.store.DataFolder;
 import dev.jasper.browser.store.Stores;
 import dev.jasper.sdk.WindowOwner;
+import dev.jasper.sdk.notifications.NotificationGroup;
 import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.ui.ActionSpec;
@@ -65,18 +72,21 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 /**
  * The Browser: web pages as Jasper items. Its start registers New Browser Tab, New Browser Window and the Browser split
  * item, the globe they show, the Web menu, Settings › Tools › Browser, its own page, whose Clear Cookies and Clear Website
  * Data clear the persistent store after a prompt over the active window, as the Indexer's, and whose Manage Site
- * Permissions opens the persistent store's permissions page, the Bookmarks and Page notifications groups, the welcome
- * page and the onboarding pages, the history, bookmarks and site permissions pages and their queries, the Bookmarks and
+ * Permissions opens the persistent store's permissions page, the Bookmarks, Page notifications and Downloads groups, the
+ * welcome page and the onboarding pages, the history, bookmarks and site permissions pages and their queries, the Bookmarks and
  * Browser History palette scopes, the error page with its Try Again and Continue actions, View Source's page, the
  * Browser as Jasper's web browser, the terminal's Open URL in Split items and the restorer of saved browser items,
  * publishes the Markdown previews' service ({@link MarkdownPreviews}), and makes Chromium's engine, which starts
@@ -94,6 +104,9 @@ import java.util.function.Function;
  * to Chromium's contexts, the persistent one and each /dev/null group's, and the plugin's own fetches, the favicons, the
  * suggestions, View Source's and the filter list's, go through it too, routed as Chromium routes, so a host on this
  * computer or its link goes direct; off, Chromium uses the system's proxy settings and the fetches the JDK's default.
+ * Chromium's downloads go to the {@link Downloads}, which reads the Downloads folder once a page first starts, makes the
+ * Downloads menu with the first download and marks each finished file; quitting stops the running ones, and once Chromium
+ * has ended their partial files go.
  */
 public class BrowserPlugin implements Plugin {
     static final String NEW_TAB = "dev.jasper.browser.new_tab", NEW_WINDOW = "dev.jasper.browser.new_window";
@@ -111,28 +124,34 @@ public class BrowserPlugin implements Plugin {
     private AboutScheme about;
     private SourcePage sources;
     private FilterList filters;
+    private Downloads downloads;
     private boolean running;
     // Plan 6's F3: the HTTP proxy the plugin's own fetches go through, read as the filter list makes its client.
     private volatile Optional<InetSocketAddress> proxy = Optional.empty();
     private final Function<Optional<InetSocketAddress>, HttpClient> filterClients;
     private final Function<BrowserSettings, URI> filterAddress;
+    private final BiFunction<Executor, BiConsumer<String, String>, FileManager> fileManagers;
 
     /** Created by the runtime. */
     public BrowserPlugin() {
-        this(ListDownload::client, BrowserSettings::filterListUrl);
+        this(ListDownload::client, BrowserSettings::filterListUrl, FileManager::new);
     }
 
     /**
-     * A plugin whose filter list's client and address are a test's (ruling F9): no test downloads a list from the web.
+     * A plugin whose filter list's client and address, and whose file manager, are a test's (ruling F9 and plan 7's F15):
+     * no test downloads a list from the web, or shows or opens a file through the desktop.
      *
      * @param filterClients makes the filter list's client through the HTTP proxy given, empty for the JDK's default, at
      *     its first download and after the proxy changes
      * @param filterAddress the filter list's address, from the settings
+     * @param fileManagers makes the Downloads menu's file manager, at the start, from the plugin's background executor
+     *     and what hears its failures
      */
-    BrowserPlugin(Function<Optional<InetSocketAddress>, HttpClient> filterClients,
-                  Function<BrowserSettings, URI> filterAddress) {
+    BrowserPlugin(Function<Optional<InetSocketAddress>, HttpClient> filterClients, Function<BrowserSettings, URI> filterAddress,
+                  BiFunction<Executor, BiConsumer<String, String>, FileManager> fileManagers) {
         this.filterClients = filterClients;
         this.filterAddress = filterAddress;
+        this.fileManagers = fileManagers;
     }
 
     @Override public void start(PluginContext context) {
@@ -191,6 +210,15 @@ public class BrowserPlugin implements Plugin {
         context.notifications().group(BookmarkPanel.GROUP);
         // Spec section 12: and so do pages' notifications.
         context.notifications().group(PageNotifications.GROUP);
+        // Spec section 10: and downloads'. Downloads is made with no I/O and no menu (plan 7's F35): its folder is read on
+        // the background executor once a page first starts (F3), and its menu is made with the first download.
+        NotificationGroup downloadsGroup = context.notifications().group(Downloads.GROUP);
+        var downloads = new Downloads(context, settings.downloadsFolder(), fileManagers.apply(context.background(),
+            (title, reason) -> EventQueue.invokeLater(() -> { if (running) downloadsGroup.error(title, reason); })));
+        this.downloads = downloads;
+        // One pair of hooks for the run (F20): the download handler is installed once, with these.
+        Function<DownloadStart, Optional<DownloadTarget>> downloadStarts = downloads::before;
+        BiConsumer<DownloadProgress, Runnable> downloadUpdates = downloads::updated;
         // A page is made when its item first shows: the client's handlers are installed then, before any page is made on
         // it, as naming their types loads Chromium's classes. Jasper's own pages ask Java through a router of their own,
         // read and answered on the background executor.
@@ -199,6 +227,9 @@ public class BrowserPlugin implements Plugin {
         var onboarding = new Onboarding(data.resolve("onboarding-finished"), context.background());
         var items = new BrowserItems(context, settings::read, dataStores, page -> {
             PageNavigation.prepare(engine, filters);
+            PageDownloads.prepare(engine, downloadStarts, downloadUpdates);
+            // Plan 7's F3: the Downloads folder is read and made on the background executor as the first page starts.
+            downloads.start();
             PageDialogs.prepare(engine);
             AboutQueries.prepare(engine, about, context.background());
             // Before the first page asks for the welcome page, so that Chromium's IO thread only reads the answer from memory.
@@ -312,18 +343,22 @@ public class BrowserPlugin implements Plugin {
     }
 
     /**
-     * Jasper quits, or the plugin is turned off. The filter list's checks, its download under way and its client end.
+     * Jasper quits, or the plugin is turned off. The running downloads are cancelled and the pages' holds complete, then
+     * the filter list's checks, its download under way and its client end.
      * The items close their open Edit Bookmark panels, whose bookmarks keep the tags they show, and give history their
      * pages' last titles, then the data stores close: the persistent history and
      * bookmarks' database takes no more work and closes once the work given before has run, and each /dev/null store
      * ends with its in-memory database and context, before Chromium closes. The items' favicon fetches and View Source's
      * fetches end. On the UI thread {@link Chromium#close()} only starts Chromium's dispose, and every Markdown preview
      * still open is then unavailable. The database's end and Chromium's are waited for on the plugin's background
-     * executor: Jasper's quit waits for that work within its own shutdown grace, so quitting holds briefly for them and
-     * never hangs on them.
+     * executor, where the partial files of the downloads that were running are deleted once Chromium has ended: Jasper's
+     * quit waits for that work within its own shutdown grace, so quitting holds briefly for them and never hangs on them.
      */
     @Override public void stop() {
         running = false;
+        // Plan 7's F30: every running download is cancelled and every page's hold completes, so each held browser closes
+        // before Chromium does; later starts, updates and marks are dropped.
+        if (downloads != null) downloads.stopAll();
         // The filter list's checks, its download under way and its client end.
         if (filters != null) filters.close();
         if (items != null) items.close();
@@ -333,7 +368,12 @@ public class BrowserPlugin implements Plugin {
         // Once closed, Chromium is unavailable for the rest of the run.
         if (previews != null) chromium.unavailable().ifPresent(previews::unavailable);
         try {
-            context.background().execute(chromium::close);
+            // Plan 7's F29: once Chromium has ended, the partial files of the downloads it was running go.
+            Downloads ending = downloads;
+            context.background().execute(() -> {
+                chromium.close();
+                if (ending != null) ending.deleteIntermediates();
+            });
             if (stores != null) {
                 CompletableFuture<Void> storesClosed = stores.closed();
                 context.background().execute(() -> awaitClosed(storesClosed));

@@ -1,6 +1,9 @@
 package dev.jasper.browser.page;
 
 import dev.jasper.browser.engine.Chromium;
+import dev.jasper.sdk.Subscription;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
@@ -29,6 +32,8 @@ public final class PageContext {
     private CompletableFuture<CefRequestContext> made;
     private Chromium from;
     private boolean closed;
+    // Told once, as an in-memory context closes.
+    private final List<Runnable> closes = new ArrayList<>();
 
     /**
      * A context that {@code make} asks of a Chromium, and {@code release} releases: Chromium's in-memory ones, or a test's.
@@ -93,18 +98,40 @@ public final class PageContext {
     }
 
     /**
+     * Tells {@code listener} once, as the group's store closes it ({@link #close()}): at once when it has closed already,
+     * and never for the persistent context, which never closes. The Downloads menu forgets a /dev/null group's finished
+     * downloads so (plan 7's F7).
+     *
+     * @param listener told on the UI thread
+     * @return the registration; closing it before the context closes means the listener is never told
+     */
+    public Subscription onClosed(Runnable listener) {
+        Objects.requireNonNull(listener, "listener");
+        if (closed) {
+            listener.run();
+            return () -> { };
+        }
+        if (!inMemory) return () -> { };
+        closes.add(listener);
+        return () -> closes.remove(listener);
+    }
+
+    /**
      * The group's store closes: an in-memory context asked for is released once, as soon as Chromium has made it, unless
-     * Chromium has stopped by then, and no page is made with it afterwards. The persistent one, Chromium's global context,
-     * outlives its store: nothing happens.
+     * Chromium has stopped by then, no page is made with it afterwards, and those who asked {@link #onClosed} are told,
+     * whether or not a page asked for it. The persistent one, Chromium's global context, outlives its store: nothing
+     * happens.
      */
     public void close() {
         if (!inMemory || closed) return;
         closed = true;
         CompletableFuture<CefRequestContext> asked = made;
         Chromium owner = from;
-        if (asked == null) return;
         // Made on Chromium's thread: released there, or here when made already.
-        asked.thenAccept(context -> released(owner, context));
+        if (asked != null) asked.thenAccept(context -> released(owner, context));
+        List<Runnable> told = List.copyOf(closes);
+        closes.clear();
+        for (Runnable listener : told) listener.run();
     }
 
     /** Releases {@code context}, which {@code owner} made, unless Chromium has stopped since. */

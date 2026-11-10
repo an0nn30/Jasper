@@ -59,10 +59,14 @@
  * handlers and message router, which refuse every navigation but the shell's first load, every request off the
  * preview's origin, popups, dialogs, the right-click menu and the camera and microphone, and its Find runs
  * {@code find.js} too.
- * {@link dev.jasper.browser.page.DownloadProgress} is a download's update as Chromium reports it, in plain values, for
- * the {@code downloads} package.
- * {@link dev.jasper.browser.page.LastPress}, {@code Favicons}, {@code DownloadProgress}, {@code Page}'s methods and
- * {@code PreviewPage}'s name no Chromium type, and none of these classes loads until a browser item opens or a Markdown
- * preview is made.
+ * {@link dev.jasper.browser.page.PageDownloads} is the client's one download handler: it hands the {@code downloads}
+ * package each download Chromium starts as a {@link dev.jasper.browser.page.DownloadStart}, and continues it into the
+ * {@link dev.jasper.browser.page.DownloadTarget} the answer names or refuses it, and each update as a
+ * {@link dev.jasper.browser.page.DownloadProgress}, in plain values; the preview client has none, so CEF cancels a
+ * preview's downloads. A page's {@link dev.jasper.browser.page.PageContext} tells as its group's store closes it, so the
+ * Downloads menu forgets a /dev/null group's downloads.
+ * {@link dev.jasper.browser.page.LastPress}, {@code Favicons}, {@code DownloadStart}, {@code DownloadTarget},
+ * {@code DownloadProgress}, {@code Page}'s methods and {@code PreviewPage}'s name no Chromium type, and none of these
+ * classes loads until a browser item opens or a Markdown preview is made.
  */
 package dev.jasper.browser.page;
