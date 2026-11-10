@@ -60,13 +60,25 @@ final class LinuxMime {
      * list empties. Every other byte is kept.
      */
     static String withoutDefault(String mimeapps, String type, String desktopId) {
+        return withoutEntry(mimeapps, DEFAULT_APPLICATIONS, type, desktopId);
+    }
+
+    /**
+     * Removes {@code desktopId} from {@code type}'s list in {@code [Added Associations]}, and the whole line when its
+     * list empties. Every other byte is kept.
+     */
+    static String withoutAddedAssociation(String mimeapps, String type, String desktopId) {
+        return withoutEntry(mimeapps, ADDED_ASSOCIATIONS, type, desktopId);
+    }
+
+    private static String withoutEntry(String mimeapps, String groupName, String type, String desktopId) {
         StringBuilder out = new StringBuilder(mimeapps.length());
         String group = null;
         for (String line : lines(mimeapps)) {
             String body = body(line);
             Optional<String> header = header(body);
             if (header.isPresent()) group = header.get();
-            Optional<Entry> entry = header.isPresent() || !DEFAULT_APPLICATIONS.equals(group) ? Optional.empty() : entry(body, type);
+            Optional<Entry> entry = header.isPresent() || !groupName.equals(group) ? Optional.empty() : entry(body, type);
             if (entry.isEmpty() || !entry.get().ids().contains(desktopId)) {
                 out.append(line);
                 continue;

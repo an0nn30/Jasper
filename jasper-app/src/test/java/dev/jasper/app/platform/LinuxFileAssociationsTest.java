@@ -22,10 +22,12 @@ import java.util.Set;
 import java.util.function.Function;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
+@DisabledOnOs(value = OS.WINDOWS, disabledReason = "XDG paths and POSIX tools")
 class LinuxFileAssociationsTest {
     private static final String JASPER = "jasper-workstation-Jasper.desktop";
     private static final FileTypeCatalog CATALOG = FileTypeCatalog.parse("""
@@ -261,13 +263,16 @@ class LinuxFileAssociationsTest {
         assertThat(tools.defaults).containsEntry("text/x-python", JASPER);
     }
 
-    @Test void aRestoreThatStillNamesJasperFails() throws IOException {
+    @Test void aRestoreThatDoesNotNameTheAppFails() throws IOException {
         write(system().resolve("applications/code.desktop"), "[Desktop Entry]\nName=Code\n");
         FakeTools tools = new FakeTools();
-        tools.query = type -> JASPER;
-        List<TypeResult> results = tools.backend().restore(Map.of(".java",
-                Map.of("text/x-java", new Handler.Other("code.desktop", "Code"))));
-        assertThat(results).singleElement().satisfies(result -> assertThat(result.outcome()).isInstanceOf(Outcome.Failed.class));
+        for (String answer : List.of(JASPER, "vim.desktop", "")) {
+            tools.query = type -> answer;
+            List<TypeResult> results = tools.backend().restore(Map.of(".java",
+                    Map.of("text/x-java", new Handler.Other("code.desktop", "Code"))));
+            assertThat(results).as(answer).singleElement().satisfies(result -> assertThat(result.outcome())
+                    .isInstanceOfSatisfying(Outcome.Failed.class, failed -> assertThat(failed.detail()).contains("names")));
+        }
     }
 
     @Test void restoringNoAppRemovesJaspersDefaultFromTheUsersListOnly() throws IOException {
@@ -277,19 +282,47 @@ class LinuxFileAssociationsTest {
         Path systemList = system().resolve("applications/mimeapps.list");
         write(systemList, "[Default Applications]\ntext/x-java=" + JASPER + ";\n");
         FakeTools tools = new FakeTools();
-        tools.query = type -> {
-            try {
-                return Files.readString(mimeapps()).contains("[Default Applications]\r\ntext/x-java=") ? JASPER : "";
-            } catch (IOException failure) {
-                throw new java.io.UncheckedIOException(failure);
-            }
-        };
+        tools.query = type -> JASPER;
         assertThat(tools.backend().restore(Map.of(".java", Map.of("text/x-java", new Handler.None()))))
                 .containsExactly(new TypeResult(".java", "text/x-java", new Outcome.Done()));
         assertThat(Files.readString(mimeapps())).isEqualTo(before.replace(
                 "[Default Applications]\r\ntext/x-java=" + JASPER + ";\r\n", "[Default Applications]\r\n"));
         assertThat(Files.readString(systemList)).isEqualTo("[Default Applications]\ntext/x-java=" + JASPER + ";\n");
-        assertThat(tools.changes()).isEmpty();
+        assertThat(tools.commands).as("the file decides, though xdg-mime still names Jasper from the caches").isEmpty();
+    }
+
+    @Test void restoringNoAppForJaspersOwnTypeAlsoRemovesItsAddedAssociation() throws IOException {
+        write(mimeapps(), "[Added Associations]\ntext/x-jasper-proto=" + JASPER + ";vim.desktop;\ntext/x-java=" + JASPER
+                + ";\n[Default Applications]\ntext/x-jasper-proto=" + JASPER + ";\n");
+        FakeTools tools = new FakeTools();
+        assertThat(tools.backend().restore(Map.of(".proto", Map.of("text/x-jasper-proto", new Handler.None()))))
+                .containsExactly(new TypeResult(".proto", "text/x-jasper-proto", new Outcome.Done()));
+        assertThat(Files.readString(mimeapps())).isEqualTo("[Added Associations]\ntext/x-jasper-proto=vim.desktop;\ntext/x-java="
+                + JASPER + ";\n[Default Applications]\n");
+        assertThat(config()).as("no temporary file left").isDirectoryNotContaining("glob:**.tmp");
+    }
+
+    @Test void theListKeepsItsPermissions() throws IOException {
+        write(mimeapps(), "[Default Applications]\ntext/x-java=" + JASPER + ";\n");
+        Files.setPosixFilePermissions(mimeapps(), java.nio.file.attribute.PosixFilePermissions.fromString("rw-r--r--"));
+        new FakeTools().backend().restore(Map.of(".java", Map.of("text/x-java", new Handler.None())));
+        assertThat(Files.readString(mimeapps())).isEqualTo("[Default Applications]\n");
+        assertThat(java.nio.file.attribute.PosixFilePermissions.toString(Files.getPosixFilePermissions(mimeapps())))
+                .isEqualTo("rw-r--r--");
+    }
+
+    @Test void aDanglingLinkGetsItsTargetCreated() throws IOException {
+        Files.createDirectories(config());
+        Files.createSymbolicLink(mimeapps(), Path.of("../dotfiles/mimeapps.list"));
+        FakeTools tools = new FakeTools();
+        tools.backend().claim(Map.of(".proto", List.of("text/x-jasper-proto")));
+        assertThat(Files.isSymbolicLink(mimeapps())).isTrue();
+        assertThat(home.resolve("dotfiles/mimeapps.list")).content()
+                .isEqualTo("[Added Associations]\ntext/x-jasper-proto=" + JASPER + ";\n");
+        // Restoring with a dangling link creates nothing.
+        Files.delete(home.resolve("dotfiles/mimeapps.list"));
+        tools.backend().restore(Map.of(".java", Map.of("text/x-java", new Handler.None())));
+        assertThat(home.resolve("dotfiles/mimeapps.list")).doesNotExist();
     }
 
     @Test void restoringNoAppWithNoListChangesNothing() {
@@ -320,6 +353,15 @@ class LinuxFileAssociationsTest {
         assertThat(tools.changes()).containsExactly("update-mime-database " + data().resolve("mime"),
                 "update-mime-database " + data().resolve("mime"));
         assertThat(tools.timeouts).containsOnly(Duration.ofSeconds(20));
+    }
+
+    @Test void forgettingDropsJaspersLinesForTheTypeFromTheList() throws IOException {
+        write(packageFile(), LinuxMime.packageXml(new java.util.TreeSet<>(Set.of("proto", "scad"))));
+        String others = "text/x-jasper-proto=" + JASPER + ";\n";
+        write(mimeapps(), "[Added Associations]\ntext/x-jasper-scad=" + JASPER + ";\n" + others
+                + "[Default Applications]\ntext/x-jasper-scad=" + JASPER + ";\n" + others);
+        new FakeTools().backend().forget(".scad");
+        assertThat(Files.readString(mimeapps())).isEqualTo("[Added Associations]\n" + others + "[Default Applications]\n" + others);
     }
 
     @Test void forgettingAnUndeclaredExtensionRunsNothing() throws IOException {

@@ -14,6 +14,7 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.PosixFileAttributeView;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -165,7 +166,7 @@ final class LinuxFileAssociations implements FileAssociations.Backend {
                 }
             }
             for (String type : types) {
-                results.add(new TypeResult(extension, type, failure != null ? new Outcome.Failed(failure) : named(type, true)));
+                results.add(new TypeResult(extension, type, failure != null ? new Outcome.Failed(failure) : names(type, DESKTOP_ID)));
             }
         });
         return List.copyOf(results);
@@ -199,8 +200,9 @@ final class LinuxFileAssociations implements FileAssociations.Backend {
     }
 
     /**
-     * Sets each saved application back with {@code xdg-mime}; for no application, removes Jasper's default from the
-     * user's {@code mimeapps.list}. A type is done when {@code xdg-mime} no longer names Jasper.
+     * Sets each saved application back with {@code xdg-mime}, done when {@code xdg-mime} then names it. For no
+     * application, removes Jasper's own lines for the type from the user's {@code mimeapps.list} (its default, and for
+     * Jasper's own type its added association), done when the file no longer has them.
      */
     @Override public List<TypeResult> restore(Map<String, Map<String, Handler>> previousByTypeByExtension) {
         List<TypeResult> results = new java.util.ArrayList<>();
@@ -219,10 +221,18 @@ final class LinuxFileAssociations implements FileAssociations.Backend {
                     LOG.log(System.Logger.Level.WARNING, failure);
                     return new Outcome.Failed(failure);
                 }
+                return names(type, other.id());
             }
             case Handler.None none -> {
+                // Done once Jasper's own lines for the type are gone from the user's list, read back from the file:
+                // xdg-mime may still name Jasper from the system's caches, which Jasper does not change.
                 try {
-                    editMimeapps(text -> LinuxMime.withoutDefault(text, type, DESKTOP_ID), false);
+                    editMimeapps(text -> withoutJasper(text, type), false);
+                    Optional<String> after = readMimeapps();
+                    if (after.isEmpty() || withoutJasper(after.get(), type).equals(after.get())) return new Outcome.Done();
+                    String detail = mimeapps() + " still names Jasper for " + type;
+                    LOG.log(System.Logger.Level.WARNING, detail);
+                    return new Outcome.Failed(detail);
                 } catch (IOException | RuntimeException failure) {
                     LOG.log(System.Logger.Level.WARNING, "Could not edit " + mimeapps(), failure);
                     return new Outcome.Failed("Could not edit " + mimeapps() + ": " + failure.getMessage());
@@ -232,12 +242,17 @@ final class LinuxFileAssociations implements FileAssociations.Backend {
                 return new Outcome.NoPrevious();
             }
         }
-        return named(type, false);
     }
 
     /** Removes the extension from Jasper's package, deleting the package once empty, and updates the database. */
     @Override public void forget(String extension) {
         Path file = packageFile();
+        String type = LinuxMime.OWN_TYPE_PREFIX + extension.substring(1);
+        try {
+            editMimeapps(text -> withoutJasper(text, type), false);
+        } catch (IOException | RuntimeException failure) {
+            LOG.log(System.Logger.Level.WARNING, "Could not drop " + type + " from " + mimeapps(), failure);
+        }
         SortedSet<String> extensions;
         try {
             extensions = packageExtensions();
@@ -250,11 +265,18 @@ final class LinuxFileAssociations implements FileAssociations.Backend {
         } catch (IOException failure) {
             throw new UncheckedIOException("Could not drop " + extension + " from " + file, failure);
         }
+        // Only logged: the package file is already rewritten, and the next update-mime-database run applies it.
         updateDatabase().ifPresent(failure -> LOG.log(System.Logger.Level.WARNING, failure));
     }
 
-    /** Whether {@code xdg-mime} now names Jasper ({@code jasper}) or not: {@code Done}, else what it names. */
-    private Outcome named(String type, boolean jasper) {
+    /** The list without Jasper's default for {@code type}, and for Jasper's own type also without its added association. */
+    private static String withoutJasper(String mimeapps, String type) {
+        String text = LinuxMime.withoutDefault(mimeapps, type, DESKTOP_ID);
+        return type.startsWith(LinuxMime.OWN_TYPE_PREFIX) ? LinuxMime.withoutAddedAssociation(text, type, DESKTOP_ID) : text;
+    }
+
+    /** {@code Done} when {@code xdg-mime} now names the desktop entry {@code expected}, else what it names. */
+    private Outcome names(String type, String expected) {
         Handler now;
         try {
             now = handler(type);
@@ -262,13 +284,13 @@ final class LinuxFileAssociations implements FileAssociations.Backend {
             LOG.log(System.Logger.Level.WARNING, "Could not read the handler of " + type, failure);
             return new Outcome.Failed(failure.getMessage());
         }
-        if ((now instanceof Handler.Jasper) == jasper) return new Outcome.Done();
-        String names = switch (now) {
+        String id = switch (now) {
             case Handler.Other other -> other.id();
-            case Handler.Jasper j -> DESKTOP_ID;
-            case Handler.None n -> "no application";
+            case Handler.Jasper jasper -> DESKTOP_ID;
+            case Handler.None none -> "";
         };
-        String detail = "xdg-mime query default " + type + " names " + names;
+        if (id.equals(expected)) return new Outcome.Done();
+        String detail = "xdg-mime query default " + type + " names " + (id.isEmpty() ? "no application" : id);
         LOG.log(System.Logger.Level.WARNING, detail);
         return new Outcome.Failed(detail);
     }
@@ -292,27 +314,46 @@ final class LinuxFileAssociations implements FileAssociations.Backend {
         return new TreeSet<>(LinuxMime.declaredExtensions(Files.readString(file, StandardCharsets.UTF_8)));
     }
 
+    /** The user's {@code mimeapps.list}, through a link; empty when there is none. */
+    private Optional<String> readMimeapps() throws IOException {
+        Path target = mimeappsTarget();
+        return Files.exists(target) ? Optional.of(Files.readString(target, StandardCharsets.UTF_8)) : Optional.empty();
+    }
+
+    /** The file to write for {@code mimeapps.list}: the real file behind its links, or a dangling link's target. */
+    private Path mimeappsTarget() throws IOException {
+        Path file = mimeapps();
+        if (Files.exists(file)) return file.toRealPath();
+        if (Files.isSymbolicLink(file)) return file.toAbsolutePath().getParent().resolve(Files.readSymbolicLink(file)).normalize();
+        return file;
+    }
+
     /**
      * Rewrites the user's {@code mimeapps.list} with {@code edit}, through a link to the real file, and only when the
-     * text changes. A missing file is created only when {@code create}.
+     * text changes. A missing file (or a dangling link's target) is created only when {@code create}.
      */
     private void editMimeapps(java.util.function.UnaryOperator<String> edit, boolean create) throws IOException {
-        Path file = mimeapps();
-        boolean exists = Files.exists(file);
+        Path target = mimeappsTarget();
+        boolean exists = Files.exists(target);
         if (!exists && !create) return;
-        Path target = exists ? file.toRealPath() : file;
         String before = exists ? Files.readString(target, StandardCharsets.UTF_8) : "";
         String after = edit.apply(before);
         if (!after.equals(before)) writeAtomically(target, after);
     }
 
-    /** Writes beside {@code file} and moves the copy over it, so a reader never sees half a file. */
+    /**
+     * Writes beside {@code file} and moves the copy over it, so a reader never sees half a file. The copy takes an
+     * existing file's POSIX permissions, which the temporary file's owner-only ones would otherwise replace.
+     */
     private static void writeAtomically(Path file, String text) throws IOException {
         Path folder = file.toAbsolutePath().getParent();
         Files.createDirectories(folder);
         Path temporary = Files.createTempFile(folder, "." + file.getFileName(), ".tmp");
         try {
             Files.writeString(temporary, text, StandardCharsets.UTF_8);
+            if (Files.exists(file) && Files.getFileStore(folder).supportsFileAttributeView(PosixFileAttributeView.class)) {
+                Files.setPosixFilePermissions(temporary, Files.getPosixFilePermissions(file));
+            }
             try {
                 Files.move(temporary, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
             } catch (AtomicMoveNotSupportedException notAtomic) {

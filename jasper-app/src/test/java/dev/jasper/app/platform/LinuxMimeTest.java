@@ -66,6 +66,19 @@ class LinuxMimeTest {
         assertThat(LinuxMime.withoutDefault("", "text/x-java", JASPER)).isEmpty();
     }
 
+    @Test void removingAnAddedAssociationKeepsEveryOtherLine() {
+        String before = "# mine\r\n[Added Associations]\r\ntext/x-proto=vim.desktop;" + JASPER + ";\r\n\r\n"
+                + "[Default Applications]\r\ntext/x-proto=" + JASPER + ";\r\n";
+        assertThat(LinuxMime.withoutAddedAssociation(before, "text/x-proto", JASPER))
+                .isEqualTo(before.replace("text/x-proto=vim.desktop;" + JASPER + ";", "text/x-proto=vim.desktop;"));
+        assertThat(LinuxMime.withoutAddedAssociation("[Added Associations]\ntext/x-proto=" + JASPER + ";\nx=y;\n",
+                "text/x-proto", JASPER)).isEqualTo("[Added Associations]\nx=y;\n");
+        assertThat(LinuxMime.withoutAddedAssociation("[Default Applications]\ntext/x-proto=" + JASPER + ";\n", "text/x-proto", JASPER))
+                .as("no group: unchanged").isEqualTo("[Default Applications]\ntext/x-proto=" + JASPER + ";\n");
+        String added = LinuxMime.withAddedAssociation("# c\n", "text/x-proto", JASPER);
+        assertThat(LinuxMime.withoutAddedAssociation(added, "text/x-proto", JASPER)).isEqualTo("# c\n\n[Added Associations]\n");
+    }
+
     @Test void anAddedAssociationGoesFirstOnce() {
         assertThat(LinuxMime.withAddedAssociation("[Added Associations]\r\ntext/x-proto=vim.desktop;" + JASPER + ";\r\n",
                 "text/x-proto", JASPER)).isEqualTo("[Added Associations]\r\ntext/x-proto=" + JASPER + ";vim.desktop;\r\n");
