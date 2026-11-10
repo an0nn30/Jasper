@@ -8,6 +8,7 @@ import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import org.cef.browser.CefBrowser;
 import org.cef.callback.CefBeforeDownloadCallback;
@@ -26,7 +27,9 @@ import org.cef.handler.CefDownloadHandlerAdapter;
  * as a page's DevTools' is, starts a download that holds no page (ruling F20). The answer refuses it, and the handler
  * returns false, which CEF's off-screen browsers take as a cancel, or names a {@link DownloadTarget}, and the handler
  * continues the download into it once and returns true: JCEF continues a download never answered into Chromium's own
- * folder once its callback is collected, so the handler never returns true without continuing.
+ * folder once its callback is collected, so the handler never returns true without continuing. A start whose answer
+ * throws, or cannot be continued, is refused too, and abandoned, so what was kept for it is given back. A load Jasper
+ * starts for the user gives the page's downloads a new document (ruling D20).
  *
  * <p>Each update ({@code onDownloadUpdated}) reaches the {@code downloads} package as a {@link DownloadProgress} with a
  * cancel of its item's own, which cancels nothing once Chromium has stopped (plan 6's "no native call after stop"); an
@@ -49,13 +52,16 @@ public final class PageDownloads {
      * @param chromium the plugin's Chromium
      * @param before answers a download Chromium starts, on Chromium's thread: where it goes, or empty to refuse it
      * @param updated hears each update of a download it gave a target, with what cancels it, on Chromium's thread
+     * @param abandoned hears a start whose answer threw, or could not be given to Chromium, which then cancels it, on
+     *     Chromium's thread: what {@code before} kept for it is given back
      */
     public static void prepare(Chromium chromium, Function<DownloadStart, Optional<DownloadTarget>> before,
-                               BiConsumer<DownloadProgress, Runnable> updated) {
+                               BiConsumer<DownloadProgress, Runnable> updated, Consumer<DownloadStart> abandoned) {
         Objects.requireNonNull(before, "before");
         Objects.requireNonNull(updated, "updated");
-        if (PREPARED.add(chromium))
-            chromium.onClient(client -> client.addDownloadHandler(handler(before, updated, () -> chromium.state() == Chromium.State.STOPPED)));
+        Objects.requireNonNull(abandoned, "abandoned");
+        if (PREPARED.add(chromium)) chromium.onClient(client -> client.addDownloadHandler(handler(before, updated, abandoned,
+            () -> chromium.state() == Chromium.State.STOPPED)));
     }
 
     /**
@@ -63,12 +69,13 @@ public final class PageDownloads {
      *
      * @param before answers each start
      * @param updated hears each update
+     * @param abandoned hears each start whose answer threw or could not be given
      * @param stopped whether Chromium has stopped, after which a kept cancel touches its callback no more; any thread
      * @return the handler
      */
     static CefDownloadHandler handler(Function<DownloadStart, Optional<DownloadTarget>> before, BiConsumer<DownloadProgress, Runnable> updated,
-                                      BooleanSupplier stopped) {
-        return new Handler(before, updated, stopped);
+                                      Consumer<DownloadStart> abandoned, BooleanSupplier stopped) {
+        return new Handler(before, updated, abandoned, stopped);
     }
 
     /**
@@ -81,57 +88,94 @@ public final class PageDownloads {
      * @return the start
      */
     static DownloadStart start(CefBrowser browser, CefDownloadItem item, String suggestedName, long nowMillis) {
-        Page page = null;
-        boolean inMemory = false, activated = false;
-        long document = 0;
-        if (browser instanceof PageBrowser shown) {
-            page = shown.owner();
-            inMemory = shown.inMemory();
-            if (page != null) {
-                activated = shown.view().activation().active(nowMillis);
-                document = page.privacy().documents();
-            }
-        }
-        return new DownloadStart(browser.getIdentifier(), item.getId(), suggestedName, item.getURL(), browser.getURL(), Optional.ofNullable(page),
-            false, activated, document, inMemory);
+        return start(browser.getIdentifier(), browser.getURL(), page(browser), inMemory(browser), item.getId(), item.getURL(), suggestedName,
+            nowMillis);
     }
 
     /**
-     * Answers {@code start} through {@code before}: continues it once into the target given and returns true, or, for
-     * no target, and for a hook that throws, returns false and never continues it.
+     * A download a browser starts, from plain values: for a page's own browser, whether the page is activated now, read
+     * without consuming the activation, and the document its downloads count in ({@link Page#downloadDocument}).
+     * Chromium's thread.
+     *
+     * @param browser the browser's identifier
+     * @param pageUrl the address the browser shows
+     * @param page the page whose own browser it is, if any
+     * @param inMemory whether the browser keeps its data in memory
+     * @param id Chromium's id for the download
+     * @param url the file's address
+     * @param suggestedName the name Chromium suggests
+     * @param nowMillis the time now
+     * @return the start
+     */
+    static DownloadStart start(int browser, String pageUrl, Optional<Page> page, boolean inMemory, int id, String url, String suggestedName,
+                               long nowMillis) {
+        boolean activated = page.map(shown -> shown.activation().active(nowMillis)).orElse(false);
+        long document = page.map(Page::downloadDocument).orElse(0L);
+        return new DownloadStart(browser, id, suggestedName, url, pageUrl, page, false, activated, document, inMemory);
+    }
+
+    /**
+     * The page whose own browser {@code browser} is; none for a page's DevTools and any other browser (ruling F20).
+     *
+     * @param browser the browser
+     * @return the page
+     */
+    static Optional<Page> page(CefBrowser browser) {
+        return browser instanceof PageBrowser shown ? Optional.ofNullable(shown.owner()) : Optional.empty();
+    }
+
+    /**
+     * Whether {@code browser} keeps its data in memory: a /dev/null page's, or its DevTools'.
+     *
+     * @param browser the browser
+     * @return whether it does
+     */
+    static boolean inMemory(CefBrowser browser) {
+        return browser instanceof PageBrowser shown && shown.inMemory();
+    }
+
+    /**
+     * Answers {@code start} through {@code before}: continues it once into the target given and returns true; returns
+     * false and never continues it for no target; and for a hook or a continue that throws returns false, which CEF
+     * takes as a cancel, and tells {@code abandoned}, so what was kept for the start is given back.
      *
      * @param start the start
      * @param callback Chromium's callback for it
      * @param before the hook
+     * @param abandoned hears the start whose answer threw
      * @return whether the download goes on
      */
-    static boolean answer(DownloadStart start, CefBeforeDownloadCallback callback, Function<DownloadStart, Optional<DownloadTarget>> before) {
-        Optional<DownloadTarget> target;
+    static boolean answer(DownloadStart start, CefBeforeDownloadCallback callback, Function<DownloadStart, Optional<DownloadTarget>> before,
+                          Consumer<DownloadStart> abandoned) {
         try {
-            target = before.apply(start);
+            Optional<DownloadTarget> target = before.apply(start);
+            if (target == null || target.isEmpty()) return false;
+            callback.Continue(target.get().file().toString(), target.get().ask());
+            return true;
         } catch (RuntimeException failure) {
             LOG.log(System.Logger.Level.WARNING, "A download could not be answered", failure);
+            abandoned.accept(start);
             return false;
         }
-        if (target == null || target.isEmpty()) return false;
-        callback.Continue(target.get().file().toString(), target.get().ask());
-        return true;
     }
 
     /** The one handler; Chromium's thread. */
     private static final class Handler extends CefDownloadHandlerAdapter {
         private final Function<DownloadStart, Optional<DownloadTarget>> before;
         private final BiConsumer<DownloadProgress, Runnable> updated;
+        private final Consumer<DownloadStart> abandoned;
         private final BooleanSupplier stopped;
 
-        Handler(Function<DownloadStart, Optional<DownloadTarget>> before, BiConsumer<DownloadProgress, Runnable> updated, BooleanSupplier stopped) {
+        Handler(Function<DownloadStart, Optional<DownloadTarget>> before, BiConsumer<DownloadProgress, Runnable> updated,
+                Consumer<DownloadStart> abandoned, BooleanSupplier stopped) {
             this.before = before;
             this.updated = updated;
+            this.abandoned = abandoned;
             this.stopped = stopped;
         }
 
         @Override public boolean onBeforeDownload(CefBrowser browser, CefDownloadItem item, String suggestedName, CefBeforeDownloadCallback callback) {
-            return answer(start(browser, item, suggestedName, System.currentTimeMillis()), callback, before);
+            return answer(start(browser, item, suggestedName, System.currentTimeMillis()), callback, before, abandoned);
         }
 
         @Override public void onDownloadUpdated(CefBrowser browser, CefDownloadItem item, CefDownloadItemCallback callback) {

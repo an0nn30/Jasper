@@ -30,9 +30,17 @@ class FileManagerTest {
     }
 
     @Test void showSelectsTheFileInExplorerOnWindowsAndOpensTheFolderWithXdgOpenOnLinux() {
-        manager("Windows 10", Set.of(Desktop.Action.OPEN)).reveal(FILE);
-        assertThat(done).as("one argument, the path whole").containsExactly("[explorer.exe, /select," + FILE + "]");
-        done.clear();
+        var commands = new CopyOnWriteArrayList<List<String>>();
+        var windows = new FileManager(Runnable::run, (title, reason) -> failures.add(title + "|" + reason), "Windows 10",
+            Set.of(Desktop.Action.OPEN)::contains, (action, file) -> done.add(action + " " + file), commands::add);
+        windows.reveal(FILE);
+        assertThat(commands).as("ruling D21: /select, and the path in quotes, two arguments")
+            .containsExactly(List.of("explorer.exe", "/select,", "\"" + FILE + "\""));
+        Path awkward = Path.of("/made/up/My Downloads/report, final.pdf");
+        windows.reveal(awkward);
+        assertThat(commands.getLast()).as("a comma and a space stay inside the quoted path")
+            .containsExactly("explorer.exe", "/select,", "\"/made/up/My Downloads/report, final.pdf\"");
+        assertThat(done).isEmpty();
         manager("Linux", Set.of()).reveal(FILE);
         assertThat(done).containsExactly("[xdg-open, " + FILE.getParent() + "]");
         done.clear();
@@ -62,10 +70,10 @@ class FileManagerTest {
         broken.open(FILE);
         assertThat(failures).containsExactly("Could not open \u201Creport.pdf\u201D|No application can open it");
         failures.clear();
-        var windows = new FileManager(Runnable::run, (title, reason) -> failures.add(title + "|" + reason), "Windows 11", action -> false,
+        var failing = new FileManager(Runnable::run, (title, reason) -> failures.add(title + "|" + reason), "Windows 11", action -> false,
             (action, file) -> { }, command -> { throw new UncheckedIOException(new IOException("Cannot run program \"explorer.exe\"")); });
         String longName = "a".repeat(70) + ".pdf";
-        windows.reveal(FILE.resolveSibling(longName));
+        failing.reveal(FILE.resolveSibling(longName));
         assertThat(failures).containsExactly("Could not show \u201C" + DownloadsMenu.elided(longName) + "\u201D|Cannot run program \"explorer.exe\"");
     }
 

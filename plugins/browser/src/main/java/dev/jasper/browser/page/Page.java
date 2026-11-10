@@ -19,6 +19,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -61,6 +62,8 @@ public final class Page implements AutoCloseable {
     // while the browser lives.
     private volatile IntConsumer browserMade = browser -> { }, browserClosed = browser -> { };
     private volatile OptionalInt browserId = OptionalInt.empty();
+    // Each load Jasper started for the user ({@link #load}); read on Chromium's thread as a download starts (plan 7's D20).
+    private final AtomicLong loads = new AtomicLong();
     private final Function<Page, CompletableFuture<NavigationHistory.History>> historyReader;
     private ObjIntConsumer<Page> historyJumper;
     // Given the page, reads the HTML its main frame shows: Chromium's, or a test's.
@@ -293,6 +296,27 @@ public final class Page implements AutoCloseable {
         return context;
     }
 
+    /**
+     * The document a download the page starts counts in, for the one download a document may start without a user
+     * activation (plan 7's D1): it changes with each document the main frame starts and with each load Jasper starts
+     * for the user ({@link #load}, D20), so such a load gives the page a fresh allowance; both counts only grow. Read on
+     * Chromium's thread.
+     *
+     * @return the document's number
+     */
+    long downloadDocument() {
+        return privacy.documents() + loads.get();
+    }
+
+    /**
+     * The page's user activation, which its canvas keeps. Any thread.
+     *
+     * @return the activation
+     */
+    Activation activation() {
+        return view.activation();
+    }
+
     /** Chromium made the page's browser, whose identifier is {@code id}. Chromium's thread. */
     void browserMade(int id) {
         browserId = OptionalInt.of(id);
@@ -316,13 +340,16 @@ public final class Page implements AutoCloseable {
     }
 
     /**
-     * Loads {@code url}. Before the page has its browser, it is what the browser loads first.
+     * Loads {@code url}. Before the page has its browser, it is what the browser loads first. Only Jasper's own UI loads a
+     * page so, for the user, so the load gives the page a fresh download allowance (plan 7's D20).
      *
      * @param url the address
      */
     public void load(URI url) {
         Objects.requireNonNull(url, "url");
         if (closed) return;
+        // Plan 7's D20: a load Jasper starts for the user gives the page a fresh download allowance.
+        loads.incrementAndGet();
         requested = url;
         address = url.toString();
         navigated();

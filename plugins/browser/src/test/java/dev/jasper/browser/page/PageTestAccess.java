@@ -297,6 +297,24 @@ public final class PageTestAccess {
     }
 
     /**
+     * The start the download handler reads as {@code page}'s own browser starts a download at {@code nowMillis}: its
+     * activation, read without consuming it, and the document its downloads count in, which a load Jasper starts for the
+     * user renews (plan 7's D1 and D20); no native call is made. Any thread, as Chromium's.
+     *
+     * @param page the page whose browser starts it
+     * @param browser the browser's identifier
+     * @param id Chromium's id for the download
+     * @param url the file's address
+     * @param suggestedName the suggested name
+     * @param pageUrl the address the page shows
+     * @param nowMillis the time now
+     * @return the start
+     */
+    public static DownloadStart downloadStart(Page page, int browser, int id, String url, String suggestedName, String pageUrl, long nowMillis) {
+        return PageDownloads.start(browser, pageUrl, java.util.Optional.of(page), page.inMemory(), id, url, suggestedName, nowMillis);
+    }
+
+    /**
      * A page's browser made without its constructor, which would start Chromium: it has only its own fields, its page and
      * the page's canvas, and every Chromium call on it answers nothing, as JCEF's calls do before a native browser
      * exists. For the client's handlers, which ask a browser whose it is.

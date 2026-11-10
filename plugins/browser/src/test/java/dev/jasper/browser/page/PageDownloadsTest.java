@@ -1,6 +1,7 @@
 package dev.jasper.browser.page;
 
 import dev.jasper.browser.permissions.AudioMode;
+import dev.jasper.browser.store.CapturedLog;
 import java.awt.Point;
 import java.lang.reflect.Proxy;
 import java.net.URI;
@@ -28,10 +29,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  * of JCEF's interfaces, and its browsers the {@code page} package's stand-ins, so nothing starts. A start Jasper refuses
  * returns false and is never continued, which CEF cancels; one it accepts is continued once, into the file and with the
  * ask it was given, and returns true, as CEF continues an unanswered download into its own folder once the callback is
- * collected. Each update reaches the {@code downloads} package in plain values with a cancel of its own.
+ * collected; a start whose answer throws is also abandoned, so what was kept for it is given back. Each update reaches
+ * the {@code downloads} package in plain values with a cancel of its own. No native method of a stand-in browser is
+ * called.
  */
 class PageDownloadsTest {
     private static final Path FILE = Path.of("/tmp/jasper-downloads-test/report.pdf");
+    private final List<DownloadStart> abandoned = new CopyOnWriteArrayList<>();
 
     @Test void aRefusedStartReturnsFalseAndIsNeverContinued() {
         var callback = new BeforeCallback();
@@ -39,32 +43,50 @@ class PageDownloadsTest {
         boolean handled = PageDownloads.answer(start(Optional.empty()), callback, start -> {
             starts.add(start);
             return Optional.empty();
-        });
+        }, abandoned::add);
         assertThat(handled).as("false: CEF cancels it").isFalse();
         assertThat(starts).hasSize(1);
         assertThat(callback.calls).as("never continued").isEmpty();
+        assertThat(abandoned).as("refused, not abandoned: nothing was kept").isEmpty();
     }
 
     @Test void anAcceptedStartIsContinuedOnceWithThePathAndTheAskAndReturnsTrue() {
         var callback = new BeforeCallback();
-        assertThat(PageDownloads.answer(start(Optional.empty()), callback, start -> Optional.of(new DownloadTarget(FILE, false)))).isTrue();
+        assertThat(PageDownloads.answer(start(Optional.empty()), callback, start -> Optional.of(new DownloadTarget(FILE, false)), abandoned::add))
+            .isTrue();
         assertThat(callback.calls).containsExactly(FILE + "|false");
         var asking = new BeforeCallback();
-        assertThat(PageDownloads.answer(start(Optional.empty()), asking, start -> Optional.of(new DownloadTarget(FILE, true)))).isTrue();
+        assertThat(PageDownloads.answer(start(Optional.empty()), asking, start -> Optional.of(new DownloadTarget(FILE, true)), abandoned::add))
+            .isTrue();
         assertThat(asking.calls).containsExactly(FILE + "|true");
+        assertThat(abandoned).isEmpty();
     }
 
-    @Test void aStartWhoseAnswerThrowsIsRefusedAndNeverContinued() {
-        var callback = new BeforeCallback();
-        Function<DownloadStart, Optional<DownloadTarget>> broken = start -> { throw new IllegalStateException("broken"); };
-        assertThat(PageDownloads.answer(start(Optional.empty()), callback, broken)).isFalse();
-        assertThat(callback.calls).isEmpty();
+    /**
+     * Review finding 9: a start whose answer throws, before or after the downloads kept it, is refused, never continued,
+     * and abandoned, so what was kept for it, its name and its page's count, is given back.
+     */
+    @Test void aStartWhoseAnswerOrContinueThrowsIsRefusedAndAbandoned() {
+        try (var log = new CapturedLog(PageDownloads.class.getName())) {
+            var callback = new BeforeCallback();
+            Function<DownloadStart, Optional<DownloadTarget>> broken = start -> { throw new IllegalStateException("broken"); };
+            DownloadStart first = start(Optional.empty());
+            assertThat(PageDownloads.answer(first, callback, broken, abandoned::add)).isFalse();
+            assertThat(callback.calls).isEmpty();
+            CefBeforeDownloadCallback refusing = (path, showDialog) -> { throw new IllegalStateException("no native callback"); };
+            DownloadStart second = start(Optional.empty());
+            assertThat(PageDownloads.answer(second, refusing, start -> Optional.of(new DownloadTarget(FILE, false)), abandoned::add)).isFalse();
+            assertThat(abandoned).containsExactly(first, second);
+            assertThat(log.records()).extracting(record -> record.getThrown().getMessage()).as("each logged")
+                .containsExactly("broken", "no native callback");
+        }
     }
 
     /**
      * Rulings F21, D1 and F7: a page's start carries the browser's identifier and the item's id, the names and
      * addresses, its page, whether the page is activated now, which it reads without consuming the activation, the
-     * number of documents its main frame has started, and whether its group keeps its data in memory.
+     * document its main frame shows, and whether its group keeps its data in memory. Its own browser names the page and
+     * the group; the values are read without a native call.
      */
     @Test void aPagesStartCarriesItsPageItsActivationItsDocumentAndItsStore() throws Exception {
         long now = System.currentTimeMillis();
@@ -72,18 +94,44 @@ class PageDownloadsTest {
             PageContext.memory()));
         page.privacy().documentStarted(AudioMode.ALLOW);
         page.privacy().documentStarted(AudioMode.ALLOW);
-        Activation activation = ((PageView) page.view()).activation();
         PageBrowser browser = PageTestAccess.pageBrowser(page);
-        DownloadStart quiet = PageDownloads.start(browser, new Item(7, "https://example.com/report.pdf"), "report.pdf", now);
-        assertThat(quiet).isEqualTo(new DownloadStart(-1, 7, "report.pdf", "https://example.com/report.pdf", "", Optional.of(page), false,
-            false, 2, true));
+        assertThat(PageDownloads.page(browser)).containsSame(page);
+        assertThat(PageDownloads.inMemory(browser)).isTrue();
+        DownloadStart quiet = PageDownloads.start(7, "https://example.com/", Optional.of(page), true, 7, "https://example.com/report.pdf",
+            "report.pdf", now);
+        assertThat(quiet).isEqualTo(new DownloadStart(7, 7, "report.pdf", "https://example.com/report.pdf", "https://example.com/",
+            Optional.of(page), false, false, 2, true));
+        Activation activation = ((PageView) page.view()).activation();
         activation.activate(now - 1_000);
-        DownloadStart clicked = PageDownloads.start(browser, new Item(8, "https://example.com/b.zip"), "b.zip", now);
+        DownloadStart clicked = PageDownloads.start(7, "", Optional.of(page), true, 8, "https://example.com/b.zip", "b.zip", now);
         assertThat(clicked.activated()).isTrue();
-        assertThat(clicked.page()).containsSame(page);
         assertThat(activation.active(now)).as("read, not consumed: a download is no popup").isTrue();
-        assertThat(PageDownloads.start(browser, new Item(9, "https://example.com/c.zip"), "c.zip", now + 5_000).activated())
+        assertThat(PageDownloads.start(7, "", Optional.of(page), true, 9, "https://example.com/c.zip", "c.zip", now + 5_000).activated())
             .as("Chromium's 5 s window").isFalse();
+        onUi(() -> {
+            page.close();
+            return null;
+        });
+    }
+
+    /**
+     * Ruling D20: a load Jasper starts for the user, as the address field's, gives the page's downloads a new document,
+     * as a document the main frame starts does; nothing else the page does changes it.
+     */
+    @Test void aLoadJasperStartsGivesThePagesDownloadsANewDocument() throws Exception {
+        long now = System.currentTimeMillis();
+        Page page = onUi(() -> new Page(URI.create("https://example.com/"), () -> { }, PageTestAccess.noFavicons(), Runnable::run,
+            PageContext.persistent()));
+        long before = PageDownloads.start(1, "", Optional.of(page), false, 1, "https://example.com/a", "a", now).document();
+        assertThat(PageDownloads.start(1, "", Optional.of(page), false, 2, "https://example.com/b", "b", now).document()).isEqualTo(before);
+        onUi(() -> {
+            page.load(URI.create("https://example.com/report.pdf"));
+            return null;
+        });
+        long loaded = PageDownloads.start(1, "", Optional.of(page), false, 3, "https://example.com/c", "c", now).document();
+        assertThat(loaded).isGreaterThan(before);
+        page.privacy().documentStarted(AudioMode.ALLOW);
+        assertThat(PageDownloads.start(1, "", Optional.of(page), false, 4, "https://example.com/d", "d", now).document()).isGreaterThan(loaded);
         onUi(() -> {
             page.close();
             return null;
@@ -99,14 +147,17 @@ class PageDownloadsTest {
         Page page = onUi(() -> new Page(URI.create("https://example.com/"), () -> { }, PageTestAccess.noFavicons(), Runnable::run,
             PageContext.memory()));
         DevTools tools = onUi(() -> PageTestAccess.devTools(page, new Point(1, 1)));
-        DownloadStart devTools = PageDownloads.start(PageTestAccess.devToolsBrowser(tools), new Item(3, "blob:devtools://x"), "a.har", now);
-        assertThat(devTools.page()).isEmpty();
-        assertThat(devTools.inMemory()).as("the inspected page's group").isTrue();
-        assertThat(devTools.activated()).isFalse();
-        assertThat(devTools.document()).isZero();
-        DownloadStart other = PageDownloads.start(browser(42, "https://other.example/"), new Item(4, "https://other.example/x.bin"),
-            "x.bin", now);
-        assertThat(other).isEqualTo(new DownloadStart(42, 4, "x.bin", "https://other.example/x.bin", "https://other.example/", Optional.empty(),
+        PageBrowser devTools = PageTestAccess.devToolsBrowser(tools);
+        assertThat(PageDownloads.page(devTools)).isEmpty();
+        assertThat(PageDownloads.inMemory(devTools)).as("the inspected page's group").isTrue();
+        DownloadStart saved = PageDownloads.start(3, "", Optional.empty(), true, 3, "blob:devtools://x", "a.har", now);
+        assertThat(saved.activated()).isFalse();
+        assertThat(saved.document()).isZero();
+        CefBrowser other = browser(42, "https://other.example/");
+        assertThat(PageDownloads.page(other)).isEmpty();
+        assertThat(PageDownloads.inMemory(other)).isFalse();
+        DownloadStart start = PageDownloads.start(other, new Item(4, "https://other.example/x.bin"), "x.bin", now);
+        assertThat(start).isEqualTo(new DownloadStart(42, 4, "x.bin", "https://other.example/x.bin", "https://other.example/", Optional.empty(),
             false, false, 0, false));
         onUi(() -> {
             page.close();
@@ -120,7 +171,7 @@ class PageDownloadsTest {
         CefDownloadHandler handler = PageDownloads.handler(start -> {
             starts.add(start);
             return start.id() == 1 ? Optional.of(new DownloadTarget(FILE, false)) : Optional.empty();
-        }, (progress, cancel) -> { }, () -> false);
+        }, (progress, cancel) -> { }, abandoned::add, () -> false);
         var accepted = new BeforeCallback();
         assertThat(handler.onBeforeDownload(browser(5, "https://example.com/"), new Item(1, "https://example.com/r.pdf"), "r.pdf", accepted))
             .isTrue();
@@ -143,7 +194,7 @@ class PageDownloadsTest {
         CefDownloadHandler handler = PageDownloads.handler(start -> Optional.empty(), (progress, cancel) -> {
             updates.add(progress);
             cancels.add(cancel);
-        }, () -> false);
+        }, abandoned::add, () -> false);
         var item = new Item(6, "https://example.com/r.pdf");
         item.inProgress = true;
         item.received = 42;
@@ -172,7 +223,8 @@ class PageDownloadsTest {
     @Test void onceChromiumHasStoppedAKeptCancelTouchesNothing() {
         var stopped = new AtomicBoolean();
         var cancels = new CopyOnWriteArrayList<Runnable>();
-        CefDownloadHandler handler = PageDownloads.handler(start -> Optional.empty(), (progress, cancel) -> cancels.add(cancel), stopped::get);
+        CefDownloadHandler handler = PageDownloads.handler(start -> Optional.empty(), (progress, cancel) -> cancels.add(cancel), abandoned::add,
+            stopped::get);
         var item = new Item(1, "https://example.com/r.pdf");
         item.inProgress = true;
         var callback = new ItemCallback();

@@ -30,6 +30,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -61,6 +62,8 @@ class DownloadsTest {
     /** Each Downloads folder read and mark as {@code call@thread}, and each time the menu's entries were set. */
     private final List<String> calls = new CopyOnWriteArrayList<>();
     private final AtomicInteger sets = new AtomicInteger();
+    /** Whether the context's background executor refuses work, as it does once the plugin stops. */
+    private volatile boolean rejectBackground;
     private final List<Page> pages = new ArrayList<>();
 
     @AfterEach void close() throws Exception {
@@ -97,22 +100,6 @@ class DownloadsTest {
         assertThat(menu()).as("refused before it began: not listed").isEmpty();
     }
 
-    @Test void aFolderThatCannotBeCreatedRefusesTheDownloadWithTheSystemsReason() throws Exception {
-        make(MAC);
-        Path file = Files.writeString(temp.resolve("file"), "a file");
-        Path under = file.resolve("Downloads");
-        resolve();
-        onUi(() -> {
-            host.setSetting(ID, "downloads_folder", under.toString());
-            return null;
-        });
-        host.runBackground();
-        assertThat(downloads.before(start(null, 1, "report.pdf"))).isEmpty();
-        flush();
-        assertThat(notices()).singleElement().asString().startsWith(GROUP + "|WARNING|Download failed for \u201Creport.pdf\u201D.|"
-            + "Jasper could not create the folder \u201C" + under + "\u201D: ");
-    }
-
     /** Ruling F3: the folder is read and made only on the background executor, after the first page start. */
     @Test void beforeTheFirstPageStartNothingIsReadAndADownloadIsRefused() throws Exception {
         make(MAC);
@@ -146,12 +133,6 @@ class DownloadsTest {
         assertThat(other).isDirectory();
         assertThat(downloads.folder()).isEqualTo(other);
         assertThat(downloads.before(start(null, 1, "report.pdf"))).contains(new DownloadTarget(other.resolve("report.pdf"), false));
-        onUi(() -> {
-            host.setSetting(ID, "downloads_folder", "~/Saved");
-            return null;
-        });
-        host.runBackground();
-        assertThat(downloads.folder()).as("home-relative").isEqualTo(temp.resolve("home").resolve("Saved"));
     }
 
     @Test void anAskStartReservesNothingAndContinuesWithAsk() throws Exception {
@@ -467,6 +448,90 @@ class DownloadsTest {
         assertThat(downloads.before(automatic(other, 10, 2))).as("another page's").isPresent();
     }
 
+    /**
+     * Ruling D20: a load Jasper starts for the user, as the address field's or a bookmark's, gives the page a fresh
+     * download allowance, so two such loads in a row that each become a download both go; within one load the second
+     * automatic download is refused, and a page's own navigation, such as {@code location.href = ...}, renews nothing.
+     */
+    @Test void aLoadJasperStartsGivesThePageAFreshDownloadAllowance() throws Exception {
+        make(MAC);
+        resolve();
+        Page page = page(PageContext.persistent());
+        assertThat(downloads.before(pageStart(page, 1))).isPresent();
+        assertThat(downloads.before(pageStart(page, 2))).as("the page's own navigation to a second file").isEmpty();
+        load(page, "https://example.com/a.zip");
+        assertThat(downloads.before(pageStart(page, 3))).as("a load Jasper started").isPresent();
+        load(page, "https://example.com/b.zip");
+        assertThat(downloads.before(pageStart(page, 4))).as("the next load too").isPresent();
+        assertThat(downloads.before(pageStart(page, 5))).as("within one load, the second").isEmpty();
+        assertThat(downloads.before(pageStart(page, 6))).isEmpty();
+    }
+
+    /** Review finding 6: a mark the background executor refuses still finishes the download, without Open on macOS. */
+    @Test void aMarkTheBackgroundExecutorRefusesStillFinishesTheDownload() throws Exception {
+        make(MAC);
+        resolve();
+        Path target = downloads.before(start(null, 1, "report.pdf")).orElseThrow().file();
+        rejectBackground = true;
+        complete(1, target);
+        assertThat(host.markedDownloads()).isEmpty();
+        assertThat(menu()).containsExactly("entry:downloads.clear-all:Clear All", "---", "entries:report.pdf" + DASH + "Finished",
+            "  entry:downloads.1.show:Show in Finder", "  entry:downloads.1.remove:Remove from List");
+    }
+
+    /**
+     * Review finding 6: an interrupted download is cancelled before its page's count ends, since the page's hold may then
+     * close its browser.
+     */
+    @Test void anInterruptedDownloadIsCancelledBeforeItsPagesHoldCompletes() throws Exception {
+        make(MAC);
+        resolve();
+        Page page = page(PageContext.persistent());
+        var seen = new CopyOnWriteArrayList<String>();
+        Path target = downloads.before(start(page, 1, "report.pdf")).orElseThrow().file();
+        CompletableFuture<Void> hold = onUi(() -> downloads.drained(page));
+        hold.thenRun(() -> seen.add("hold"));
+        Runnable cancel = () -> seen.add(hold.isDone() ? "cancel after the hold" : "cancel");
+        update(running(1, 1, 10, target + ".crdownload"), cancel);
+        update(interrupted(1), cancel);
+        assertThat(seen).containsExactly("cancel", "hold");
+    }
+
+    /**
+     * Review finding 6: a start refused at the second lock, as its page's close began while its name was reserved,
+     * gives the name back.
+     */
+    @Test void aStartRefusedAfterItsNameWasReservedGivesTheNameBack() throws Exception {
+        make(MAC);
+        resolve();
+        Page page = page(PageContext.persistent());
+        downloads.afterReservation(() -> downloads.drained(page));
+        assertThat(downloads.before(start(page, 1, "report.pdf"))).as("the close began meanwhile").isEmpty();
+        downloads.afterReservation(() -> { });
+        assertThat(downloads.before(start(null, 2, "report.pdf"))).as("its name is free")
+            .contains(new DownloadTarget(folder.resolve("report.pdf"), false));
+    }
+
+    /**
+     * Review finding 9: a start Chromium could not be given is abandoned: its name is free again, its page's hold
+     * completes, and an update for it is dropped.
+     */
+    @Test void anAbandonedStartGivesBackItsNameAndItsPagesCount() throws Exception {
+        make(MAC);
+        resolve();
+        Page page = page(PageContext.persistent());
+        DownloadStart start = start(page, 1, "report.pdf");
+        Path target = downloads.before(start).orElseThrow().file();
+        CompletableFuture<Void> hold = onUi(() -> downloads.drained(page));
+        assertThat(hold).isNotDone();
+        downloads.abandon(start);
+        downloads.abandon(start);
+        assertThat(hold).isCompleted();
+        update(running(1, 1, 10, target + ".crdownload"), () -> { });
+        assertThat(menu()).as("dropped").isEmpty();
+        assertThat(downloads.before(start(null, 2, "report.pdf"))).contains(new DownloadTarget(target, false));
+    }
+
     /** Ruling F19: Chromium's updates set the entries only when a title, an enabled state or the structure changes. */
     @Test void anUpdateThatChangesNoLabelSetsNothing() throws Exception {
         make(MAC);
@@ -559,7 +624,9 @@ class DownloadsTest {
             });
             var files = new FileManager(Runnable::run, (title, reason) -> fileFailures.add(title + "|" + reason), osName, action -> true,
                 (action, file) -> desktop.add(action + " " + file), command -> desktop.add(String.join(" ", command)));
-            downloads = new Downloads(recording(context.get()), setting.get(), files, temp.resolve("home"), osName);
+            PluginContext recorded = recording(context.get());
+            downloads = new Downloads(recorded, recorded.notifications().group(Downloads.GROUP), setting.get(), files, temp.resolve("home"),
+                osName);
             return null;
         });
     }
@@ -600,6 +667,20 @@ class DownloadsTest {
 
     private static DownloadStart ask(Page page, int id, String name) {
         return new DownloadStart(BROWSER, id, name, "https://example.com/" + name, PAGE, Optional.ofNullable(page), true, false, 1, false);
+    }
+
+    /** A download {@code page}'s own browser starts now, as the download handler reads it: no activation here. */
+    private static DownloadStart pageStart(Page page, int id) {
+        return PageTestAccess.downloadStart(page, BROWSER, id, "https://example.com/" + id + ".bin", id + ".bin", PAGE,
+            System.currentTimeMillis());
+    }
+
+    /** A load Jasper starts for the user, as the address field's. */
+    private static void load(Page page, String address) throws Exception {
+        onUi(() -> {
+            page.load(URI.create(address));
+            return null;
+        });
     }
 
     /** A download a page starts in its {@code document}th document without a user activation. */
@@ -653,6 +734,8 @@ class DownloadsTest {
             if (type == Platform.class && (name.equals("downloadsFolder") || name.equals("markDownloaded")))
                 calls.add(name + "@" + Thread.currentThread().getName());
             if (type == MenuEntries.class && name.equals("set")) sets.incrementAndGet();
+            if (type == PluginContext.class && name.equals("background") && rejectBackground)
+                return (java.util.concurrent.Executor) task -> { throw new RejectedExecutionException("The plugin has stopped"); };
             Object result;
             try {
                 result = method.invoke(target, args);

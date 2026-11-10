@@ -79,6 +79,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
@@ -213,12 +214,13 @@ public class BrowserPlugin implements Plugin {
         // Spec section 10: and downloads'. Downloads is made with no I/O and no menu (plan 7's F35): its folder is read on
         // the background executor once a page first starts (F3), and its menu is made with the first download.
         NotificationGroup downloadsGroup = context.notifications().group(Downloads.GROUP);
-        var downloads = new Downloads(context, settings.downloadsFolder(), fileManagers.apply(context.background(),
+        var downloads = new Downloads(context, downloadsGroup, settings.downloadsFolder(), fileManagers.apply(context.background(),
             (title, reason) -> EventQueue.invokeLater(() -> { if (running) downloadsGroup.error(title, reason); })));
         this.downloads = downloads;
-        // One pair of hooks for the run (F20): the download handler is installed once, with these.
+        // One set of hooks for the run (F20): the download handler is installed once, with these.
         Function<DownloadStart, Optional<DownloadTarget>> downloadStarts = downloads::before;
         BiConsumer<DownloadProgress, Runnable> downloadUpdates = downloads::updated;
+        Consumer<DownloadStart> downloadsAbandoned = downloads::abandon;
         // A page is made when its item first shows: the client's handlers are installed then, before any page is made on
         // it, as naming their types loads Chromium's classes. Jasper's own pages ask Java through a router of their own,
         // read and answered on the background executor.
@@ -227,7 +229,7 @@ public class BrowserPlugin implements Plugin {
         var onboarding = new Onboarding(data.resolve("onboarding-finished"), context.background());
         var items = new BrowserItems(context, settings::read, dataStores, page -> {
             PageNavigation.prepare(engine, filters);
-            PageDownloads.prepare(engine, downloadStarts, downloadUpdates);
+            PageDownloads.prepare(engine, downloadStarts, downloadUpdates, downloadsAbandoned);
             // Plan 7's F3: the Downloads folder is read and made on the background executor as the first page starts.
             downloads.start();
             PageDialogs.prepare(engine);

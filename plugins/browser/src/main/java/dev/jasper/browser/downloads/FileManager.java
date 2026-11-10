@@ -15,9 +15,10 @@ import java.util.function.Predicate;
 /**
  * The Downloads menu's Show and Open (spec section 10, ruling F31), as the File Server shows a folder: Show in Finder,
  * Explorer or Folder shows the file in the system's file manager, through Java's desktop where it can browse to a
- * file, else Explorer selecting it on Windows, {@code xdg-open} opening its folder on Linux, and otherwise the desktop
- * opening its folder; Open is the desktop's open action, or {@code xdg-open} on Linux without Java's desktop. A process
- * is started with the path as one argument, never through a shell. Both run on the background executor, as they may
+ * file, else Explorer selecting it on Windows ({@code /select,} and the path in quotes, two arguments, ruling D21),
+ * {@code xdg-open} opening its folder on Linux, and otherwise the desktop opening its folder; Open is the desktop's open
+ * action, or {@code xdg-open} on Linux without Java's desktop. A process is started with the path as an argument of its
+ * own, never through a shell. Both run on the background executor, as they may
  * block, and nothing runs once it has stopped; a failure is told with its title, "Could not show “NAME”" or "Could not
  * open “NAME”", NAME elided as the menu elides it, and the reason. Any thread.
  */
@@ -71,7 +72,8 @@ public final class FileManager {
         Objects.requireNonNull(file, "file");
         run(file, "Could not show", () -> {
             if (supports.test(Desktop.Action.BROWSE_FILE_DIR)) desktop.accept(Desktop.Action.BROWSE_FILE_DIR, file);
-            else if (windows) processes.accept(List.of("explorer.exe", "/select," + file));
+            // Ruling D21: two arguments, the path quoted, which Java passes as it is: explorer.exe /select, "C:\Users\...".
+            else if (windows) processes.accept(List.of("explorer.exe", "/select,", "\"" + file + "\""));
             else if (linux) processes.accept(List.of("xdg-open", folder(file).toString()));
             else if (supports.test(Desktop.Action.OPEN)) desktop.accept(Desktop.Action.OPEN, folder(file));
             else throw new UnsupportedOperationException("This system cannot show files");
