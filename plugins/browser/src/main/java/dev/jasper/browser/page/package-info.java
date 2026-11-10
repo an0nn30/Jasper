@@ -68,9 +68,11 @@
  * ({@link dev.jasper.browser.page.Page#setCloseHold}). A page's {@link dev.jasper.browser.page.PageContext} tells as its
  * group's store closes it, so the Downloads menu forgets a /dev/null group's downloads.
  * For the {@code tools} package, a page runs a script in its top frame ({@link dev.jasper.browser.page.Page#run}), but
- * never in a challenge provider's, tells each main-frame load end ({@link dev.jasper.browser.page.Page#onLoadEnd}), and
+ * never in a challenge provider's, tells each main-frame load end ({@link dev.jasper.browser.page.Page#onLoadEnd}),
  * hands on the reports its tools' scripts send through the {@code links} package's opener bridge
- * ({@link dev.jasper.browser.page.Page#onToolReport}).
+ * ({@link dev.jasper.browser.page.Page#onToolReport}), Save Page As's parts among them, and counts its documents
+ * ({@link dev.jasper.browser.page.Page#document}), which tells Save Page As whether the page navigated meanwhile; the
+ * right-click menu's Save Page As… is its item's, through the menu place.
  * {@link dev.jasper.browser.page.LastPress}, {@code Favicons}, {@code DownloadStart}, {@code DownloadTarget},
  * {@code DownloadProgress}, {@code Page}'s methods and {@code PreviewPage}'s name no Chromium type, and none of these
  * classes loads until a browser item opens or a Markdown preview is made.

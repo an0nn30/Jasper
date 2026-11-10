@@ -112,7 +112,9 @@ class BrowserPluginTest {
         var plugin = new BrowserPlugin(proxy -> {
             asked.add("a client");
             throw new IllegalStateException("no network in tests");
-        }, settings -> LIST, DownloadsTestAccess::refusingFiles);
+        }, settings -> LIST, DownloadsTestAccess::refusingFiles, proxy -> {
+            throw new AssertionError("no Save Page As in this test");
+        });
         var host = new AtomicReference<FakePluginHost>();
         SwingUtilities.invokeAndWait(() -> {
             host.set(new FakePluginHost(root));
@@ -147,7 +149,9 @@ class BrowserPluginTest {
             URI remote = URI.create("https://list.invalid/list.json"), local = URI.create("http://127.0.0.1:" + origin.port() + "/list.json");
             var list = new AtomicReference<>(remote);
             var plugin = new BrowserPlugin(dev.jasper.browser.adblock.ListDownload::client, settings -> list.get(),
-                DownloadsTestAccess::refusingFiles);
+                DownloadsTestAccess::refusingFiles, proxy -> {
+                    throw new AssertionError("no Save Page As in this test");
+                });
             var host = new AtomicReference<FakePluginHost>();
             SwingUtilities.invokeAndWait(() -> {
                 host.set(new FakePluginHost(root));

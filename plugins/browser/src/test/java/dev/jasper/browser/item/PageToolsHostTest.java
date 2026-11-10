@@ -1,11 +1,15 @@
 package dev.jasper.browser.item;
 
+import dev.jasper.browser.downloads.DownloadsTestAccess;
+import dev.jasper.browser.json.StrictJson;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageFind;
 import dev.jasper.browser.page.PageTestAccess;
 import dev.jasper.browser.settings.BrowserSettings;
 import dev.jasper.browser.store.MemoryStores;
+import dev.jasper.browser.tools.PageSaver;
 import dev.jasper.browser.tools.PageTools;
+import dev.jasper.browser.tools.SavePage;
 import dev.jasper.browser.tools.ToolScripts;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.Variant;
@@ -19,17 +23,22 @@ import dev.jasper.sdk.ui.WorkspacePalette;
 import java.awt.Color;
 import java.awt.Point;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -45,7 +54,9 @@ class PageToolsHostTest {
     private final MemoryStores memory = new MemoryStores();
     // The scripts the item's page ran, each as its address and the script.
     private final List<String> ran = new ArrayList<>();
+    @TempDir Path temp;
     private FakePluginHost host;
+    private BrowserItems items;
     private PluginContext context;
     private BrowserItem item;
     private JPanel parent;
@@ -186,6 +197,100 @@ class PageToolsHostTest {
         });
     }
 
+    /**
+     * Plan 7's Task 7: Save Page As…, from the page's right-click menu, asks where, starting in the Downloads folder the
+     * plugin gave the items; then the page's {@code savePage} reports go to the save, which writes the folder on the
+     * background executor and shows it. The save's client goes through the items' proxy, and nothing is fetched.
+     */
+    @Test void savePageAsGivesThePagesPartsToTheSave() throws Exception {
+        Path downloads = Files.createDirectories(temp.resolve("Downloads")), folder = downloads.resolve("news.example");
+        var shown = new CopyOnWriteArrayList<String>();
+        var proxies = new CopyOnWriteArrayList<Optional<java.net.InetSocketAddress>>();
+        SwingUtilities.invokeAndWait(() -> {
+            open("https://news.example/article");
+            items.useSaving(() -> downloads, DownloadsTestAccess.recordingFiles(Runnable::run, shown), proxy -> {
+                proxies.add(proxy);
+                return PageSaver.client(proxy);
+            });
+            items.useProxy(Optional.of(java.net.InetSocketAddress.createUnresolved("proxy.invalid", 3128)));
+            PageTestAccess.loadStarted(item.page(), "https://news.example/article");
+            PageTestAccess.addressChanged(item.page(), "https://news.example/article");
+            host.queuePathSelection(List.of(folder));
+            item.page().menuPlace().orElseThrow().savePage().run();
+        });
+        host.runBackground();
+        SwingUtilities.invokeAndWait(() -> { });
+        SwingUtilities.invokeAndWait(() -> {
+            assertThat(ran).hasSize(1);
+            String prefix = prefix(ran.getFirst());
+            assertThat(ran.getFirst()).startsWith(ToolScripts.SAVE_PAGE_URL + " ");
+            item.page().toolReported(SavePage.OP, part(prefix));
+        });
+        host.runBackground();
+        SwingUtilities.invokeAndWait(() -> { });
+        assertThat(Files.readString(folder.resolve("index.html"))).isEqualTo("<p>Saved</p>");
+        assertThat(shown).containsExactly("BROWSE_FILE_DIR " + folder);
+        assertThat(proxies).containsExactly(Optional.of(java.net.InetSocketAddress.createUnresolved("proxy.invalid", 3128)));
+        SwingUtilities.invokeAndWait(() -> assertThat(host.failures()).isEmpty());
+    }
+
+    /** A load start while the save awaits its answer fails it over the item; an item closing ends its save with a warning. */
+    @Test void aLoadStartOrTheItemClosingEndsTheSave() throws Exception {
+        Path downloads = Files.createDirectories(temp.resolve("Downloads"));
+        SwingUtilities.invokeAndWait(() -> {
+            open("https://news.example/article");
+            items.useSaving(() -> downloads, DownloadsTestAccess.recordingFiles(Runnable::run, new ArrayList<>()), proxy -> {
+                throw new AssertionError("no client for a save that fails first");
+            });
+            PageTestAccess.loadStarted(item.page(), "https://news.example/article");
+            PageTestAccess.addressChanged(item.page(), "https://news.example/article");
+            host.queuePathSelection(List.of(downloads.resolve("news.example")));
+            host.queuePathSelection(List.of(downloads.resolve("news.example")));
+            item.page().menuPlace().orElseThrow().savePage().run();
+        });
+        host.runBackground();
+        SwingUtilities.invokeAndWait(() -> { });
+        SwingUtilities.invokeAndWait(() -> {
+            assertThat(ran).hasSize(1);
+            PageTestAccess.loadStarted(item.page(), "https://news.example/next");
+            assertThat(host.windowView(ID, "Save Failed")).isPresent();
+            PageTestAccess.addressChanged(item.page(), "https://news.example/next");
+            item.page().menuPlace().orElseThrow().savePage().run();
+        });
+        host.runBackground();
+        SwingUtilities.invokeAndWait(() -> { });
+        SwingUtilities.invokeAndWait(() -> {
+            assertThat(ran).hasSize(2);
+            item.close();
+            assertThat(host.notifications().lines()).contains("dev.jasper.browser.downloads|WARNING|Save Failed|"
+                + "Could not save the page: the page closed.");
+        });
+    }
+
+    /** The prefix a script ran with, as {@code address script} records it. */
+    private static String prefix(String ran) {
+        int start = ran.lastIndexOf("\n(\"") + 3;
+        return ran.substring(start, ran.indexOf('"', start));
+    }
+
+    /** The whole answer of a page that names no resource, in one part. */
+    private static String part(String prefix) {
+        var answer = new LinkedHashMap<String, Object>();
+        answer.put("prefix", prefix);
+        answer.put("html", "<p>Saved</p>");
+        answer.put("resources", List.of());
+        answer.put("styles", List.of());
+        answer.put("attributes", List.of());
+        answer.put("base", "https://news.example/article");
+        var request = new LinkedHashMap<String, Object>();
+        request.put("op", SavePage.OP);
+        request.put("save", prefix);
+        request.put("part", 0L);
+        request.put("parts", 1L);
+        request.put("text", StrictJson.write(answer));
+        return StrictJson.write(request);
+    }
+
     /** The reader's CSS: the theme's colours on the overlay's root, as Jasper's own pages name them, and its colour scheme. */
     @Test void theReadersCssIsTheThemesColoursOnTheOverlaysRoot() {
         var palette = new WorkspacePalette(Color.WHITE, new Color(0xf0f0f0), new Color(0xe0e0e0), new Color(0x111111),
@@ -207,7 +312,7 @@ class PageToolsHostTest {
             settings.set(BrowserSettings.declare(plugin.settings()));
         });
         context = started.get();
-        var items = new BrowserItems(context, settings.get()::read, new DataStores(memory.make(), () -> false), page -> { },
+        items = new BrowserItems(context, settings.get()::read, new DataStores(memory.make(), () -> false), page -> { },
             (Duration delay, Runnable task) -> () -> { }, request -> new CompletableFuture<>());
         item = items.open(URI.create(url), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
         PageTestAccess.useScriptRunner(item.page(), (script, address) -> ran.add(address + " " + script));

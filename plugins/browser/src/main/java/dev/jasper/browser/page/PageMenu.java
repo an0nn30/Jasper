@@ -187,8 +187,8 @@ final class PageMenu {
 
     /**
      * Runs the page's item {@code id}, chosen from the menu for {@code pointed} over a frame at {@code from}. Open Link and
-     * Open Image in New Tab check again that the frame could open their address, and Save Link As… and Save Image As…
-     * that it may be saved. UI thread.
+     * Open Image in New Tab check again that the frame could open their address, Save Link As… and Save Image As… that
+     * it may be saved, and Save Page As… that the main frame does not show one of Jasper's own pages. UI thread.
      */
     static void run(Page page, MenuPlace place, Pointed pointed, String from, String id) {
         switch (id) {
@@ -210,6 +210,9 @@ final class PageMenu {
             case PageMenuItems.PRINT -> page.print();
             case PageMenuItems.COPY_TITLE -> {
                 if (!page.title().isEmpty()) place.clipboard().accept(page.title());
+            }
+            case PageMenuItems.SAVE_PAGE -> {
+                if (Page.runsScriptsIn(page.committedAddress())) place.savePage().run();
             }
             case PageMenuItems.VIEW_SOURCE -> place.viewSource().run();
             case PageMenuItems.REMOVE_ELEMENT -> place.removeElement().accept(pointed.at());

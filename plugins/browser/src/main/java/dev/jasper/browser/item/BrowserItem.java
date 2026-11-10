@@ -110,7 +110,7 @@ import javax.swing.JComponent;
  * Exit Reader Mode, Escape in the page or the page's next load (spec section 10); Remove Distractions hides the overlays
  * the user clicks until Exit Distraction Removal, Escape or the next load, and either mode ends the other. Remove
  * Element, from the page's right-click menu, hides the overlay under the pointer, its point divided by the zoom the page
- * shows at. UI thread.
+ * shows at, and Save Page As… saves the page with its resources in a folder the user chooses. UI thread.
  */
 public final class BrowserItem implements AutoCloseable {
     static final String ROOT = "browser", PAGE = "browser.page", CONTENT = "browser.page.content";
@@ -306,7 +306,7 @@ public final class BrowserItem implements AutoCloseable {
         // right-click menu, which copies with the plugin's clipboard and searches with the engine chosen as it opens.
         page.setDialogPlace(new DialogPlace(items.context().kit(), items.context().windows(), tab));
         page.setMenuPlace(new MenuPlace(tab, items.context().platform()::copy, this::engineName, this::search, errors::canGoBack,
-            this::goBack, this::reload, this::viewSource, this::removeElement, this::inspect));
+            this::goBack, this::reload, this::savePage, this::viewSource, this::removeElement, this::inspect));
         items.opened(this);
         present();
     }
@@ -528,6 +528,15 @@ public final class BrowserItem implements AutoCloseable {
      */
     void proceed(String token) {
         if (!closed) errors.proceed(token);
+    }
+
+    /**
+     * Save Page As…, from the page's right-click menu (plan 7's Task 7): the save chooser asks where, starting in the
+     * Downloads folder, then the page is saved there with its resources ({@link BrowserItems#savePage}). Nothing once the
+     * item has closed.
+     */
+    void savePage() {
+        if (!closed && tab != null) items.savePage(page, tab).ifPresent(pageTools::saving);
     }
 
     /**

@@ -46,6 +46,7 @@ import dev.jasper.browser.settings.BrowserSettingsPanel;
 import dev.jasper.browser.store.BrowserDatabase;
 import dev.jasper.browser.store.DataFolder;
 import dev.jasper.browser.store.Stores;
+import dev.jasper.browser.tools.PageSaver;
 import dev.jasper.sdk.WindowOwner;
 import dev.jasper.sdk.notifications.NotificationGroup;
 import dev.jasper.sdk.plugin.Plugin;
@@ -103,11 +104,12 @@ import java.util.function.Function;
  * and downloads only once a page first starts or the user turns ad blocking on, or at Update Now (the plan's call); its
  * rule set applies to every page's requests and documents, a /dev/null page's too. The HTTP proxy, while on, is given
  * to Chromium's contexts, the persistent one and each /dev/null group's, and the plugin's own fetches, the favicons, the
- * suggestions, View Source's and the filter list's, go through it too, routed as Chromium routes, so a host on this
- * computer or its link goes direct; off, Chromium uses the system's proxy settings and the fetches the JDK's default.
- * Chromium's downloads go to the {@link Downloads}, which reads the Downloads folder once a page first starts, makes the
- * Downloads menu with the first download and marks each finished file; a page that closes keeps its browser until its
- * downloads end; quitting stops the running ones, and once Chromium has ended their partial files go.
+ * suggestions, View Source's, the filter list's and Save Page As's, go through it too, routed as Chromium routes, so a
+ * host on this computer or its link goes direct; off, Chromium uses the system's proxy settings and the fetches the
+ * JDK's default. Chromium's downloads go to the {@link Downloads}, which reads the Downloads folder once a page first
+ * starts, makes the Downloads menu with the first download and marks each finished file; a page that closes keeps its
+ * browser until its downloads end; quitting stops the running ones, and once Chromium has ended their partial files go.
+ * Save Page As's chooser starts in that folder, and its saved folder shows as a download's file does.
  */
 public class BrowserPlugin implements Plugin {
     static final String NEW_TAB = "dev.jasper.browser.new_tab", NEW_WINDOW = "dev.jasper.browser.new_window";
@@ -132,27 +134,33 @@ public class BrowserPlugin implements Plugin {
     private final Function<Optional<InetSocketAddress>, HttpClient> filterClients;
     private final Function<BrowserSettings, URI> filterAddress;
     private final BiFunction<Executor, BiConsumer<String, String>, FileManager> fileManagers;
+    private final Function<Optional<InetSocketAddress>, HttpClient> saveClients;
 
     /** Created by the runtime. */
     public BrowserPlugin() {
-        this(ListDownload::client, BrowserSettings::filterListUrl, FileManager::new);
+        this(ListDownload::client, BrowserSettings::filterListUrl, FileManager::new, PageSaver::client);
     }
 
     /**
-     * A plugin whose filter list's client and address, and whose file manager, are a test's (ruling F9 and plan 7's F15):
-     * no test downloads a list from the web, or shows or opens a file through the desktop.
+     * A plugin whose filter list's client and address, whose file manager and whose Save Page As client are a test's
+     * (ruling F9 and plan 7's F15): no test downloads a list from the web, shows or opens a file through the desktop, or
+     * fetches a saved page's resources.
      *
      * @param filterClients makes the filter list's client through the HTTP proxy given, empty for the JDK's default, at
      *     its first download and after the proxy changes
      * @param filterAddress the filter list's address, from the settings
      * @param fileManagers makes the Downloads menu's file manager, at the start, from the plugin's background executor
-     *     and what hears its failures
+     *     and what hears its failures; Save Page As shows a saved folder with it too
+     * @param saveClients makes a Save Page As client through the HTTP proxy given, empty for the JDK's default, once a
+     *     save has its page's answer
      */
     BrowserPlugin(Function<Optional<InetSocketAddress>, HttpClient> filterClients, Function<BrowserSettings, URI> filterAddress,
-                  BiFunction<Executor, BiConsumer<String, String>, FileManager> fileManagers) {
+                  BiFunction<Executor, BiConsumer<String, String>, FileManager> fileManagers,
+                  Function<Optional<InetSocketAddress>, HttpClient> saveClients) {
         this.filterClients = filterClients;
         this.filterAddress = filterAddress;
         this.fileManagers = fileManagers;
+        this.saveClients = saveClients;
     }
 
     @Override public void start(PluginContext context) {
@@ -214,8 +222,9 @@ public class BrowserPlugin implements Plugin {
         // Spec section 10: and downloads'. Downloads is made with no I/O and no menu (plan 7's F35): its folder is read on
         // the background executor once a page first starts (F3), and its menu is made with the first download.
         NotificationGroup downloadsGroup = context.notifications().group(Downloads.GROUP);
-        var downloads = new Downloads(context, downloadsGroup, settings.downloadsFolder(), fileManagers.apply(context.background(),
-            (title, reason) -> EventQueue.invokeLater(() -> { if (running) downloadsGroup.error(title, reason); })));
+        FileManager files = fileManagers.apply(context.background(),
+            (title, reason) -> EventQueue.invokeLater(() -> { if (running) downloadsGroup.error(title, reason); }));
+        var downloads = new Downloads(context, downloadsGroup, settings.downloadsFolder(), files);
         this.downloads = downloads;
         // One set of hooks for the run (F20): the download handler is installed once, with these.
         Function<DownloadStart, Optional<DownloadTarget>> downloadStarts = downloads::before;
@@ -245,6 +254,9 @@ public class BrowserPlugin implements Plugin {
             page.start(engine, filters);
         });
         this.items = items;
+        // Plan 7's Task 7: Save Page As starts its chooser in the Downloads folder and shows the saved folder as Show does;
+        // each save makes its own client through the proxy as it is then.
+        items.useSaving(downloads::folder, files, saveClients);
         about.registerAction(WelcomePage.SETTINGS, () -> { if (running) items.showSettings(); });
         // Plan 6 Task 8: Settings › Tools › Browser is the Browser's own page: the declared rows by section, and the
         // persistent store's Clear Cookies, Clear Website Data and Manage Site Permissions. Making it opens nothing.

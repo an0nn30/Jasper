@@ -12,14 +12,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * The page's right-click menu for what is under the pointer (spec section 11), as the SDK's menu items: above Jasper's
  * pane items, Back, Forward and Reload over a bare page only, as in Chrome (P38), the link's items, the image's, then the
- * editing or selection items with Select All last; below them, Print… and Copy Page Title, then View Source, Remove
- * Element (plan 7's Task 6) and Inspect Element, a separator between groups. The link's and image's items include Save
+ * editing or selection items with Select All last; below them, Save Page As… (plan 7's Task 7), Print… and Copy Page Title,
+ * then View Source, Remove Element (plan 7's Task 6) and Inspect Element, a separator between groups. The link's and image's items include Save
  * Link As… and Save Image As… (plan 7's F10). Pure: no Chromium, no host.
  */
 class PageMenuItemsTest {
     private static final Optional<String> NONE = Optional.empty();
     private static final String PAGE = "https://example.com/";
-    private static final List<String> TRAILING = List.of("page-menu.print Print…", "page-menu.copy-title Copy Page Title", "---",
+    private static final List<String> TRAILING = List.of("page-menu.save-page Save Page As…", "page-menu.print Print…",
+        "page-menu.copy-title Copy Page Title", "---",
         "page-menu.view-source View Source", "page-menu.remove-element Remove Element", "page-menu.inspect-element Inspect Element");
 
     @Test void aBarePageGivesBackForwardAndReloadThenSelectAllAboveAndThePageItemsBelow() {
@@ -112,8 +113,8 @@ class PageMenuItemsTest {
     /** P39: Copy Page Title is disabled while the page has no title. */
     @Test void copyPageTitleIsDisabledOnAnUntitledPage() {
         var menu = PageMenuItems.of(new Context(true, true, NONE, NONE, NONE, false, "Google", PAGE, false, PAGE));
-        assertThat(lines(menu.trailing())).containsExactly("page-menu.print Print…", "page-menu.copy-title Copy Page Title (disabled)",
-            "---", "page-menu.view-source View Source", "page-menu.remove-element Remove Element",
+        assertThat(lines(menu.trailing())).containsExactly("page-menu.save-page Save Page As…", "page-menu.print Print…",
+            "page-menu.copy-title Copy Page Title (disabled)", "---", "page-menu.view-source View Source", "page-menu.remove-element Remove Element",
             "page-menu.inspect-element Inspect Element");
     }
 
@@ -218,6 +219,29 @@ class PageMenuItemsTest {
         assertThat(lines(PageMenuItems.of(new Context(true, true, NONE, NONE, NONE, false, "Google", "jasper-about:welcome", true,
             "jasper-about:welcome")).trailing())).as("the rest of the group stays").contains("page-menu.view-source View Source",
             "page-menu.remove-element Remove Element (disabled)", "page-menu.inspect-element Inspect Element");
+    }
+
+    /**
+     * Plan 7's Task 7 and F26: Save Page As… comes first in the group before View Source, before Print…, and is disabled
+     * where Jasper's page scripts never run, on Jasper's own pages and a challenge provider's, as its script could not.
+     */
+    @Test void savePageAsLeadsThePagesGroupAndIsDisabledWhereJaspersScriptsDoNotRun() {
+        assertThat(PageMenuItems.SAVE_PAGE).isEqualTo("page-menu.save-page");
+        for (var context : List.of(context(true, true, NONE, NONE, NONE, false), context(false, false, Optional.of("https://example.com/a"),
+            Optional.of("https://example.com/a.png"), Optional.of("text"), true)))
+            assertThat(groups(PageMenuItems.of(context).trailing()).getFirst()).containsExactly("page-menu.save-page Save Page As…",
+                "page-menu.print Print…", "page-menu.copy-title Copy Page Title");
+        for (String page : List.of("jasper-about:welcome", "JASPER-ABOUT:history",
+            "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/b/turnstile"))
+            assertThat(savePage(page)).as(page).isFalse();
+        for (String page : List.of(PAGE, "http://localhost:8080/", "file:///Users/ada/index.html", "about:blank"))
+            assertThat(savePage(page)).as(page).isTrue();
+    }
+
+    /** Whether Save Page As… is enabled in a page whose main frame shows {@code page}. */
+    private static boolean savePage(String page) {
+        return PageMenuItems.of(new Context(true, true, NONE, NONE, NONE, false, "Google", page, true, page)).trailing().stream()
+            .filter(item -> item.id().equals(PageMenuItems.SAVE_PAGE)).findFirst().orElseThrow().enabled();
     }
 
     /** Whether Remove Element is enabled over a frame at {@code frame} in a page whose main frame shows {@code page}. */

@@ -67,7 +67,8 @@ class PageMenuTest {
             assertThat(lines).startsWith("item:page-menu.open-link", "item:page-menu.copy-link", "item:page-menu.save-link", "---",
                 "item:page-menu.copy", "item:page-menu.search", "item:page-menu.select-all", "---", "host:Split");
             assertThat(lines).contains("host:Move Pane to Tab (disabled)", "host:Close Pane");
-            assertThat(lines).endsWith("host:Close Pane", "---", "item:page-menu.print", "item:page-menu.copy-title (disabled)", "---",
+            assertThat(lines).endsWith("host:Close Pane", "---", "item:page-menu.save-page", "item:page-menu.print",
+                "item:page-menu.copy-title (disabled)", "---",
                 "item:page-menu.view-source", "item:page-menu.remove-element", "item:page-menu.inspect-element");
             assertThat(ended).as("Chromium's menu ends once the menu closes").hasValue(0);
             assertThat(host.dismissContentMenu(item.tab())).isTrue();
@@ -339,7 +340,7 @@ class PageMenuTest {
             var inspected = new ArrayList<Point>();
             var page = new Page(URI.create(PAGE), () -> { }, PageTestAccess.noFavicons(), Runnable::run, PageContext.persistent());
             var place = new MenuPlace(tab((proxy, method, args) -> null), copied -> { }, () -> "Google", terms -> URI.create(PAGE),
-                () -> false, () -> { }, () -> { }, () -> { }, at -> { }, inspected::add);
+                () -> false, () -> { }, () -> { }, () -> { }, () -> { }, at -> { }, inspected::add);
             var pointed = new PageMenu.Pointed(new Point(40, 70), NONE, NONE, NONE, NONE, false, NONE);
             PageMenu.run(page, place, pointed, PAGE, PageMenuItems.INSPECT_ELEMENT);
             assertThat(inspected).containsExactly(new Point(40, 70));
@@ -356,11 +357,31 @@ class PageMenuTest {
             var inspected = new ArrayList<Point>();
             var page = new Page(URI.create(PAGE), () -> { }, PageTestAccess.noFavicons(), Runnable::run, PageContext.persistent());
             var place = new MenuPlace(tab((proxy, method, args) -> null), copied -> { }, () -> "Google", terms -> URI.create(PAGE),
-                () -> false, () -> { }, () -> { }, () -> { }, removed::add, inspected::add);
+                () -> false, () -> { }, () -> { }, () -> { }, () -> { }, removed::add, inspected::add);
             var pointed = new PageMenu.Pointed(new Point(40, 70), NONE, NONE, NONE, NONE, false, NONE);
             PageMenu.run(page, place, pointed, PAGE, PageMenuItems.REMOVE_ELEMENT);
             assertThat(removed).containsExactly(new Point(40, 70));
             assertThat(inspected).isEmpty();
+        });
+    }
+
+    /**
+     * Plan 7's Task 7: Save Page As… is its item's, which asks where and saves the page; over one of Jasper's own pages,
+     * which the main frame may have committed since the menu showed, it does nothing.
+     */
+    @Test void savePageAsIsTheItemsButNotOverJaspersOwnPages() throws Exception {
+        onUiThread(() -> {
+            var saved = new java.util.concurrent.atomic.AtomicInteger();
+            var page = new Page(URI.create(PAGE), () -> { }, PageTestAccess.noFavicons(), Runnable::run, PageContext.persistent());
+            var place = new MenuPlace(tab((proxy, method, args) -> null), copied -> { }, () -> "Google", terms -> URI.create(PAGE),
+                () -> false, () -> { }, () -> { }, saved::incrementAndGet, () -> { }, at -> { }, at -> { });
+            PageTestAccess.addressChanged(page, PAGE);
+            PageMenu.run(page, place, plain(), PAGE, PageMenuItems.SAVE_PAGE);
+            assertThat(saved).hasValue(1);
+            PageTestAccess.addressChanged(page, "jasper-about:welcome");
+            PageMenu.run(page, place, plain(), PAGE, PageMenuItems.SAVE_PAGE);
+            assertThat(saved).as("not on Jasper's own page").hasValue(1);
+            page.close();
         });
     }
 
@@ -574,7 +595,7 @@ class PageMenuTest {
     private static Page placed(ContentTab tab, List<String> copies) {
         var page = new Page(URI.create(PAGE), () -> { }, PageTestAccess.noFavicons(), Runnable::run, PageContext.persistent());
         page.setMenuPlace(new MenuPlace(tab, copies::add, () -> "Google", terms -> URI.create("https://google.com/search?q=" + terms),
-            page::canGoBack, page::back, page::reload, () -> { }, at -> { }, at -> { }));
+            page::canGoBack, page::back, page::reload, () -> { }, () -> { }, at -> { }, at -> { }));
         return page;
     }
 

@@ -12,8 +12,8 @@ import java.util.regex.Pattern;
  * items Jasper adds, in groups: over a bare page, Back, Forward and Reload, as in Chrome; with a link, Open Link in New
  * Tab, Copy Link and Save Link As…; with an image, Open Image in New Tab, Save Image As… and Copy Image Address, in
  * Chrome's order; then, in an editable field, Cut, Copy and Paste, or else, with a selection, Copy and Search with
- * ⟨engine⟩, and Select All last. Below them: Print… and Copy Page Title, then View Source, Remove Element and Inspect
- * Element. A separator parts each group from the next. Each item's id is what the menu reports when it is chosen, and
+ * ⟨engine⟩, and Select All last. Below them: Save Page As…, Print… and Copy Page Title, then View Source, Remove Element
+ * and Inspect Element. A separator parts each group from the next. Each item's id is what the menu reports when it is chosen, and
  * its action. It names no Chromium type.
  *
  * @param leading the items above Jasper's pane items
@@ -25,7 +25,8 @@ record PageMenuItems(List<MenuItem> leading, List<MenuItem> trailing) {
         COPY_IMAGE_ADDRESS = "page-menu.copy-image-address", CUT = "page-menu.cut", COPY = "page-menu.copy",
         PASTE = "page-menu.paste", SEARCH = "page-menu.search", SELECT_ALL = "page-menu.select-all", PRINT = "page-menu.print",
         COPY_TITLE = "page-menu.copy-title", VIEW_SOURCE = "page-menu.view-source", INSPECT_ELEMENT = "page-menu.inspect-element",
-        SAVE_LINK = "page-menu.save-link", SAVE_IMAGE = "page-menu.save-image", REMOVE_ELEMENT = "page-menu.remove-element";
+        SAVE_LINK = "page-menu.save-link", SAVE_IMAGE = "page-menu.save-image", REMOVE_ELEMENT = "page-menu.remove-element",
+        SAVE_PAGE = "page-menu.save-page";
     /** The most of a selection Search with searches for, as find cuts its query. */
     static final int LONGEST_SEARCH = 1_000;
     // The separators, each named by the group it comes before.
@@ -81,8 +82,8 @@ record PageMenuItems(List<MenuItem> leading, List<MenuItem> trailing) {
      * the frame could not open itself ({@link LinkSchemes#opensFrom}), as it opens with Jasper's rights; Save Link As…
      * and Save Image As… for what is neither a web address the frame could open nor a {@code data:} one
      * ({@link LinkSchemes#saves}, plan 7's D9), as they download with Jasper's rights; an editable field's Cut and Copy
-     * without a selection; Copy Page Title without a title; and Remove Element where Jasper's page scripts do not run, on
-     * one of Jasper's own pages or a challenge provider's ({@link Page#run}). Search with shows only for a selection that
+     * without a selection; Copy Page Title without a title; and Save Page As… and Remove Element where Jasper's page
+     * scripts do not run, on one of Jasper's own pages or a challenge provider's ({@link Page#run}, plan 7's F26). Search with shows only for a selection that
      * is not all white space.
      *
      * @param context what is under the pointer
@@ -111,9 +112,11 @@ record PageMenuItems(List<MenuItem> leading, List<MenuItem> trailing) {
         }
         editing.add(item(SELECT_ALL, "Select All", true));
         group(leading, BEFORE_EDITING, editing);
-        var trailing = new ArrayList<MenuItem>(List.of(item(PRINT, "Print…", true), item(COPY_TITLE, "Copy Page Title", context.titled())));
-        group(trailing, BEFORE_TOOLS, List.of(item(VIEW_SOURCE, "View Source", true),
-            item(REMOVE_ELEMENT, "Remove Element", Page.runsScriptsIn(context.page())), item(INSPECT_ELEMENT, "Inspect Element", true)));
+        boolean scripts = Page.runsScriptsIn(context.page());
+        var trailing = new ArrayList<MenuItem>(List.of(item(SAVE_PAGE, "Save Page As…", scripts), item(PRINT, "Print…", true),
+            item(COPY_TITLE, "Copy Page Title", context.titled())));
+        group(trailing, BEFORE_TOOLS, List.of(item(VIEW_SOURCE, "View Source", true), item(REMOVE_ELEMENT, "Remove Element", scripts),
+            item(INSPECT_ELEMENT, "Inspect Element", true)));
         return new PageMenuItems(leading, trailing);
     }
 

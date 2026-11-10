@@ -58,9 +58,10 @@ import org.cef.network.CefResponse;
  * a request's {@link Op op} says what it asks, and which of the page's frames may ask it. {@code favicon}, from
  * {@code detect-favicon.js}, tells the page the icon its document names (spec section 5); {@code find}, from
  * {@code find.js}, tells the page's find what a frame found, or the text selected there (spec section 10); and
- * {@code reader} and {@code distractions} go to the page's tools as the page sent them: from the {@code tools}
- * package's {@code reader.js}, what a check found and that the reader closed, and from its {@code distractions.js},
- * that distraction removal ended (plan 7).
+ * {@code reader}, {@code distractions} and {@code savePage} go to the page's tools as the page sent them: from the
+ * {@code tools} package's {@code reader.js}, what a check found and that the reader closed, from its
+ * {@code distractions.js}, that distraction removal ended, and from its {@code save-page.js}, the parts of Save Page
+ * As's snapshot, each within a message's limit (plan 7).
  *
  * <p>Every frame and every script of a page can call the page function, so each request is untrusted, and the bridge
  * keeps the limits Chromium would:
@@ -221,7 +222,9 @@ final class OpenerBridge {
         /** Reader mode's report: how much text a check found, or that the reader closed (plan 7). */
         READER("reader", false),
         /** Distraction removal's report: that it ended in the page (plan 7). */
-        DISTRACTIONS("distractions", false);
+        DISTRACTIONS("distractions", false),
+        /** A part of Save Page As's snapshot (plan 7's Task 7). */
+        SAVE_PAGE("savePage", false);
 
         private final String name;
         private final boolean subFrames;
@@ -412,7 +415,7 @@ final class OpenerBridge {
             case FOCUS -> focus(sender, request, nowMillis);
             case FAVICON -> favicon(sender, from, request);
             case FIND -> find(sender, from, request);
-            case READER, DISTRACTIONS -> toolReport(sender, op, text);
+            case READER, DISTRACTIONS, SAVE_PAGE -> toolReport(sender, op, text);
             case null -> MALFORMED_REQUEST;
         };
     }
@@ -678,9 +681,10 @@ final class OpenerBridge {
     }
 
     /**
-     * {@code reader} or {@code distractions}: what the page's tools script in its top frame reports, handed to the page's
-     * tools as the page sent it, within the bridge's request limit. Any script of the page could send it, so the tools take
-     * only their own shapes, and only for the check they ran last ({@code tools.PageTools}).
+     * {@code reader}, {@code distractions} or {@code savePage}: what the page's tools script in its top frame reports,
+     * handed to the page's tools as the page sent it, within the bridge's request limit. Any script of the page could send
+     * it, so the tools take only their own shapes, and only for the check or save they ran last ({@code tools.PageTools},
+     * {@code tools.SavePage}).
      */
     private static Answer toolReport(Party sender, Op op, String text) {
         sender.page().toolReported(op.name, text);

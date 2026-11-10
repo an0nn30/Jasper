@@ -23,7 +23,8 @@ class OfflinePluginsTest {
         Path classes = Path.of(OfflinePluginsTest.class.getProtectionDomain().getCodeSource().getLocation().toURI());
         assertThat(classes.resolve("dev/jasper/browser/BrowserPluginTest.class")).as("the scan sees the test classes").isRegularFile();
         assertThat(callers(classes, "()V")).isEmpty();
-        assertThat(callers(classes, "(Ljava/util/function/Function;Ljava/util/function/Function;Ljava/util/function/BiFunction;)V"))
+        assertThat(callers(classes, "(Ljava/util/function/Function;Ljava/util/function/Function;Ljava/util/function/BiFunction;"
+            + "Ljava/util/function/Function;)V"))
             .as("the scan sees calls of the seam")
             .contains("dev/jasper/browser/OfflinePlugins.class");
     }
@@ -32,6 +33,7 @@ class OfflinePluginsTest {
         assertThat(OfflinePlugins.plugin()).isNotNull();
         assertThat(OfflinePlugins.clientsAsked()).as("no test asked for a client").isZero();
         assertThat(dev.jasper.browser.downloads.DownloadsTestAccess.filesUsed()).as("no test showed or opened a file").isZero();
+        assertThat(OfflinePlugins.saveClientsAsked()).as("no test fetched a saved page's resources").isZero();
     }
 
     /** Each test class that calls the plugin's constructor of {@code descriptor}. */

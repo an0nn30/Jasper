@@ -183,4 +183,36 @@ class ToolScriptsTest {
         assertThat(ToolScripts.distractions().chars().filter(c -> (c < 0x20 && c != '\n') || c >= 0x7F)).isEmpty();
         assertThat(ToolScripts.distractions()).startsWith("/*").endsWith("})\n");
     }
+
+    /**
+     * Task 7's {@code save-page.js}: called with the save's prefix as one string literal; a prefix of no save is refused,
+     * so nothing the page could write reaches the call. It needs no Readability and makes no style element.
+     */
+    @Test void savePageCallsSavePageJsWithThePrefix() {
+        assertThat(ToolScripts.SAVE_PAGE_URL).isEqualTo("jasper-about:save-page.js");
+        assertThat(ToolScripts.savePage("jasper-save-0123456789abcdef-"))
+            .isEqualTo(ToolScripts.savePageScript() + "\n(\"jasper-save-0123456789abcdef-\");");
+        for (String bad : new String[] {"", "jasper-save-0123456789abcdef", "jasper-save-0123456789ABCDEF-", "\");alert(1);(\""})
+            assertThatThrownBy(() -> ToolScripts.savePage(bad)).as(bad).isInstanceOf(IllegalArgumentException.class);
+        assertThat(ToolScripts.savePageScript()).doesNotContain("Arc90").doesNotContainIgnoringCase("<style")
+            .doesNotContainIgnoringCase("createElement('style'").doesNotContain("innerHTML", "insertAdjacentHTML", "document.write");
+    }
+
+    /**
+     * Task 7's F27, as far as Java can see it: the snapshot is a copy of the document, whose references become the
+     * prefix's tokens, each ending with {@code -}; base, charset and CSP declarations go and a UTF-8 charset comes first;
+     * an element with a token loses integrity and crossorigin; the answer goes in parts bounded by their JSON length,
+     * one at a time, at most 64. The stub harness and Task 9 check the behaviour.
+     */
+    @Test void savePageJsTakesACopyAndSendsItInParts() {
+        assertThat(ToolScripts.savePageScript()).contains("Symbol.for('dev.jasper.browser.save-page')", "op: 'savePage'", "save: prefix",
+            "part: at", "parts: count", "const LIMIT = 1048576;", "const MOST_PARTS = 64;", "apply(cloneNode, page, [true])",
+            "prefix + 'r' + number + '-'", "prefix + 's' + (styles.length - 1) + '-'", "prefix + 'a' + (attributes.length - 1) + '-'",
+            "'content-security-policy'", "'content-type'", "'base, meta[charset], meta[http-equiv]'", "['charset', 'utf-8']",
+            "['integrity']", "['crossorigin']", "onSuccess()", "const BUSY = 5", "/^jasper-save-[0-9a-f]{16}-$/",
+            "apply(setUser, url, [''])", "apply(setPassword, url, [''])");
+        assertThat(ToolScripts.savePageScript().chars().filter(c -> (c < 0x20 && c != '\n') || c >= 0x7F)).isEmpty();
+        assertThat(ToolScripts.savePageScript()).startsWith("/*").endsWith("})\n");
+        assertThat(SavePayload.PART_LIMIT).as("the bridge's 1 MiB message, which the parts keep to").isEqualTo(1 << 20);
+    }
 }

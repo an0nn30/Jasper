@@ -5,8 +5,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 
 /**
- * The {@code downloads} package's seams for the plugin's tests in other packages (ruling F15): a file manager that
- * reaches no desktop and starts no process.
+ * The {@code downloads} package's seams for the plugin's tests in other packages (ruling F15): file managers that reach
+ * no desktop and start no process.
  */
 public final class DownloadsTestAccess {
     private static final AtomicInteger USED = new AtomicInteger();
@@ -23,6 +23,18 @@ public final class DownloadsTestAccess {
     public static FileManager refusingFiles(Executor background, BiConsumer<String, String> failed) {
         return new FileManager(background, failed, System.getProperty("os.name", ""), action -> refused(), (action, file) -> refused(),
             command -> refused());
+    }
+
+    /**
+     * A file manager whose desktop and processes record what they were asked, as macOS's would be asked, and run nothing.
+     *
+     * @param background where it shows and opens files
+     * @param asked hears each request as {@code ACTION path}, and each failure as {@code failed title: reason}
+     * @return the file manager
+     */
+    public static FileManager recordingFiles(Executor background, java.util.List<String> asked) {
+        return new FileManager(background, (title, reason) -> asked.add("failed " + title + ": " + reason), "Mac OS X", action -> true,
+            (action, file) -> asked.add(action + " " + file), command -> asked.add(String.join(" ", command)));
     }
 
     /**

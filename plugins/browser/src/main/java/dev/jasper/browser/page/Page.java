@@ -1677,8 +1677,13 @@ public final class Page implements AutoCloseable {
         return iconFetch != null;
     }
 
-    /** Which document the main frame shows, counted by its load starts. */
-    long document() {
+    /**
+     * Which document the main frame shows, counted by its load starts: what changed since a count was read tells a load
+     * start came in between, as Save Page As checks after its chooser (plan 7's F26). UI thread.
+     *
+     * @return the count
+     */
+    public long document() {
         return document;
     }
 

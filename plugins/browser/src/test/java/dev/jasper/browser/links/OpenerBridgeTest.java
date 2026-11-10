@@ -751,6 +751,30 @@ class OpenerBridgeTest {
         });
     }
 
+    /**
+     * Plan 7's Task 7: {@code savePage}, a part of Save Page As's answer from {@code save-page.js}, reaches the page's tools
+     * as the page sent it, from the top frame alone; a sub-frame's is refused on Chromium's thread and the UI thread. A part
+     * may be as long as a message of the bridge's limit, 1 MiB of JSON.
+     */
+    @Test void aSavePagePartFromTheTopFrameReachesThePagesTools() throws Exception {
+        onUiThread(() -> {
+            var page = new Document(APP);
+            var told = new java.util.ArrayList<String>();
+            page.page.onToolReport((op, json) -> told.add(op + " " + json.length()));
+            String part = "{\"op\":\"savePage\",\"save\":\"jasper-save-0123456789abcdef-\",\"part\":0,\"parts\":1,\"text\":\""
+                + "x".repeat(OpenerBridge.MESSAGE_LIMIT - 2) + "\"}";
+            assertThat(bridge.admit(page.page, true, part)).as("admitted on Chromium's thread").isEmpty();
+            bridge.settled(page.page, true);
+            Answer answer = ask(page, part);
+            assertThat(answer.ok()).as(answer.toString()).isTrue();
+            assertThat(told).containsExactly("savePage " + part.length());
+            assertThat(bridge.admit(page.page, false, part)).as("a sub-frame's, on Chromium's thread")
+                .hasValueSatisfying(refused -> assertThat(refused.code()).isEqualTo(OpenerBridge.REFUSED));
+            assertThat(bridge.request(page.party(), false, APP, part, NOW).code()).as("a sub-frame's").isEqualTo(OpenerBridge.REFUSED);
+            assertThat(told).hasSize(1);
+        });
+    }
+
     @Test void aRequestIsReadAsStrictJson() {
         assertThat(BridgeJson.object(" { \"op\" : \"post\" , \"data\" : \"a\\\"b\\\\c\\/d\\b\\f\\n\\r\\t\\u00e9\\uD83D\\uDE00\" , \"x\" : true , \"y\" : false } "))
             .hasValueSatisfying(members -> assertThat(members).containsExactly(java.util.Map.entry("op", "post"),
