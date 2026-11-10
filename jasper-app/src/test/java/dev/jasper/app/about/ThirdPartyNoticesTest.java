@@ -82,6 +82,25 @@ class ThirdPartyNoticesTest {
         assertThat(files.toList()).containsExactly("dev.jasper.browser/dev/jasper/browser/third_party/mermaid.min.js");
     }
 
+    /**
+     * Browser plan 7's Task 5: the Browser ships {@code @mozilla/readability} 0.6.0's {@code Readability.js} unmodified,
+     * listed in the component's files, with the Apache License 2.0's text; it has no NOTICE file.
+     */
+    @Test void readabilityIsListedWithItsFileAndItsApacheLicense() {
+        var readability = ThirdPartyNotices.thirdParty().stream().filter(c -> c.name().equals("Readability.js")).findFirst().orElseThrow();
+        assertThat(readability.title()).isEqualTo("Readability.js 0.6.0");
+        assertThat(readability.license()).isEqualTo("Apache-2.0");
+        assertThat(readability.homepage()).isEqualTo("https://github.com/mozilla/readability");
+        assertThat(readability.modules()).isEmpty();
+        assertThat(readability.notice()).isEmpty();
+        assertThat(readability.text()).isEqualTo("apache-2.0.txt");
+        assertThat(ThirdPartyNotices.read(readability.text())).contains("Apache License", "Version 2.0, January 2004");
+        var table = Toml.parse(ThirdPartyNotices.read("notices.toml")).getArrayOrEmpty("component");
+        var files = IntStream.range(0, table.size()).mapToObj(table::getTable)
+            .filter(component -> "Readability.js".equals(component.getString("name"))).findFirst().orElseThrow().getArrayOrEmpty("files");
+        assertThat(files.toList()).containsExactly("dev.jasper.browser/dev/jasper/browser/third_party/Readability.js");
+    }
+
     @Test void jasperComesFirstThenTheRestByNameIgnoringCase() {
         var listed = ThirdPartyNotices.listed("1.2.0 + 14 commits");
         assertThat(listed.getFirst().title()).isEqualTo("Jasper 1.2.0 + 14 commits");

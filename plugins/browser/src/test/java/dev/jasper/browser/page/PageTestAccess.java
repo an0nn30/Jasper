@@ -196,6 +196,17 @@ public final class PageTestAccess {
     }
 
     /**
+     * Has {@code page} run the scripts asked of it ({@link Page#run}) with {@code runner} from now on, which is told each
+     * script and the address it goes by: a test's recording one, as a page without Chromium runs nothing. UI thread.
+     *
+     * @param page a page
+     * @param runner told each script and its address
+     */
+    public static void useScriptRunner(Page page, java.util.function.BiConsumer<String, String> runner) {
+        page.useScriptRunner(runner);
+    }
+
+    /**
      * Has {@code page} load {@code about:blank} in its browser with {@code blank}, and close its browser with
      * {@code close}, from now on, each told the page: a test's recording ones, as a page without Chromium has no browser
      * to load or close. UI thread.

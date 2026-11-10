@@ -90,10 +90,14 @@ public final class Page implements AutoCloseable {
         page -> page.pageText().map(PageText::selectedText).orElseGet(() -> CompletableFuture.completedFuture(new Selection.None()));
     // Given the page, runs Chromium's copy in its focused frame; or a test's.
     private Consumer<Page> copier = page -> page.onFocusedFrame(CefFrame::copy);
+    // Given a script and the address it goes by, runs it in the page's main frame: through its browser, or a test's.
+    private BiConsumer<String, String> scriptRunner = this::runInMainFrame;
     // The page's text insertion and selection reads through its browser's DevTools, made the first time either is asked
     // for once the browser is ready; null before.
     private PageText pageText;
     private final List<Consumer<String>> loadStarts = new CopyOnWriteArrayList<>();
+    private final List<Runnable> loadEnds = new CopyOnWriteArrayList<>();
+    private final List<BiConsumer<String, String>> toolReports = new CopyOnWriteArrayList<>();
     private final List<Runnable> selectionGestures = new CopyOnWriteArrayList<>();
     private final List<BiConsumer<String, Reached>> visits = new CopyOnWriteArrayList<>();
     private final List<Consumer<NavigationButton>> navigationButtons = new CopyOnWriteArrayList<>();
@@ -830,6 +834,64 @@ public final class Page implements AutoCloseable {
     }
 
     /**
+     * Tells {@code listener} each time the page's main frame finishes loading its document, as Chromium reports the
+     * load's end ({@link #documentLoaded}).
+     *
+     * @param listener told on the UI thread
+     * @return the registration; the page's close ends it
+     */
+    public Subscription onLoadEnd(Runnable listener) {
+        Objects.requireNonNull(listener, "listener");
+        if (closed) return () -> { };
+        loadEnds.add(listener);
+        return () -> loadEnds.remove(listener);
+    }
+
+    /**
+     * Tells {@code listener} each report the page's tools' scripts send through the {@code links} package's opener bridge
+     * from the page's top frame (plan 7: {@code reader.js}'s and {@code distractions.js}'s), as {@link #toolReported}
+     * hands them on. Any script of the page can send one, so each is untrusted.
+     *
+     * @param listener told the bridge op and the request as the page sent it, a JSON object, on the UI thread
+     * @return the registration; the page's close ends it
+     */
+    public Subscription onToolReport(BiConsumer<String, String> listener) {
+        Objects.requireNonNull(listener, "listener");
+        if (closed) return () -> { };
+        toolReports.add(listener);
+        return () -> toolReports.remove(listener);
+    }
+
+    /**
+     * The page's top frame sent a report of its tools through the opener bridge, which has checked only its op and
+     * length: those who asked {@link #onToolReport} are told. Nothing after {@link #close()}. UI thread.
+     *
+     * @param op the bridge op, such as {@code reader}
+     * @param json the request, as the page sent it
+     */
+    public void toolReported(String op, String json) {
+        Objects.requireNonNull(op, "op");
+        Objects.requireNonNull(json, "json");
+        if (closed) return;
+        for (BiConsumer<String, String> listener : toolReports) listener.accept(op, json);
+    }
+
+    /**
+     * Runs {@code script}, which Jasper wrote, in the document the page's main frame shows now, under the name
+     * {@code url} in the page's console and stack traces, then releases the frame: as the {@code tools} package's page
+     * scripts run. Nothing before the page's browser is ready, after {@link #close()}, or in a main frame at a challenge
+     * provider's address ({@link ChallengeFrames}), which Jasper's page scripts stay out of.
+     *
+     * @param script the script
+     * @param url the address it goes by, such as {@code jasper-about:reader.js}
+     */
+    public void run(String script, String url) {
+        Objects.requireNonNull(script, "script");
+        Objects.requireNonNull(url, "url");
+        if (!closed) scriptRunner.accept(script, url);
+    }
+
+    /**
      * Tells {@code listener} each time the page's main frame starts loading a document, as {@link #onLoadStart} does, with
      * how the load reached it: each of the page's visits, for its item's history.
      *
@@ -1198,6 +1260,8 @@ public final class Page implements AutoCloseable {
         // answer when its browser may close.
         CompletableFuture<Void> held = downloadState.held(this);
         loadStarts.clear();
+        loadEnds.clear();
+        toolReports.clear();
         selectionGestures.clear();
         view.endSelectionGestures();
         visits.clear();
@@ -1237,6 +1301,21 @@ public final class Page implements AutoCloseable {
         if (frame == null) return;
         try {
             command.accept(frame);
+        } finally {
+            frame.dispose();
+        }
+    }
+
+    /**
+     * Runs {@code script} in the main frame of the page's browser, then releases only this handle to the frame; nothing
+     * before the browser is ready, and nothing in a challenge provider's frame.
+     */
+    private void runInMainFrame(String script, String url) {
+        PageBrowser ready = readyBrowser();
+        CefFrame frame = ready == null ? null : ready.getMainFrame();
+        if (frame == null) return;
+        try {
+            if (frame.isValid() && !ChallengeFrames.is(frame.getURL())) frame.executeJavaScript(script, url, 0);
         } finally {
             frame.dispose();
         }
@@ -1339,6 +1418,7 @@ public final class Page implements AutoCloseable {
         if (closed) return;
         documentLoaded = true;
         readHistory();
+        for (Runnable listener : loadEnds) listener.run();
     }
 
     /**
@@ -1444,6 +1524,11 @@ public final class Page implements AutoCloseable {
     /** Has the page load again with {@code replacement} from now on, as a test's recording one. */
     void useReloader(Consumer<Page> replacement) {
         reloader = Objects.requireNonNull(replacement, "replacement");
+    }
+
+    /** Has the page run the scripts asked of it ({@link #run}) with {@code replacement} from now on, as a test's recording one. */
+    void useScriptRunner(BiConsumer<String, String> replacement) {
+        scriptRunner = Objects.requireNonNull(replacement, "replacement");
     }
 
     /** Has the page press Return with {@code replacement} from now on, as a test's recording one. */

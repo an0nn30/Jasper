@@ -724,6 +724,33 @@ class OpenerBridgeTest {
         });
     }
 
+    /**
+     * Plan 7's Task 5: {@code reader} and {@code distractions}, from {@code reader.js} and {@code distractions.js}, reach
+     * the page's tools as the page script sent them, op and text, for its item to judge; a sub-frame's are refused, on
+     * Chromium's thread and the UI thread, as those scripts live in the top frame alone; and none reaches a closed page.
+     */
+    @Test void aToolReportFromTheTopFrameReachesThePagesTools() throws Exception {
+        onUiThread(() -> {
+            var page = new Document(APP);
+            var told = new java.util.ArrayList<String>();
+            page.page.onToolReport((op, json) -> told.add(op + " " + json));
+            String reader = "{\"op\":\"reader\",\"check\":1,\"length\":42}", off = "{\"op\":\"distractions\",\"check\":1,\"state\":\"off\"}";
+            Answer answer = ask(page, reader);
+            assertThat(answer.ok()).as(answer.toString()).isTrue();
+            assertThat(answer.text()).isEmpty();
+            assertThat(ask(page, off).ok()).isTrue();
+            assertThat(told).containsExactly("reader " + reader, "distractions " + off);
+            assertThat(bridge.admit(page.page, false, reader)).as("a sub-frame's, on Chromium's thread")
+                .hasValueSatisfying(refused -> assertThat(refused.code()).isEqualTo(OpenerBridge.REFUSED));
+            assertThat(bridge.request(page.party(), false, APP, off, NOW).code()).as("a sub-frame's").isEqualTo(OpenerBridge.REFUSED);
+            assertThat(told).hasSize(2);
+            assertThat(page.scripts).isEmpty();
+            page.page.close();
+            ask(page, reader);
+            assertThat(told).as("a closed page's tools hear nothing").hasSize(2);
+        });
+    }
+
     @Test void aRequestIsReadAsStrictJson() {
         assertThat(BridgeJson.object(" { \"op\" : \"post\" , \"data\" : \"a\\\"b\\\\c\\/d\\b\\f\\n\\r\\t\\u00e9\\uD83D\\uDE00\" , \"x\" : true , \"y\" : false } "))
             .hasValueSatisfying(members -> assertThat(members).containsExactly(java.util.Map.entry("op", "post"),

@@ -104,7 +104,10 @@ import javax.swing.JComponent;
  * panel are the store's, and so are the certificates it goes on past; and the links and popups its page opens in items
  * of their own open in the same store, so a /dev/null item's stay in its group. An item its page opened that way closes
  * when its first navigation becomes a download, before it shows any document, as Chrome closes such a tab, while the
- * download keeps its browser (plan 7's F28); one the user opened never does. UI thread.
+ * download keeps its browser (plan 7's F28); one the user opened never does. Its menu button's first group is its page's
+ * tools ({@link PageToolsHost}): Reader Mode and Remove Distractions, offered once a check of the page's document finds
+ * more than 10 characters of reader text, and Reader Mode lays the article over the page in the theme's colours until
+ * Exit Reader Mode, Escape in the page or the page's next load (spec section 10). UI thread.
  */
 public final class BrowserItem implements AutoCloseable {
     static final String ROOT = "browser", PAGE = "browser.page", CONTENT = "browser.page.content";
@@ -135,6 +138,8 @@ public final class BrowserItem implements AutoCloseable {
     private final Subscription bookmarksChanged, visitsChanged;
     // The menu's privacy group, which follows the store's permissions until the item closes.
     private final PrivacyMenu privacy;
+    // The page's tools, reader mode first, whose group leads the menu (plan 7's F38).
+    private final PageToolsHost pageTools;
     // Answers the page's camera, microphone and notification requests until the item closes or the plugin stops.
     private final SitePermissions sitePermissions;
     // The plugin's pages' notifications, which the page's go to.
@@ -195,6 +200,7 @@ public final class BrowserItem implements AutoCloseable {
         page.onSelectionGesture(this::selectionFinished);
         errors = new ErrorPages(page, store.allowance(), this::load);
         privacy = new PrivacyMenu(store, items, errors::address, this::reloadForPermissions, page);
+        pageTools = new PageToolsHost(page, items.context().appearance(), () -> this.zoom, items::later, this::render);
         sitePermissions = new SitePermissions(page, store, items::closed);
         // The page's notifications are Jasper's, in the item's window, until it closes; a new document's names are its own.
         // A /dev/null item shows none, as Chrome's Incognito (ruling V20).
@@ -211,7 +217,9 @@ public final class BrowserItem implements AutoCloseable {
         view = items.context().kit().create(spec(), this::event);
         view.registerContent(new CustomContent(CONTENT, Nodes.CustomKind.PREVIEW, page.view(), page));
         page.view().addHierarchyListener(event -> {
-            if ((event.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0 && page.view().isShowing()) shown();
+            if ((event.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) == 0 || !page.view().isShowing()) return;
+            shown();
+            pageTools.shown();
         });
         // The item draws again as the bookmarks change, and as the visits do while something is typed, for the field's list.
         bookmarksChanged = stores.bookmarkIndex().onChanged(this::render);
@@ -272,6 +280,7 @@ public final class BrowserItem implements AutoCloseable {
             bookmarksChanged.close();
             visitsChanged.close();
             privacy.close();
+            pageTools.close();
             view.close();
             throw failure;
         }
@@ -695,6 +704,7 @@ public final class BrowserItem implements AutoCloseable {
         bookmarksChanged.close();
         visitsChanged.close();
         privacy.close();
+        pageTools.close();
         sitePermissions.close();
         endSuggestions();
         sources.close();
@@ -856,10 +866,11 @@ public final class BrowserItem implements AutoCloseable {
                 endWait();
                 page.focus();
             }
-            // A Reset item or Unmute Current Page of the menu, an answer of the audio bar, or an entry of Back's or
-            // Forward's hold menu.
+            // A Reset item or Unmute Current Page of the menu, an answer of the audio bar, a page tool of the menu, or an
+            // entry of Back's or Forward's hold menu.
             default -> {
-                if (!privacy.choose(action)) NavigationHistory.entryId(action).ifPresent(page::goToHistoryEntry);
+                if (!privacy.choose(action) && !pageTools.choose(action))
+                    NavigationHistory.entryId(action).ifPresent(page::goToHistoryEntry);
             }
         }
     }
@@ -991,8 +1002,8 @@ public final class BrowserItem implements AutoCloseable {
     }
 
     private ViewSpec spec() {
-        Nodes.Node bar = toolbar.node(shown(errors.address()), page.loading(), errors.canGoBack(), page.canGoForward(), icon(),
-            page.history(), items.settings(), errors.notSecure(), store.devNull(),
+        Nodes.Node bar = toolbar.node(pageTools.group(), shown(errors.address()), page.loading(), errors.canGoBack(), page.canGoForward(),
+            icon(), page.history(), items.settings(), errors.notSecure(), store.devNull(),
             store.devNull() ? Optional.empty() : Optional.of(stores.bookmarkIndex().has(errors.address())), privacy.group());
         // A waiting item keeps the canvas's slot, hidden: a slot that leaves the view closes its content, the page.
         Nodes.Node canvas = new Nodes.Custom(PAGE, waiting ? HIDDEN : ControlState.READY, CONTENT, Nodes.CustomKind.PREVIEW, "Web page");
