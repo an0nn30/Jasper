@@ -330,7 +330,7 @@ opens in the [Jasper Editor](editor.md#opening-files), or is revealed in the fil
 and each folder as a terminal tab, in the most recently active window
 ([one Jasper per home](command-line.md#one-jasper-per-home)). `verifyPackage` checks the key.
 
-The app also declares the source and text types of its file-type catalogue (`file-types.tsv`) in a third document type, ranked `Alternate`, with `UTImportedTypeDeclarations` for the types macOS lacks (Kotlin, Go, Rust, TypeScript and TOML); installing Jasper makes it the default for none of them.
+The app also declares the source and text types of its file-type catalogue (`file-types.tsv`) in a third document type, ranked `Alternate`, with `UTImportedTypeDeclarations` for the types macOS lacks (Kotlin, Go, Rust and TOML); installing Jasper makes it the default for none of them.
 
 ### macOS web links
 
