@@ -51,9 +51,11 @@ record PageMenuItems(List<MenuItem> leading, List<MenuItem> trailing) {
      * @param engineName the search engine's name, as Search with says it
      * @param frame the address of the frame the pointer is in, which decides what its link or image may open
      * @param titled whether the page has a title
+     * @param page the address of the document the page's main frame shows, which decides whether Jasper's page scripts
+     *     run there ({@link Page#run})
      */
     record Context(boolean canBack, boolean canForward, Optional<String> link, Optional<String> image, Optional<String> selection,
-                   boolean editable, String engineName, String frame, boolean titled) {
+                   boolean editable, String engineName, String frame, boolean titled, String page) {
         /** Rejects nulls; an empty address or selection is none. */
         Context {
             link = present(link, "link");
@@ -61,6 +63,7 @@ record PageMenuItems(List<MenuItem> leading, List<MenuItem> trailing) {
             selection = present(selection, "selection");
             Objects.requireNonNull(engineName, "engineName");
             Objects.requireNonNull(frame, "frame");
+            Objects.requireNonNull(page, "page");
         }
 
         /** Whether the pointer is over the page itself: no link, image, selection or editable field. */
@@ -78,8 +81,9 @@ record PageMenuItems(List<MenuItem> leading, List<MenuItem> trailing) {
      * the frame could not open itself ({@link LinkSchemes#opensFrom}), as it opens with Jasper's rights; Save Link As…
      * and Save Image As… for what is neither a web address the frame could open nor a {@code data:} one
      * ({@link LinkSchemes#saves}, plan 7's D9), as they download with Jasper's rights; an editable field's Cut and Copy
-     * without a selection; and Copy Page Title without a title. Search with shows only for a selection that is not all
-     * white space.
+     * without a selection; Copy Page Title without a title; and Remove Element where Jasper's page scripts do not run, on
+     * one of Jasper's own pages or a challenge provider's ({@link Page#run}). Search with shows only for a selection that
+     * is not all white space.
      *
      * @param context what is under the pointer
      * @return the items above and below Jasper's pane items
@@ -108,8 +112,8 @@ record PageMenuItems(List<MenuItem> leading, List<MenuItem> trailing) {
         editing.add(item(SELECT_ALL, "Select All", true));
         group(leading, BEFORE_EDITING, editing);
         var trailing = new ArrayList<MenuItem>(List.of(item(PRINT, "Print…", true), item(COPY_TITLE, "Copy Page Title", context.titled())));
-        group(trailing, BEFORE_TOOLS, List.of(item(VIEW_SOURCE, "View Source", true), item(REMOVE_ELEMENT, "Remove Element", true),
-            item(INSPECT_ELEMENT, "Inspect Element", true)));
+        group(trailing, BEFORE_TOOLS, List.of(item(VIEW_SOURCE, "View Source", true),
+            item(REMOVE_ELEMENT, "Remove Element", Page.runsScriptsIn(context.page())), item(INSPECT_ELEMENT, "Inspect Element", true)));
         return new PageMenuItems(leading, trailing);
     }
 

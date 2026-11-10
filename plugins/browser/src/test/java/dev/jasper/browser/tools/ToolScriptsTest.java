@@ -176,6 +176,10 @@ class ToolScriptsTest {
             "['pointerup', onPress, true]", "['mousedown', onPress, true]", "['mouseup', onPress, true]", "['click', onClick, true]",
             "['keydown', onKeyDown, true]", "['pagehide', onPageHide, true]", "stopImmediatePropagation", "preventDefault",
             "Symbol.for('dev.jasper.browser.reader')", "const COVERING = 0.9;");
+        // Task 6's review: one pointer click hides (D34); Escape's keyup and repeats stop at the window after it ends; a
+        // hidden cookie wall leaves no scroll lock (D35).
+        assertThat(ToolScripts.distractions()).contains("getter(UiEvents, 'detail')", "getter(KeyEvents, 'repeat')",
+            "['keyup', onKeyUp, true]", "['overflow-y', 'visible', 'important']", "'clip'");
         assertThat(ToolScripts.distractions().chars().filter(c -> (c < 0x20 && c != '\n') || c >= 0x7F)).isEmpty();
         assertThat(ToolScripts.distractions()).startsWith("/*").endsWith("})\n");
     }

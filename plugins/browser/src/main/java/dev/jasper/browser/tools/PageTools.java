@@ -257,13 +257,14 @@ public final class PageTools implements AutoCloseable {
 
     /**
      * The tools' items, first in the menu: Reader Mode, or Exit Reader Mode while it is on; Remove Distractions, or Exit
-     * Distraction Removal while it is on; then a separator. None while the offer does not stand and no mode is on.
+     * Distraction Removal while it is on; then a separator. None while the offer does not stand and no mode is on. Reader
+     * Mode is disabled while distraction removal outlives a withdrawn offer, as it would show nothing then.
      *
      * @return the items, each item's id its action
      */
     public List<MenuItem> menuItems() {
         if (!offered && !reading && !removing) return List.of();
-        return List.of(new MenuItem(READER, reading ? "Exit Reader Mode" : "Reader Mode", "", READER, true, false),
+        return List.of(new MenuItem(READER, reading ? "Exit Reader Mode" : "Reader Mode", "", READER, offered || reading, false),
             new MenuItem(DISTRACTIONS, removing ? "Exit Distraction Removal" : "Remove Distractions", "", DISTRACTIONS, true, false),
             SEPARATOR);
     }

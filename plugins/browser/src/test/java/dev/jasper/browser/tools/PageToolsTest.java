@@ -483,6 +483,31 @@ class PageToolsTest {
         assertThat(tools.removing()).isFalse();
     }
 
+    /**
+     * Task 6's review, minor 4: Reader Mode's item is enabled while the offer stands or the reader shows; while
+     * distraction removal outlives an offer an address change withdrew, it shows disabled, as it would show nothing, until
+     * the settled check offers again. Remove Distractions' item is enabled whenever the items show.
+     */
+    @Test void readerModeIsEnabledOnlyWhileItCanShowOrHide() {
+        offer();
+        assertThat(enabled()).containsExactly(true, true, true);
+        tools.toggleDistractions();
+        tools.addressChanged(ARTICLE + "?section=2");
+        assertThat(labels()).containsExactly("Reader Mode", "Exit Distraction Removal", "");
+        assertThat(enabled()).containsExactly(false, true, true);
+        int ran = scripts.size();
+        tools.toggleReader();
+        assertThat(scripts).as("the disabled item does nothing").hasSize(ran);
+        end();
+        length(2, 400);
+        assertThat(enabled()).as("offered again").containsExactly(true, true, true);
+        tools.toggleReader();
+        assertThat(tools.reading()).isTrue();
+        tools.addressChanged(ARTICLE + "?section=3");
+        assertThat(labels()).containsExactly("Exit Reader Mode", "Remove Distractions", "");
+        assertThat(enabled()).as("while reading, the offer withdrawn").containsExactly(true, true, true);
+    }
+
     /** Without the items, as before any check or on one of Jasper's pages, the toggle starts nothing. */
     @Test void theDistractionsToggleDoesNothingWithoutTheItems() {
         tools.toggleDistractions();
@@ -577,6 +602,10 @@ class PageToolsTest {
 
     private List<String> labels() {
         return tools.menuItems().stream().map(MenuItem::label).toList();
+    }
+
+    private List<Boolean> enabled() {
+        return tools.menuItems().stream().map(MenuItem::enabled).toList();
     }
 
     private Runnable later(Duration delay, Runnable task) {

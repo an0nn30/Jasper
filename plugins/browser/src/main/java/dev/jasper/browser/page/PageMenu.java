@@ -172,7 +172,7 @@ final class PageMenu {
         try {
             PageMenuItems items = PageMenuItems.of(new PageMenuItems.Context(place.canGoBack().getAsBoolean(), page.canGoForward(),
                 pointed.link(), pointed.image(), pointed.selection(), pointed.editable(), place.engineName().get(), from,
-                !page.title().isEmpty()));
+                !page.title().isEmpty(), page.committedAddress()));
             Point at = pointed.at();
             SwingUtilities.convertPointToScreen(at, page.view());
             place.tab().showContextMenu(at, items.leading(), items.trailing(), chosen -> {

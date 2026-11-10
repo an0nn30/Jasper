@@ -365,6 +365,25 @@ class PageMenuTest {
     }
 
     /**
+     * Task 6's review, minor 5: over one of Jasper's own pages, which the page's main frame committed, Remove Element is
+     * disabled, and over a web page enabled again.
+     */
+    @Test void removeElementIsDisabledOverJaspersOwnPages() throws Exception {
+        onUiThread(() -> {
+            open();
+            PageTestAccess.addressChanged(page, "jasper-about:welcome");
+            show(plain());
+            assertThat(host.contentMenu(item.tab())).contains("item:page-menu.remove-element (disabled)", "item:page-menu.view-source");
+            assertThat(host.chooseFromContentMenu(item.tab(), "item:page-menu.remove-element")).isFalse();
+            assertThat(host.dismissContentMenu(item.tab())).isTrue();
+            PageTestAccess.addressChanged(page, PAGE + "/");
+            show(plain());
+            assertThat(host.contentMenu(item.tab())).contains("item:page-menu.remove-element");
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
      * Plan 7's Task 6: chosen from the menu over an item's page, Remove Element ends Chromium's menu and runs
      * {@code distractions.js}'s removeAt in the page at the menu's point, in CSS pixels at the item's zoom.
      */

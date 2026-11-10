@@ -10,20 +10,26 @@
  *   overlay under the pointer is outlined in red, through its own inline outline, set with the important priority,
  *   whose earlier values come back as the pointer moves on. A press, release or click of the pointer stops at the
  *   window's capture listeners and is prevented, so neither the page's own handlers nor a link hears it, except the
- *   secondary button's, whose right-click menu goes on; a click of the primary button hides the overlay under it and
- *   its backdrops. Escape, pressed by the user, is stopped and prevented, ends it, and Jasper is told, through
- *   jasperBridgeQuery (op "distractions"), {check: token, state: "off"}, as for a start that fails. A second start
- *   while it runs only takes the new token. As the page goes, it ends untold. A capture listener the page added to the
- *   window earlier still hears the pointer and the keys first.
+ *   secondary button's, whose right-click menu goes on. Only one click of the primary button, its detail 1, hides the
+ *   overlay under it and its backdrops: a key's click, as Enter on a link, and a double click's later clicks hide
+ *   nothing, as a hidden element stays hidden. Keys are the page's, but Escape: pressed by the user, it is stopped and
+ *   prevented, ends removal, and Jasper is told, through jasperBridgeQuery (op "distractions"), {check: token, state:
+ *   "off"}, as for a start that fails; its repeats and its keyup stop at the window too, until that keyup, the next
+ *   Escape pressed anew, a stop, the next start or the page going. A second start while it runs only takes the new
+ *   token. As the page goes, it ends untold. A capture listener the page added to the window earlier still hears the
+ *   pointer and the keys first.
  * - "stop": the crosshair, the outline and the listeners go, untold. What was hidden stays hidden.
  * - "removeAt", with a point in CSS pixels from the viewport's top left: the overlay of the element there
  *   (document.elementFromPoint) is hidden, or nothing.
  *
  * An element's overlay is its outermost ancestor-or-self below the body whose computed position is fixed or sticky,
  * else the element itself, unless it is the root or the body element, which have none; the reader's overlay
- * (reader.js), while it shows, is never one. An overlay's backdrops are the other fixed elements of the body, of its
- * first 50,000 elements, that cover at least 90% of the viewport, neither inside the overlay nor around it. Hiding is
- * an inline display: none with the important priority, which stays.
+ * (reader.js), while it shows, is never one. An overlay's backdrops are the other fixed elements of the document, of
+ * its last 50,000, as a page appends its banners, that cover at least 90% of the viewport, neither inside the overlay
+ * nor around it, and neither the body, the root nor the reader's overlay. Hiding is an inline display: none with the
+ * important priority, which stays. Where a click or "removeAt" hides a fixed element covering 90% of the viewport, the
+ * overlay or a backdrop, the root and the body elements whose computed overflow-y is hidden or clip, as a cookie wall
+ * locks the page's scrolling, get an inline overflow-y: visible with the important priority, which stays too.
  *
  * It is made once per document, kept under window[Symbol.for('dev.jasper.browser.distractions')], and calls the
  * built-ins as they were when it was made. The page's own scripts share this world, so they can see and undo all of
@@ -72,8 +78,10 @@
     // The page's interfaces, by their constructors; SVG's is optional.
     const Sheets = window.CSSStyleSheet, Documents = window.Document, Elements = window.Element, HtmlElements = window.HTMLElement,
       SvgElements = window.SVGElement, Nodes = window.Node, ShadowRoots = window.ShadowRoot, Targets = window.EventTarget,
-      Events = window.Event, KeyEvents = window.KeyboardEvent, MouseEvents = window.MouseEvent, Styles = window.CSSStyleDeclaration;
-    const constructors = [Sheets, Documents, Elements, HtmlElements, Nodes, ShadowRoots, Targets, Events, KeyEvents, MouseEvents, Styles];
+      Events = window.Event, UiEvents = window.UIEvent, KeyEvents = window.KeyboardEvent, MouseEvents = window.MouseEvent,
+      Styles = window.CSSStyleDeclaration;
+    const constructors = [Sheets, Documents, Elements, HtmlElements, Nodes, ShadowRoots, Targets, Events, UiEvents, KeyEvents, MouseEvents,
+      Styles];
     if (typeof query !== 'function' || typeof computed !== 'function') return null;
     for (let at = 0; at < constructors.length; at++) if (typeof constructors[at] !== 'function') return null;
     // A getter of {@code type}'s prototype, as it is now; null for none.
@@ -100,18 +108,22 @@
     const listen = Targets.prototype.addEventListener, unlisten = Targets.prototype.removeEventListener;
     const halt = Events.prototype.stopImmediatePropagation, prevent = Events.prototype.preventDefault,
       targetOf = getter(Events, 'target');
-    const keyOf = getter(KeyEvents, 'key'), buttonOf = getter(MouseEvents, 'button');
+    const keyOf = getter(KeyEvents, 'key'), repeatOf = getter(KeyEvents, 'repeat'), buttonOf = getter(MouseEvents, 'button'),
+      detailOf = getter(UiEvents, 'detail');
     const setProperty = Styles.prototype.setProperty, removeProperty = Styles.prototype.removeProperty,
       getPropertyValue = Styles.prototype.getPropertyValue, getPropertyPriority = Styles.prototype.getPropertyPriority;
     const page = document;
     const needed = [replaceSync, elementFromPoint, rootOf, bodyOf, querySelectorAll, boundsOf, parentOf, contains, hostOf, styleOf,
-      listen, unlisten, halt, prevent, targetOf, keyOf, buttonOf, setProperty, removeProperty, getPropertyValue, getPropertyPriority];
+      listen, unlisten, halt, prevent, targetOf, keyOf, repeatOf, buttonOf, detailOf, setProperty, removeProperty, getPropertyValue,
+      getPropertyPriority];
     for (let at = 0; at < needed.length; at++) if (typeof needed[at] !== 'function') return null;
     if (!adopted || typeof adopted.get !== 'function' || typeof adopted.set !== 'function') return null;
 
     // While removal runs: the token its Escape reports, the sheet the document adopted, and the outlined overlay with
     // its inline style and its outline's earlier values.
     let running = null;
+    // Whether Escape ended removal and its keyup is still to come: the keys' listeners wait for it.
+    let closing = false;
 
     /** Tells Jasper {@code fields}, through the opener bridge; a failure tells nothing, and the page goes on. */
     function report(fields) {
@@ -133,6 +145,7 @@
         running.token = token;
         return;
       }
+      if (closing) endClosing();
       const now = {token, sheet: null, outlined: null};
       try {
         const sheet = new Sheets();
@@ -140,7 +153,8 @@
         adopt(sheet);
         now.sheet = sheet;
         running = now;
-        listeners(listen);
+        pointerListeners(listen);
+        keyListeners(listen);
       } catch (failed) {
         running = null;
         end(now);
@@ -148,18 +162,28 @@
       }
     }
 
-    /** Distraction removal ends, untold; what it hid stays hidden. */
+    /** Distraction removal ends, untold, and so does Escape's wait for its keyup; what it hid stays hidden. */
     function stop() {
       const now = running;
-      if (now === null) return;
       running = null;
-      end(now);
+      if (now !== null) end(now);
+      else if (closing) endClosing();
     }
 
     /** {@code now}'s listeners, outline and sheet go. */
     function end(now) {
+      leave(now);
       try {
-        listeners(unlisten);
+        keyListeners(unlisten);
+      } catch (kept) {
+        // A listener the page took away is gone already.
+      }
+    }
+
+    /** {@code now}'s pointer's listeners, outline and sheet go; the keys' listeners stay. */
+    function leave(now) {
+      try {
+        pointerListeners(unlisten);
       } catch (kept) {
         // A listener the page took away is gone already.
       }
@@ -167,8 +191,18 @@
       if (now.sheet !== null) unadopt(now.sheet);
     }
 
-    /** The window's capture listeners, added or removed with {@code method}. */
-    function listeners(method) {
+    /** Escape's wait for its keyup ends: the keys' listeners go. */
+    function endClosing() {
+      closing = false;
+      try {
+        keyListeners(unlisten);
+      } catch (kept) {
+        // A listener the page took away is gone already.
+      }
+    }
+
+    /** The window's capture listeners for the pointer, added or removed with {@code method}. */
+    function pointerListeners(method) {
       apply(method, window, ['pointerover', onOver, true]);
       apply(method, window, ['pointerdown', onPress, true]);
       apply(method, window, ['pointerup', onPress, true]);
@@ -177,7 +211,12 @@
       apply(method, window, ['auxclick', onPress, true]);
       apply(method, window, ['dblclick', onPress, true]);
       apply(method, window, ['click', onClick, true]);
+    }
+
+    /** The window's capture listeners for the keys and the page going, added or removed with {@code method}. */
+    function keyListeners(method) {
       apply(method, window, ['keydown', onKeyDown, true]);
+      apply(method, window, ['keyup', onKeyUp, true]);
       apply(method, window, ['pagehide', onPageHide, true]);
     }
 
@@ -191,7 +230,10 @@
         return;
       }
       const overlay = overlayOf(element);
-      if (overlay !== null) hide(overlay);
+      if (overlay === null) return;
+      const walled = wall(overlay);
+      hide(overlay);
+      if (walled) unlock();
     }
 
     /** The pointer came over an element: its overlay is outlined, and the one before has its own outline again. */
@@ -207,29 +249,58 @@
       apply(prevent, event, []);
     }
 
-    /** A click stops here, prevented, but the secondary button's; the primary one's hides the overlay and its backdrops. */
+    /**
+     * A click stops here, prevented, but the secondary button's. Only one click of the primary button, its detail 1,
+     * hides the overlay and its backdrops (ruling D34): a key's click has detail 0, and a double click's second 2. Page
+     * code the overlay's search reaches may end removal first, and then nothing is hidden.
+     */
     function onClick(event) {
       if (running === null || event.isTrusted !== true) return;
       const button = apply(buttonOf, event, []);
       if (button === SECONDARY) return;
       apply(halt, event, []);
       apply(prevent, event, []);
-      if (button !== PRIMARY) return;
+      if (button !== PRIMARY || apply(detailOf, event, []) !== 1) return;
       const overlay = overlayOf(apply(targetOf, event, []));
-      if (overlay === null) return;
+      if (overlay === null || running === null) return;
       const backdrops = backdropsOf(overlay);
+      if (running === null) return;
+      const walled = backdrops.length > 0 || wall(overlay);
       hide(overlay);
       for (let at = 0; at < backdrops.length; at++) hide(backdrops[at]);
+      if (walled) unlock();
     }
 
-    /** Escape, pressed by the user, is stopped and prevented, ends removal, and Jasper is told. */
+    /**
+     * Escape, pressed by the user, is stopped and prevented, ends removal, and Jasper is told; the keys' listeners stay
+     * for its repeats, which stop here too, and its keyup. Escape pressed anew meanwhile, as when its keyup went
+     * elsewhere, ends the wait and is the page's.
+     */
     function onKeyDown(event) {
+      if (event.isTrusted !== true || apply(keyOf, event, []) !== 'Escape') return;
       const now = running;
-      if (now === null || event.isTrusted !== true || apply(keyOf, event, []) !== 'Escape') return;
+      if (now !== null) {
+        apply(halt, event, []);
+        apply(prevent, event, []);
+        running = null;
+        closing = true;
+        leave(now);
+        report({op: 'distractions', check: now.token, state: 'off'});
+      } else if (closing) {
+        if (apply(repeatOf, event, []) !== true) {
+          endClosing();
+          return;
+        }
+        apply(halt, event, []);
+        apply(prevent, event, []);
+      }
+    }
+
+    /** Escape's keyup, after Escape ended removal, stops here, and the wait for it ends. */
+    function onKeyUp(event) {
+      if (!closing || event.isTrusted !== true || apply(keyOf, event, []) !== 'Escape') return;
       apply(halt, event, []);
-      apply(prevent, event, []);
-      stop();
-      report({op: 'distractions', check: now.token, state: 'off'});
+      endClosing();
     }
 
     /** The page goes: removal ends, untold, as Jasper ends it with the document. */
@@ -254,26 +325,67 @@
       return overlay === readerHost() ? null : overlay;
     }
 
-    /** The other fixed elements of the body that cover at least 90% of the viewport, neither inside {@code overlay} nor around it. */
+    /**
+     * The other fixed elements of the document that cover at least 90% of the viewport, neither inside {@code overlay}
+     * nor around it, nor the body, the root or the reader's overlay; of its last 50,000 elements, as a page appends its
+     * banners and their backdrops.
+     */
     function backdropsOf(overlay) {
       const found = [];
       try {
-        const body = apply(bodyOf, page, []);
-        const width = widthOf !== null ? apply(widthOf, window, []) : window.innerWidth;
-        const height = heightOf !== null ? apply(heightOf, window, []) : window.innerHeight;
-        if (!(body instanceof Elements) || typeof width !== 'number' || typeof height !== 'number' || !(width > 0) || !(height > 0))
-          return found;
-        const all = apply(querySelectorAll, body, ['*']);
-        const count = min(all.length, LIMIT);
-        for (let at = 0; at < count; at++) {
+        const root = apply(rootOf, page, []), body = apply(bodyOf, page, []), size = viewport();
+        if (!(root instanceof Elements) || size === null) return found;
+        const host = readerHost();
+        const all = apply(querySelectorAll, root, ['*']);
+        const first = max(all.length - LIMIT, 0);
+        for (let at = all.length - 1; at >= first; at--) {
           const element = all[at];
-          if (positionOf(element) !== 'fixed' || apply(contains, overlay, [element]) || apply(contains, element, [overlay])) continue;
-          if (covered(apply(boundsOf, element, []), width, height) >= COVERING) found[found.length] = element;
+          if (element === body || element === host || positionOf(element) !== 'fixed' || apply(contains, overlay, [element])
+              || apply(contains, element, [overlay])) continue;
+          if (covered(apply(boundsOf, element, []), size.width, size.height) >= COVERING) found[found.length] = element;
         }
       } catch (unread) {
         // The backdrops found so far.
       }
       return found;
+    }
+
+    /** Whether {@code element} is a wall: fixed, and covering at least 90% of the viewport. */
+    function wall(element) {
+      try {
+        const size = viewport();
+        return size !== null && positionOf(element) === 'fixed' && covered(apply(boundsOf, element, []), size.width, size.height) >= COVERING;
+      } catch (unread) {
+        return false;
+      }
+    }
+
+    /** The viewport's width and height, from the window; null for a size that is no positive number. */
+    function viewport() {
+      const width = widthOf !== null ? apply(widthOf, window, []) : window.innerWidth;
+      const height = heightOf !== null ? apply(heightOf, window, []) : window.innerHeight;
+      return typeof width === 'number' && typeof height === 'number' && width > 0 && height > 0 ? {width, height} : null;
+    }
+
+    /**
+     * A wall was hidden (ruling D35): the root and the body elements whose computed overflow-y is hidden or clip, as a
+     * cookie wall locks the page's scrolling, scroll again, inline and important, which stays.
+     */
+    function unlock() {
+      const elements = [apply(rootOf, page, []), apply(bodyOf, page, [])];
+      for (let at = 0; at < elements.length; at++) {
+        const element = elements[at];
+        if (!(element instanceof Elements)) continue;
+        const overflow = computedOf(element, 'overflow-y');
+        if (overflow !== 'hidden' && overflow !== 'clip') continue;
+        const style = inline(element);
+        if (style === null) continue;
+        try {
+          apply(setProperty, style, ['overflow-y', 'visible', 'important']);
+        } catch (refused) {
+          // An element the page will not let go of stays locked.
+        }
+      }
     }
 
     /** How much of the viewport, {@code width} by {@code height} from its top left, {@code bounds} covers: 0 to 1. */
@@ -284,8 +396,13 @@
 
     /** {@code element}'s computed position; empty when it cannot be read. */
     function positionOf(element) {
+      return computedOf(element, 'position');
+    }
+
+    /** {@code element}'s computed value of {@code name}; empty when it cannot be read. */
+    function computedOf(element, name) {
       try {
-        return apply(getPropertyValue, apply(computed, window, [element]), ['position']);
+        return apply(getPropertyValue, apply(computed, window, [element]), [name]);
       } catch (unread) {
         return '';
       }
@@ -326,10 +443,13 @@
       }
     }
 
-    /** Outlines {@code overlay} in red, after the outlined one before has its own outline again; null outlines nothing. */
+    /**
+     * Outlines {@code overlay} in red, after the outlined one before has its own outline again; null outlines nothing,
+     * and so does a removal that page code the overlay's search reached ended.
+     */
     function outline(overlay) {
       const now = running;
-      if (now.outlined !== null && now.outlined.element === overlay) return;
+      if (now === null || (now.outlined !== null && now.outlined.element === overlay)) return;
       unoutline(now);
       const style = overlay === null ? null : inline(overlay);
       if (style === null) return;
