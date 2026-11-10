@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.jasper.app.platform.FileAssociations.Claimability;
 import dev.jasper.app.platform.FileAssociations.Handler;
 import dev.jasper.app.platform.FileAssociations.Outcome;
+import dev.jasper.app.platform.FileAssociations.Refusal;
 import dev.jasper.app.platform.FileAssociations.TypeResult;
 import dev.jasper.app.platform.FileAssociations.Unavailable;
 import dev.jasper.app.platform.WindowsFileAssociations.Registry;
@@ -27,6 +28,7 @@ class WindowsFileAssociationsTest {
     private static final String CAPABILITIES = "Software\\Jasper\\Capabilities\\FileAssociations";
     private static final URI DEEP_LINK = URI.create("ms-settings:defaultapps?registeredAppUser=Jasper");
     private static final URI DEFAULT_APPS = URI.create("ms-settings:defaultapps");
+    private static final FileTypeCatalog CATALOG = FileTypeCatalog.parse(".js\tcom.netscape.javascript-source\ttext/javascript\n");
 
     /** An in-memory {@code HKEY_CURRENT_USER}: values keyed by {@code key + "|" + name}, with every write recorded. */
     private static final class FakeRegistry {
@@ -49,8 +51,10 @@ class WindowsFileAssociationsTest {
                     }, () -> notifications++, extension -> Optional.ofNullable(friendlyNames.get(extension)));
         }
 
+        Map<String, String> environment = Map.of();
+
         WindowsFileAssociations backend() {
-            return new WindowsFileAssociations(registry(), uri -> {
+            return new WindowsFileAssociations(CATALOG, environment, registry(), uri -> {
                 opened.add(uri);
                 if (failingLinks.contains(uri)) throw new IllegalStateException("no handler for " + uri);
             });
@@ -74,13 +78,37 @@ class WindowsFileAssociationsTest {
         assertThat(system.backend().claimability(".java")).isEqualTo(new Claimability.Claimable(List.of(".java"), false));
     }
 
+    @Test void executableAndShellHandledExtensionsAreRefused() {
+        WindowsFileAssociations backend = system.backend();
+        for (String extension : List.of(".exe", ".com", ".bat", ".cmd", ".vbs", ".vbe", ".jse", ".wsf", ".wsh", ".msc",
+                ".lnk", ".url", ".dll", ".msi", ".sys", ".scr", ".cpl", ".ps1", ".reg", ".hta", ".pif")) {
+            assertThat(backend.claimability(extension)).as(extension)
+                    .isEqualTo(new Claimability.NotClaimable(Refusal.NOT_TEXT));
+        }
+        assertThat(backend.claimability(".js")).as("a catalogue extension is never refused that way")
+                .isEqualTo(new Claimability.Claimable(List.of(".js"), false));
+
+        system.environment = Map.of("PathExt", ".EXE;.Py;;");
+        backend = system.backend();
+        assertThat(backend.claimability(".py")).as("PATHEXT from the environment, any case")
+                .isEqualTo(new Claimability.NotClaimable(Refusal.NOT_TEXT));
+        assertThat(backend.claimability(".bat")).as("the environment's PATHEXT replaces the default")
+                .isEqualTo(new Claimability.Claimable(List.of(".bat"), false));
+        assertThat(backend.claimability(".lnk")).isEqualTo(new Claimability.NotClaimable(Refusal.NOT_TEXT));
+    }
+
     @Test void theUsersChoiceDecidesTheHandler() throws IOException {
         WindowsFileAssociations backend = system.backend();
-        assertThat(backend.handler(".txt")).as("no choice").isEqualTo(new Handler.None());
+        assertThat(backend.handler(".txt")).as("no choice and no application").isEqualTo(new Handler.None());
+        system.friendlyNames.put(".txt", "Notepad");
+        assertThat(backend.handler(".txt")).as("no choice, but Windows names an application")
+                .isEqualTo(new Handler.Other("", "Notepad"));
         system.values.put(FILE_EXTS + ".java\\UserChoice|ProgId", "JasperFile");
         assertThat(backend.handler(".java")).isEqualTo(new Handler.Jasper());
         system.values.put(FILE_EXTS + ".kt\\UserChoice|ProgId", "jasperfile");
         assertThat(backend.handler(".kt")).as("ProgIds ignore case").isEqualTo(new Handler.Jasper());
+        system.values.put(FILE_EXTS + ".md\\UserChoice|ProgId", "applications\\JASPER.EXE");
+        assertThat(backend.handler(".md")).as("jasper.exe picked in Open with").isEqualTo(new Handler.Jasper());
         system.values.put(FILE_EXTS + ".py\\UserChoice|ProgId", "VSCode.java");
         assertThat(backend.handler(".py")).as("no friendly name").isEqualTo(new Handler.Other("VSCode.java", "VSCode.java"));
         system.friendlyNames.put(".py", "Visual Studio Code");
@@ -90,7 +118,7 @@ class WindowsFileAssociationsTest {
     }
 
     @Test void aFailedReadIsAnIOException() {
-        var backend = new WindowsFileAssociations(new Registry((key, name) -> {
+        var backend = new WindowsFileAssociations(CATALOG, Map.of(), new Registry((key, name) -> {
             throw new UncheckedIOException(new IOException("RegGetValueW failed with 5"));
         }, key -> true, (key, name, value) -> { }, () -> { }, extension -> Optional.empty()), uri -> { });
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> backend.handler(".java"))

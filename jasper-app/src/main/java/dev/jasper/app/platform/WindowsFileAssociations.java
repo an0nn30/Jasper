@@ -3,6 +3,7 @@ package dev.jasper.app.platform;
 import dev.jasper.app.platform.FileAssociations.Claimability;
 import dev.jasper.app.platform.FileAssociations.Handler;
 import dev.jasper.app.platform.FileAssociations.Outcome;
+import dev.jasper.app.platform.FileAssociations.Refusal;
 import dev.jasper.app.platform.FileAssociations.TypeResult;
 import dev.jasper.app.platform.FileAssociations.Unavailable;
 import java.io.IOException;
@@ -13,6 +14,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -27,6 +29,12 @@ import java.util.function.Predicate;
 final class WindowsFileAssociations implements FileAssociations.Backend {
     private static final System.Logger LOG = System.getLogger(WindowsFileAssociations.class.getName());
     static final String PROG_ID = "JasperFile";
+    /** The ProgId Windows makes when the user picks {@code jasper.exe} itself in "Open with". */
+    static final String APPLICATION_PROG_ID = "Applications\\jasper.exe";
+    private static final String DEFAULT_PATHEXT = ".COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC";
+    /** Executable and shell-handled extensions besides {@code PATHEXT}'s, which Jasper never claims. */
+    private static final List<String> SHELL_HANDLED = List.of(".lnk", ".url", ".dll", ".msi", ".sys", ".scr", ".cpl",
+            ".ps1", ".reg", ".hta", ".pif");
     private static final String COMMAND = "Software\\Classes\\JasperFile\\shell\\open\\command";
     private static final String FILE_EXTS = "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\";
     private static final String CAPABILITIES = "Software\\Jasper\\Capabilities\\FileAssociations";
@@ -81,30 +89,60 @@ final class WindowsFileAssociations implements FileAssociations.Backend {
         }
     }
 
+    private final FileTypeCatalog catalog;
     private final Registry registry;
     private final Consumer<URI> openSettings;
+    private final Set<String> refused;
 
     /**
+     * @param catalog the built-in extensions, which are always claimable
+     * @param environment where {@code PATHEXT} is read
      * @param registry the registry calls
      * @param openSettings opens an {@code ms-settings:} link; throws when it cannot
      */
-    WindowsFileAssociations(Registry registry, Consumer<URI> openSettings) {
+    WindowsFileAssociations(FileTypeCatalog catalog, Map<String, String> environment, Registry registry,
+            Consumer<URI> openSettings) {
+        this.catalog = catalog;
         this.registry = registry;
         this.openSettings = openSettings;
+        Set<String> executable = new java.util.HashSet<>(SHELL_HANDLED);
+        for (String entry : pathExt(environment).split(";")) {
+            String extension = entry.strip().toLowerCase(Locale.ROOT);
+            if (!extension.isEmpty()) executable.add(extension.startsWith(".") ? extension : "." + extension);
+        }
+        this.refused = Set.copyOf(executable);
+    }
+
+    /** {@code PATHEXT}, whose name Windows matches ignoring case; Windows' default when it is unset or empty. */
+    private static String pathExt(Map<String, String> environment) {
+        String value = environment.get("PATHEXT");
+        if (value == null) {
+            value = environment.entrySet().stream().filter(entry -> entry.getKey().equalsIgnoreCase("PATHEXT"))
+                    .map(Map.Entry::getValue).findFirst().orElse(null);
+        }
+        return value == null || value.isBlank() ? DEFAULT_PATHEXT : value;
     }
 
     @Override public Optional<Unavailable> unavailable() {
         return registry.exists().test(COMMAND) ? Optional.empty() : Optional.of(Unavailable.NOT_INSTALLED);
     }
 
+    /**
+     * Every extension is claimable as itself except executable and shell-handled ones ({@code PATHEXT}'s, shortcuts,
+     * libraries, installers, scripts); a catalogue extension, such as {@code .js}, is never refused that way.
+     */
     @Override public Claimability claimability(String extension) {
+        if (refused.contains(extension) && !catalog.extensions().contains(extension)) {
+            return new Claimability.NotClaimable(Refusal.NOT_TEXT);
+        }
         return new Claimability.Claimable(List.of(extension), false);
     }
 
     /**
      * The user's choice for an extension. When it is Jasper, the extension is listed among Jasper's capabilities again
      * if missing: an upgrade removes and rewrites {@code Software\Jasper\Capabilities}, which drops the listings a claim
-     * wrote, and Settings shows only listed extensions.
+     * wrote, and Settings shows only listed extensions. With no user's choice, the application Windows names for the
+     * extension is another application with an empty id, and only when Windows names none is there no handler.
      */
     @Override public Handler handler(String extension) throws IOException {
         Optional<String> progId;
@@ -113,13 +151,19 @@ final class WindowsFileAssociations implements FileAssociations.Backend {
         } catch (UncheckedIOException failure) {
             throw failure.getCause();
         }
-        if (progId.isEmpty()) return new Handler.None();
+        if (progId.isEmpty()) {
+            return friendlyName(extension).<Handler>map(name -> new Handler.Other("", name)).orElse(new Handler.None());
+        }
         String id = progId.get();
-        if (PROG_ID.equalsIgnoreCase(id)) {
+        if (PROG_ID.equalsIgnoreCase(id) || APPLICATION_PROG_ID.equalsIgnoreCase(id)) {
             keepListed(extension);
             return new Handler.Jasper();
         }
-        return new Handler.Other(id, registry.friendlyAppName().apply(extension).filter(name -> !name.isBlank()).orElse(id));
+        return new Handler.Other(id, friendlyName(extension).orElse(id));
+    }
+
+    private Optional<String> friendlyName(String extension) {
+        return registry.friendlyAppName().apply(extension).filter(name -> !name.isBlank());
     }
 
     private void keepListed(String extension) {

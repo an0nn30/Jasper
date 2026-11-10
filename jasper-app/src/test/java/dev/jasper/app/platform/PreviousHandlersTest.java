@@ -24,6 +24,13 @@ class PreviousHandlersTest {
         assertThat(new PreviousHandlers(file).get("com.apple.dt.Xcode-type")).isPresent();
     }
 
+    @Test void anApplicationWithoutAnIdStaysAnApplication(@TempDir Path home) {
+        Path file = home.resolve("file-associations.toml");
+        new PreviousHandlers(file).put(".txt", new Handler.Other("", "Notepad"));
+        assertThat(new PreviousHandlers(file).get(".txt")).as("Windows names it without a ProgId")
+                .contains(new Handler.Other("", "Notepad"));
+    }
+
     @Test void typesWithDotsSlashesAndQuotesSurvive(@TempDir Path home) {
         Path file = home.resolve("file-associations.toml");
         var store = new PreviousHandlers(file);

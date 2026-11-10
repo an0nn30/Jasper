@@ -14,7 +14,8 @@ import org.tomlj.TomlTable;
 
 /**
  * The handler each file type had before Jasper claimed it, kept in {@code file-associations.toml} as one table per
- * type: {@code [previous."<type>"]} with {@code id} and {@code name}; an empty {@code id} is "no handler". Writes go
+ * type: {@code [previous."<type>"]} with {@code id} and {@code name}; an empty {@code id} and {@code name} is "no handler", and an empty {@code id} with a
+ * name is an application Windows names without a ProgId. Writes go
  * through a temporary file in the same folder and an atomic move. A file that cannot be read counts as empty and is
  * logged once, and the unreadable file is moved to {@code file-associations.toml.bad} so no write replaces it; a write that fails is logged and swallowed, so the store never blocks a claim.
  */
@@ -64,7 +65,7 @@ final class PreviousHandlers {
                     }
                     String id = entry.getString("id", () -> "");
                     String name = entry.getString("name", () -> id);
-                    out.put(type, id.isEmpty()
+                    out.put(type, id.isEmpty() && name.isEmpty()
                             ? new FileAssociations.Handler.None()
                             : new FileAssociations.Handler.Other(id, name));
                 }
