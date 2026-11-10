@@ -4,11 +4,12 @@ import java.util.zip.ZipFile;
 /** The JBR 25 WiX v3 extension point validated by the native installer probe. */
 public final class CygwinInstallerTemplate {
     // The per-user registration as a web browser. Windows lists Jasper among the http and https choices; the uninstall,
-    // and so an upgrade (RemoveExistingProducts runs first), removes the values and deletes the two keys Jasper owns.
+    // and so an upgrade (RemoveExistingProducts runs first), removes the values and deletes the three keys Jasper owns.
     // DefaultBrowser compares the user's choice with the JasperURL ProgId. The command passes the link after --url, which
     // admits nothing after its one web address: a link with a quote in it that breaks out of "%1" adds no option, and
     // Jasper refuses the launch (ruling Q13). The JasperFile ProgId, which the Editor's file associations name, takes a
-    // plain "%1": File Explorer passes absolute paths, which cannot start with --. Keep the GUID: it names this component in every release.
+    // plain "%1": File Explorer passes absolute paths, which cannot start with --. Keep the GUID: it names this
+    // component in every release.
     private static final String BROWSER_COMPONENT = """
         <DirectoryRef Id="INSTALLDIR">
           <Component Id="JasperWebBrowser" Guid="{6F685105-E30D-4CAF-9091-ED60DF8D5D62}">

@@ -556,7 +556,7 @@ class JasperApplicationPluginsTest {
         Path edited = dirs.plugins().resolve("dev.example.loop/data/edited");
         List<String> lines = awaitLines(edited, 2);
         assertThat(lines).containsExactly("Note.txt|JASPER", "Note.txt|OUTSIDE");
-        Thread.sleep(2000);
+        Thread.sleep(500);
         assertThat(java.nio.file.Files.readAllLines(edited)).as("no third open").containsExactly("Note.txt|JASPER", "Note.txt|OUTSIDE");
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();

@@ -399,8 +399,8 @@ template's one feature ([Browser](browser.md#making-jasper-your-default-browser)
 | `Software\Classes\JasperURL\shell\open\command` | (Default) = `"[INSTALLDIR]Jasper.exe" --url "%1"` ([`--url`](command-line.md#launching-jasper-with-options)) |
 
 The uninstall, and so an upgrade before it writes the new version's, removes the `Jasper` value and deletes the
-`Capabilities` and `JasperURL` keys. The setup also registers the `JasperFile` ProgId under `Software\Classes` (the Editor's File associations use it; its
-open command is `"[INSTALLDIR]Jasper.exe" "%1"`), sets no default, and the uninstall removes it. The portable ZIP and
+`Capabilities`, `JasperURL` and `JasperFile` keys. The setup also registers the `JasperFile` ProgId under `Software\Classes` (the Editor's File associations use it; its
+open command is `"[INSTALLDIR]Jasper.exe" "%1"`) and sets no default. The portable ZIP and
 `installWindowsUser` register nothing.
 
 The package's architecture is that of the selected JBR SDK, which must match the host's. On Windows on Arm, build the
@@ -547,7 +547,9 @@ or, where none is, as the default, and its uninstall never takes it out. The ins
 `applications/defaults.list` of the data folders (`XDG_DATA_DIRS`, else `/usr/local/share` and `/usr/share`) before
 the menu install, then writes back each that changed and deletes each that it created, so that the packages make Jasper
 no default. When the copies cannot be made, it prints "jasper: the system's default applications were not saved" and
-the menu install's change stays.
+the menu install's change stays. Removing the package leaves the user's own MIME package
+(`~/.local/share/mime/packages/jasper-workstation.xml`) and `mimeapps.list` entries, which the Editor's File
+associations write, as they are.
 
 With the default `system.run_in_background`, the first eligible installed launch registers the current user's
 `$XDG_CONFIG_HOME/autostart/dev.jasper.background.desktop` (normally under `~/.config`) to run Jasper with

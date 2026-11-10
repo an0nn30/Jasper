@@ -18,7 +18,7 @@ stream, `video/mp2t`) and its TypeScript import removed; `.zsh` is `public.zsh-s
 missing desktop or `BROWSE` action into an `UnsupportedOperationException`). Pending: the Linux real-database check in
 the `jasper-ci-linux` container (Docker was not running), the Windows-only tests (`WindowsRegistryTest`,
 `Verify-Installer.ps1`, `InstallerAcceptanceTest`), the GUI checks at the end of this plan, and `packageApp` plus
-`verifyPackage` on macOS. Plan 2 of 3. Plan 1 (handed-in files open in the Jasper Editor, SDK
+`verifyPackage` on macOS. Final-review fixes: a failed claim keeps its saved entry while the type is still Jasper's; claim and restore ask nothing when unavailable (`Failed("unavailable: <reason>")`); restore hands back only types Jasper still opens and drops the others' entries; `unavailable()` has its own lock and is primed on the worker; Windows names an app without a `UserChoice`, reads `Applications\jasper.exe` as Jasper and refuses `PATHEXT` and shell-handled extensions outside the catalogue; Linux counts types that inherit from `text/plain` (`mime/subclasses`) as text; `Handler.Unknown` replaces `Other("", "")`; a status pass asks each shared type once. Plan 2 of 3. Plan 1 (handed-in files open in the Jasper Editor, SDK
 0.31.0 `FileOrigin`) is on main at 44c11698e. Plan 3 adds the SDK file-association surface, the testkit, the Editor's
 File associations section and `file_association_extensions`. Planned deviations from the spec, recorded here as
 AGENTS.md asks:
