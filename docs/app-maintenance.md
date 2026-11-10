@@ -491,6 +491,19 @@ run, on every path (a played rehearsal, a failed one, an `Error`, and the headle
 `JasperApplication.collector` is the test seam. A headless JVM cannot build a `WindowFrame`, so some of the rehearsal's
 failure paths are covered by reading only.
 
+### Adding a file type to the catalogue
+
+`file-types.tsv` (`jasper-app/src/main/resources/dev/jasper/app/platform/`) is read by `FileTypeCatalog` and by the
+packaging build, which declares the types in the macOS plist and the Linux desktop entry.
+
+1. Add the extension's row, with its macOS type and its Linux MIME type (an empty column for a system that gives the
+   extension a type that is not text).
+2. Run `./gradlew :jasper-app:testMacLaunchServices` on macOS: its harness fails when an extension resolves to a
+   declared non-text type and prints other mismatches as notes.
+3. Run the Linux tests in the `jasper-ci-linux` container, so `LinuxFileAssociationsTest` reads the image's
+   shared-mime-info database; empty the Linux column of any extension it gives a non-text type.
+4. Run `./gradlew :jasper-app:verifyPackagingSupport`.
+
 ## Session lifecycle change
 
 Begin with

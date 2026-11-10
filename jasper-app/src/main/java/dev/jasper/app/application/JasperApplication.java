@@ -223,6 +223,9 @@ public final class JasperApplication {
     Consumer<java.net.URI> desktop = dev.jasper.app.platform.Browser::open;
     /** Whether Jasper is the system's default browser; never, until {@link #defaultBrowser(DefaultBrowser)} asks the system. */
     private volatile DefaultBrowser defaultBrowser = neverTheDefault();
+    /** Which application opens each file type; unsupported until {@link #fileAssociations(FileAssociations)}. */
+    private volatile dev.jasper.app.platform.FileAssociations fileAssociations =
+        dev.jasper.app.platform.FileAssociations.unsupported();
     /** Web addresses from outside, which wait for the browser and never loop back to the system (browser plan 4c). EDT. */
     private final ExternalAddresses externalAddresses;
     /**
@@ -1224,6 +1227,16 @@ public final class JasperApplication {
         // The plugins hear each change of its answer; one this application no longer asks is not passed on.
         browser.onChanged(jasper -> { if (defaultBrowser == browser && plugins != null) plugins.defaultBrowserChanged(jasper); });
         browser.refresh();
+    }
+
+    /** Sets the file associations, refreshed whenever a Jasper window activates. Injected so tests never ask the system. EDT. */
+    public void fileAssociations(dev.jasper.app.platform.FileAssociations associations) {
+        fileAssociations = Objects.requireNonNull(associations, "associations");
+    }
+
+    /** The file associations; {@code FileAssociations.unsupported()} until one is set. */
+    public dev.jasper.app.platform.FileAssociations fileAssociations() {
+        return fileAssociations;
     }
 
     /**
@@ -2320,6 +2333,7 @@ public final class JasperApplication {
     void windowActivated(JasperWindow window) {
         activatedSinceOpen = true;
         defaultBrowser.refresh();
+        fileAssociations.refresh();
         // Coming back to any window shows the cards that waited, there.
         notificationViews.activated(window.content());
         systemNotices.focused();

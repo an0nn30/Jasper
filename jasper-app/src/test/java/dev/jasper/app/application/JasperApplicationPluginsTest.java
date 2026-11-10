@@ -525,6 +525,44 @@ class JasperApplicationPluginsTest {
         ApplicationPluginCleanup.await(application[0]);
     }
 
+    /** The origin fixture with one change: it declines Jasper's own opens, as the Editor does with Default editor "system". */
+    private static final String DECLINING_EDITOR = ORIGIN_EDITOR.replace("fix.origin", "fix.loop")
+        .replace("return true;", "return origin != dev.jasper.sdk.ui.FileOrigin.JASPER;");
+
+    /**
+     * Plan 2 Task 8, the loop check plan 1 left over: with Jasper the system's handler, Jasper's own open is declined by
+     * the editor (as with Default editor system), the desktop's edit action hands the file back as an outside open, and
+     * the editor takes that one. Once each, then nothing more.
+     */
+    @Test void theLoopEndsInTheJasperEditorOnce() throws Exception {
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path dev = home.resolve("loop-plugin");
+        PluginJars.build(dev, "loop.jar", PluginJars.descriptor("dev.example.loop", "1.0.0", "fix.loop.Main")
+            + "capabilities = [\"editor.provide\"]\n", Map.of("fix.loop.Main", DECLINING_EDITOR), List.of());
+        Path file = java.nio.file.Files.writeString(home.resolve("Note.txt"), "text\n");
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        var desktop = new dev.jasper.app.platform.ConfigEditor(
+            path -> javax.swing.SwingUtilities.invokeLater(() -> application[0].filesOpened(List.of(path.toFile()))),
+            path -> { throw new AssertionError("never opened"); }, path -> { });
+        java.util.UUID window = java.util.UUID.randomUUID();
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].startPlugins(null, dev, false, dirs);
+            framesHeadless(application[0]);
+            application[0].openFirstWindow(List.of(), List.of()).orElseThrow();
+            application[0].openFileAt(file, 0, window, desktop);
+        });
+        Path edited = dirs.plugins().resolve("dev.example.loop/data/edited");
+        List<String> lines = awaitLines(edited, 2);
+        assertThat(lines).containsExactly("Note.txt|JASPER", "Note.txt|OUTSIDE");
+        Thread.sleep(2000);
+        assertThat(java.nio.file.Files.readAllLines(edited)).as("no third open").containsExactly("Note.txt|JASPER", "Note.txt|OUTSIDE");
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
+    }
+
     /** Plan 1 final review: every route a program can hand a file over (launch, open-file event, open-URI, second launch) is OUTSIDE. */
     @Test void everyHandedInRouteCarriesTheOutsideOrigin() throws Exception {
         AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));

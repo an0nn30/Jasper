@@ -2,7 +2,23 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-Status: not started (written 2026-11-10). Plan 2 of 3. Plan 1 (handed-in files open in the Jasper Editor, SDK
+Status: done on `claude/editor-file-associations-2`, not merged or pushed (written 2026-11-10); Tasks 1 to 8 are
+committed. Changes from the plan below: (a) the Windows installer registers the `JasperFile` ProgId, and an upgrade
+deletes `Software\Jasper\Capabilities`, so a status check that sees Jasper re-writes
+`Capabilities\FileAssociations\<ext>`; (b) `file-types.tsv` is shared by the code and the packaging build; (c) the
+Unavailable and Refusal codes are enums, plus `Outcome.Refused(Refusal)`, made only by the facade; (d) the previous
+handler is saved before the claim, and an unreadable `file-associations.toml` is moved aside to
+`file-associations.toml.bad`; (e) the macOS harness fails only when an extension resolves to a declared non-text type,
+other mismatches print as notes; (f) on Linux, restoring "no previous app" is Done once Jasper's own lines are gone from
+`mimeapps.list`, and the type may still read Jasper through the `mimeinfo.cache` fallback; (g) restoring an app that is
+gone gives `PreviousGone` on macOS and Linux. Catalogue: `.ts` is emptied on macOS and Linux (an MPEG-2 transport
+stream, `video/mp2t`) and its TypeScript import removed; `.zsh` is `public.zsh-script` and `.bash`
+`public.bash-script`; `.txt` is `public.plain-text` and `.log` `com.apple.log`. Task 8 added
+`FileAssociations.desktopOpener()` (turning `Desktop.browse`'s `IOException` into an `UncheckedIOException`, and a
+missing desktop or `BROWSE` action into an `UnsupportedOperationException`). Pending: the Linux real-database check in
+the `jasper-ci-linux` container (Docker was not running), the Windows-only tests (`WindowsRegistryTest`,
+`Verify-Installer.ps1`, `InstallerAcceptanceTest`), the GUI checks at the end of this plan, and `packageApp` plus
+`verifyPackage` on macOS. Plan 2 of 3. Plan 1 (handed-in files open in the Jasper Editor, SDK
 0.31.0 `FileOrigin`) is on main at 44c11698e. Plan 3 adds the SDK file-association surface, the testkit, the Editor's
 File associations section and `file_association_extensions`. Planned deviations from the spec, recorded here as
 AGENTS.md asks:

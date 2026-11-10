@@ -43,6 +43,31 @@ class FileAssociationsTest {
         SwingUtilities.invokeAndWait(() -> { });
     }
 
+    @Test void forThisPlatformPicksTheBackend() {
+        var dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        java.util.function.Function<String, FileAssociations> make = os ->
+                FileAssociations.forThisPlatform(os, dirs, Map.of(), home, uri -> { });
+        assertThat(make.apply("Mac OS X").backendForTests()).isInstanceOf(MacFileAssociations.class);
+        assertThat(make.apply("Windows 11").backendForTests()).isInstanceOf(WindowsFileAssociations.class);
+        assertThat(make.apply("Linux").backendForTests()).isInstanceOf(LinuxFileAssociations.class);
+        var other = make.apply("FreeBSD");
+        assertThat(other.unavailable()).contains(FileAssociations.Unavailable.UNSUPPORTED_SYSTEM);
+        assertThat(other.backendForTests()).isNotInstanceOf(MacFileAssociations.class);
+    }
+
+    @Test void theDesktopOpenerTurnsFailuresIntoRuntimeExceptions() {
+        var link = java.net.URI.create("ms-settings:defaultapps");
+        var opened = new ArrayList<java.net.URI>();
+        FileAssociations.opener(() -> true, opened::add).accept(link);
+        assertThat(opened).containsExactly(link);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> FileAssociations.opener(() -> false, opened::add).accept(link))
+                .isInstanceOf(UnsupportedOperationException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> FileAssociations.opener(() -> true, uri -> {
+            throw new IOException("no browser");
+        }).accept(link)).isInstanceOf(java.io.UncheckedIOException.class).hasCauseInstanceOf(IOException.class);
+        assertThat(opened).hasSize(1);
+    }
+
     @Test void extensionsAreNormalisedOrRefused() {
         assertThat(FileAssociations.normalise(".JAVA")).contains(".java");
         assertThat(FileAssociations.normalise("java")).contains(".java");

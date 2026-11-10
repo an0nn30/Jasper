@@ -1,6 +1,10 @@
 package dev.jasper.app.platform;
 
+import java.awt.Desktop;
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.URI;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -13,6 +17,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import javax.swing.SwingUtilities;
@@ -165,10 +170,72 @@ public final class FileAssociations {
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
+    /**
+     * The facade for this operating system, its work on one virtual thread per task named
+     * {@code jasper-file-associations}. A system with no backend gets {@link #unsupported()}'s.
+     *
+     * @param osName {@code os.name}
+     * @param dirs where {@code file-associations.toml} lives
+     * @param environment the process environment
+     * @param home the user's home folder
+     * @param openSettings opens an {@code ms-settings:} link on Windows; it throws when it cannot
+     */
+    public static FileAssociations forThisPlatform(String osName, AppDirs dirs, Map<String, String> environment,
+            Path home, Consumer<URI> openSettings) {
+        Backend backend;
+        String os = osName == null ? "" : osName.toLowerCase(Locale.ROOT);
+        if (os.startsWith("mac")) {
+            backend = new MacFileAssociations(FileTypeCatalog.builtIn(), MacFileAssociations.MacCalls.system());
+        } else if (os.startsWith("windows")) {
+            backend = new WindowsFileAssociations(WindowsFileAssociations.Registry.system(), openSettings);
+        } else if (os.startsWith("linux")) {
+            backend = new LinuxFileAssociations(FileTypeCatalog.builtIn(), environment, home,
+                    LinuxFileAssociations.Tools.system());
+        } else {
+            return unsupported();
+        }
+        return new FileAssociations(work -> Thread.ofVirtual().name("jasper-file-associations").start(work), backend,
+                new PreviousHandlers(dirs.fileAssociations()));
+    }
+
+    /**
+     * Opens a link with the desktop's browse action, as {@link WindowsFileAssociations} wants it: an
+     * {@link UnsupportedOperationException} when there is no desktop or no browse action, an
+     * {@link UncheckedIOException} when it fails.
+     */
+    public static Consumer<URI> desktopOpener() {
+        return opener(() -> Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE),
+                uri -> Desktop.getDesktop().browse(uri));
+    }
+
+    /** A link that opens. */
+    @FunctionalInterface
+    interface Browse {
+        void browse(URI uri) throws IOException;
+    }
+
+    static Consumer<URI> opener(java.util.function.BooleanSupplier canBrowse, Browse browse) {
+        return uri -> {
+            if (!canBrowse.getAsBoolean()) {
+                throw new UnsupportedOperationException("The desktop cannot open links");
+            }
+            try {
+                browse.browse(uri);
+            } catch (IOException failure) {
+                throw new UncheckedIOException(failure);
+            }
+        };
+    }
+
+    /** The backend, for tests. */
+    Backend backendForTests() {
+        return backend;
+    }
+
     /** A facade for a system with no file associations: always {@link Unavailable#UNSUPPORTED_SYSTEM}. */
     public static FileAssociations unsupported() {
         return new FileAssociations(Runnable::run, new UnsupportedBackend(),
-                new PreviousHandlers(java.nio.file.Path.of(System.getProperty("java.io.tmpdir"), "jasper-no-file-associations.toml")));
+                new PreviousHandlers(Path.of(System.getProperty("java.io.tmpdir"), "jasper-no-file-associations.toml")));
     }
 
     /**
