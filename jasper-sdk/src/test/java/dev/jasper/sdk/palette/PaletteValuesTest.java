@@ -104,7 +104,7 @@ class PaletteValuesTest {
         assertThatIllegalArgumentException().isThrownBy(() -> new PaletteQuery(null, Optional.empty(), 5, true, Optional.empty()));
         assertThat(Capabilities.PALETTE_CONTRIBUTE).isEqualTo("palette.contribute");
         assertThat(Capabilities.ALL).contains("palette.contribute");
-        assertThat(JasperSdk.VERSION).isEqualTo("0.30.0");
+        assertThat(JasperSdk.VERSION).isEqualTo("0.31.0");
     }
 
     /** Browser plan 5 Task 10 (SDK 0.29.0): a query names a text target only when no pane is its origin. */

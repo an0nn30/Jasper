@@ -760,7 +760,7 @@ id = "dev.example.harbour"
 name = "Harbour Theme"
 version = "1.0.0"
 entry = "dev.example.harbour.HarbourPlugin"
-sdk = ">=0.30.0, <0.31"
+sdk = ">=0.31.0, <0.32"
 description = "The Harbour theme."
 themes = ["themes/harbour.json"]
 ```

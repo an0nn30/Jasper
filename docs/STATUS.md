@@ -1,5 +1,7 @@
 # Jasper — Status and Handoff
 
+**Editor file associations — 2026-11-10** (`claude/editor-file-associations`, worktree `.claude/worktrees/editor-file-associations`, from `417e2270f`; [spec](superpowers/specs/2026-11-10-editor-file-associations-design.md), [plan 1](superpowers/plans/2026-11-10-editor-file-associations-1-handed-in-files.md), handed-in files open in the Jasper Editor; not merged or pushed): plan 1 started with Task 1, the SDK 0.31.0 version bump alone (every bundled range `>=0.31.0, <0.32`); the `FileOrigin` type follows in Task 2.
+
 **Browser plan 6: privacy — 2026-11-09** (`claude/browser-privacy`, worktree `.claude/worktrees/browser-4b-4c-e6deab`,
 from local `main` `ef3347601`, which has plans 4a, 4b, 4c, 9 and 5 merged; the plan `daa19c574`, commits `827ac12ba`
 to `03af74d75`, local `main` `67653bbf6` (Mermaid, plan 9's slice 1b) merged in as `965c11432`, the docs, `7ad704159`,
@@ -1272,8 +1274,8 @@ plugins on the public plugin SDK. The [documentation index](README.md) lists eve
   `claude/test-isolation-leaks` (the Swing test-isolation guard, 3 commits).
 - **Modules.** `jasper-ui`, `jasper-terminal`, `jasper-app`, `jasper-buddy`, `jasper-sdk` and `jasper-sdk-testkit`, plus
   one `:jasper-plugin-<dir>` for each directory under `plugins/`.
-- **SDK** `0.30.0` (`JasperSdk.VERSION`; no release carries it yet, `v1.0.0` has 0.18.1); every bundled plugin declares
-  `sdk = ">=0.30.0, <0.31"`.
+- **SDK** `0.31.0` (`JasperSdk.VERSION`; no release carries it yet, `v1.0.0` has 0.18.1); every bundled plugin declares
+  `sdk = ">=0.31.0, <0.32"`.
 - **Themes.** Built in: Jasper Meadow (`jasper-meadow`, Dark and Light; the default theme of both appearances under
   either look), Slate Cobalt (Dark and Light; start-up falls back to its Dark variant when a theme cannot be applied),
   Catppuccin Latte, Frappé, Macchiato and Mocha, and Ubuntu Yaru; the Enterprise plugin adds the Enterprise theme.

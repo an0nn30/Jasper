@@ -319,14 +319,14 @@ The bump alone, as `827ac12ba` ("SDK: 0.30.0") did for 0.30.0. That commit's fil
 - [ ] **Step 4: Docs, in `docs/editor.md`.**
   - The Opening files bullet: files a launch names, `jasper <file>`, and on macOS files opened with Jasper in Finder or
     dropped on its Dock icon open in this Editor, whatever Default editor says, in the most recently active window.
-  - The Default editor intro: drop "the files a launch or Finder hands to Jasper ([Opening files](#opening-files))"
+  - The Default editor intro: drop "the files a launch or Finder hands to Jasper (the link "Opening files" to #opening-files)"
     from the list.
   - The **System default app** bullet: drop the sentence "A file a launch or Finder hands to Jasper is shown in the file
     manager instead."
 
   In `docs/command-line.md`'s `jasper PATH...` row (near line 114), "Opens each file in the default editor, or reveals
   it … when no editor plugin runs or the default editor is **System default app**" becomes: opens each file in the
-  [Jasper Editor](editor.md#opening-files), or reveals it in the file manager when no editor plugin runs. Add the plan's
+  Jasper Editor (linked to editor.md#opening-files), or reveals it in the file manager when no editor plugin runs. Add the plan's
   line to the STATUS.md entry from Task 1.
 - [ ] **Step 5:** `./gradlew check`. Expected: BUILD SUCCESSFUL.
 - [ ] **Step 6:** Commit: `Editor: files handed to Jasper open in the Jasper Editor`.
