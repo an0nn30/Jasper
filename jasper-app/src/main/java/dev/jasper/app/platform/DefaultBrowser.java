@@ -203,11 +203,7 @@ public final class DefaultBrowser {
      */
     static Optional<Boolean> askWindows(String https, BiFunction<String, String, Optional<String>> registry) {
         try {
-            for (String key : List.of(https + "\\UserChoiceLatest", https + "\\UserChoiceLatest\\ProgId", https + "\\UserChoice")) {
-                Optional<String> progId = registry.apply(key, "ProgId");
-                if (progId.isPresent()) return Optional.of(parseWindows(progId.get()));
-            }
-            return Optional.of(false);
+            return Optional.of(WindowsRegistry.userChoice(https, registry).map(DefaultBrowser::parseWindows).orElse(false));
         } catch (UncheckedIOException failure) {
             LOG.log(System.Logger.Level.DEBUG, "Could not read the user's choice of browser", failure);
             return Optional.empty();
@@ -217,7 +213,7 @@ public final class DefaultBrowser {
     /** A string value under {@code HKEY_CURRENT_USER}, for {@link #askWindows}; Windows only, elsewhere it throws. */
     static Optional<String> readRegistry(String key, String name) {
         try {
-            return WindowsUserPath.read(key, name);
+            return WindowsRegistry.read(key, name);
         } catch (IOException failure) {
             throw new UncheckedIOException(failure);
         }
