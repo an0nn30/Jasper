@@ -10,10 +10,11 @@ import java.util.regex.Pattern;
 /**
  * The page's right-click menu (spec section 11) as the SDK's menu items, for what is under the pointer. Above the pane
  * items Jasper adds, in groups: over a bare page, Back, Forward and Reload, as in Chrome; with a link, Open Link in New
- * Tab and Copy Link; with an image, Open Image in New Tab and Copy Image Address; then, in an editable field, Cut, Copy
- * and Paste, or else, with a selection, Copy and Search with ⟨engine⟩, and Select All last. Below them: Print… and Copy
- * Page Title, then View Source and Inspect Element. A separator parts each group from the next. Each item's id is what
- * the menu reports when it is chosen, and its action. It names no Chromium type.
+ * Tab, Copy Link and Save Link As…; with an image, Open Image in New Tab, Save Image As… and Copy Image Address, in
+ * Chrome's order; then, in an editable field, Cut, Copy and Paste, or else, with a selection, Copy and Search with
+ * ⟨engine⟩, and Select All last. Below them: Print… and Copy Page Title, then View Source and Inspect Element. A
+ * separator parts each group from the next. Each item's id is what the menu reports when it is chosen, and its action.
+ * It names no Chromium type.
  *
  * @param leading the items above Jasper's pane items
  * @param trailing the items below them
@@ -23,7 +24,8 @@ record PageMenuItems(List<MenuItem> leading, List<MenuItem> trailing) {
         OPEN_LINK = "page-menu.open-link", COPY_LINK = "page-menu.copy-link", OPEN_IMAGE = "page-menu.open-image",
         COPY_IMAGE_ADDRESS = "page-menu.copy-image-address", CUT = "page-menu.cut", COPY = "page-menu.copy",
         PASTE = "page-menu.paste", SEARCH = "page-menu.search", SELECT_ALL = "page-menu.select-all", PRINT = "page-menu.print",
-        COPY_TITLE = "page-menu.copy-title", VIEW_SOURCE = "page-menu.view-source", INSPECT_ELEMENT = "page-menu.inspect-element";
+        COPY_TITLE = "page-menu.copy-title", VIEW_SOURCE = "page-menu.view-source", INSPECT_ELEMENT = "page-menu.inspect-element",
+        SAVE_LINK = "page-menu.save-link", SAVE_IMAGE = "page-menu.save-image";
     /** The most of a selection Search with searches for, as find cuts its query. */
     static final int LONGEST_SEARCH = 1_000;
     // The separators, each named by the group it comes before.
@@ -73,9 +75,11 @@ record PageMenuItems(List<MenuItem> leading, List<MenuItem> trailing) {
 
     /**
      * The menu for {@code context}. Back and Forward are disabled where the page cannot go; Open in New Tab for what
-     * the frame could not open itself ({@link LinkSchemes#opensFrom}), as it opens with Jasper's rights; an editable
-     * field's Cut and Copy without a selection; and Copy Page Title without a title. Search with shows only for a
-     * selection that is not all white space.
+     * the frame could not open itself ({@link LinkSchemes#opensFrom}), as it opens with Jasper's rights; Save Link As…
+     * and Save Image As… for what is neither a web address the frame could open nor a {@code data:} one
+     * ({@link LinkSchemes#saves}, plan 7's D9), as they download with Jasper's rights; an editable field's Cut and Copy
+     * without a selection; and Copy Page Title without a title. Search with shows only for a selection that is not all
+     * white space.
      *
      * @param context what is under the pointer
      * @return the items above and below Jasper's pane items
@@ -85,9 +89,11 @@ record PageMenuItems(List<MenuItem> leading, List<MenuItem> trailing) {
         if (context.bare()) leading.addAll(List.of(item(BACK, "Back", context.canBack()), item(FORWARD, "Forward", context.canForward()),
             item(RELOAD, "Reload", true)));
         context.link().ifPresent(link -> group(leading, BEFORE_LINK, List.of(
-            item(OPEN_LINK, "Open Link in New Tab", LinkSchemes.opensFrom(context.frame(), link)), item(COPY_LINK, "Copy Link", true))));
+            item(OPEN_LINK, "Open Link in New Tab", LinkSchemes.opensFrom(context.frame(), link)), item(COPY_LINK, "Copy Link", true),
+            item(SAVE_LINK, "Save Link As…", LinkSchemes.saves(context.frame(), link)))));
         context.image().ifPresent(image -> group(leading, BEFORE_IMAGE, List.of(
             item(OPEN_IMAGE, "Open Image in New Tab", LinkSchemes.opensFrom(context.frame(), image)),
+            item(SAVE_IMAGE, "Save Image As…", LinkSchemes.saves(context.frame(), image)),
             item(COPY_IMAGE_ADDRESS, "Copy Image Address", true))));
         var editing = new ArrayList<MenuItem>();
         Optional<String> selection = context.selection();

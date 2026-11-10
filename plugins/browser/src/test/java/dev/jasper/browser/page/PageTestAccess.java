@@ -196,6 +196,19 @@ public final class PageTestAccess {
     }
 
     /**
+     * Has {@code page} load {@code about:blank} in its browser with {@code blank}, and close its browser with
+     * {@code close}, from now on, each told the page: a test's recording ones, as a page without Chromium has no browser
+     * to load or close. UI thread.
+     *
+     * @param page a page
+     * @param blank told each {@code about:blank} load, as a held browser's
+     * @param close told each close of its browser
+     */
+    public static void useBrowserEnding(Page page, java.util.function.Consumer<Page> blank, java.util.function.Consumer<Page> close) {
+        page.useBrowserEnding(blank, close);
+    }
+
+    /**
      * Has {@code page} read its selection with {@code reader} from now on, which is told the page each time and answers
      * what is selected, as the page's script would: a test's, as a page without Chromium has nothing selected.
      *

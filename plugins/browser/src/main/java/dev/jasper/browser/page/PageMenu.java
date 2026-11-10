@@ -28,7 +28,9 @@ import org.cef.handler.CefContextMenuHandlerAdapter;
  * <p>Every item is Jasper's to run: Back and Reload as the page's item runs them, which on its error page go past the
  * failed load and try it again (spec section 14), and Forward through the page; the links' and images' through the
  * page's item, which opens them in the tab next to its own with Jasper's rights, so only what the frame they are in
- * could open itself ({@link LinkSchemes#opensFrom}, R36); Cut, Copy, Paste and Select All as the page's Edit menu runs
+ * could open itself ({@link LinkSchemes#opensFrom}, R36); Save Link As… and Save Image As… through the page, which
+ * downloads a web address the frame could open, or a {@code data:} one ({@link LinkSchemes#saves}), asking where it goes
+ * in Jasper's save chooser (plan 7's F10); Cut, Copy, Paste and Select All as the page's Edit menu runs
  * them, on its focused frame, as Chrome's menu does; Search with ⟨engine⟩ in the next tab with the engine the settings
  * choose; Print… with Chromium's print dialog; the copies with the plugin's clipboard; and View Source and Inspect
  * Element as the page's item runs them, showing the page's source in the item and the page's DevTools, inspecting the
@@ -185,7 +187,8 @@ final class PageMenu {
 
     /**
      * Runs the page's item {@code id}, chosen from the menu for {@code pointed} over a frame at {@code from}. Open Link and
-     * Open Image in New Tab check again that the frame could open their address. UI thread.
+     * Open Image in New Tab check again that the frame could open their address, and Save Link As… and Save Image As…
+     * that it may be saved. UI thread.
      */
     static void run(Page page, MenuPlace place, Pointed pointed, String from, String id) {
         switch (id) {
@@ -194,7 +197,9 @@ final class PageMenu {
             case PageMenuItems.RELOAD -> place.reload().run();
             case PageMenuItems.OPEN_LINK -> openInNextTab(page, from, pointed.link());
             case PageMenuItems.COPY_LINK -> pointed.linkAsWritten().ifPresent(place.clipboard());
+            case PageMenuItems.SAVE_LINK -> save(page, from, pointed.link());
             case PageMenuItems.OPEN_IMAGE -> openInNextTab(page, from, pointed.image());
+            case PageMenuItems.SAVE_IMAGE -> save(page, from, pointed.image());
             case PageMenuItems.COPY_IMAGE_ADDRESS -> pointed.image().ifPresent(place.clipboard());
             case PageMenuItems.CUT -> page.cut();
             case PageMenuItems.COPY -> page.copy();
@@ -215,5 +220,16 @@ final class PageMenu {
     /** Opens {@code address} in the tab next to the page's, when a frame at {@code from} could open it itself. */
     private static void openInNextTab(Page page, String from, Optional<String> address) {
         address.filter(url -> LinkSchemes.opensFrom(from, url)).ifPresent(url -> page.openItem(url, TabPlacement.NEXT_TAB));
+    }
+
+    /**
+     * Downloads {@code address}, as Chromium checked it, in the page, when a frame at {@code from} may save it: the page's
+     * next download of it asks where it goes, then the download starts.
+     */
+    private static void save(Page page, String from, Optional<String> address) {
+        address.filter(url -> LinkSchemes.saves(from, url)).ifPresent(url -> {
+            page.askNextDownload(url);
+            page.startDownload(url);
+        });
     }
 }

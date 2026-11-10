@@ -63,8 +63,10 @@
  * package each download Chromium starts as a {@link dev.jasper.browser.page.DownloadStart}, and continues it into the
  * {@link dev.jasper.browser.page.DownloadTarget} the answer names or refuses it, and each update as a
  * {@link dev.jasper.browser.page.DownloadProgress}, in plain values; the preview client has none, so CEF cancels a
- * preview's downloads. A page's {@link dev.jasper.browser.page.PageContext} tells as its group's store closes it, so the
- * Downloads menu forgets a /dev/null group's downloads.
+ * preview's downloads. The right-click menu's Save Link As… and Save Image As… start a download that asks where it goes
+ * ({@code DownloadAsk}), and a page that closes keeps its browser while its downloads run, as its close hold says
+ * ({@link dev.jasper.browser.page.Page#setCloseHold}). A page's {@link dev.jasper.browser.page.PageContext} tells as its
+ * group's store closes it, so the Downloads menu forgets a /dev/null group's downloads.
  * {@link dev.jasper.browser.page.LastPress}, {@code Favicons}, {@code DownloadStart}, {@code DownloadTarget},
  * {@code DownloadProgress}, {@code Page}'s methods and {@code PreviewPage}'s name no Chromium type, and none of these
  * classes loads until a browser item opens or a Markdown preview is made.

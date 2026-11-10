@@ -106,8 +106,8 @@ import java.util.function.Function;
  * suggestions, View Source's and the filter list's, go through it too, routed as Chromium routes, so a host on this
  * computer or its link goes direct; off, Chromium uses the system's proxy settings and the fetches the JDK's default.
  * Chromium's downloads go to the {@link Downloads}, which reads the Downloads folder once a page first starts, makes the
- * Downloads menu with the first download and marks each finished file; quitting stops the running ones, and once Chromium
- * has ended their partial files go.
+ * Downloads menu with the first download and marks each finished file; a page that closes keeps its browser until its
+ * downloads end; quitting stops the running ones, and once Chromium has ended their partial files go.
  */
 public class BrowserPlugin implements Plugin {
     static final String NEW_TAB = "dev.jasper.browser.new_tab", NEW_WINDOW = "dev.jasper.browser.new_window";
@@ -232,6 +232,10 @@ public class BrowserPlugin implements Plugin {
             PageDownloads.prepare(engine, downloadStarts, downloadUpdates, downloadsAbandoned);
             // Plan 7's F3: the Downloads folder is read and made on the background executor as the first page starts.
             downloads.start();
+            // Plan 7's F1: the page's close tells the downloads first, then keeps its browser while one of its downloads
+            // runs; F1.3: a save chooser cancelled for it ends the count of the download that asked.
+            page.setCloseHold(downloads::drained);
+            page.onSaveCancelled(() -> downloads.saveCancelled(page));
             PageDialogs.prepare(engine);
             AboutQueries.prepare(engine, about, context.background());
             // Before the first page asks for the welcome page, so that Chromium's IO thread only reads the answer from memory.

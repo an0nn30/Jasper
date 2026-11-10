@@ -8,14 +8,17 @@ import java.util.List;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 /**
  * The mouse's back and forward buttons go to the page's item, never to the page; every other button is the page's.
  * The view's buttons here are Windows', whatever the host is. Headless AWT makes no event of a button above 3, so each
  * event here reports its button itself. On Windows and Linux, Ctrl+wheel magnifies the page through its item, and never
- * reaches the page.
+ * reaches the page. An Alt-click on a link reaches the page without Alt, so it loads in place (spec section 8).
  */
 class PageViewMouseTest {
+    /** AWT's old Alt modifier, {@code InputEvent.ALT_MASK}, which Java deprecates. */
+    private static final int ALT_MASK = 1 << 3;
     private final List<NavigationButton> told = new ArrayList<>();
     private final List<Integer> magnified = new ArrayList<>();
 
@@ -153,6 +156,87 @@ class PageViewMouseTest {
         });
     }
 
+    /**
+     * Spec section 8: Chromium downloads an Alt-click on a link, and Jasper loads it in place, so the press, its drags
+     * and its release reach the page without Alt, their other keys, buttons, place and click count unchanged; the menu
+     * key is Cmd on macOS and Ctrl elsewhere, so the other one does not count. What comes after the release has Alt again.
+     * Neither AWT's extended Alt nor its old one, which only the deprecated {@code getModifiers()} reads, is left.
+     */
+    @SuppressWarnings("deprecation")
+    @Test void anAltClickOnALinkReachesThePageWithoutAlt() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            for (var platform : List.of(List.of(NavigationButtonTest.WINDOWS, InputEvent.META_DOWN_MASK),
+                    List.of(NavigationButtonTest.LINUX, InputEvent.META_DOWN_MASK),
+                    List.of(NavigationButtonTest.MAC, InputEvent.CTRL_DOWN_MASK))) {
+                String os = (String) platform.get(0);
+                for (int also : new int[] { 0, InputEvent.SHIFT_DOWN_MASK, (Integer) platform.get(1) }) {
+                    var sent = new ArrayList<MouseEvent>();
+                    var view = view(os);
+                    view.useMouse(sent::add);
+                    view.setHoverUrl("https://example.com/report.pdf");
+                    int keys = InputEvent.ALT_DOWN_MASK | also;
+                    long when = System.currentTimeMillis();
+                    view.processMouseEvent(event(view, MouseEvent.MOUSE_PRESSED, when, keys | InputEvent.BUTTON1_DOWN_MASK,
+                        MouseEvent.BUTTON1, 12, 2));
+                    view.processMouseMotionEvent(event(view, MouseEvent.MOUSE_DRAGGED, when + 1, keys | InputEvent.BUTTON1_DOWN_MASK,
+                        MouseEvent.NOBUTTON, 14, 0));
+                    view.processMouseEvent(event(view, MouseEvent.MOUSE_RELEASED, when + 2, keys, MouseEvent.BUTTON1, 14, 2));
+                    view.processMouseMotionEvent(event(view, MouseEvent.MOUSE_MOVED, when + 3, keys, MouseEvent.NOBUTTON, 15, 0));
+                    String as = os + " with " + InputEvent.getModifiersExText(also);
+                    assertThat(sent).as(as).hasSize(4);
+                    assertThat(sent.subList(0, 3)).as(as).allSatisfy(event -> {
+                        assertThat(event.getModifiersEx() & InputEvent.ALT_DOWN_MASK).as(event.paramString()).isZero();
+                        assertThat(event.getModifiers() & ALT_MASK).as(event.paramString()).isZero();
+                    });
+                    assertThat(sent.subList(0, 3)).extracting(MouseEvent::getID, MouseEvent::getModifiersEx, MouseEvent::getButton,
+                        MouseEvent::getX, MouseEvent::getClickCount).as(as).containsExactly(
+                        tuple(MouseEvent.MOUSE_PRESSED, also | InputEvent.BUTTON1_DOWN_MASK, MouseEvent.BUTTON1, 12, 2),
+                        tuple(MouseEvent.MOUSE_DRAGGED, also | InputEvent.BUTTON1_DOWN_MASK, MouseEvent.NOBUTTON, 14, 0),
+                        tuple(MouseEvent.MOUSE_RELEASED, also, MouseEvent.BUTTON1, 14, 2));
+                    assertThat(sent.getLast().getModifiersEx()).as(as + ": after the release").isEqualTo(keys);
+                }
+            }
+        });
+    }
+
+    /**
+     * An Alt-click over no link, an Alt-click with the menu key, which opens a new tab, and Alt with another button reach
+     * the page as they are: only a plain Alt-click on a link is Chromium's download.
+     */
+    @Test void anAltClickWithNothingUnderThePointerKeepsAlt() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            for (var os : List.of(NavigationButtonTest.WINDOWS, NavigationButtonTest.MAC)) {
+                int menuKey = os.equals(NavigationButtonTest.MAC) ? InputEvent.META_DOWN_MASK : InputEvent.CTRL_DOWN_MASK;
+                var sent = new ArrayList<MouseEvent>();
+                var view = view(os);
+                view.useMouse(sent::add);
+                for (MouseEvent event : click(view, MouseEvent.BUTTON1, InputEvent.ALT_DOWN_MASK)) view.processMouseEvent(event);
+                view.setHoverUrl("https://example.com/report.pdf");
+                for (MouseEvent event : click(view, MouseEvent.BUTTON1, InputEvent.ALT_DOWN_MASK | menuKey)) view.processMouseEvent(event);
+                for (MouseEvent event : click(view, MouseEvent.BUTTON3, InputEvent.ALT_DOWN_MASK)) view.processMouseEvent(event);
+                view.setHoverUrl("");
+                for (MouseEvent event : click(view, MouseEvent.BUTTON1, InputEvent.ALT_DOWN_MASK)) view.processMouseEvent(event);
+                assertThat(sent).as(os).hasSize(12).allSatisfy(event ->
+                    assertThat(event.getModifiersEx() & InputEvent.ALT_DOWN_MASK).as(event.paramString()).isNotZero());
+            }
+        });
+    }
+
+    /** The last press keeps the keys that were down, Alt included, so 4a's gestures still read an Alt-click as a click. */
+    @Test void theLastPressKeepsAlt() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var sent = new ArrayList<MouseEvent>();
+            var view = view();
+            view.useMouse(sent::add);
+            view.setHoverUrl("https://example.com/report.pdf");
+            for (MouseEvent event : click(view, MouseEvent.BUTTON1, InputEvent.ALT_DOWN_MASK)) view.processMouseEvent(event);
+            assertThat(sent.getFirst().getModifiersEx() & InputEvent.ALT_DOWN_MASK).as("the page's press").isZero();
+            assertThat(view.lastPress().button()).isEqualTo(MouseEvent.BUTTON1);
+            assertThat(view.lastPress().modifiersEx()).isEqualTo(InputEvent.ALT_DOWN_MASK | InputEvent.BUTTON1_DOWN_MASK);
+            assertThat(view.activation().active(view.lastPress().whenMillis())).as("and it activates the page").isTrue();
+        });
+    }
+
     private PageView view() {
         return view(NavigationButtonTest.WINDOWS);
     }
@@ -183,14 +267,24 @@ class PageViewMouseTest {
 
     /** A button's press, release and click over the view. */
     private static List<MouseEvent> click(PageView view, int button) {
+        return click(view, button, 0);
+    }
+
+    /** A button's press, release and click over the view, with {@code keys}, AWT's extended modifiers, held. */
+    private static List<MouseEvent> click(PageView view, int button, int keys) {
         long when = System.currentTimeMillis();
         int down = button == MouseEvent.BUTTON1 ? InputEvent.BUTTON1_DOWN_MASK : 0;
-        return List.of(event(view, MouseEvent.MOUSE_PRESSED, when, down, button), event(view, MouseEvent.MOUSE_RELEASED, when + 1, 0, button),
-            event(view, MouseEvent.MOUSE_CLICKED, when + 1, 0, button));
+        return List.of(event(view, MouseEvent.MOUSE_PRESSED, when, keys | down, button),
+            event(view, MouseEvent.MOUSE_RELEASED, when + 1, keys, button), event(view, MouseEvent.MOUSE_CLICKED, when + 1, keys, button));
     }
 
     private static MouseEvent event(PageView view, int id, long when, int modifiers, int button) {
-        return new MouseEvent(view, id, when, modifiers, 10, 10, 1, false, MouseEvent.NOBUTTON) {
+        return event(view, id, when, modifiers, button, 10, 1);
+    }
+
+    /** A mouse event over the view at ({@code x}, 10), whose button is {@code button} whatever headless AWT allows. */
+    private static MouseEvent event(PageView view, int id, long when, int modifiers, int button, int x, int clicks) {
+        return new MouseEvent(view, id, when, modifiers, x, 10, clicks, false, MouseEvent.NOBUTTON) {
             @Override public int getButton() { return button; }
         };
     }

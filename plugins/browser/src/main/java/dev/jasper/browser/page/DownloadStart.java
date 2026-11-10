@@ -15,8 +15,8 @@ import java.util.Optional;
  * @param pageUrl the address the browser's main frame shows, the page that led to the file; never null
  * @param page the page whose browser started it; empty for a browser that is no page's, as DevTools' is, whose download
  *     holds nothing
- * @param ask whether the user asked where to save it, so Chromium shows the save chooser; false until Save Link As
- *     asks (plan 7 Task 4)
+ * @param ask whether the user asked where to save it, as Save Link As… and Save Image As… ask through the page's
+ *     {@link DownloadAsk}, so Chromium shows the save chooser; false for a browser that is no page's
  * @param activated whether the page had a user activation as the download started, read and not consumed: within
  *     5 seconds of a press or key it got (ruling D1); false for a browser that is no page's
  * @param document how many documents the page's main frame had started, which names the document the download comes

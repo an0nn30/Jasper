@@ -444,6 +444,31 @@ class BrowserItemTest {
     }
 
     /**
+     * Plan 7's F28, as Chrome does: an item a page opened, a popup or a link's new tab or split, closes when its first
+     * navigation becomes a download, before it committed any document, so no empty tab is left; the download keeps its
+     * browser through the page's close hold. An item the user opened, and one that has shown a document, stay.
+     */
+    @Test void anItemAPageOpenedClosesWhenItsFirstNavigationBecomesADownload() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var items = items(host, page -> { });
+            var opener = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            Page popup = opener.page().openItem("https://example.com/report.pdf", TabPlacement.NEXT_TAB).orElseThrow();
+            Page split = opener.page().openItem("https://example.com/archive.zip", TabPlacement.SPLIT_RIGHT).orElseThrow();
+            Page shown = opener.page().openItem("https://example.com/next", TabPlacement.NEXT_TAB).orElseThrow();
+            PageTestAccess.addressChanged(shown, "https://example.com/next");
+            assertThat(items.items()).hasSize(4);
+            popup.firstNavigationDownloaded();
+            split.firstNavigationDownloaded();
+            assertThat(items.items()).extracting(BrowserItem::page).containsExactly(opener.page(), shown);
+            shown.firstNavigationDownloaded();
+            opener.page().firstNavigationDownloaded();
+            assertThat(items.items()).as("a document shown, and the user's own item").extracting(BrowserItem::page)
+                .containsExactly(opener.page(), shown);
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /**
      * The opener bridge reaches a popup through pages (Task 8): the page a link or popup opens is the new item's, and a
      * page can show its item, close it, and tell who asks when it closes.
      */

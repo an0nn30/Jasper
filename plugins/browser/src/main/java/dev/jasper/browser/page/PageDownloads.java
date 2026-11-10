@@ -23,13 +23,15 @@ import org.cef.handler.CefDownloadHandlerAdapter;
  * asks where a download goes ({@code onBeforeDownload}), the handler reads a {@link DownloadStart}: the browser's
  * identifier and Chromium's id for it (ruling F21), the suggested name, the file's address, the address the browser
  * shows, and for a page's own browser the page, whether the page has a user activation, read without consuming it, as
- * a download is no popup, and how many documents its main frame has started (ruling D1). A browser that is no page's,
- * as a page's DevTools' is, starts a download that holds no page (ruling F20). The answer refuses it, and the handler
- * returns false, which CEF's off-screen browsers take as a cancel, or names a {@link DownloadTarget}, and the handler
- * continues the download into it once and returns true: JCEF continues a download never answered into Chromium's own
- * folder once its callback is collected, so the handler never returns true without continuing. A start whose answer
- * throws, or cannot be continued, is refused too, and abandoned, so what was kept for it is given back. A load Jasper
- * starts for the user gives the page's downloads a new document (ruling D20).
+ * a download is no popup, how many documents its main frame has started (ruling D1), and whether the download asks
+ * where it goes, as Save Link As… and Save Image As… ask, taking the page's {@link DownloadAsk}. A browser that is no
+ * page's, as a page's DevTools' is, starts a download that holds no page (ruling F20). The answer refuses it, and the
+ * handler returns false, which CEF's off-screen browsers take as a cancel, or names a {@link DownloadTarget}, and the
+ * handler continues the download into it once and returns true: JCEF continues a download never answered into
+ * Chromium's own folder once its callback is collected, so the handler never returns true without continuing. A start
+ * whose answer throws, or cannot be continued, is refused too, and abandoned, so what was kept for it is given back; an
+ * abandon that throws as well is logged. A load Jasper starts for the user gives the page's downloads a new document
+ * (ruling D20).
  *
  * <p>Each update ({@code onDownloadUpdated}) reaches the {@code downloads} package as a {@link DownloadProgress} with a
  * cancel of its item's own, which cancels nothing once Chromium has stopped (plan 6's "no native call after stop"); an
@@ -94,8 +96,8 @@ public final class PageDownloads {
 
     /**
      * A download a browser starts, from plain values: for a page's own browser, whether the page is activated now, read
-     * without consuming the activation, and the document its downloads count in ({@link Page#downloadDocument}).
-     * Chromium's thread.
+     * without consuming the activation, the document its downloads count in ({@link Page#downloadDocument}), and whether
+     * it asks where it goes, which takes the page's ask ({@link DownloadAsk#take}). Chromium's thread.
      *
      * @param browser the browser's identifier
      * @param pageUrl the address the browser shows
@@ -111,7 +113,8 @@ public final class PageDownloads {
                                long nowMillis) {
         boolean activated = page.map(shown -> shown.activation().active(nowMillis)).orElse(false);
         long document = page.map(Page::downloadDocument).orElse(0L);
-        return new DownloadStart(browser, id, suggestedName, url, pageUrl, page, false, activated, document, inMemory);
+        boolean ask = page.map(shown -> shown.downloadAsk().take(url, nowMillis)).orElse(false);
+        return new DownloadStart(browser, id, suggestedName, url, pageUrl, page, ask, activated, document, inMemory);
     }
 
     /**
@@ -137,7 +140,8 @@ public final class PageDownloads {
     /**
      * Answers {@code start} through {@code before}: continues it once into the target given and returns true; returns
      * false and never continues it for no target; and for a hook or a continue that throws returns false, which CEF
-     * takes as a cancel, and tells {@code abandoned}, so what was kept for the start is given back.
+     * takes as a cancel, and tells {@code abandoned}, so what was kept for the start is given back; an {@code abandoned}
+     * that throws too is logged.
      *
      * @param start the start
      * @param callback Chromium's callback for it
@@ -154,7 +158,11 @@ public final class PageDownloads {
             return true;
         } catch (RuntimeException failure) {
             LOG.log(System.Logger.Level.WARNING, "A download could not be answered", failure);
-            abandoned.accept(start);
+            try {
+                abandoned.accept(start);
+            } catch (RuntimeException alsoFailed) {
+                LOG.log(System.Logger.Level.WARNING, "A download that could not be answered could not be abandoned", alsoFailed);
+            }
             return false;
         }
     }

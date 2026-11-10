@@ -63,8 +63,8 @@ class PageMenuTest {
             PageTestAccess.loadingChanged(page, false, true, false);
             show(pointed(Optional.of("https://example.com/next"), NONE, Optional.of("selected"), false));
             List<String> lines = host.contentMenu(item.tab());
-            assertThat(lines).startsWith("item:page-menu.open-link", "item:page-menu.copy-link", "---", "item:page-menu.copy",
-                "item:page-menu.search", "item:page-menu.select-all", "---", "host:Split");
+            assertThat(lines).startsWith("item:page-menu.open-link", "item:page-menu.copy-link", "item:page-menu.save-link", "---",
+                "item:page-menu.copy", "item:page-menu.search", "item:page-menu.select-all", "---", "host:Split");
             assertThat(lines).contains("host:Move Pane to Tab (disabled)", "host:Close Pane");
             assertThat(lines).endsWith("host:Close Pane", "---", "item:page-menu.print", "item:page-menu.copy-title (disabled)", "---",
                 "item:page-menu.view-source", "item:page-menu.inspect-element");
@@ -185,6 +185,64 @@ class PageMenuTest {
             show(local);
             assertThat(host.chooseFromContentMenu(item.tab(), "item:page-menu.open-link")).isTrue();
             assertThat(items.items()).extracting(BrowserItem::url).contains(URI.create("file:///etc/hosts"));
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * Spec sections 10 and 11, plan 7's F10: Save Link As… and Save Image As… arm the page's ask with the address Chromium
+     * checked, not the one the page wrote, then start its download, which asks where it goes; a data: image saves too.
+     */
+    @Test void saveLinkAsAndSaveImageAsAskWhereTheDownloadGoesThenStartIt() throws Exception {
+        onUiThread(() -> {
+            open();
+            var started = new ArrayList<String>();
+            page.useDownloader((downloading, url) -> {
+                assertThat(downloading).isSameAs(page);
+                started.add(url);
+            });
+            String link = "https://example.org/report.pdf", image = "data:image/png;base64,AAAA";
+            var pointed = new PageMenu.Pointed(new Point(), Optional.of(link), Optional.of("https://ada:pw@example.org/report.pdf"),
+                Optional.of(image), NONE, false, NONE);
+            show(pointed);
+            assertThat(host.contentMenu(item.tab())).contains("item:page-menu.save-link", "item:page-menu.save-image");
+            assertThat(host.chooseFromContentMenu(item.tab(), "item:page-menu.save-link")).isTrue();
+            assertThat(started).containsExactly(link);
+            assertThat(page.downloadAsk().take(link, System.currentTimeMillis() + 2_000)).as("armed for the link").isTrue();
+            show(pointed);
+            assertThat(host.chooseFromContentMenu(item.tab(), "item:page-menu.save-image")).isTrue();
+            assertThat(started).containsExactly(link, image);
+            assertThat(page.downloadAsk().take(image, System.currentTimeMillis() + 2_000)).as("armed for the image").isTrue();
+            assertThat(ended).hasValue(2);
+            assertThat(items.items()).as("nothing opened").hasSize(1);
+            assertThat(host.clipboard().copies()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * Plan 7's D9: Save Link As… and Save Image As… are disabled for a local, Jasper, blob or script address, and save
+     * nothing even when run, as they download with Jasper's rights; a page without a browser starts nothing.
+     */
+    @Test void saveLinkAsAndSaveImageAsSaveNoOtherAddressEvenWhenRun() throws Exception {
+        onUiThread(() -> {
+            open();
+            var started = new ArrayList<String>();
+            page.useDownloader((downloading, url) -> started.add(url));
+            for (String other : List.of("file:///etc/hosts", "jasper-about:welcome", "blob:https://example.com/1", "javascript:alert(1)")) {
+                var pointed = pointed(Optional.of(other), Optional.of(other), NONE, false);
+                show(pointed);
+                assertThat(host.contentMenu(item.tab())).as(other)
+                    .contains("item:page-menu.save-link (disabled)", "item:page-menu.save-image (disabled)");
+                assertThat(host.dismissContentMenu(item.tab())).isTrue();
+                PageMenu.run(page, page.menuPlace().orElseThrow(), pointed, PAGE + "/", PageMenuItems.SAVE_LINK);
+                PageMenu.run(page, page.menuPlace().orElseThrow(), pointed, PAGE + "/", PageMenuItems.SAVE_IMAGE);
+                assertThat(page.downloadAsk().take(other, System.currentTimeMillis() + 2_000)).as(other + ": nothing armed").isFalse();
+            }
+            assertThat(started).isEmpty();
+            var unready = new Page(URI.create(PAGE), () -> { }, PageTestAccess.noFavicons(), Runnable::run, PageContext.persistent());
+            unready.startDownload("https://example.org/report.pdf");
+            unready.close();
             assertThat(host.failures()).isEmpty();
         });
     }

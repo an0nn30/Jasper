@@ -24,6 +24,7 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -52,12 +53,14 @@ import java.util.concurrent.RejectedExecutionException;
  *
  * <p><b>A page's downloads.</b> A download counts for its page from the moment {@code before} gives it a target to its
  * outcome (ruling F1), and once the page's close has begun ({@link #drained}), its later starts are refused, under the
- * same lock, so none slips past a close; a start Chromium could not be given is abandoned ({@link #abandon}). As Chrome
- * limits them (ruling D1, the user's "Match Chrome"), a page's first download without a user activation in a document
- * goes and each later one in that document is refused, the first refusal posting "This site tried to download multiple
- * files" with the page's host, never its user name or password ({@link DownloadAddresses}); an activated start, one the
- * user asked to save, a new document, a load Jasper starts for the user (ruling D20) and a browser that is no page's
- * always go.
+ * same lock, so none slips past a close; the page's browser closes once its count ends. A start Chromium could not be
+ * given is abandoned ({@link #abandon}), and a save chooser cancelled for the page ends its ask start that had no
+ * update ({@link #saveCancelled}, ruling F1.3). A download given a target before its page committed any document tells
+ * the page, whose item closes if a page opened it (ruling F28). As Chrome limits them (ruling D1, the user's "Match
+ * Chrome"), a page's first download without a user activation in a document goes and each later one in that document is
+ * refused, the first refusal posting "This site tried to download multiple files" with the page's host, never its user
+ * name or password ({@link DownloadAddresses}); an activated start, one the user asked to save, a new document, a load
+ * Jasper starts for the user (ruling D20) and a browser that is no page's always go.
  *
  * <p><b>The list and the menu.</b> A download joins the {@link DownloadList}, and the Downloads menu, at its first
  * update: the first creates the menu, whose entries ({@link DownloadsMenu}) are set again only when a title, an enabled
@@ -121,10 +124,11 @@ public final class Downloads {
     /**
      * A download Chromium was given a target for, as its first update lists it.
      *
+     * @param ask whether the user asked where to save it, as Save Link As… asks
      * @param folder the folder its intermediate file is in: its reservation's; null for one the user asked to save
      */
     private record Started(DownloadKey key, String name, Path target, String url, String pageUrl, Optional<Page> page, boolean inMemory,
-                           Optional<DownloadNames.Reservation> reservation, Path folder) { }
+                           boolean ask, Optional<DownloadNames.Reservation> reservation, Path folder) { }
 
     /** A running download's intermediate file, and the folder it must be in to be deleted; null for any. */
     private record Intermediate(Path file, Path folder) { }
@@ -193,7 +197,9 @@ public final class Downloads {
 
     /**
      * Where a download Chromium starts goes, or empty to refuse it, which CEF cancels. Chromium's thread: it reads only
-     * whether names are free in the folder.
+     * whether names are free in the folder. A download given a target while its page has committed no document, its
+     * first navigation become a download, tells the page on the UI thread ({@link Page#firstNavigationDownloaded},
+     * ruling F28).
      *
      * @param start the download
      * @return a free file in the Downloads folder, with no ask; the folder and the safe name, with the ask, for a download
@@ -249,26 +255,48 @@ public final class Downloads {
                 state.running++;
                 if (automatic) state.automatic = start.document();
             }
-            starts.put(key, new Started(key, name, target, start.url(), start.pageUrl(), start.page(), start.inMemory(), reservation,
-                reservation.map(held -> held.file().getParent()).orElse(null)));
+            starts.put(key, new Started(key, name, target, start.url(), start.pageUrl(), start.page(), start.inMemory(), start.ask(),
+                reservation, reservation.map(held -> held.file().getParent()).orElse(null)));
         }
+        if (page != null && page.committedAddress().isEmpty()) later(page::firstNavigationDownloaded);
         return Optional.of(new DownloadTarget(target, start.ask()));
     }
 
     /**
      * A start {@link #before} gave a target that Chromium could not be given, as its continue threw: it is forgotten, its
-     * name freed and its page's count ended, so the page's hold may complete on this thread; a start not kept, and one
-     * abandoned before, change nothing. Chromium's thread.
+     * name freed and its page's count ended, so the page's hold may complete on this thread, and a close that touches
+     * Swing then hops to the UI thread, as the page's does; a start not kept, and one abandoned before, change nothing.
+     * Chromium's thread.
      *
      * @param start the start
      */
     public void abandon(DownloadStart start) {
         Objects.requireNonNull(start, "start");
-        var key = new DownloadKey(start.browser(), start.id());
-        Started kept = starts.remove(key);
-        if (kept == null) return;
-        cancels.remove(key);
-        intermediates.remove(key);
+        Started kept = starts.remove(new DownloadKey(start.browser(), start.id()));
+        if (kept != null) forgotten(kept);
+    }
+
+    /**
+     * A save chooser Chromium asked for {@code page} was cancelled (ruling F1.3): the page's oldest start that asked
+     * where it goes and has had no update yet is forgotten and its page's count ended, as Chromium may tell nothing of a
+     * download cancelled before it began, which would otherwise hold the page's browser until Jasper quits. Only a
+     * download or the page's own {@code showSaveFilePicker} opens such a chooser, so at worst a count ends early; a start
+     * that has had an update ends with its own outcome. UI thread.
+     *
+     * @param page the page the chooser was for
+     */
+    public void saveCancelled(Page page) {
+        Objects.requireNonNull(page, "page");
+        starts.values().stream().filter(start -> start.ask() && start.page().orElse(null) == page && !cancels.containsKey(start.key()))
+            .min(Comparator.comparingInt(start -> start.key().id()))
+            .filter(start -> starts.remove(start.key(), start))
+            .ifPresent(this::forgotten);
+    }
+
+    /** A start forgotten before its outcome: what was kept for it goes, its name is freed and its page's count ends. */
+    private void forgotten(Started kept) {
+        cancels.remove(kept.key());
+        intermediates.remove(kept.key());
         kept.reservation().ifPresent(names::release);
         kept.page().ifPresent(this::ended);
     }
@@ -306,7 +334,8 @@ public final class Downloads {
     /**
      * Whether {@code page}'s downloads have ended: its close has begun, so its later downloads are refused (ruling F1),
      * and the answer completes once its last running download has its outcome, on the UI thread, or its last start is
-     * {@linkplain #abandon abandoned}, on Chromium's, at once when it has none, and at {@link #stopAll}. Any thread.
+     * {@linkplain #abandon abandoned}, on Chromium's, at once when it has none, and at {@link #stopAll}. A close that
+     * waits for it and touches Swing hops to the UI thread, as the page's does ({@link Page#setCloseHold}). Any thread.
      *
      * @param page the page that closes
      * @return complete once it holds no download

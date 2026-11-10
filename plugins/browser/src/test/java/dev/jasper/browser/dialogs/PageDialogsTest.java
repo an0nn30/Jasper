@@ -37,12 +37,16 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.Vector;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.LongSupplier;
 import javax.swing.SwingUtilities;
+import org.cef.browser.CefBrowser;
+import org.cef.callback.CefFileDialogCallback;
+import org.cef.handler.CefDialogHandler.FileDialogMode;
 import org.cef.handler.CefJSDialogHandler.JSDialogType;
 import org.cef.misc.BoolRef;
 import org.junit.jupiter.api.AfterEach;
@@ -518,6 +522,38 @@ class PageDialogsTest {
         });
     }
 
+    /**
+     * Plan 7's F1.3: Chromium's save chooser, cancelled, cancels Chromium's callback and then tells the page, so its
+     * downloads end the count of the download that asked, whose cancel Chromium may never report; also when the item
+     * closes under the chooser. An open chooser's cancel, and a save chosen, tell the page nothing.
+     */
+    @Test void aCancelledSaveChooserCancelsChromiumsCallbackThenTellsThePage() throws Exception {
+        shown = show();
+        var told = new CopyOnWriteArrayList<String>();
+        Path target = Path.of("/tmp/out.pdf").toAbsolutePath();
+        onUiThread(() -> shown.page.onSaveCancelled(() -> told.add("page")));
+        var handler = new PageDialogs.Files();
+        var browser = PageTestAccess.pageBrowser(shown.page);
+        var cancelled = new FileCallback(told);
+        save(handler, browser, target, cancelled);
+        var opened = new FileCallback(told);
+        handler.onFileDialog(browser, FileDialogMode.FILE_DIALOG_OPEN, "", "", new Vector<>(), new Vector<>(), new Vector<>(), opened);
+        onUiThread(() -> shown.host.queuePathSelection(List.of(target)));
+        var chosen = new FileCallback(told);
+        save(handler, browser, target, chosen);
+        onUiThread(() -> {
+            assertThat(told).containsExactly("cancel", "page", "cancel", "continue " + List.of(target.toString()));
+            told.clear();
+            shown.host.duringPathSelection(shown.item::close);
+        });
+        var closing = new FileCallback(told);
+        save(handler, browser, target, closing);
+        onUiThread(() -> {
+            assertThat(told).as("the item closed under the chooser").containsExactly("cancel", "page");
+            assertThat(shown.host.failures()).isEmpty();
+        });
+    }
+
     @Test void aChooserStartsWhereChromiumSuggestsAndASavedNameStaysInItsFolder() {
         Path home = Path.of(System.getProperty("user.home"));
         Path absolute = Path.of("/tmp/start/file.txt").toAbsolutePath();
@@ -652,6 +688,29 @@ class PageDialogsTest {
 
         @Override public void accept(Boolean ok, String text) {
             calls.add(ok + "|" + text);
+        }
+    }
+
+    /** Chromium asks {@code handler} for a save chooser for {@code browser}'s page, suggesting {@code target}. */
+    private static void save(PageDialogs.Files handler, CefBrowser browser, Path target, CefFileDialogCallback callback) {
+        handler.onFileDialog(browser, FileDialogMode.FILE_DIALOG_SAVE, "", target.toString(), new Vector<>(), new Vector<>(), new Vector<>(),
+            callback);
+    }
+
+    /** Chromium's file dialog callback, recording each {@code continue}, with its paths, and each {@code cancel}. */
+    private static final class FileCallback implements CefFileDialogCallback {
+        private final List<String> calls;
+
+        FileCallback(List<String> calls) {
+            this.calls = calls;
+        }
+
+        @Override public void Continue(Vector<String> paths) {
+            calls.add("continue " + List.copyOf(paths));
+        }
+
+        @Override public void Cancel() {
+            calls.add("cancel");
         }
     }
 

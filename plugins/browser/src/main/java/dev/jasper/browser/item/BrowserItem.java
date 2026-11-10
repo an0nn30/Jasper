@@ -102,7 +102,9 @@ import javax.swing.JComponent;
  * in a {@link DataStore} (spec section 12), which it holds while it is open: its page is made in the store's request
  * context, once the store is {@link DataStore#ready ready}; its history, bookmarks, address suggestions and Edit Bookmark
  * panel are the store's, and so are the certificates it goes on past; and the links and popups its page opens in items
- * of their own open in the same store, so a /dev/null item's stay in its group. UI thread.
+ * of their own open in the same store, so a /dev/null item's stay in its group. An item its page opened that way closes
+ * when its first navigation becomes a download, before it shows any document, as Chrome closes such a tab, while the
+ * download keeps its browser (plan 7's F28); one the user opened never does. UI thread.
  */
 public final class BrowserItem implements AutoCloseable {
     static final String ROOT = "browser", PAGE = "browser.page", CONTENT = "browser.page.content";
@@ -154,6 +156,8 @@ public final class BrowserItem implements AutoCloseable {
     private OptionalInt ownZoom;
     private String title;
     private boolean waiting, asked, closed;
+    // Whether a page opened the item, as its link or popup (plan 7's F28).
+    private boolean openedByPage;
     // How many main-frame loads the page has started: a bookmark's panel opens only if none has since Add Bookmark.
     private long loadStarts;
     // Copy on select: whether a read of the page's selection is under way, and whether a gesture came meanwhile (H34);
@@ -183,6 +187,8 @@ public final class BrowserItem implements AutoCloseable {
         page.onMagnify(this::magnify);
         page.onOpenItem(this::openItem);
         page.onCloseItem(this::close);
+        // Plan 7's F28: a tab a page opened, whose first navigation became a download, is empty: it closes, as Chrome's.
+        page.onFirstNavigationDownload(() -> { if (openedByPage) close(); });
         page.onShowItem(this::show);
         page.onAddressChange(this::committed);
         page.onLoadStart(address -> loadStarts++);
@@ -717,7 +723,7 @@ public final class BrowserItem implements AutoCloseable {
      * A link or popup of the page opens an item of its own beside this one, for no OSC 8 target, in this item's store: in
      * a new tab right after this item's tab, or split from this item's pane. A split opens beside the focused pane of the
      * window's shown tab, so this item is selected first when it is not that. An address that is no URI opens nothing.
-     * Answers the new item's page, which the opener bridge links to this one.
+     * Answers the new item's page, which the opener bridge links to this one. The new item knows a page opened it.
      */
     private Optional<Page> openItem(String address, TabPlacement placement) {
         if (closed || tab == null) return Optional.empty();
@@ -725,7 +731,9 @@ public final class BrowserItem implements AutoCloseable {
         if (link.isEmpty()) return Optional.empty();
         if (placement != TabPlacement.NEXT_TAB && !tab.isActive()) tab.select();
         try {
-            return Optional.of(items.open(link.get(), placement, Optional.empty(), Optional.of(tab), store).page);
+            BrowserItem opened = items.open(link.get(), placement, Optional.empty(), Optional.of(tab), store);
+            opened.openedByPage = true;
+            return Optional.of(opened.page);
         } catch (IllegalStateException closing) { // the windows close, or Jasper quits
             items.context().log().log(System.Logger.Level.WARNING, "A link could not open: " + closing.getMessage(), closing);
             return Optional.empty();

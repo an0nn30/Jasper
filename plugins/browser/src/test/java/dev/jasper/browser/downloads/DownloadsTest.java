@@ -375,6 +375,170 @@ class DownloadsTest {
         assertThat(downloads.before(start(other, 5, "e.pdf"))).as("another page's").isPresent();
     }
 
+    /** The plan's row: a page's hold completes once its last download ends, and is complete at once for a page with none. */
+    @Test void drainedCompletesWhenThePagesLastDownloadEnds() throws Exception {
+        make(MAC);
+        resolve();
+        Page page = page(PageContext.persistent()), none = page(PageContext.persistent());
+        assertThat(onUi(() -> downloads.drained(none))).as("no download").isCompleted();
+        Path a = downloads.before(start(page, 1, "a.pdf")).orElseThrow().file();
+        Path b = downloads.before(start(page, 2, "b.pdf")).orElseThrow().file();
+        update(running(1, 1, 10, a + ".crdownload"), () -> { });
+        update(running(2, 1, 10, b + ".crdownload"), () -> { });
+        CompletableFuture<Void> hold = onUi(() -> downloads.drained(page));
+        assertThat(hold).isNotDone();
+        complete(1, a);
+        assertThat(hold).as("one still runs").isNotDone();
+        update(interrupted(2), () -> { });
+        assertThat(hold).isCompleted();
+        assertThat(onUi(() -> downloads.drained(page))).as("asked again").isCompleted();
+    }
+
+    /**
+     * Ruling F1 and D19, the whole path: a page that starts a download and then closes itself, as {@code window.close()}
+     * closes its item, keeps its browser, which loads {@code about:blank}, until the download's outcome; its entry stays
+     * in the menu meanwhile, and the finished file is marked. Closing first refuses the download instead.
+     */
+    @Test void aPageThatDownloadsAndClosesItselfKeepsItsBrowserUntilTheFileIsMarked() throws Exception {
+        make(MAC);
+        resolve();
+        Page page = page(PageContext.persistent());
+        var browser = new CopyOnWriteArrayList<String>();
+        onUi(() -> {
+            PageTestAccess.useBrowserEnding(page, blanked -> browser.add("about:blank"), closing -> browser.add("close"));
+            page.setCloseHold(downloads::drained);
+            page.onCloseItem(page::close);
+            return null;
+        });
+        Path target = downloads.before(new DownloadStart(BROWSER, 1, "report.pdf", "https://files.example/report.pdf", PAGE,
+            Optional.of(page), false, true, 1, false)).orElseThrow().file();
+        onUi(() -> {
+            page.closeItem();
+            return null;
+        });
+        assertThat(browser).as("held before its first update").containsExactly("about:blank");
+        update(running(1, 5, 10, target + ".crdownload"), () -> { });
+        assertThat(menu()).contains("entries:report.pdf" + DASH + "50%");
+        complete(1, target);
+        assertThat(browser).as("closed at the outcome").containsExactly("about:blank", "close");
+        host.runBackground();
+        flush();
+        assertThat(host.markedDownloads()).containsExactly(new MarkedDownload(target, URI.create("https://files.example/report.pdf"),
+            Optional.of(URI.create(PAGE))));
+        assertThat(menu()).contains("entries:report.pdf" + DASH + "Finished");
+        assertThat(notices()).containsExactly(GROUP + "|INFO|Download finished for \u201Creport.pdf\u201D.|");
+
+        Page closedFirst = page(PageContext.persistent());
+        onUi(() -> {
+            PageTestAccess.useBrowserEnding(closedFirst, blanked -> browser.add("blank, closed first"),
+                closing -> browser.add("closed first"));
+            closedFirst.setCloseHold(downloads::drained);
+            closedFirst.close();
+            return null;
+        });
+        assertThat(downloads.before(start(closedFirst, 2, "late.pdf"))).as("a start after the close").isEmpty();
+        assertThat(browser).endsWith("closed first");
+    }
+
+    /**
+     * Ruling F30 with F1: Jasper's quit completes every hold in {@code stopAll}, on the UI thread, and a held browser
+     * closes in that same turn, before the plugin closes Chromium; a start Chromium could not be given, abandoned on
+     * Chromium's thread, closes its page's held browser on the UI thread.
+     */
+    @Test void aHeldBrowserClosesAsJasperQuitsBeforeChromiumDoesAndAnAbandonClosesItOnTheUiThread() throws Exception {
+        make(MAC);
+        resolve();
+        Page quitting = page(PageContext.persistent()), abandoning = page(PageContext.persistent());
+        var browser = new CopyOnWriteArrayList<String>();
+        DownloadStart abandoned = start(abandoning, 2, "b.pdf");
+        Path a = downloads.before(start(quitting, 1, "a.pdf")).orElseThrow().file();
+        downloads.before(abandoned).orElseThrow();
+        update(running(1, 1, 10, a + ".crdownload"), () -> { });
+        onUi(() -> {
+            PageTestAccess.useBrowserEnding(quitting, blanked -> browser.add("quitting blank"),
+                closing -> browser.add("quitting closed on the UI thread: " + SwingUtilities.isEventDispatchThread()));
+            PageTestAccess.useBrowserEnding(abandoning, blanked -> browser.add("abandoning blank"),
+                closing -> browser.add("abandoning closed on the UI thread: " + SwingUtilities.isEventDispatchThread()));
+            quitting.setCloseHold(downloads::drained);
+            abandoning.setCloseHold(downloads::drained);
+            quitting.close();
+            abandoning.close();
+            return null;
+        });
+        assertThat(browser).containsExactly("quitting blank", "abandoning blank");
+        downloads.abandon(abandoned);
+        flush();
+        assertThat(browser).endsWith("abandoning closed on the UI thread: true");
+        List<String> seen = onUi(() -> {
+            downloads.stopAll();
+            return List.copyOf(browser);
+        });
+        assertThat(seen).as("in stopAll's own turn").endsWith("quitting closed on the UI thread: true");
+    }
+
+    /**
+     * Ruling F1.3: a save chooser cancelled for a page ends its oldest ask start that has had no update, as Chromium may
+     * tell nothing of a download cancelled before it began; one that had an update ends with its own outcome, and
+     * another page's are its own.
+     */
+    @Test void aCancelledSaveChooserEndsThePagesOldestAskStartThatHadNoUpdate() throws Exception {
+        make(MAC);
+        resolve();
+        Page page = page(PageContext.persistent()), other = page(PageContext.persistent());
+        downloads.before(ask(page, 1, "a.pdf")).orElseThrow();
+        Path updated = downloads.before(ask(page, 2, "b.pdf")).orElseThrow().file();
+        update(running(2, 1, 10, updated + ".crdownload"), () -> { });
+        downloads.before(ask(page, 3, "c.pdf")).orElseThrow();
+        downloads.before(ask(other, 4, "d.pdf")).orElseThrow();
+        CompletableFuture<Void> hold = onUi(() -> downloads.drained(page)), otherHold = onUi(() -> downloads.drained(other));
+        onUi(() -> {
+            downloads.saveCancelled(page);
+            return null;
+        });
+        update(running(1, 1, 10, folder.resolve("a.pdf") + ".crdownload"), () -> { });
+        assertThat(menu()).as("its update is dropped").noneMatch(line -> line.startsWith("entries:a.pdf"));
+        assertThat(hold).isNotDone();
+        onUi(() -> {
+            downloads.saveCancelled(page);
+            return null;
+        });
+        assertThat(hold).as("the one with an update still runs").isNotDone();
+        update(cancelled(2), () -> { });
+        assertThat(hold).isCompleted();
+        assertThat(otherHold).isNotDone();
+        onUi(() -> {
+            downloads.saveCancelled(page);
+            return null;
+        });
+        assertThat(otherHold).as("another page's").isNotDone();
+        assertThat(notices()).isEmpty();
+    }
+
+    /**
+     * Ruling F28: a download given a target while its page has committed no document, its first navigation become a
+     * download, tells the page on the UI thread, which tells its item; a page showing a document, and a refused start,
+     * tell nothing.
+     */
+    @Test void aDownloadBeforeThePagesFirstDocumentTellsThePageOnTheUiThread() throws Exception {
+        make(MAC);
+        resolve();
+        Page fresh = page(PageContext.persistent()), shown = page(PageContext.persistent()), closing = page(PageContext.persistent());
+        var told = new CopyOnWriteArrayList<String>();
+        onUi(() -> {
+            PageTestAccess.addressChanged(shown, PAGE);
+            fresh.onFirstNavigationDownload(() -> told.add("fresh on the UI thread: " + SwingUtilities.isEventDispatchThread()));
+            shown.onFirstNavigationDownload(() -> told.add("shown"));
+            closing.onFirstNavigationDownload(() -> told.add("closing"));
+            downloads.drained(closing);
+            return null;
+        });
+        assertThat(downloads.before(start(fresh, 1, "a.pdf"))).isPresent();
+        assertThat(downloads.before(start(shown, 2, "b.pdf"))).isPresent();
+        assertThat(downloads.before(start(closing, 3, "c.pdf"))).isEmpty();
+        flush();
+        assertThat(told).containsExactly("fresh on the UI thread: true");
+    }
+
     /**
      * Ruling F7: a /dev/null download's mark names no address, and its group's finished downloads leave the list as the
      * group's store closes; a running one leaves at its end, and another group's stay.

@@ -13,7 +13,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * The page's right-click menu for what is under the pointer (spec section 11), as the SDK's menu items: above Jasper's
  * pane items, Back, Forward and Reload over a bare page only, as in Chrome (P38), the link's items, the image's, then the
  * editing or selection items with Select All last; below them, Print… and Copy Page Title, then View Source and Inspect
- * Element, a separator between groups. Pure: no Chromium, no host.
+ * Element, a separator between groups. The link's and image's items include Save Link As… and Save Image As… (plan 7's
+ * F10). Pure: no Chromium, no host.
  */
 class PageMenuItemsTest {
     private static final Optional<String> NONE = Optional.empty();
@@ -33,8 +34,9 @@ class PageMenuItemsTest {
         var menu = PageMenuItems.of(new Context(false, true, Optional.of("https://example.com/next"),
             Optional.of("https://example.com/cat.png"), Optional.of("two words"), false, "DuckDuckGo", PAGE, true));
         assertThat(lines(menu.leading())).containsExactly(
-            "page-menu.open-link Open Link in New Tab", "page-menu.copy-link Copy Link", "---",
-            "page-menu.open-image Open Image in New Tab", "page-menu.copy-image-address Copy Image Address", "---",
+            "page-menu.open-link Open Link in New Tab", "page-menu.copy-link Copy Link", "page-menu.save-link Save Link As…", "---",
+            "page-menu.open-image Open Image in New Tab", "page-menu.save-image Save Image As…",
+            "page-menu.copy-image-address Copy Image Address", "---",
             "page-menu.copy Copy", "page-menu.search Search with DuckDuckGo", "page-menu.select-all Select All");
         assertThat(lines(menu.trailing())).isEqualTo(TRAILING);
     }
@@ -80,6 +82,22 @@ class PageMenuItemsTest {
         assertThat(opens("jasper-about:welcome", "https://example.com")).isTrue();
     }
 
+    /**
+     * Plan 7's F10 and D9: Save Link As… and Save Image As… download, with Jasper's rights, only an http or https address
+     * the frame could open itself, or a data: address; never a local file, Jasper's own pages, a blob or anything else,
+     * whichever page the frame shows. Copying works for any address.
+     */
+    @Test void saveLinkAndSaveImageSaveOnlyWebAndDataAddresses() {
+        for (String frame : List.of(PAGE, "file:///Users/ada/index.html", "jasper-about:welcome")) {
+            for (String address : List.of("https://example.com/report.pdf", "HTTP://example.com/a.zip", "data:image/png;base64,AAAA",
+                "DATA:text/plain,hello"))
+                assertThat(saves(frame, address)).as("from %s: %s", frame, address).isTrue();
+            for (String address : List.of("file:///etc/hosts", "jasper-about:welcome", "blob:https://example.com/1", "javascript:alert(1)",
+                "about:blank", "mailto:ada@example.com", "ftp://example.com/a.zip", "chrome://settings", "relative/path"))
+                assertThat(saves(frame, address)).as("from %s: %s", frame, address).isFalse();
+        }
+    }
+
     @Test void searchTermsAreTheSelectionWithItsWhiteSpaceCollapsedAndCutToAThousandCharacters() {
         assertThat(PageMenuItems.searchTerms("  two\n\twords\u00A0 here ")).isEqualTo("two words here");
         assertThat(PageMenuItems.searchTerms(" \n ")).isEmpty();
@@ -118,9 +136,10 @@ class PageMenuItemsTest {
             if (link.isEmpty() && image.isEmpty() && selection.isEmpty() && !editable)
                 expected.add(List.of("page-menu.back Back" + (back ? "" : " (disabled)"),
                     "page-menu.forward Forward" + (forward ? "" : " (disabled)"), "page-menu.reload Reload"));
-            if (link.isPresent()) expected.add(List.of("page-menu.open-link Open Link in New Tab", "page-menu.copy-link Copy Link"));
-            if (image.isPresent())
-                expected.add(List.of("page-menu.open-image Open Image in New Tab", "page-menu.copy-image-address Copy Image Address"));
+            if (link.isPresent()) expected.add(List.of("page-menu.open-link Open Link in New Tab", "page-menu.copy-link Copy Link",
+                "page-menu.save-link Save Link As…"));
+            if (image.isPresent()) expected.add(List.of("page-menu.open-image Open Image in New Tab", "page-menu.save-image Save Image As…",
+                "page-menu.copy-image-address Copy Image Address"));
             String cutAndCopy = selection.isPresent() ? "" : " (disabled)";
             if (editable) expected.add(List.of("page-menu.cut Cut" + cutAndCopy, "page-menu.copy Copy" + cutAndCopy, "page-menu.paste Paste",
                 "page-menu.select-all Select All"));
@@ -186,6 +205,17 @@ class PageMenuItemsTest {
         assertThat(image.orElseThrow().enabled()).as("Open Image follows the same rule").isEqualTo(link.orElseThrow().enabled());
         assertThat(LinkSchemes.opensFrom(frame, address)).as("the shared rule").isEqualTo(link.orElseThrow().enabled());
         return link.orElseThrow().enabled();
+    }
+
+    /** Whether Save Link As… is enabled for a link to {@code address} in a frame at {@code frame}, as Save Image As… is. */
+    private static boolean saves(String frame, String address) {
+        var link = PageMenuItems.of(new Context(true, true, Optional.of(address), NONE, NONE, false, "Google", frame, true))
+            .leading().stream().filter(item -> item.id().equals(PageMenuItems.SAVE_LINK)).findFirst().orElseThrow();
+        var image = PageMenuItems.of(new Context(true, true, NONE, Optional.of(address), NONE, false, "Google", frame, true))
+            .leading().stream().filter(item -> item.id().equals(PageMenuItems.SAVE_IMAGE)).findFirst().orElseThrow();
+        assertThat(image.enabled()).as("Save Image As… follows the same rule").isEqualTo(link.enabled());
+        assertThat(LinkSchemes.saves(frame, address)).as("the shared rule").isEqualTo(link.enabled());
+        return link.enabled();
     }
 
     /** Each item as {@code id label}, {@code " (disabled)"} after a disabled one, and {@code ---} for a separator. */

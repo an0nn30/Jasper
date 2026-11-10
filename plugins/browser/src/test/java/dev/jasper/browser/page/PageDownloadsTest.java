@@ -83,6 +83,49 @@ class PageDownloadsTest {
     }
 
     /**
+     * Task 3's re-review: an {@code abandoned} hook that throws too is logged, and the start is still refused, so CEF
+     * cancels it.
+     */
+    @Test void aStartWhoseAbandonThrowsTooIsStillRefused() {
+        try (var log = new CapturedLog(PageDownloads.class.getName())) {
+            var callback = new BeforeCallback();
+            assertThat(PageDownloads.answer(start(Optional.empty()), callback, start -> { throw new IllegalStateException("broken"); },
+                start -> { throw new IllegalStateException("not abandoned"); })).isFalse();
+            assertThat(callback.calls).isEmpty();
+            assertThat(log.records()).extracting(record -> record.getThrown().getMessage()).containsExactly("broken", "not abandoned");
+        }
+    }
+
+    /**
+     * Spec section 10 and ruling F32: Save Link As… arms the page's ask with its address, and the page's start of that
+     * address asks, once; a page that armed nothing, and a browser that is no page's, go without asking.
+     */
+    @Test void aPagesStartOfTheAddressItsSaveArmedAsksOnce() throws Exception {
+        long now = System.currentTimeMillis();
+        Page page = onUi(() -> new Page(URI.create("https://example.com/"), () -> { }, PageTestAccess.noFavicons(), Runnable::run,
+            PageContext.persistent()));
+        String link = "https://example.com/report.pdf";
+        assertThat(PageDownloads.start(1, "", Optional.of(page), false, 1, link, "report.pdf", now).ask()).as("nothing armed").isFalse();
+        onUi(() -> {
+            page.askNextDownload(link);
+            return null;
+        });
+        DownloadStart saved = PageDownloads.start(1, "https://example.com/", Optional.of(page), false, 2, link, "report.pdf",
+            System.currentTimeMillis());
+        assertThat(saved.ask()).isTrue();
+        assertThat(PageDownloads.start(1, "", Optional.of(page), false, 3, link, "report.pdf", System.currentTimeMillis()).ask())
+            .as("once").isFalse();
+        assertThat(PageDownloads.start(1, "", Optional.empty(), false, 4, link, "report.pdf", now).ask()).as("no page's").isFalse();
+        onUi(() -> {
+            page.close();
+            page.askNextDownload(link);
+            return null;
+        });
+        assertThat(PageDownloads.start(1, "", Optional.of(page), false, 5, link, "report.pdf", System.currentTimeMillis()).ask())
+            .as("a closed page arms nothing").isFalse();
+    }
+
+    /**
      * Rulings F21, D1 and F7: a page's start carries the browser's identifier and the item's id, the names and
      * addresses, its page, whether the page is activated now, which it reads without consuming the activation, the
      * document its main frame shows, and whether its group keeps its data in memory. Its own browser names the page and

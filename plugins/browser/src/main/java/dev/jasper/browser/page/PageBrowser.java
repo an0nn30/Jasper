@@ -103,8 +103,8 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
     void attach() {
         PageView target = view;
         target.browser = this;
-        target.attached(new PageView.Hooks(this::setWindowVisibility, this::setWindowlessFrameRate, this::sendKeyEvent),
-            new ImeAdapter(target, this), new Drops());
+        target.attached(new PageView.Hooks(this::setWindowVisibility, this::setWindowlessFrameRate, this::sendKeyEvent,
+            this::sendMouseEvent), new ImeAdapter(target, this), new Drops());
     }
 
     /**

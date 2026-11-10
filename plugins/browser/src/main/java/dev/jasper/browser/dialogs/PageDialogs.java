@@ -21,7 +21,8 @@ import org.cef.misc.BoolRef;
  * Jasper's modals over the page's item ({@link ScriptDialog}), which are told the asking document's origin;
  * {@code prompt()} shows nothing and returns null, as iTerm2 has no handler for it; a page that asks before it unloads
  * closes without asking; Chromium's reset of a page's dialogs ends the one shown or waiting; and a file input opens
- * Jasper's chooser over the item ({@link FileInput}).
+ * Jasper's chooser over the item ({@link FileInput}), as does a save Chromium asks a file for, whose cancel also tells
+ * the page ({@link Page#saveCancelled}), so its downloads end the count of the download that asked (plan 7's F1.3).
  * Chromium calls both handlers on its own UI thread; what Jasper shows is posted to Swing's. A page's fullscreen request
  * is refused by the {@code page} package's display handler, the client's only one.
  *
@@ -80,7 +81,10 @@ public final class PageDialogs {
         }
     }
 
-    /** File inputs, and saves Chromium asks a file for. */
+    /**
+     * File inputs, and saves Chromium asks a file for: a download that asks where it goes, or a page's
+     * {@code showSaveFilePicker}. A save's cancel cancels Chromium's callback, then tells the page, which may have closed.
+     */
     static final class Files implements CefDialogHandler {
         @Override public boolean onFileDialog(CefBrowser browser, FileDialogMode mode, String title, String defaultFilePath,
                                               Vector<String> acceptFilters, Vector<String> acceptExtensions,
@@ -91,7 +95,15 @@ public final class PageDialogs {
                 case FILE_DIALOG_OPEN_FOLDER -> FileInput.Mode.OPEN_FOLDER;
                 case FILE_DIALOG_SAVE -> FileInput.Mode.SAVE;
             };
-            FileInput.choose(page(browser), asked, title, defaultFilePath, paths -> callback.Continue(new Vector<>(paths)), callback::Cancel);
+            Page page = page(browser);
+            Runnable cancelled = asked == FileInput.Mode.SAVE && page != null ? () -> {
+                try {
+                    callback.Cancel();
+                } finally {
+                    page.saveCancelled();
+                }
+            } : callback::Cancel;
+            FileInput.choose(page, asked, title, defaultFilePath, paths -> callback.Continue(new Vector<>(paths)), cancelled);
             return true;
         }
     }
