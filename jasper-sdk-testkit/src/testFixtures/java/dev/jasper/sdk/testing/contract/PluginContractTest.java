@@ -5202,7 +5202,7 @@ public abstract class PluginContractTest {
 
     /**
      * SDK 0.31.0 (F7): a download whose addresses must not be kept, such as one from a /dev/null page, is marked with
-     * {@code about:internet} and no referrer; marking it again keeps the mark it has, and the file's content is untouched.
+     * {@code about:internet} and no referrer, and marked again with addresses; the file's content is untouched.
      */
     @Test void aDownloadWithNoAddressToKeepIsMarked(@org.junit.jupiter.api.io.TempDir Path folder) throws Exception {
         PluginContext a = started("test.a", Set.of());

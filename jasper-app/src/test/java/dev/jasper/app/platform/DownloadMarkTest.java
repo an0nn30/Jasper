@@ -128,6 +128,30 @@ class DownloadMarkTest {
         assertThat(file).hasContent("zip");
     }
 
+    /** macOS's call gets the value without a trailing NUL, the absolute path, and XATTR_NOFOLLOW | XATTR_CREATE. */
+    @Test void theQuarantineCallCreatesTheAttributeOnTheFileItself() throws IOException {
+        Path file = download("report.zip");
+        String value = "0081;6543210f;Jasper;0F8FAD5B-D9CB-469F-A165-70867728950E";
+        var calls = new java.util.ArrayList<String>();
+        DownloadMark.quarantine(file, value, (path, bytes, options) -> {
+            calls.add(path + "|" + new String(bytes, StandardCharsets.US_ASCII) + "|" + options);
+            return 0;
+        });
+        assertThat(calls).containsExactly(file.toAbsolutePath() + "|" + value + "|"
+            + (com.sun.jna.platform.mac.XAttr.XATTR_NOFOLLOW | com.sun.jna.platform.mac.XAttr.XATTR_CREATE));
+    }
+
+    /** Review 1c, Minor 1: a native library that cannot load is an IOException with a reason, never an Error. */
+    @Test void aQuarantineCallThatCannotLoadIsAnIoException() throws IOException {
+        Path file = download("report.zip");
+        var unloadable = new UnsatisfiedLinkError("Unable to load library 'c'");
+        assertThatThrownBy(() -> DownloadMark.quarantine(file, "0081;6543210f;Jasper;0F8FAD5B-D9CB-469F-A165-70867728950E",
+                (path, bytes, options) -> { throw unloadable; }))
+            .isInstanceOf(FileSystemException.class).hasCause(unloadable)
+            .extracting(failure -> ((FileSystemException) failure).getReason()).asString().contains("Unable to load library 'c'");
+        assertThat(file).hasContent("zip");
+    }
+
     /** Linux has no mark: nothing about the file changes. Through the seam everywhere. */
     @Test void theLinuxBranchLeavesTheFileUnchanged() throws IOException {
         assertUnchanged(LINUX);

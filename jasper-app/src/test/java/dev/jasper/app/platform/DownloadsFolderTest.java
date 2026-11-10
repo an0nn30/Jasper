@@ -2,12 +2,16 @@ package dev.jasper.app.platform;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
@@ -76,6 +80,43 @@ class DownloadsFolderTest {
             .isEqualTo(home().resolve("New"));
     }
 
+    /** D16: {@code $HOME} is an absolute {@code HOME} from the environment, as xdg-user-dir and GLib read it, else home. */
+    @Test void linuxExpandsHomeFromTheEnvironment() {
+        Path environment = dir.resolve("environment-home");
+        assertThat(linux(Map.of("HOME", environment.toString()), "XDG_DOWNLOAD_DIR=\"$HOME/dl\"\n")).as("an absolute HOME")
+            .isEqualTo(environment.resolve("dl"));
+        assertThat(linux(Map.of("HOME", environment.toString()), "XDG_DOWNLOAD_DIR=\"$HOME\"\n")).as("$HOME alone")
+            .isEqualTo(environment);
+        assertThat(linux(Map.of("HOME", "relative/home"), "XDG_DOWNLOAD_DIR=\"$HOME/dl\"\n")).as("a relative HOME")
+            .isEqualTo(home().resolve("dl"));
+        assertThat(linux(Map.of("HOME", ""), "XDG_DOWNLOAD_DIR=\"$HOME/dl\"\n")).as("an empty HOME").isEqualTo(home().resolve("dl"));
+        assertThat(linux(Map.of(), "XDG_DOWNLOAD_DIR=\"$HOME/dl\"\n")).as("no HOME").isEqualTo(home().resolve("dl"));
+    }
+
+    /** Review 1c, Minor 2: a FIFO at user-dirs.dirs would block every caller in open(); it counts as missing. */
+    @Test @DisabledOnOs(value = OS.WINDOWS, disabledReason = "no mkfifo")
+    void aFifoAtUserDirsIsNotRead() throws Exception {
+        Path fifo = dir.resolve("user-dirs.dirs");
+        Process mkfifo = new ProcessBuilder("mkfifo", fifo.toString()).redirectErrorStream(true).start();
+        assertThat(mkfifo.waitFor(30, TimeUnit.SECONDS)).as("mkfifo finished").isTrue();
+        assertThat(mkfifo.exitValue()).as(new String(mkfifo.getInputStream().readAllBytes(), StandardCharsets.UTF_8)).isZero();
+        var read = CompletableFuture.supplyAsync(() -> DownloadsFolder.read(fifo));
+        try {
+            assertThat(read.get(10, TimeUnit.SECONDS)).isEmpty();
+        } finally {
+            // A reader blocked in open() waits for a writer: give it one, so a failure leaves no stuck thread.
+            if (!read.isDone()) try (var writer = Files.newOutputStream(fifo)) { writer.flush(); }
+        }
+    }
+
+    @Test void aFolderAtUserDirsIsNotRead() throws Exception {
+        Path folder = Files.createDirectories(dir.resolve("user-dirs.dirs"));
+        assertThat(DownloadsFolder.read(folder)).isEmpty();
+        assertThat(DownloadsFolder.read(dir.resolve("missing"))).isEmpty();
+        Path file = Files.writeString(dir.resolve("real.dirs"), "XDG_DOWNLOAD_DIR=\"$HOME/dl\"\n");
+        assertThat(DownloadsFolder.read(file)).contains("XDG_DOWNLOAD_DIR=\"$HOME/dl\"\n");
+    }
+
     @Test void linuxIgnoresACommentedLine() {
         assertThat(linux("#XDG_DOWNLOAD_DIR=\"$HOME/Old\"\n  # XDG_DOWNLOAD_DIR=\"$HOME/Older\"\n"))
             .isEqualTo(home().resolve("Downloads"));
@@ -96,6 +137,8 @@ class DownloadsFolderTest {
                 "XDG_DOWNLOAD_DIR=\"$HOME/dl",         // unclosed
                 "XDG_DOWNLOAD_DIR \"$HOME/dl\"",       // no =
                 "XDG_DOWNLOAD_DIRS=\"$HOME/dl\"",      // another key
+                "XDG_DOWNLOAD_DIR=\"\\$HOME/dl\"",     // an escaped $HOME, which the lookup does not expand
+                "XDG_DOWNLOAD_DIR=\"\\/data/dl\"",     // an escaped first slash, which the lookup does not take
                 "XDG_DOWNLOAD_DIR=\"\"")) {            // empty
             files.clear();
             assertThat(linux(line + "\n")).as(line).isEqualTo(home().resolve("Downloads"));

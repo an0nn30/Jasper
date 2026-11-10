@@ -45,13 +45,14 @@ public final class DownloadsFolder {
      *
      * @param osName the {@code os.name} property
      * @param home the user's home folder
-     * @param env the environment ({@code XDG_CONFIG_HOME} on Linux, {@code USERPROFILE} on Windows)
+     * @param env the environment ({@code XDG_CONFIG_HOME} and {@code HOME} on Linux, {@code USERPROFILE} on Windows)
      * @param read a file's text, or empty when it cannot be read; asked only for {@code user-dirs.dirs}, on Linux and other
      *     Unix systems
      * @param knownFolder Windows' Downloads known folder, or empty when it is unavailable; asked only on Windows
      * @return the folder, an absolute path: on macOS {@code home/Downloads}; on Windows the known folder, else
      *     {@code %USERPROFILE%\Downloads}, else {@code home\Downloads}; elsewhere {@code XDG_DOWNLOAD_DIR} from
-     *     {@code user-dirs.dirs} in {@code XDG_CONFIG_HOME} when that is absolute, else in {@code home/.config}, else
+     *     {@code user-dirs.dirs} in {@code XDG_CONFIG_HOME} when that is absolute, else in {@code home/.config}, its
+     *     {@code $HOME} the environment's {@code HOME} when that is absolute, else {@code home}; else
      *     {@code home/Downloads}
      */
     public static Path of(String osName, Path home, Map<String, String> env, Function<Path, Optional<String>> read,
@@ -66,6 +67,8 @@ public final class DownloadsFolder {
                 .orElse(fallback);
         }
         Path config = absolute(env.get("XDG_CONFIG_HOME")).orElse(user.resolve(".config"));
+        // D16: $HOME is the environment's, as xdg-user-dir and GLib read it, when it is absolute; else the home folder.
+        Path expanded = absolute(env.get("HOME")).orElse(user);
         Optional<String> text;
         try {
             text = read.apply(config.resolve("user-dirs.dirs"));
@@ -73,14 +76,14 @@ public final class DownloadsFolder {
             LOG.log(System.Logger.Level.DEBUG, "Could not read user-dirs.dirs", unreadable);
             text = Optional.empty();
         }
-        return text.flatMap(userDirs -> downloadDir(userDirs, user)).orElse(fallback);
+        return text.flatMap(userDirs -> downloadDir(userDirs, expanded)).orElse(fallback);
     }
 
     /**
      * {@code XDG_DOWNLOAD_DIR} in a {@code user-dirs.dirs} file, read as xdg-user-dirs' own lookup reads it: the last line
-     * {@code XDG_DOWNLOAD_DIR="$HOME/…"} or {@code XDG_DOWNLOAD_DIR="/…"} that parses, blanks around {@code =}, a backslash
-     * escaping the next character, trailing slashes dropped. A comment line, and a value that is not quoted, not closed,
-     * relative or empty, is ignored.
+     * {@code XDG_DOWNLOAD_DIR="$HOME/…"} or {@code XDG_DOWNLOAD_DIR="/…"} that parses, blanks around {@code =}, its
+     * {@code $HOME} or {@code /} read before any escape, then a backslash escaping the next character, trailing slashes
+     * dropped. A comment line, and a value that is not quoted, not closed, relative or empty, is ignored.
      */
     static Optional<Path> downloadDir(String userDirs, Path home) {
         Optional<Path> found = Optional.empty();
@@ -99,31 +102,45 @@ public final class DownloadsFolder {
         return found;
     }
 
-    /** The text between {@code text}'s opening quote and the next unescaped quote, unescaped; empty when it is not closed. */
+    /** The text between {@code text}'s opening quote and the next unescaped quote, as written; empty if not closed. */
     private static Optional<String> quoted(String text) {
-        StringBuilder value = new StringBuilder();
         for (int i = 1; i < text.length(); i++) {
             char c = text.charAt(i);
-            if (c == '"') return Optional.of(value.toString());
-            if (c == '\\' && i + 1 < text.length()) c = text.charAt(++i);
-            value.append(c);
+            if (c == '"') return Optional.of(text.substring(1, i));
+            if (c == '\\') i++;
         }
         return Optional.empty();
     }
 
-    /** A value's folder: {@code $HOME} alone or followed by {@code /}, or an absolute path; trailing slashes dropped. */
-    private static Optional<Path> folder(String value, Path home) {
-        String trimmed = value;
+    /** {@code raw} with each backslash taken as escaping the next character. */
+    private static String unescaped(String raw) {
+        StringBuilder value = new StringBuilder(raw.length());
+        for (int i = 0; i < raw.length(); i++) {
+            char c = raw.charAt(i);
+            if (c == '\\' && i + 1 < raw.length()) c = raw.charAt(++i);
+            value.append(c);
+        }
+        return value.toString();
+    }
+
+    /**
+     * A value's folder: {@code $HOME} alone or followed by {@code /}, or an absolute path, the prefix read as written
+     * and the rest unescaped; trailing slashes dropped.
+     */
+    private static Optional<Path> folder(String raw, Path home) {
+        boolean belowHome = raw.equals(HOME) || raw.startsWith(HOME + "/");
+        if (!belowHome && !raw.startsWith("/")) return Optional.empty();
+        String trimmed = belowHome ? HOME + unescaped(raw.substring(HOME.length())) : unescaped(raw);
         while (trimmed.length() > 1 && trimmed.endsWith("/")) trimmed = trimmed.substring(0, trimmed.length() - 1);
         try {
             if (trimmed.equals(HOME)) return Optional.of(home);
-            if (trimmed.startsWith(HOME + "/")) {
+            if (belowHome) {
                 // "$HOME//x" is home's x, as the lookup's concatenation gives it, never the root's.
                 String below = trimmed.substring(HOME.length());
                 while (below.startsWith("/")) below = below.substring(1);
                 return Optional.of(below.isEmpty() ? home : home.resolve(below));
             }
-            if (trimmed.startsWith("/")) return Optional.of(Path.of(trimmed)).filter(Path::isAbsolute);
+            return Optional.of(Path.of(trimmed)).filter(Path::isAbsolute);
         } catch (InvalidPathException invalid) {
             LOG.log(System.Logger.Level.DEBUG, "Ignored an XDG_DOWNLOAD_DIR that is no path", invalid);
         }
@@ -149,8 +166,12 @@ public final class DownloadsFolder {
         }
     }
 
-    /** At most {@link #MOST_READ} bytes of a file as UTF-8; empty when it does not exist or cannot be read. */
-    private static Optional<String> read(Path file) {
+    /**
+     * At most {@link #MOST_READ} bytes of a file as UTF-8; empty when it does not exist, is not a regular file (a FIFO
+     * would block {@code open} until a writer came, holding every caller of {@link #current}) or cannot be read.
+     */
+    static Optional<String> read(Path file) {
+        if (!Files.isRegularFile(file)) return Optional.empty();
         try (InputStream in = Files.newInputStream(file)) {
             return Optional.of(new String(in.readNBytes(MOST_READ), StandardCharsets.UTF_8));
         } catch (NoSuchFileException missing) {

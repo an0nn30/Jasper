@@ -54,7 +54,9 @@ public final class DownloadMark {
         // Every system's missing file is a NoSuchFileException, before any native call.
         Files.readAttributes(file, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
         String os = osName.toLowerCase(Locale.ROOT);
-        if (os.startsWith("mac")) quarantine(file, quarantine(System.currentTimeMillis() / 1000, UUID.randomUUID()));
+        if (os.startsWith("mac")) {
+            quarantine(file, quarantine(System.currentTimeMillis() / 1000, UUID.randomUUID()), Setxattr.SYSTEM);
+        }
         else if (os.startsWith("windows")) {
             byte[] value = zoneIdentifier(source, referrer).getBytes(StandardCharsets.US_ASCII);
             if (!Files.getFileStore(file).supportsFileAttributeView(UserDefinedFileAttributeView.class))
@@ -128,15 +130,22 @@ public final class DownloadMark {
 
     /**
      * Sets {@code com.apple.quarantine} in one {@code setxattr} call that creates it only when it is missing, on the file
-     * itself rather than a link's target, without a trailing NUL, so {@code xattr -p} prints exactly the value.
+     * itself rather than a link's target, without a trailing NUL, so {@code xattr -p} prints exactly the value. A
+     * native library that cannot load fails the mark with a {@link FileSystemException} whose cause is the error.
      */
-    private static void quarantine(Path file, String value) throws IOException {
+    static void quarantine(Path file, String value, Setxattr setxattr) throws IOException {
         byte[] bytes = value.getBytes(StandardCharsets.US_ASCII);
-        Memory memory = new Memory(bytes.length);
-        memory.write(0, bytes, 0, bytes.length);
         int options = com.sun.jna.platform.mac.XAttr.XATTR_NOFOLLOW | com.sun.jna.platform.mac.XAttr.XATTR_CREATE;
-        if (com.sun.jna.platform.mac.XAttr.INSTANCE.setxattr(file.toAbsolutePath().toString(), QUARANTINE, memory, bytes.length,
-                0, options) == 0) return;
+        int result;
+        try {
+            result = setxattr.set(file.toAbsolutePath().toString(), bytes, options);
+        } catch (LinkageError unloadable) {
+            // libc or JNA could not load: a failed mark with a reason, as every other failure is, never an Error.
+            var failure = new FileSystemException(file.toString(), null, String.valueOf(unloadable.getMessage()));
+            failure.initCause(unloadable);
+            throw failure;
+        }
+        if (result == 0) return;
         int errno = Native.getLastError();
         if (errno == EEXIST) return; // Chromium's own mark, or an earlier one: kept.
         String reason = reason(errno);
@@ -145,6 +154,19 @@ public final class DownloadMark {
             case EACCES, EPERM -> new AccessDeniedException(file.toString(), null, reason);
             default -> new FileSystemException(file.toString(), null, reason);
         };
+    }
+
+    /** libc's {@code setxattr} of {@code com.apple.quarantine}: 0 when it was set, else -1 with {@code errno} set. */
+    @FunctionalInterface
+    interface Setxattr {
+        /** The system's call through JNA, loaded at the first mark. */
+        Setxattr SYSTEM = (path, value, options) -> {
+            Memory memory = new Memory(value.length);
+            memory.write(0, value, 0, value.length);
+            return com.sun.jna.platform.mac.XAttr.INSTANCE.setxattr(path, QUARANTINE, memory, value.length, 0, options);
+        };
+
+        int set(String path, byte[] value, int options);
     }
 
     /** The system's text for an {@code errno}, such as "Permission denied"; the number when libc gives none. */
@@ -164,7 +186,8 @@ public final class DownloadMark {
 
     /**
      * libc's {@code strerror_r}, which, unlike {@code strerror}, is safe from several threads at once; loaded at the first
-     * failure. JNA Platform declares neither.
+     * failure. JNA Platform declares neither. This is the XSI and Darwin form, which answers an {@code int}; glibc's
+     * default form answers a {@code char*} instead, so only the macOS branch may reach it.
      */
     private interface Strings extends Library {
         Strings LIBC = Native.load(null, Strings.class);

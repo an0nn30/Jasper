@@ -150,7 +150,8 @@ public interface Platform {
      * {@code user-dirs.dirs} in {@code $XDG_CONFIG_HOME} ({@code ~/.config} by default), with {@code $HOME} expanded,
      * else {@code ~/Downloads}. Jasper finds it at the first call and gives the same folder until it restarts. The folder
      * may not exist yet: reading it creates nothing, so a plugin that saves there creates it first. Callable from any
-     * thread; only the first call reads the system's settings.
+     * thread; only the first call reads the system's settings, which may block while it does, and a call made meanwhile
+     * waits for it, so a plugin makes its first call off the UI thread.
      *
      * @return the folder, an absolute path
      * @throws UnsupportedOperationException if the host predates this query

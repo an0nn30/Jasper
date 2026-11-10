@@ -10084,7 +10084,8 @@ the Downloads known folder, else <code>%USERPROFILE%\Downloads</code>; on Linux 
 <code>user-dirs.dirs</code> in <code>$XDG_CONFIG_HOME</code> (<code>~/.config</code> by default), with <code>$HOME</code> expanded,
 else <code>~/Downloads</code>. Jasper finds it at the first call and gives the same folder until it restarts. The folder
 may not exist yet: reading it creates nothing, so a plugin that saves there creates it first. Callable from any
-thread; only the first call reads the system's settings.</p></div>
+thread; only the first call reads the system's settings, which may block while it does, and a call made meanwhile
+waits for it, so a plugin makes its first call off the UI thread.</p></div>
 <dl class="tags"><dt>Returns</dt><dd>the folder, an absolute path</dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/UnsupportedOperationException.html">UnsupportedOperationException</a> if the host predates this query</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.ui.Platform.markDownloaded(Path,URI,Optional)">
