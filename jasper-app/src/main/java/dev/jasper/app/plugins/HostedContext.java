@@ -305,6 +305,21 @@ final class HostedContext implements PluginContext {
                     requireOpen();
                     return host.copyOnSelect;
                 }
+                /** Any thread: found once per process, at the first call from any plugin (browser plan 7's F3). */
+                @Override public Path downloadsFolder() {
+                    requireOpen();
+                    return dev.jasper.app.platform.DownloadsFolder.current();
+                }
+                /** Off the UI thread: file work on the caller's thread (browser plan 7's F33). */
+                @Override public void markDownloaded(Path file, URI source, Optional<URI> referrer) throws IOException {
+                    requireOpen();
+                    if (host.environment.onUi().getAsBoolean())
+                        throw new IllegalStateException("Platform.markDownloaded must not be called on the UI thread: " + id);
+                    Objects.requireNonNull(file, "file");
+                    Objects.requireNonNull(source, "source");
+                    Objects.requireNonNull(referrer, "referrer");
+                    dev.jasper.app.platform.DownloadMark.apply(file, source, referrer, System.getProperty("os.name", ""));
+                }
                 @Override public Subscription editor(dev.jasper.sdk.ui.FileEditor editor) {
                     requireOpen();
                     requireUi("Platform.editor");

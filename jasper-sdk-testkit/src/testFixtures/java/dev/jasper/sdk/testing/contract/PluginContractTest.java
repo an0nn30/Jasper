@@ -5166,6 +5166,53 @@ public abstract class PluginContractTest {
         assertThat(a.platform().copyOnSelect()).as("the user turned it off").isFalse();
     }
 
+    /**
+     * Browser plan 7 (SDK 0.31.0): the Downloads folder is an absolute path, the same on any thread. The case only reads
+     * it, so it never creates the folder or writes in it (the application's is the user's own).
+     */
+    @Test void theDownloadsFolderIsAbsolute() {
+        PluginContext a = started("test.a", Set.of());
+        Path folder = a.platform().downloadsFolder();
+        assertThat(folder).isAbsolute();
+        assertThat(a.platform().downloadsFolder()).as("the same folder again").isEqualTo(folder);
+        h.ui(() -> assertThat(a.platform().downloadsFolder()).as("on the UI thread too").isEqualTo(folder));
+    }
+
+    /** SDK 0.31.0: marking a file that does not exist throws {@code NoSuchFileException} and creates nothing. */
+    @Test void markingAMissingFileThrowsNoSuchFile(@org.junit.jupiter.api.io.TempDir Path folder) {
+        PluginContext a = started("test.a", Set.of());
+        Path missing = folder.resolve("missing.zip");
+        assertThatThrownBy(() -> a.platform().markDownloaded(missing, java.net.URI.create("https://example.com/missing.zip"), Optional.empty()))
+            .isInstanceOf(java.nio.file.NoSuchFileException.class);
+        assertThat(missing).doesNotExist();
+    }
+
+    /** SDK 0.31.0 (F33): marking does file work, so the UI thread is refused, and so are missing arguments. */
+    @Test void markingADownloadRefusesTheUiThread(@org.junit.jupiter.api.io.TempDir Path folder) throws Exception {
+        PluginContext a = started("test.a", Set.of());
+        Path file = java.nio.file.Files.writeString(folder.resolve("report.pdf"), "%PDF-1.7");
+        java.net.URI source = java.net.URI.create("https://example.com/report.pdf");
+        h.ui(() -> assertThatIllegalStateException().isThrownBy(() -> a.platform().markDownloaded(file, source, Optional.empty()))
+            .withMessageContaining("UI thread"));
+        assertThatNullPointerException().isThrownBy(() -> a.platform().markDownloaded(null, source, Optional.empty()));
+        assertThatNullPointerException().isThrownBy(() -> a.platform().markDownloaded(file, null, Optional.empty()));
+        assertThatNullPointerException().isThrownBy(() -> a.platform().markDownloaded(file, source, null));
+        assertThat(file).hasContent("%PDF-1.7");
+    }
+
+    /**
+     * SDK 0.31.0 (F7): a download whose addresses must not be kept, such as one from a /dev/null page, is marked with
+     * {@code about:internet} and no referrer; marking it again keeps the mark it has, and the file's content is untouched.
+     */
+    @Test void aDownloadWithNoAddressToKeepIsMarked(@org.junit.jupiter.api.io.TempDir Path folder) throws Exception {
+        PluginContext a = started("test.a", Set.of());
+        Path file = java.nio.file.Files.writeString(folder.resolve("notes.txt"), "notes");
+        a.platform().markDownloaded(file, java.net.URI.create("about:internet"), Optional.empty());
+        a.platform().markDownloaded(file, java.net.URI.create("https://user:secret@example.com/notes.txt"),
+            Optional.of(java.net.URI.create("https://example.com/")));
+        assertThat(file).hasContent("notes");
+    }
+
     @Test void theCommandLineNamesTheClientOnceTheHostKnowsIt() {
         PluginContext a = started("test.a", Set.of());
         assertThat(a.commandLine().client()).as("no client yet").isEmpty();

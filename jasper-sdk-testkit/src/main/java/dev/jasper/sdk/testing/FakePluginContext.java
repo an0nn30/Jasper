@@ -191,6 +191,18 @@ public final class FakePluginContext implements PluginContext {
                     return host.clipboard.text();
                 }
                 @Override public boolean copyOnSelect() { requireOpen(); return host.copyOnSelect; }
+                @Override public Path downloadsFolder() { requireOpen(); return host.downloadsFolder(); }
+                @Override public void markDownloaded(Path file, java.net.URI source, Optional<java.net.URI> referrer) throws IOException {
+                    requireOpen();
+                    // As the application: file work, refused on the UI thread, which a fake test's EDT plays outside a
+                    // background task.
+                    if (host.onUiThread())
+                        throw new IllegalStateException("Platform.markDownloaded must not be called on the UI thread: " + info.id());
+                    Objects.requireNonNull(file, "file");
+                    Objects.requireNonNull(source, "source");
+                    Objects.requireNonNull(referrer, "referrer");
+                    host.markDownloaded(file, source, referrer);
+                }
             };
         }
 

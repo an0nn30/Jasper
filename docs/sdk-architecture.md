@@ -340,6 +340,12 @@ does. The testkit's `FakePluginHost.setTerminalTypography` mirrors it, and share
 `Platform.copyOnSelect()` reads `PluginHost.copyOnSelect`, a volatile field, so any thread can read it;
 `JasperApplication` passes `terminal.copy_on_select` to `PluginRuntime.copyOnSelect` before plugins start and with
 every configuration snapshot.
+`Platform.downloadsFolder()` returns `platform.DownloadsFolder.current()`, found once per process at the first call
+(the only one that reads `user-dirs.dirs` or calls `SHGetKnownFolderPath`) by the pure `DownloadsFolder.of`.
+`Platform.markDownloaded` refuses the UI thread and runs `platform.DownloadMark.apply` on the caller's thread: on macOS
+one `setxattr` of `com.apple.quarantine` through JNA with `XATTR_NOFOLLOW | XATTR_CREATE`, so a mark already there
+stays; on Windows the `Zone.Identifier` stream through `UserDefinedFileAttributeView`, written only when the file has
+no non-empty one. The testkit's `FakePluginHost` records marks instead of writing them.
 
 `Appearance.presentation()` returns one immutable `Presentation` per run, read from any thread.
 `PluginRuntime.presentation(Kit, PluginLook, DefaultSource)` hands the host the installed kit, the presentation's

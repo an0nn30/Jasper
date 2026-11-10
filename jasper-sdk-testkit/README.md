@@ -138,6 +138,8 @@ Jasper's is `<home>/plugins/<id>/data`.
 | `setCommandClient(path)` | What `CommandLine.client()` returns |
 | `setDefaultBrowser(jasper)` | What `Platform.isDefaultBrowser()` returns, false until set, and whether another plugin's `browse` asks the provided browser first; a change runs the `onDefaultBrowserChanged` handlers at once, on the EDT |
 | `setCopyOnSelect(on)` | What `Platform.copyOnSelect()` returns from the next read, false until set |
+| `setDownloadsFolder(folder)` | What `Platform.downloadsFolder()` returns from the next call, an absolute folder; until set, `home/Downloads` under the host's data root, never the user's own. The host creates neither |
+| `markedDownloads()`, `failMarks(failure)` | Each `Platform.markDownloaded` that succeeded, as a `MarkedDownload(file, source, referrer)` in call order, with nothing written to the file; every later mark throws `failure`. As in Jasper, a missing file throws `NoSuchFileException` first, and a call on the EDT `IllegalStateException`, except from a background task `runBackground()` runs there |
 | `declareSubcommand(pluginId, name, summary)`, `call(name, arguments, workingDirectory[, paneId])` | Declares a subcommand as `[[subcommands]]` would, before the plugin starts; calls it as `jasper <name> …` would and returns a `FakeCommandCall` |
 
 ### Settings and appearance

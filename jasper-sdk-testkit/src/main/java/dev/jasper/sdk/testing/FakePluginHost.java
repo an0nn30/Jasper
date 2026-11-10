@@ -440,11 +440,20 @@ public final class FakePluginHost implements AutoCloseable {
         int count = 0;
         Runnable task;
         while ((task = background.poll()) != null) {
+            boolean outer = inBackground.get();
+            inBackground.set(true);
             try { task.run(); } catch (RuntimeException failure) { failures.add("background: " + failure); }
+            finally { inBackground.set(outer); }
             count++;
         }
         return count;
     }
+
+    /** Whether this thread is running a background task now: off the UI thread, as in Jasper, even on the EDT. */
+    private final ThreadLocal<Boolean> inBackground = ThreadLocal.withInitial(() -> false);
+
+    /** Whether the caller plays the UI thread for a call that refuses it: the EDT, outside a background task. */
+    boolean onUiThread() { return javax.swing.SwingUtilities.isEventDispatchThread() && !inBackground.get(); }
 
     /**
      * Publishes as the application, for example {@code AppEvents.THEME_CHANGED}.
@@ -909,7 +918,7 @@ public final class FakePluginHost implements AutoCloseable {
         return Map.copyOf(result);
     }
 
-    Path dataRoot() {
+    synchronized Path dataRoot() {
         if (dataRoot == null) {
             try { dataRoot = Files.createTempDirectory("jasper-fake-plugins"); }
             catch (IOException failure) { throw new UncheckedIOException(failure); }
@@ -2680,6 +2689,81 @@ public final class FakePluginHost implements AutoCloseable {
      * @since 0.29.0
      */
     public void setCopyOnSelect(boolean on) { copyOnSelect = on; }
+
+    /**
+     * A file a plugin gave the downloaded-file mark ({@code Platform.markDownloaded}), with the addresses as it passed them.
+     *
+     * @param file the file
+     * @param source the address the file came from
+     * @param referrer the page that led to it, if any
+     * @since 0.31.0
+     */
+    public record MarkedDownload(Path file, java.net.URI source, Optional<java.net.URI> referrer) {
+        /**
+         * A mark as recorded.
+         *
+         * @throws NullPointerException when an argument is null
+         */
+        public MarkedDownload {
+            Objects.requireNonNull(file, "file");
+            Objects.requireNonNull(source, "source");
+            Objects.requireNonNull(referrer, "referrer");
+        }
+    }
+
+    private volatile Path downloadsFolder;
+    private final List<MarkedDownload> markedDownloads = new CopyOnWriteArrayList<>();
+    private volatile IOException markFailure;
+
+    /**
+     * Sets what {@code Platform.downloadsFolder} returns to every plugin from its next call. Until then it is
+     * {@code home/Downloads} under the host's data root, never the user's own folder, and the host creates neither.
+     *
+     * @param folder an absolute folder, which need not exist
+     * @throws IllegalArgumentException when {@code folder} is not absolute
+     * @since 0.31.0
+     */
+    public void setDownloadsFolder(Path folder) {
+        Objects.requireNonNull(folder, "folder");
+        if (!folder.isAbsolute()) throw new IllegalArgumentException("The Downloads folder must be absolute: " + folder);
+        downloadsFolder = folder;
+    }
+
+    /** What {@code Platform.downloadsFolder} returns: the folder set, else {@code home/Downloads} under the data root. */
+    Path downloadsFolder() {
+        Path set = downloadsFolder;
+        return set != null ? set : dataRoot().resolve("home").resolve("Downloads");
+    }
+
+    /**
+     * Every downloaded-file mark plugins asked for that succeeded, one per call in call order; a call that threw is not
+     * listed. Nothing is written to the files. As in Jasper, a call on the Swing event dispatch thread throws
+     * {@code IllegalStateException}, except from a background task that {@link #runBackground} runs there.
+     *
+     * @return the marks
+     * @since 0.31.0
+     */
+    public List<MarkedDownload> markedDownloads() { return List.copyOf(markedDownloads); }
+
+    /**
+     * Makes every later {@code Platform.markDownloaded} throw {@code failure}, as a volume that keeps no mark or a file
+     * the user may not write does; a file that does not exist still throws {@code NoSuchFileException} first.
+     *
+     * @param failure what each mark throws
+     * @since 0.31.0
+     */
+    public void failMarks(IOException failure) {
+        markFailure = Objects.requireNonNull(failure, "failure");
+    }
+
+    /** {@code Platform.markDownloaded} once the context has checked the thread and the arguments, as the application does. */
+    void markDownloaded(Path file, java.net.URI source, Optional<java.net.URI> referrer) throws IOException {
+        // As the application: a missing file is a NoSuchFileException before anything else can fail.
+        Files.readAttributes(file, java.nio.file.attribute.BasicFileAttributes.class, java.nio.file.LinkOption.NOFOLLOW_LINKS);
+        IOException failure = markFailure;
+        if (failure != null) throw failure;
+        markedDownloads.add(new MarkedDownload(file, source, referrer));
+    }
 
     /** The application's own content tabs that take text ({@link #addTextTarget}), each with what was inserted into it. */
     private final Map<UUID, List<dev.jasper.sdk.ui.InsertedText>> textTargets = new ConcurrentHashMap<>();
