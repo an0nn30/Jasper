@@ -7,6 +7,7 @@ import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.settings.Applies;
 import dev.jasper.sdk.settings.Choice;
+import dev.jasper.sdk.settings.EditorHint;
 import dev.jasper.sdk.settings.PluginSettings;
 import dev.jasper.sdk.settings.Setting;
 import dev.jasper.sdk.settings.SettingKind;
@@ -14,6 +15,7 @@ import dev.jasper.sdk.settings.SettingSpec;
 import dev.jasper.sdk.settings.SettingsPanel;
 import dev.jasper.sdk.testing.FakePluginHost;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -23,18 +25,19 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Settings › Browser (spec section 17): Start page and Page zoom under General, the two link settings under Link
- * Opening, and the search engine and its custom URLs under Search Engine, with the spec's labels and choices, stored as
- * their tokens in the plugin's settings file.
+ * Settings › Browser (spec section 17): Start page, Page zoom and Downloads folder under General, the two link settings
+ * under Link Opening, and the search engine and its custom URLs under Search Engine, with the spec's labels and choices,
+ * stored as their tokens in the plugin's settings file.
  */
 class BrowserSettingsTest {
     private static final String ID = "dev.jasper.browser";
 
-    @Test void theRowsAreStartPageAndPageZoomThenTheLinkAndSearchSettingsWithTheSpecsLabelsChoicesAndDefaults() throws Exception {
+    @Test void theRowsAreStartPagePageZoomAndDownloadsFolderThenTheLinkAndSearchSettingsWithTheSpecsLabelsChoicesAndDefaults() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
             var recording = new AtomicReference<Recording>();
             host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(), plugin -> {
@@ -42,46 +45,46 @@ class BrowserSettingsTest {
                 BrowserSettings.declare(recording.get());
             });
             List<SettingSpec<?>> specs = recording.get().specs;
-            assertThat(specs).extracting(SettingSpec::key).containsExactly("start_page", "page_zoom", "open_links_from_terminal",
+            assertThat(specs).extracting(SettingSpec::key).containsExactly("start_page", "page_zoom", "downloads_folder", "open_links_from_terminal",
                 "open_local_web_files", "search_engine", "custom_search_url", "custom_suggestions_url", "devnull_mode", "ad_blocking",
                 "filter_list_url", "http_proxy", "proxy_host", "proxy_port");
-            assertThat(specs).extracting(SettingSpec::label).containsExactly("Start page", "Page zoom", "Open Links From Terminal",
-                "Open Local Web Files", "Default Search Engine", "Custom Search URL", "Custom Search Suggestions URL",
+            assertThat(specs).extracting(SettingSpec::label).containsExactly("Start page", "Page zoom", "Downloads folder",
+                "Open Links From Terminal", "Open Local Web Files", "Default Search Engine", "Custom Search URL", "Custom Search Suggestions URL",
                 "Use /dev/null mode (no history, cookies, or other data saved)", "Enable Ad Blocking", "Filter List URL", "Enable HTTP Proxy",
                 "Proxy Server", "Proxy Port");
-            assertThat(specs).extracting(SettingSpec::section).containsExactly("General", "General", "Link Opening", "Link Opening",
+            assertThat(specs).extracting(SettingSpec::section).containsExactly("General", "General", "General", "Link Opening", "Link Opening",
                 "Search Engine", "Search Engine", "Search Engine", "Privacy & Data", "Ad Blocking", "Ad Blocking", "Proxy", "Proxy", "Proxy");
             assertThat(specs).allSatisfy(spec -> assertThat(spec.description()).isNotBlank());
             assertThat(specs.get(1).kind()).isEqualTo(SettingKind.integer(25, 500));
             assertThat(specs.get(1).unit()).isEqualTo("%");
             assertThat(specs.get(1).defaultValue()).isEqualTo(100);
             assertThat(specs).filteredOn(spec -> spec != specs.get(1)).allSatisfy(spec -> assertThat(spec.unit()).isEmpty());
-            assertThat(choices(specs.get(2))).containsExactly("ask|Always Ask|ASK", "builtin|Built-in Browser|BUILT_IN", "default|Default Browser|DEFAULT_BROWSER");
-            assertThat(choices(specs.get(3))).containsExactly("ask|Always Ask|ASK", "builtin|Built-in Browser|BUILT_IN", "editor|Default Editor|DEFAULT_EDITOR");
-            assertThat(choices(specs.get(4))).containsExactly("google|Google|GOOGLE", "duckduckgo|DuckDuckGo|DUCKDUCKGO", "bing|Bing|BING",
+            assertThat(choices(specs.get(3))).containsExactly("ask|Always Ask|ASK", "builtin|Built-in Browser|BUILT_IN", "default|Default Browser|DEFAULT_BROWSER");
+            assertThat(choices(specs.get(4))).containsExactly("ask|Always Ask|ASK", "builtin|Built-in Browser|BUILT_IN", "editor|Default Editor|DEFAULT_EDITOR");
+            assertThat(choices(specs.get(5))).containsExactly("google|Google|GOOGLE", "duckduckgo|DuckDuckGo|DUCKDUCKGO", "bing|Bing|BING",
                 "kagi|Kagi|KAGI", "custom|Custom|CUSTOM");
-            assertThat(specs.get(2).defaultValue()).isEqualTo(LinkOpening.ASK);
-            assertThat(specs.get(3).defaultValue()).isEqualTo(LocalFileOpening.ASK);
-            assertThat(specs.get(4).defaultValue()).isEqualTo(SearchEngine.GOOGLE);
-            assertThat(specs.get(5).defaultValue()).isEqualTo("");
+            assertThat(specs.get(3).defaultValue()).isEqualTo(LinkOpening.ASK);
+            assertThat(specs.get(4).defaultValue()).isEqualTo(LocalFileOpening.ASK);
+            assertThat(specs.get(5).defaultValue()).isEqualTo(SearchEngine.GOOGLE);
             assertThat(specs.get(6).defaultValue()).isEqualTo("");
-            assertThat(specs.get(7).kind()).isEqualTo(SettingKind.bool());
-            assertThat(specs.get(7).defaultValue()).isEqualTo(false);
-            assertThat(specs.get(7).applies()).isEqualTo(Applies.LIVE);
-            assertThat(specs.get(7).description()).isEqualTo("Browser tabs, windows and panes opened after you turn this on keep cookies, "
-                + "history and all other browser data in memory, and lose them when that tab and the tabs it opened have all closed.");
-            // Plan 6 Task 10: Ad Blocking, off by default, and EasyList's content blocker list.
+            assertThat(specs.get(7).defaultValue()).isEqualTo("");
             assertThat(specs.get(8).kind()).isEqualTo(SettingKind.bool());
             assertThat(specs.get(8).defaultValue()).isEqualTo(false);
-            assertThat(specs.get(9).defaultValue()).isEqualTo("https://easylist-downloads.adblockplus.org/easylist_content_blocker.json");
-            assertThat(specs.get(9).description()).isEqualTo("A content blocker list in WebKit's format, downloaded automatically every 24 hours.");
+            assertThat(specs.get(8).applies()).isEqualTo(Applies.LIVE);
+            assertThat(specs.get(8).description()).isEqualTo("Browser tabs, windows and panes opened after you turn this on keep cookies, "
+                + "history and all other browser data in memory, and lose them when that tab and the tabs it opened have all closed.");
+            // Plan 6 Task 10: Ad Blocking, off by default, and EasyList's content blocker list.
+            assertThat(specs.get(9).kind()).isEqualTo(SettingKind.bool());
+            assertThat(specs.get(9).defaultValue()).isEqualTo(false);
+            assertThat(specs.get(10).defaultValue()).isEqualTo("https://easylist-downloads.adblockplus.org/easylist_content_blocker.json");
+            assertThat(specs.get(10).description()).isEqualTo("A content blocker list in WebKit's format, downloaded automatically every 24 hours.");
             // Plan 6 Task 11: the HTTP proxy, off by default, at 127.0.0.1 and port 8118.
-            assertThat(specs.get(10).kind()).isEqualTo(SettingKind.bool());
-            assertThat(specs.get(10).defaultValue()).isEqualTo(false);
-            assertThat(specs.get(10).description()).isEqualTo("Route browser traffic through a CONNECT proxy server.");
-            assertThat(specs.get(11).defaultValue()).isEqualTo("127.0.0.1");
-            assertThat(specs.get(12).kind()).isEqualTo(SettingKind.integer(1, 65535));
-            assertThat(specs.get(12).defaultValue()).isEqualTo(8118);
+            assertThat(specs.get(11).kind()).isEqualTo(SettingKind.bool());
+            assertThat(specs.get(11).defaultValue()).isEqualTo(false);
+            assertThat(specs.get(11).description()).isEqualTo("Route browser traffic through a CONNECT proxy server.");
+            assertThat(specs.get(12).defaultValue()).isEqualTo("127.0.0.1");
+            assertThat(specs.get(13).kind()).isEqualTo(SettingKind.integer(1, 65535));
+            assertThat(specs.get(13).defaultValue()).isEqualTo(8118);
             assertThat(host.failures()).isEmpty();
         } });
     }
@@ -130,7 +133,7 @@ class BrowserSettingsTest {
             assertThat(sections).extracting(BrowserSettings.Section::title)
                 .containsExactly("General", "Link Opening", "Search Engine", "Privacy & Data", "Ad Blocking", "Proxy");
             assertThat(sections).extracting(section -> section.settings().stream().map(Setting::key).toList()).containsExactly(
-                List.of("start_page", "page_zoom"), List.of("open_links_from_terminal", "open_local_web_files"),
+                List.of("start_page", "page_zoom", "downloads_folder"), List.of("open_links_from_terminal", "open_local_web_files"),
                 List.of("search_engine", "custom_search_url", "custom_suggestions_url"), List.of("devnull_mode"),
                 List.of("ad_blocking", "filter_list_url"), List.of("http_proxy", "proxy_host", "proxy_port"));
             assertThat(BrowserSettings.SECTIONS).containsExactly("General", "Link Opening", "Search Engine", "Privacy & Data",
@@ -139,6 +142,64 @@ class BrowserSettingsTest {
                 .isInstanceOf(UnsupportedOperationException.class);
             assertThat(host.failures()).isEmpty();
         } });
+    }
+
+    /**
+     * Plan 7 Task 2 and spec section 17: Downloads folder, under General after Page zoom, is empty, its default, for the
+     * system's Downloads folder, {@code ~} or {@code ~/folder} under the home folder, or an absolute folder; anything
+     * else is refused for the default.
+     */
+    @Test void theDownloadsFolderIsEmptyAHomeFolderOrAnAbsoluteFolder(@TempDir Path temp) throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var recording = new AtomicReference<Recording>();
+            var declared = new AtomicReference<BrowserSettings.Declared>();
+            host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(), plugin -> {
+                recording.set(new Recording(plugin.settings()));
+                declared.set(BrowserSettings.declare(recording.get()));
+            });
+            SettingSpec<?> spec = recording.get().specs.get(2);
+            assertThat(spec.key()).isEqualTo("downloads_folder");
+            assertThat(spec.label()).isEqualTo("Downloads folder");
+            assertThat(spec.section()).isEqualTo("General");
+            assertThat(spec.defaultValue()).isEqualTo("");
+            assertThat(spec.editor()).contains(EditorHint.directory());
+            assertThat(spec.applies()).isEqualTo(Applies.LIVE);
+            assertThat(spec.description()).isEqualTo("Where downloaded files go, without asking. Empty uses the system's Downloads folder.");
+            assertThat(spec.keywords()).contains("downloads", "download", "folder", "save");
+            String refusal = "Enter an absolute folder path, or leave it empty.";
+            assertThat(((SettingKind.Text) spec.kind()).invalidMessage()).isEqualTo(refusal);
+
+            Setting<String> folder = declared.get().downloadsFolder();
+            assertThat(folder.key()).isEqualTo("downloads_folder");
+            assertThat(folder.get()).as("the system's folder by default").isEmpty();
+            for (String value : List.of(temp.toString(), "~", "~/Saved", "")) {
+                host.setSetting(ID, "downloads_folder", value);
+                assertThat(host.settingsReports(ID)).as(value).isEmpty();
+                assertThat(folder.get()).isEqualTo(value);
+            }
+            for (String value : List.of("relative/dir", "Saved", "~user/Saved", " ")) {
+                host.setSetting(ID, "downloads_folder", value);
+                assertThat(host.settingsReports(ID)).as(value).containsExactly("downloads_folder: " + refusal);
+                assertThat(folder.get()).as(value + ": the default").isEmpty();
+            }
+            assertThat(declared.get().sections().getFirst().settings()).extracting(Setting::key)
+                .containsExactly("start_page", "page_zoom", "downloads_folder");
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /** The settings file is seeded with Downloads folder commented out, after Page zoom, in the file's columns. */
+    @Test void theSettingsFileSeedsTheDownloadsFolderCommentedOutAfterPageZoom() throws Exception {
+        List<String> lines;
+        try (var in = BrowserSettings.class.getResourceAsStream("/settings.toml")) {
+            assertThat(in).as("the Browser's settings template").isNotNull();
+            lines = new String(in.readAllBytes(), StandardCharsets.UTF_8).lines().toList();
+        }
+        assertThat(lines.get(2)).startsWith("# page_zoom = 100 ");
+        assertThat(lines.get(3)).isEqualTo("# downloads_folder = \"\"                 # where downloaded files go, without asking: "
+            + "an absolute folder, ~ or ~/folder; empty uses the system's Downloads folder");
+        assertThat(lines.get(3).indexOf(" # ")).as("the comment column").isEqualTo(lines.get(2).indexOf(" # "));
+        assertThat(lines.get(4)).startsWith("# open_links_from_terminal = ");
     }
 
     @Test void devNullModeIsReadFromItsKey() throws Exception {
