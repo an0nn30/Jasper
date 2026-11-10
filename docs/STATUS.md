@@ -1,6 +1,6 @@
 # Jasper — Status and Handoff
 
-**Editor file associations — 2026-11-10** (`claude/editor-file-associations`, worktree `.claude/worktrees/editor-file-associations`, from `417e2270f`; [spec](superpowers/specs/2026-11-10-editor-file-associations-design.md), [plan 1](superpowers/plans/2026-11-10-editor-file-associations-1-handed-in-files.md), handed-in files open in the Jasper Editor; not merged or pushed): plan 1 started with Task 1, the SDK 0.31.0 version bump alone (every bundled range `>=0.31.0, <0.32`); the `FileOrigin` type follows in Task 2.
+**Editor file associations — 2026-11-10** (`claude/editor-file-associations`, worktree `.claude/worktrees/editor-file-associations`, from `417e2270f`; [spec](superpowers/specs/2026-11-10-editor-file-associations-design.md), [plan 1](superpowers/plans/2026-11-10-editor-file-associations-1-handed-in-files.md), handed-in files open in the Jasper Editor; not merged or pushed): plan 1 started with Task 1, the SDK 0.31.0 version bump alone (every bundled range `>=0.31.0, <0.32`); the `FileOrigin` type follows in Task 2. Task 4: the Editor's `DefaultEditor` opens `OUTSIDE` files (a launch, `jasper <file>`, Finder) in the Jasper Editor whatever Default editor says, `JASPER` opens still follow the choice; `docs/editor.md` and `docs/command-line.md` say so.
 
 **Browser plan 6: privacy — 2026-11-09** (`claude/browser-privacy`, worktree `.claude/worktrees/browser-4b-4c-e6deab`,
 from local `main` `ef3347601`, which has plans 4a, 4b, 4c, 9 and 5 merged; the plan `daa19c574`, commits `827ac12ba`

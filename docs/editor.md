@@ -27,6 +27,8 @@ Other plugins open files in it through its API: Remote for files on SFTP hosts, 
   Open File Right does, show the file chooser for one file and open it in a new pane beside the focused pane; the new
   pane takes the focus. A file that is open already shows in another [view](#views-of-one-file); cancelling opens
   nothing. None of these has a default shortcut.
+- Files a launch names, `jasper <file>`, and on macOS files opened with Jasper in Finder or dropped on its Dock icon open
+  in this Editor, whatever [Default editor](#default-editor) says, in the most recently active window.
 - **Recent Files…** (command palette) reopens a file the Editor opened before; see [Recent files](#recent-files).
 - **Show Editor** (command palette) selects the Editor tab you were last in, or opens an untitled tab when there is
   none.
@@ -589,8 +591,7 @@ a recent file".
 **Default editor** on the Editor's settings page (Settings › Tools › Editor) chooses the editor for the files Jasper
 opens itself: `config.toml` (**Open in Editor** in Settings › Appearance & Behavior › System Settings › Configuration
 file, **Open config.toml** on the Settings banner and the configuration notification), a plugin's settings file, the
-custom VM options file, **File › Open File…**, Cmd-clicked paths in terminal panes, the files a launch or Finder hands
-to Jasper ([Opening files](#opening-files)) and other plugins' requests. It also sets the `EDITOR` of Jasper's shells,
+custom VM options file, **File › Open File…**, Cmd-clicked paths in terminal panes and other plugins' requests. It also sets the `EDITOR` of Jasper's shells,
 which `git commit`, `crontab -e` and `kubectl edit` use.
 
 - **Jasper Editor**, the default: files open in a tab here. `EDITOR` is the path of this Jasper's own `jasper` command
@@ -601,8 +602,7 @@ which `git commit`, `crontab -e` and `kubectl edit` use.
   otherwise. They run with Jasper's own `PATH`, so when Jasper starts from the Dock their `:!` commands may need full
   paths. App editors start on their own; one that exits with an error posts "Could not open a file in your default
   editor", naming its program. `EDITOR` is the editor's path with the options below.
-- **System default app**: files open with your system's app for them, and Jasper sets no `EDITOR`. A file a launch or
-  Finder hands to Jasper is shown in the file manager instead.
+- **System default app**: files open with your system's app for them, and Jasper sets no `EDITOR`.
 - **Custom command**: `custom_command` with the file's quoted path added, in a terminal tab, or on its own when
   `custom_in_terminal` is off. `/bin/sh` runs it with Jasper's `PATH` plus `/opt/homebrew/bin`, `/usr/local/bin` and
   `~/.local/bin`; on Windows, `cmd` runs it. `EDITOR` is the command as written. Until you enter one, files open with
