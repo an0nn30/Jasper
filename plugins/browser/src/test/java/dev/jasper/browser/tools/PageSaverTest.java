@@ -127,12 +127,12 @@ class PageSaverTest {
         });
         List<MarkedDownload> marks = host.markedDownloads();
         assertThat(marks).hasSize(10).allSatisfy(mark -> assertThat(mark.referrer()).hasValue(page));
-        assertThat(marks.getLast()).as("index.html last, from the page").isEqualTo(new MarkedDownload(folder.resolve("index.html"), page,
-            Optional.of(page)));
-        assertThat(marks.subList(0, 9)).extracting(mark -> mark.file().getFileName() + " " + mark.source()).containsExactlyInAnyOrder(
-            "logo.png " + server.at("/page/logo.png"), "site.css " + server.at("/page/site.css"), "app.js " + server.at("/page/app.js"),
-            "moved.png " + server.at("/page/moved.png"), "more.css " + server.at("/page/more.css"), "bg.png " + server.at("/page/bg.png"),
-            "icon.svg " + server.at("/img/icon.svg"), "dot.gif " + server.at("/page/dot.gif"), "other.png " + server.at("/page/other.png"));
+        assertThat(where(marks.getLast())).as("index.html last, from the page").isEqualTo(folder + " " + page);
+        assertThat(marks.subList(0, 9)).extracting(PageSaverTest::where).containsExactlyInAnyOrder(resources + " " + server.at("/page/logo.png"),
+            resources + " " + server.at("/page/site.css"), resources + " " + server.at("/page/app.js"),
+            resources + " " + server.at("/page/moved.png"), resources + " " + server.at("/page/more.css"),
+            resources + " " + server.at("/page/bg.png"), resources + " " + server.at("/img/icon.svg"),
+            resources + " " + server.at("/page/dot.gif"), resources + " " + server.at("/page/other.png"));
         assertThat(saved).isEqualTo(new PageSaver.Saved(folder.resolve("index.html"), 10, Optional.empty()));
     }
 
@@ -338,9 +338,8 @@ class PageSaverTest {
         Path folder = temp.resolve("devnull");
         saver(page, true, false).save(folder, new Snapshot(P, "<img src=\"" + P + "r0-\">", List.of(other("/page/logo.png")), List.of(), List.of(),
             page), client(Optional.empty()));
-        assertThat(host.markedDownloads()).containsExactly(
-            new MarkedDownload(folder.resolve("resources").resolve("logo.png"), URI.create("about:internet"), Optional.empty()),
-            new MarkedDownload(folder.resolve("index.html"), URI.create("about:internet"), Optional.empty()));
+        assertThat(host.markedDownloads()).allSatisfy(mark -> assertThat(mark.referrer()).isEmpty()).extracting(PageSaverTest::where)
+            .containsExactly(folder.resolve("resources") + " about:internet", folder + " about:internet");
     }
 
     /** A mark that fails leaves the files saved, and the save tells why once. */
@@ -504,8 +503,70 @@ class PageSaverTest {
         URI page = URI.create("file:///Users/ada/page.html");
         Path folder = temp.resolve("file");
         saver(page, false, false).save(folder, new Snapshot(P, "<p>local</p>", List.of(), List.of(), List.of(), page), client(Optional.empty()));
-        assertThat(host.markedDownloads()).containsExactly(new MarkedDownload(folder.resolve("index.html"), URI.create("about:internet"),
-            Optional.empty()));
+        assertThat(host.markedDownloads()).allSatisfy(mark -> assertThat(mark.referrer()).isEmpty()).extracting(PageSaverTest::where)
+            .containsExactly(folder + " about:internet");
+    }
+
+    /**
+     * Ruling D44: a lone surrogate in the page's text, as a truncated emoji leaves, does not fail the save: it is written
+     * as {@code ?}, as Java's encoder replaces malformed input.
+     */
+    @Test void aLoneSurrogateIsWrittenAsAQuestionMark() throws Exception {
+        URI page = server.at("/");
+        Path folder = temp.resolve("surrogate");
+        saver(page, false, false).save(folder, new Snapshot(P, "<p>truncated " + (char) 0xD83D + " and " + (char) 0xDE00 + " caf\u00e9</p>",
+            List.of(), List.of(), List.of(), page), client(Optional.empty()));
+        assertThat(Files.readAllBytes(folder.resolve("index.html"))).isEqualTo("<p>truncated ? and ? caf\u00e9</p>".getBytes(StandardCharsets.UTF_8));
+    }
+
+    /** Ruling D44: a redirect to a scheme-relative address with user information goes there, without it. */
+    @Test void aSchemeRelativeRedirectKeepsItsScheme() throws Exception {
+        URI page = server.at("/");
+        server.redirect("/hop.png", "//u:p@127.0.0.1:" + server.port() + "/logo.png");
+        Path folder = temp.resolve("relative");
+        saver(page, false, false).save(folder, new Snapshot(P, "<img src=\"" + P + "r0-\">", List.of(other("/hop.png")), List.of(), List.of(),
+            page), client(Optional.empty()));
+        assertThat(server.hits("/logo.png")).isEqualTo(1);
+        assertThat(Files.readString(folder.resolve("resources").resolve("hop.png"))).isEqualTo("PNG-1");
+    }
+
+    /**
+     * Ruling D44: the plugin's stop between two files leaves no file without its mark: each is marked before it is moved
+     * into place, and nothing is written after the stop, {@code index.html} included.
+     */
+    @Test void aStopDuringTheWriteLeavesNoUnmarkedFile() throws Exception {
+        URI page = server.at("/page/");
+        var running = new AtomicBoolean(true);
+        var marked = new CopyOnWriteArrayList<String>();
+        Path folder = temp.resolve("racing");
+        Platform stopping = (Platform) java.lang.reflect.Proxy.newProxyInstance(Platform.class.getClassLoader(), new Class<?>[] {Platform.class},
+            (self, method, arguments) -> {
+                marked.add(((Path) arguments[0]).getParent().getFileName().toString());
+                running.set(false);
+                return null;
+            });
+        assertThatThrownBy(() -> new PageSaver(page, false, false, CURRENT, running::get, stopping, limits(), this::lookUp)
+            .save(folder, new Snapshot(P, "<img src=\"" + P + "r0-\">", List.of(other("/page/logo.png")), List.of(), List.of(), page),
+                client(Optional.empty()))).isInstanceOf(IOException.class).hasMessage("the plugin stopped");
+        assertThat(marked).as("the resource, marked before the stop").containsExactly("resources");
+        assertThat(listed(folder)).as("no index.html after the stop").containsExactly("resources");
+        assertThat(listed(folder.resolve("resources"))).as("the marked file, and no part file").containsExactly("logo.png");
+    }
+
+    /** Ruling D44: a mark refused after the stop leaves no file: the one it was for is deleted, not moved into place. */
+    @Test void aMarkRefusedAfterTheStopLeavesNoFile() throws Exception {
+        URI page = server.at("/page/");
+        var running = new AtomicBoolean(true);
+        Path folder = temp.resolve("refused");
+        Platform closing = (Platform) java.lang.reflect.Proxy.newProxyInstance(Platform.class.getClassLoader(), new Class<?>[] {Platform.class},
+            (self, method, arguments) -> {
+                running.set(false);
+                throw new IllegalStateException("Plugin context is closed: dev.jasper.browser");
+            });
+        assertThatThrownBy(() -> new PageSaver(page, false, false, CURRENT, running::get, closing, limits(), this::lookUp)
+            .save(folder, new Snapshot(P, "<img src=\"" + P + "r0-\">", List.of(other("/page/logo.png")), List.of(), List.of(), page),
+                client(Optional.empty()))).isInstanceOf(IOException.class).hasMessage("the plugin stopped");
+        assertThat(folder).as("nothing left, the folder it made gone").doesNotExist();
     }
 
     /** The save's client: no cookie handler, no redirect followed, through the proxy as plan 6's clients go. */
@@ -550,6 +611,16 @@ class PageSaverTest {
 
     private Resource other(String path) {
         return new Resource(server.at(path), Kind.OTHER);
+    }
+
+    /**
+     * Where a mark went, as {@code folder source}: each file is marked as a temporary file beside its target and then
+     * moved over it, its mark with it (ruling D44), so the mark names a hidden {@code .part} file that is gone since.
+     */
+    private static String where(MarkedDownload mark) {
+        assertThat(mark.file().getFileName().toString()).matches("\\.jasper-save-[0-9a-f]+\\.part");
+        assertThat(mark.file()).as("moved over its target").doesNotExist();
+        return mark.file().getParent() + " " + mark.source();
     }
 
     private static List<String> listed(Path folder) throws IOException {

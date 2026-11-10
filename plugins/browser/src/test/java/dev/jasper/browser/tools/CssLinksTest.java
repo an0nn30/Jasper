@@ -88,6 +88,18 @@ class CssLinksTest {
             .isEqualTo("a { b: url(\"https://example.com/css/x.png\") } @import \"https://cdn.example/y.css\";");
     }
 
+    /**
+     * Ruling D44: a scheme-relative reference with user information keeps its form without it, so it resolves against
+     * the base's scheme, a host Java reads as a registry name's too; it never becomes {@code null://}.
+     */
+    @Test void aSchemeRelativeReferenceLosesOnlyItsUserInformation() {
+        String css = "a { b: url(//u:p@cdn.example/x.png) } c { d: url(//u@a_b.example/y.png) } e { f: url(//cdn.example/z.png) }";
+        assertThat(CssLinks.references(css, BASE)).containsExactly(URI.create("https://cdn.example/x.png"),
+            URI.create("https://a_b.example/y.png"), URI.create("https://cdn.example/z.png"));
+        assertThat(CssLinks.rewrite(css, BASE, NONE)).isEqualTo("a { b: url(\"https://cdn.example/x.png\") } c { d: url(\"https://a_b.example/y.png\") }"
+            + " e { f: url(\"https://cdn.example/z.png\") }");
+    }
+
     /** A written address that holds a quote, a backslash or a line break stays one CSS string. */
     @Test void aWrittenAddressStaysOneString() {
         assertThat(CssLinks.rewrite("a { b: url(x.png) }", BASE, uri -> Optional.of("we\"ird\\na\nme.png")))

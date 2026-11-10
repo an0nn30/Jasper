@@ -154,8 +154,12 @@ class SavePageTest {
         host.runBackground();
         flush();
         assertThat(Files.readString(folder.resolve("index.html"))).isEqualTo("<!DOCTYPE html>\n<html><body><p>Saved</p></body></html>");
-        assertThat(host.markedDownloads()).containsExactly(new FakePluginHost.MarkedDownload(folder.resolve("index.html"),
-            URI.create("https://example.com/news/"), Optional.of(URI.create("https://example.com/news/"))));
+        assertThat(host.markedDownloads()).singleElement().satisfies(mark -> {
+            assertThat(mark.file().getParent()).as("marked beside it, then moved over it (D44)").isEqualTo(folder);
+            assertThat(mark.file().getFileName().toString()).matches("\\.jasper-save-[0-9a-f]+\\.part");
+            assertThat(mark.source()).isEqualTo(URI.create("https://example.com/news/"));
+            assertThat(mark.referrer()).hasValue(URI.create("https://example.com/news/"));
+        });
         assertThat(shown).containsExactly("BROWSE_FILE_DIR " + folder);
         assertThat(clients).as("one client, made for the save and shut down").hasValue(1);
         assertThat(save.done()).isTrue();

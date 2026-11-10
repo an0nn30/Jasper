@@ -6,9 +6,11 @@ import dev.jasper.browser.tools.SavePayload.Kind;
 import dev.jasper.browser.tools.SavePayload.Resource;
 import dev.jasper.browser.tools.SavePayload.Snapshot;
 import dev.jasper.sdk.ui.Platform;
+import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -86,13 +88,14 @@ import java.util.regex.Pattern;
  * the page fixes; stylesheets are written with their references rewritten to those bare names, the others' temporary
  * files renamed; the style elements' and attributes' texts are rewritten to {@code resources/} names; and each token of
  * the snapshot is replaced, a resource's by its {@code resources/} name or, failed, refused, past a cap or never
- * fetched, by its absolute address, escaped for an attribute. {@code index.html} is written last, in UTF-8, streamed.
- * Every file is an ordinary new file, with the mode the umask gives, written beside its target first and moved over it,
- * so no write follows a link; a symbolic link at {@code resources} or {@code index.html} fails the save, and an existing
- * folder is saved into, its same-named files replaced. Each file gets the downloaded-file mark as it lands
- * ({@code Platform.markDownloaded}): from its resource's address, or the page's for {@code index.html}, with the page as
- * referrer, as a download's addresses go ({@link DownloadAddresses}); a /dev/null page's with no address at all (ruling
- * F7).
+ * fetched, by its absolute address, escaped for an attribute. {@code index.html} is written last, in UTF-8, streamed,
+ * malformed text such as a lone surrogate written as {@code ?}. Every file is an ordinary new file, with the mode the
+ * umask gives, written beside its target first and moved over it, so no write follows a link; a symbolic link at
+ * {@code resources} or {@code index.html} fails the save, and an existing folder is saved into, its same-named files
+ * replaced. Each file gets the downloaded-file mark before it is moved into place, as the mark goes with it
+ * ({@code Platform.markDownloaded}, ruling D44): from its resource's address, or the page's for {@code index.html},
+ * with the page as referrer, as a download's addresses go ({@link DownloadAddresses}); a /dev/null page's with no
+ * address at all (ruling F7).
  *
  * <p>Runs on the plugin's background executor and blocks until the save ends.
  */
@@ -552,26 +555,39 @@ public final class PageSaver {
             for (Entry entry : order) {
                 if (entry.fetched == null) continue;
                 if (!live()) throw new IOException(STOPPED);
-                Path target = resources.resolve(entry.name);
+                Path file;
                 if (entry.stylesheet()) {
                     String css = CssLinks.rewrite(utf8(css(entry.fetched)), entry.finalUrl, address -> local(address, ""));
-                    replace(resources, target, css.getBytes(StandardCharsets.UTF_8));
+                    file = temporaryFile(resources);
+                    Files.write(file, css.getBytes(StandardCharsets.UTF_8));
                 } else {
-                    move(entry.fetched.file(), target);
+                    file = entry.fetched.file();
                 }
+                place(file, resources.resolve(entry.name), entry.url, marks);
                 entry.placed = true;
                 files++;
-                marks.mark(target, entry.url);
             }
             if (!live()) throw new IOException(STOPPED);
             Path index = folder.resolve(INDEX), file = temporaryFile(folder);
-            try (Writer out = Files.newBufferedWriter(file, StandardCharsets.UTF_8, StandardOpenOption.WRITE,
-                    StandardOpenOption.TRUNCATE_EXISTING)) {
+            // An encoder that writes malformed input, as a lone surrogate, as '?' (ruling D44), as String.getBytes does.
+            try (Writer out = new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(file, StandardOpenOption.WRITE,
+                    StandardOpenOption.TRUNCATE_EXISTING), StandardCharsets.UTF_8))) {
                 tokens(snapshot, out);
             }
-            move(file, index);
-            marks.mark(index, page);
+            place(file, index, page, marks);
             return new Saved(index, files + 1, marks.failure);
+        }
+
+        /**
+         * Puts {@code file}, a temporary file of the save written whole, in place as {@code target}, marked as from
+         * {@code source} first, as the mark goes with a file that moves within its folder (ruling D44): so no file lands
+         * unmarked once the plugin stops, a stop is heard again before the mark, and a mark refused after a stop leaves
+         * the file to the save's clean-up instead of moving it into place.
+         */
+        private void place(Path file, Path target, URI source, Marks marks) throws IOException {
+            if (!live()) throw new IOException(STOPPED);
+            if (!marks.mark(file, source) && !live()) throw new IOException(STOPPED);
+            move(file, target);
         }
 
         /**
@@ -643,13 +659,6 @@ public final class PageSaver {
             } catch (AtomicMoveNotSupportedException unsupported) {
                 Files.move(file, target, StandardCopyOption.REPLACE_EXISTING);
             }
-        }
-
-        /** Writes {@code bytes} beside {@code target}, in {@code folder}, then moves them over it. */
-        private void replace(Path folder, Path target, byte[] bytes) throws IOException {
-            Path file = temporaryFile(folder);
-            Files.write(file, bytes);
-            move(file, target);
         }
 
         /**
@@ -884,15 +893,18 @@ public final class PageSaver {
             /**
              * Marks {@code file} as from {@code source} with the page as referrer, as a download's addresses go
              * ({@link DownloadAddresses}): an address that is no web page's, as a {@code file:} page's, as
-             * {@code about:internet} (ruling D43), and no address at all for a /dev/null page (ruling F7).
+             * {@code about:internet} (ruling D43), and no address at all for a /dev/null page (ruling F7). Answers whether
+             * the mark was written; a refusal's reason is kept, the first one.
              */
-            void mark(Path file, URI source) {
+            boolean mark(Path file, URI source) {
                 URI from = inMemory ? NO_ADDRESS : DownloadAddresses.source(source.toString());
                 Optional<URI> referrer = inMemory ? Optional.empty() : DownloadAddresses.web(page.toString());
                 try {
                     platform.markDownloaded(file, from, referrer);
+                    return true;
                 } catch (IOException | RuntimeException refused) {
                     if (failure.isEmpty()) failure = Optional.of(reason(refused));
+                    return false;
                 }
             }
         }
