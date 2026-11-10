@@ -27,8 +27,6 @@ Other plugins open files in it through its API: Remote for files on SFTP hosts, 
   Open File Right does, show the file chooser for one file and open it in a new pane beside the focused pane; the new
   pane takes the focus. A file that is open already shows in another [view](#views-of-one-file); cancelling opens
   nothing. None of these has a default shortcut.
-- Files a launch names, `jasper <file>`, and on macOS files opened with Jasper in Finder or dropped on its Dock icon open
-  in this Editor, whatever [Default editor](#default-editor) says, in the most recently active window.
 - **Recent Files…** (command palette) reopens a file the Editor opened before; see [Recent files](#recent-files).
 - **Show Editor** (command palette) selects the Editor tab you were last in, or opens an untitled tab when there is
   none.
@@ -48,7 +46,8 @@ Other plugins open files in it through its API: Remote for files on SFTP hosts, 
   messages here; Ctrl+C stops waiting and leaves the tabs open. With no file it does what **Show Editor** does.
 - The files a launch names (`Jasper notes.txt`, or `jasper notes.txt` with the
   [jasper command](command-line.md#the-jasper-command)), and on macOS the files you open with Jasper in Finder (Open
-  With) or drop on its Dock icon, go to the [default editor](#default-editor); this Editor opens them in the most recently active window ([One Jasper per home](command-line.md#one-jasper-per-home)).
+  With) or drop on its Dock icon, open in this Editor whatever [Default editor](#default-editor) says, in the most
+  recently active window ([One Jasper per home](command-line.md#one-jasper-per-home)).
 
 A file opens in a new tab of the window it was opened from, otherwise of the most recently active window. Opening a file that is already
 open selects its tab, of several [views](#views-of-one-file) the one you were in last; `jasper editor` and a Cmd-click
@@ -591,8 +590,8 @@ a recent file".
 **Default editor** on the Editor's settings page (Settings › Tools › Editor) chooses the editor for the files Jasper
 opens itself: `config.toml` (**Open in Editor** in Settings › Appearance & Behavior › System Settings › Configuration
 file, **Open config.toml** on the Settings banner and the configuration notification), a plugin's settings file, the
-custom VM options file, **File › Open File…**, Cmd-clicked paths in terminal panes and other plugins' requests. It also sets the `EDITOR` of Jasper's shells,
-which `git commit`, `crontab -e` and `kubectl edit` use.
+custom VM options file, **File › Open File…**, Cmd-clicked paths in terminal panes and other plugins' requests. It also
+sets the `EDITOR` of Jasper's shells, which `git commit`, `crontab -e` and `kubectl edit` use.
 
 - **Jasper Editor**, the default: files open in a tab here. `EDITOR` is the path of this Jasper's own `jasper` command
   (the one inside the installed app) followed by `editor --wait`, so it works whether or not the command is installed
