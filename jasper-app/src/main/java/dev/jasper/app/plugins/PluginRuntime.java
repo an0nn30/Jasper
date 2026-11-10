@@ -710,11 +710,24 @@ public final class PluginRuntime {
         OUTSIDE
     }
 
-    /** As {@link #open(Path, OptionalInt, Optional, Consumer)}, telling the editor where the open came from. */
+    /**
+     * As {@link #open(Path, OptionalInt, Optional, Consumer)}, telling the editor where the open came from.
+     *
+     * @param file the file
+     * @param line the 1-based line, or empty for the file's start
+     * @param window the Jasper window the open came from, or empty for none
+     * @param origin whether Jasper or another program asked for the open
+     * @param desktop the desktop's opener; its failure propagates
+     * @throws IllegalStateException on the UI thread
+     */
     public void open(Path file, OptionalInt line, Optional<UUID> window, Origin origin, Consumer<Path> desktop) {
         Objects.requireNonNull(window, "window");
         Objects.requireNonNull(origin, "origin");
-        openFromWorker(file, line, () -> window, origin == Origin.OUTSIDE ? dev.jasper.sdk.ui.FileOrigin.OUTSIDE : dev.jasper.sdk.ui.FileOrigin.JASPER, desktop);
+        openFromWorker(file, line, () -> window, sdk(origin), desktop);
+    }
+
+    private static dev.jasper.sdk.ui.FileOrigin sdk(Origin origin) {
+        return origin == Origin.OUTSIDE ? dev.jasper.sdk.ui.FileOrigin.OUTSIDE : dev.jasper.sdk.ui.FileOrigin.JASPER;
     }
 
     private void openFromWorker(Path file, OptionalInt line, Supplier<Optional<UUID>> window, Consumer<Path> desktop) {

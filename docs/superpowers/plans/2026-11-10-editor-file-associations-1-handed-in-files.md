@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-Status: not started (written 2026-11-10). Plan 1 of 3 for the spec below. Plan 2 adds the app's platform layer and
+Status: executed 2026-11-10 on `claude/editor-file-associations`, not merged. Deviations: Task 2 added `FileEditors.edit(..., FileOrigin)` early, because `ContractHarness` needed it; `HostedContext` needed no edit; the plan's lines 322 and 329 lost their link syntax, because `AppDocumentationTest` checks the links in plans; the loop anti-goal is tested in halves (the plugin half in `DefaultEditorTest`, the application half through the OUTSIDE funnel), not as one end-to-end test with a fake desktop handing the file back, which plan 2 owns. Plan 1 of 3 for the spec below. Plan 2 adds the app's platform layer and
 packaging declarations (`dev.jasper.app.platform.FileAssociations`); plan 3 adds the SDK file-association surface,
 the testkit, the Editor's File associations section and `file_association_extensions`.
 

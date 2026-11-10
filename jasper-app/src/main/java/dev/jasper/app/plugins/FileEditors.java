@@ -112,13 +112,9 @@ final class FileEditors {
      * interrupt also stays set on the thread, which tells it from a decline: {@link #openFromWorker} then skips the
      * desktop.
      *
+     * @param origin whether Jasper or another program asked for the open
      * @throws IllegalStateException on the UI thread
      */
-    boolean editFromWorker(Path file, OptionalInt line, Supplier<Optional<UUID>> window) {
-        return editFromWorker(file, line, window, dev.jasper.sdk.ui.FileOrigin.JASPER);
-    }
-
-    /** As {@link #editFromWorker(Path, OptionalInt, Supplier)}, telling the editor where the open came from. */
     boolean editFromWorker(Path file, OptionalInt line, Supplier<Optional<UUID>> window, dev.jasper.sdk.ui.FileOrigin origin) {
         if (onUi.getAsBoolean()) throw new IllegalStateException("Opening a file for editing waits for the UI thread; ask from a worker");
         Objects.requireNonNull(file, "file");

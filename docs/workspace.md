@@ -499,7 +499,7 @@ One Jasper runs per home. Launching it again, with its launcher or the
 [`jasper` command](command-line.md#one-jasper-per-home), hands the request to the running one, which brings its most recently active
 window to the front, restoring its window first when none is open, and opens the files and folders the launch
 named (`Jasper notes.txt src`): each folder as a terminal tab in that window, and each file in the
-[default editor](editor.md#default-editor), which is the Editor, in that window, unless you chose another. On macOS
+[Jasper Editor](editor.md#opening-files), in that window. On macOS
 a file or folder you open with Jasper in Finder (Open With), or drop on its Dock icon, opens the same way. A running
 Jasper that does not answer within 10 seconds is reported with its process id, and the launch starts no second one.
 

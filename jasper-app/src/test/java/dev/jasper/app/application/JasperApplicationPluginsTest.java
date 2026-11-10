@@ -525,6 +525,34 @@ class JasperApplicationPluginsTest {
         ApplicationPluginCleanup.await(application[0]);
     }
 
+    /** Plan 1 final review: every route a program can hand a file over (launch, open-file event, open-URI, second launch) is OUTSIDE. */
+    @Test void everyHandedInRouteCarriesTheOutsideOrigin() throws Exception {
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path dev = home.resolve("origin-routes-plugin");
+        PluginJars.build(dev, "origin.jar", PluginJars.descriptor("dev.example.origin", "1.0.0", "fix.origin.Main")
+            + "capabilities = [\"editor.provide\"]\n", Map.of("fix.origin.Main", ORIGIN_EDITOR), List.of());
+        Path launched = java.nio.file.Files.writeString(home.resolve("Launched.java"), "class Launched { }\n");
+        Path opened = java.nio.file.Files.writeString(home.resolve("Opened.java"), "class Opened { }\n");
+        Path uri = java.nio.file.Files.writeString(home.resolve("Uri.java"), "class Uri { }\n");
+        Path second = java.nio.file.Files.writeString(home.resolve("Second.java"), "class Second { }\n");
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].startPlugins(null, dev, false, dirs);
+            framesHeadless(application[0]);
+            application[0].openFirstWindow(List.of(launched), List.of()).orElseThrow();
+            application[0].filesOpened(List.of(opened.toFile()));
+            application[0].uriOpened(uri.toUri());
+            application[0].handedOff(List.of(second), List.of(), List.of(), false);
+        });
+        assertThat(awaitLines(dirs.plugins().resolve("dev.example.origin/data/edited"), 4)).containsExactlyInAnyOrder(
+            "Launched.java|OUTSIDE", "Opened.java|OUTSIDE", "Uri.java|OUTSIDE", "Second.java|OUTSIDE");
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
+    }
+
     /** Review Focus 1, the application's half: a clicked file opens at its line when it is an existing regular file. */
     @Test void aClickedFileOpensAtItsLineOnlyWhenItIsAnExistingRegularFile() throws Exception {
         AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
