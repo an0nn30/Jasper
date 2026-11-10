@@ -64,8 +64,8 @@ final class LinuxFileAssociations implements FileAssociations.Backend {
     private final Path dataHome;
     private final List<Path> dataFolders;
     private final Path configHome;
-    /** The catalogue's {@code application/*} types, which are text here. */
-    private final Set<String> textApplicationTypes;
+    /** The catalogue's Linux types, which are text here. */
+    private final Set<String> catalogTypes;
 
     /**
      * @param environment where the XDG Base Directory variables are read
@@ -80,8 +80,8 @@ final class LinuxFileAssociations implements FileAssociations.Backend {
         folders.addAll(system.isEmpty() ? List.of(Path.of("/usr/local/share"), Path.of("/usr/share")) : system);
         this.dataFolders = List.copyOf(folders);
         this.configHome = folder(environment.get("XDG_CONFIG_HOME")).orElse(home.resolve(".config"));
-        this.textApplicationTypes = catalog.extensions().stream().flatMap(extension -> catalog.linuxTypes(extension).stream())
-                .filter(type -> type.startsWith("application/")).collect(java.util.stream.Collectors.toUnmodifiableSet());
+        this.catalogTypes = catalog.extensions().stream().flatMap(extension -> catalog.linuxTypes(extension).stream())
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
     /** The data folders, the user's first: the spec ignores an empty or relative value. */
@@ -104,27 +104,38 @@ final class LinuxFileAssociations implements FileAssociations.Backend {
         return Optional.empty();
     }
 
+    /**
+     * A catalogue extension is claimable for its Linux types. Any other is claimable for the type the MIME database
+     * gives it when that type is text: {@code text/*}, one of the catalogue's types, or a type that inherits from
+     * {@code text/plain} in the database's {@code subclasses} files. An extension the database does not know is
+     * claimable for Jasper's own type.
+     */
     @Override public Claimability claimability(String extension) {
         if (catalog.extensions().contains(extension)) {
             List<String> types = catalog.linuxTypes(extension);
             return types.isEmpty() ? new Claimability.NotClaimable(Refusal.NOT_TEXT) : new Claimability.Claimable(types, false);
         }
         String body = extension.substring(1);
-        List<String> globs = new java.util.ArrayList<>();
+        Optional<String> type = LinuxMime.globType(databaseFiles("mime/globs2"), body);
+        if (type.isEmpty()) return new Claimability.Claimable(List.of(LinuxMime.OWN_TYPE_PREFIX + body), true);
+        String found = type.get();
+        boolean text = found.startsWith("text/") || catalogTypes.contains(found)
+                || LinuxMime.inheritsFrom(databaseFiles("mime/subclasses"), found, "text/plain");
+        return text ? new Claimability.Claimable(List.of(found), false) : new Claimability.NotClaimable(Refusal.NOT_TEXT);
+    }
+
+    /** The texts of a MIME database file in each data folder that has it, the user's first. */
+    private List<String> databaseFiles(String name) {
+        List<String> texts = new java.util.ArrayList<>();
         for (Path folder : dataFolders) {
-            Path file = folder.resolve("mime/globs2");
+            Path file = folder.resolve(name);
             try {
-                if (Files.isRegularFile(file)) globs.add(Files.readString(file, StandardCharsets.UTF_8));
+                if (Files.isRegularFile(file)) texts.add(Files.readString(file, StandardCharsets.UTF_8));
             } catch (IOException | UncheckedIOException failure) {
                 LOG.log(System.Logger.Level.DEBUG, "Could not read " + file, failure);
             }
         }
-        Optional<String> type = LinuxMime.globType(globs, body);
-        if (type.isEmpty()) return new Claimability.Claimable(List.of(LinuxMime.OWN_TYPE_PREFIX + body), true);
-        String found = type.get();
-        return found.startsWith("text/") || textApplicationTypes.contains(found)
-                ? new Claimability.Claimable(List.of(found), false)
-                : new Claimability.NotClaimable(Refusal.NOT_TEXT);
+        return List.copyOf(texts);
     }
 
     @Override public Handler handler(String type) throws IOException {
@@ -241,6 +252,9 @@ final class LinuxFileAssociations implements FileAssociations.Backend {
             case Handler.Jasper jasper -> {
                 return new Outcome.NoPrevious();
             }
+            case Handler.Unknown unknown -> {
+                return new Outcome.NoPrevious();
+            }
         }
     }
 
@@ -288,6 +302,7 @@ final class LinuxFileAssociations implements FileAssociations.Backend {
             case Handler.Other other -> other.id();
             case Handler.Jasper jasper -> DESKTOP_ID;
             case Handler.None none -> "";
+            case Handler.Unknown unknown -> "an unknown application";
         };
         if (id.equals(expected)) return new Outcome.Done();
         String detail = "xdg-mime query default " + type + " names " + (id.isEmpty() ? "no application" : id);

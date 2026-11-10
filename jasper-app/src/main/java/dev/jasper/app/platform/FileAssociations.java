@@ -27,7 +27,7 @@ import javax.swing.SwingUtilities;
  * system-specific part is a {@link Backend}; this class adds the extension rule, the previous-handler bookkeeping
  * ({@link PreviousHandlers}) and the threading: backend work runs on one worker under one lock, so calls never overlap,
  * and the futures returned never complete exceptionally. A backend exception becomes {@link Outcome.Failed} for the
- * extension's types (for {@link #status}, a handler {@code Other("", "")}) with a log line.
+ * extension's types (for {@link #status}, a handler {@link Handler.Unknown}) with a log line.
  */
 public final class FileAssociations {
     private static final System.Logger LOG = System.getLogger(FileAssociations.class.getName());
@@ -50,6 +50,9 @@ public final class FileAssociations {
 
         /** No application. */
         record None() implements Handler { }
+
+        /** The handler could not be read. */
+        record Unknown() implements Handler { }
     }
 
     /**
@@ -127,6 +130,10 @@ public final class FileAssociations {
 
     /** The system-specific part: one implementation per operating system. */
     interface Backend {
+        /**
+         * Why file associations cannot be used here. It must be cheap (no process beyond a {@code PATH} search) and safe
+         * to call while other backend work runs: the facade calls it outside its work lock, on any thread.
+         */
         Optional<Unavailable> unavailable();
 
         /** Called only with a normalised extension the facade accepted. */
@@ -148,8 +155,10 @@ public final class FileAssociations {
     private final Backend backend;
     private final PreviousHandlers store;
     private final Clock clock;
-    /** Serialises every backend call. */
+    /** Serialises every backend call except {@link Backend#unavailable()}. */
     private final Object lock = new Object();
+    /** Guards the one {@link Backend#unavailable()} call; backend work never holds it. */
+    private final Object availabilityLock = new Object();
     private volatile Optional<Unavailable> unavailable;
     private volatile Runnable listener = () -> { };
     /** The last {@code status} extensions and answer. Guarded by {@code lock}. */
@@ -187,15 +196,27 @@ public final class FileAssociations {
         if (os.startsWith("mac")) {
             backend = new MacFileAssociations(FileTypeCatalog.builtIn(), MacFileAssociations.MacCalls.system());
         } else if (os.startsWith("windows")) {
-            backend = new WindowsFileAssociations(WindowsFileAssociations.Registry.system(), openSettings);
+            backend = new WindowsFileAssociations(FileTypeCatalog.builtIn(), environment,
+                    WindowsFileAssociations.Registry.system(), openSettings);
         } else if (os.startsWith("linux")) {
             backend = new LinuxFileAssociations(FileTypeCatalog.builtIn(), environment, home,
                     LinuxFileAssociations.Tools.system());
         } else {
             return unsupported();
         }
-        return new FileAssociations(work -> Thread.ofVirtual().name("jasper-file-associations").start(work), backend,
-                new PreviousHandlers(dirs.fileAssociations()));
+        Executor worker = work -> Thread.ofVirtual().name("jasper-file-associations").start(work);
+        FileAssociations associations = new FileAssociations(worker, backend, new PreviousHandlers(dirs.fileAssociations()));
+        associations.prime();
+        return associations;
+    }
+
+    /** Asks {@link #unavailable()} once on the worker, so a first call from the EDT finds the answer ready. */
+    void prime() {
+        try {
+            worker.execute(this::unavailable);
+        } catch (RuntimeException notRun) {
+            LOG.log(System.Logger.Level.DEBUG, "The file association availability was not primed", notRun);
+        }
     }
 
     /**
@@ -254,11 +275,14 @@ public final class FileAssociations {
         return EXTENSION.matcher(text).matches() ? Optional.of(text) : Optional.empty();
     }
 
-    /** Why file associations cannot be used, or empty when they can. Any thread; the first answer is kept. */
+    /**
+     * Why file associations cannot be used, or empty when they can. Any thread; the first answer is kept. It never waits
+     * for a running status, claim or restore.
+     */
     public Optional<Unavailable> unavailable() {
         Optional<Unavailable> known = unavailable;
         if (known == null) {
-            synchronized (lock) {
+            synchronized (availabilityLock) {
                 known = unavailable;
                 if (known == null) {
                     try {
@@ -286,7 +310,10 @@ public final class FileAssociations {
         return run(() -> claimabilityOf(normal.get()), () -> new Claimability.NotClaimable(Refusal.NO_SYSTEM_TYPE));
     }
 
-    /** Who opens each type of each extension now; an extension that cannot be claimed has no types. */
+    /**
+     * Who opens each type of each extension now; an extension that cannot be claimed has no types. {@link #refresh()}
+     * asks again for these extensions until another call replaces them; {@code status(List.of())} stops it.
+     */
     public CompletableFuture<List<ExtensionStatus>> status(List<String> extensions) {
         List<String> asked = List.copyOf(extensions);
         return run(() -> {
@@ -302,12 +329,18 @@ public final class FileAssociations {
     /**
      * Makes Jasper the handler of every claimable type of {@code extensions}. Before claiming a type it reads its
      * handler and, when that is not Jasper and nothing is saved, saves it: the earliest previous handler wins, and a
-     * type Jasper already owns saves nothing. A type whose claim failed saves nothing. An extension that cannot be
-     * claimed has one result with an empty type and a {@link Outcome.Failed} naming the {@link Refusal}.
+     * type Jasper already owns saves nothing. A type whose claim failed and that is not Jasper's afterwards saves
+     * nothing. An extension that cannot be claimed has one result with an empty type and a {@link Outcome.Refused}
+     * naming the {@link Refusal}. When {@link #unavailable()} has a reason, nothing is asked of the system and each
+     * extension has one result with an empty type and {@code Failed("unavailable: <reason>")}.
      */
     public CompletableFuture<List<TypeResult>> claim(List<String> extensions) {
         List<String> asked = List.copyOf(extensions);
         return run(() -> {
+            Optional<List<TypeResult>> refused = whenUnavailable(asked);
+            if (refused.isPresent()) {
+                return refused.get();
+            }
             List<TypeResult> results;
             synchronized (lock) {
                 results = claimOf(asked);
@@ -319,13 +352,20 @@ public final class FileAssociations {
     }
 
     /**
-     * Hands back the saved handler of every type of {@code extensions} that has one, including a saved
-     * {@link Handler.None}. A {@link Outcome.Done} deletes the entry; {@link Outcome.PreviousGone}, {@link Outcome.NoPrevious}
-     * and failures keep it.
+     * Hands back the saved handler of every type of {@code extensions} that has one and that Jasper opens now, including
+     * a saved {@link Handler.None}. A type another application took since has no result, and its saved entry is
+     * deleted. A {@link Outcome.Done} deletes the entry; {@link Outcome.PreviousGone}, {@link Outcome.NoPrevious} and
+     * failures keep it. An extension that cannot be claimed has one result with an empty type and a
+     * {@link Outcome.Refused}; when {@link #unavailable()} has a reason, each extension has one result with an empty
+     * type and {@code Failed("unavailable: <reason>")}, and nothing is asked of the system.
      */
     public CompletableFuture<List<TypeResult>> restore(List<String> extensions) {
         List<String> asked = List.copyOf(extensions);
         return run(() -> {
+            Optional<List<TypeResult>> refused = whenUnavailable(asked);
+            if (refused.isPresent()) {
+                return refused.get();
+            }
             List<TypeResult> results;
             synchronized (lock) {
                 results = restoreOf(asked);
@@ -354,14 +394,18 @@ public final class FileAssociations {
         }, () -> null);
     }
 
-    /** Sets the one listener, run on the EDT after each claim or restore and after a refresh that found a change. */
+    /**
+     * Sets the one listener, run on the EDT after each claim or restore and after a refresh that found a change. It may
+     * run before the future of that claim or restore completes.
+     */
     public void onChanged(Runnable listener) {
         this.listener = Objects.requireNonNull(listener, "listener");
     }
 
     /**
      * Asks again for the last {@link #status} extensions on the worker, unless one is running or the last began less
-     * than 5 seconds ago; a clock set back never holds a check back. Tells the listener when the answer differs.
+     * than 5 seconds ago; a clock set back never holds a check back. Tells the listener when the answer differs. It keeps
+     * asking for the last extensions until {@link #status} replaces them; {@code status(List.of())} stops it.
      */
     public void refresh() {
         synchronized (this) {
@@ -439,6 +483,17 @@ public final class FileAssociations {
         return future;
     }
 
+    /** For every extension, a {@code Failed("unavailable: <reason>")} with an empty type, when there is a reason. */
+    private Optional<List<TypeResult>> whenUnavailable(List<String> extensions) {
+        Optional<Unavailable> reason = unavailable();
+        if (reason.isEmpty()) {
+            return Optional.empty();
+        }
+        Outcome failed = new Outcome.Failed("unavailable: " + reason.get());
+        return Optional.of(extensions.stream()
+                .map(extension -> new TypeResult(normalise(extension).orElse(extension), "", failed)).toList());
+    }
+
     /** Asks status again for the last extensions after a change, so the next refresh sees no second change. Under lock. */
     private void restatus() {
         if (!lastExtensions.isEmpty()) {
@@ -473,24 +528,30 @@ public final class FileAssociations {
         return resolve(extension) instanceof Claimability.Claimable claimable ? claimable.types() : List.of();
     }
 
+    /** Each platform type is asked once per pass: several extensions share types. */
     private List<ExtensionStatus> statusOf(List<String> extensions) {
         List<ExtensionStatus> out = new java.util.ArrayList<>();
+        Map<String, Handler> asked = new java.util.HashMap<>();
         for (String extension : extensions) {
             String normal = normalise(extension).orElse(extension);
             List<TypeStatus> types = new java.util.ArrayList<>();
             for (String type : claimableTypes(extension)) {
-                Handler handler;
-                try {
-                    handler = Objects.requireNonNull(backend.handler(type), "handler");
-                } catch (IOException | RuntimeException | LinkageError failure) {
-                    LOG.log(System.Logger.Level.WARNING, "Could not read the handler of " + type, failure);
-                    handler = new Handler.Other("", "");
-                }
+                Handler handler = asked.computeIfAbsent(type, this::handlerOrUnknown);
                 types.add(new TypeStatus(type, handler, store.get(type)));
             }
             out.add(new ExtensionStatus(normal, types));
         }
         return out;
+    }
+
+    /** The type's handler, or {@link Handler.Unknown} when it cannot be read. */
+    private Handler handlerOrUnknown(String type) {
+        try {
+            return Objects.requireNonNull(backend.handler(type), "handler");
+        } catch (IOException | RuntimeException | LinkageError failure) {
+            LOG.log(System.Logger.Level.WARNING, "Could not read the handler of " + type, failure);
+            return new Handler.Unknown();
+        }
     }
 
     private List<TypeResult> claimOf(List<String> extensions) {
@@ -511,7 +572,11 @@ public final class FileAssociations {
             String failure = null;
             for (String type : claimable.types()) {
                 try {
-                    read.put(type, Objects.requireNonNull(backend.handler(type), "handler"));
+                    Handler handler = Objects.requireNonNull(backend.handler(type), "handler");
+                    if (handler instanceof Handler.Unknown) {
+                        throw new IOException("Could not read the handler of " + type);
+                    }
+                    read.put(type, handler);
                 } catch (IOException | RuntimeException | LinkageError e) {
                     LOG.log(System.Logger.Level.WARNING, "Could not read the handler of " + type, e);
                     failure = String.valueOf(e.getMessage());
@@ -547,8 +612,13 @@ public final class FileAssociations {
             claimed = failed;
         }
         for (TypeResult result : claimed) {
+            // A failure may still have applied (a macOS time-out, a killed xdg-mime): the entry goes only once the type
+            // is known not to be Jasper's.
             if (result.outcome() instanceof Outcome.Failed && created.contains(result.type())) {
-                store.remove(result.type());
+                Handler now = handlerOrUnknown(result.type());
+                if (!(now instanceof Handler.Jasper) && !(now instanceof Handler.Unknown)) {
+                    store.remove(result.type());
+                }
             }
         }
         results.addAll(claimed);
@@ -568,7 +638,19 @@ public final class FileAssociations {
                 continue;
             }
             for (String type : claimable.types()) {
-                store.get(type).ifPresent(handler -> saved.put(type, handler));
+                Optional<Handler> previous = store.get(type);
+                if (previous.isEmpty()) {
+                    continue;
+                }
+                Handler now = handlerOrUnknown(type);
+                if (now instanceof Handler.Jasper) {
+                    saved.put(type, previous.get());
+                } else if (now instanceof Handler.Unknown) {
+                    results.add(new TypeResult(normal, type, new Outcome.Failed("Could not read the handler of " + type)));
+                } else {
+                    // The user chose another application since: there is nothing to hand back.
+                    store.remove(type);
+                }
             }
             if (!saved.isEmpty()) {
                 toRestore.put(normal, saved);

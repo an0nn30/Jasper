@@ -101,6 +101,7 @@ final class MacFileAssociations implements FileAssociations.Backend {
     private Outcome restore(String type, Handler previous) {
         return switch (previous) {
             case Handler.None none -> new Outcome.NoPrevious();
+            case Handler.Unknown unknown -> new Outcome.NoPrevious();
             case Handler.Jasper jasper -> set(type, BUNDLE_ID);
             case Handler.Other other -> calls.hasApplication().test(other.id())
                     ? set(type, other.id())

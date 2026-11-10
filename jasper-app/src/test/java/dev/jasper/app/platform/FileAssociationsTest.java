@@ -121,6 +121,7 @@ class FileAssociationsTest {
         store.put("t.a", XCODE);
         store.put("t.b", XCODE);
         store.put("t.c", new Handler.None());
+        List.of("t.a", "t.b", "t.c", "t.d").forEach(type -> backend.handlers.put(type, JASPER));
         backend.restoreOutcomes.put("t.b", new Outcome.NoPrevious());
         backend.restoreOutcomes.put("t.c", new Outcome.Failed("denied"));
         var results = associations.restore(List.of(".a", ".b", ".c", ".d")).join();
@@ -136,6 +137,7 @@ class FileAssociationsTest {
         backend.claimable(".a", "t.a");
         var associations = withBackend();
         store.put("t.a", XCODE);
+        backend.handlers.put("t.a", JASPER);
         backend.restoreOutcomes.put("t.a", new Outcome.PreviousGone());
         assertThat(associations.restore(List.of(".a")).join())
                 .containsExactly(new TypeResult(".a", "t.a", new Outcome.PreviousGone()));
@@ -195,7 +197,7 @@ class FileAssociationsTest {
         assertThat(associations.restore(List.of(".html", "../x", ".nope")).join()).isEqualTo(expected);
     }
 
-    @Test void claimabilityAndUnavailableTakeTheBackendLock() throws Exception {
+    @Test void claimabilityTakesTheBackendLockAndUnavailableDoesNot() throws Exception {
         var inside = new java.util.concurrent.atomic.AtomicBoolean();
         var associations = withBackend();
         backend.claimable(".a", "t.a");
@@ -203,9 +205,99 @@ class FileAssociationsTest {
         backend.onBackendCall = () -> inside.set(Thread.holdsLock(lock));
         associations.claimability(".a").join();
         assertThat(inside).isTrue();
-        inside.set(false);
+        inside.set(true);
         associations.unavailable();
-        assertThat(inside).isTrue();
+        assertThat(inside).as("unavailable() runs outside the work lock").isFalse();
+    }
+
+    @Test void unavailableNeverWaitsForRunningWork() throws Exception {
+        var associations = withBackend();
+        Object lock = lockOf(associations);
+        var held = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        Thread work = Thread.ofVirtual().start(() -> {
+            synchronized (lock) {
+                held.countDown();
+                try {
+                    release.await();
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+        try {
+            held.await();
+            var answer = java.util.concurrent.CompletableFuture.supplyAsync(associations::unavailable);
+            assertThat(answer.get(5, java.util.concurrent.TimeUnit.SECONDS)).isEmpty();
+        } finally {
+            release.countDown();
+            work.join();
+        }
+    }
+
+    @Test void primingAsksTheBackendOnceOnTheWorker() {
+        var queued = new ArrayList<Runnable>();
+        store = new PreviousHandlers(home.resolve("file-associations.toml"));
+        var associations = new FileAssociations(queued::add, backend, store);
+        var asked = new AtomicInteger();
+        backend.onBackendCall = asked::incrementAndGet;
+        associations.prime();
+        assertThat(asked).as("not on the caller's thread").hasValue(0);
+        assertThat(queued).hasSize(1);
+        queued.getFirst().run();
+        assertThat(asked).hasValue(1);
+        assertThat(associations.unavailable()).isEmpty();
+        assertThat(asked).as("the primed answer is kept").hasValue(1);
+    }
+
+    @Test void anUnavailableSystemIsAskedNothingByClaimOrRestore() {
+        backend.claimable(".java", "com.sun.java-source");
+        backend.unavailableAnswer = Optional.of(FileAssociations.Unavailable.NOT_INSTALLED);
+        var associations = withBackend();
+        var expected = List.of(
+                new TypeResult(".java", "", new Outcome.Failed("unavailable: NOT_INSTALLED")),
+                new TypeResult(".html", "", new Outcome.Failed("unavailable: NOT_INSTALLED")));
+        assertThat(associations.claim(List.of("JAVA", ".html")).join()).isEqualTo(expected);
+        assertThat(associations.restore(List.of("JAVA", ".html")).join()).isEqualTo(expected);
+        assertThat(backend.calls).isEmpty();
+    }
+
+    @Test void aFailedClaimThatStillAppliedKeepsTheSavedEntry() {
+        backend.claimable(".a", "t.a");
+        backend.claimable(".b", "t.b");
+        backend.handlers.put("t.a", XCODE);
+        backend.handlers.put("t.b", XCODE);
+        backend.failingButApplied.add("t.a");
+        backend.failing.add("t.b");
+        var associations = withBackend();
+        assertThat(associations.claim(List.of(".a", ".b")).join()).extracting(TypeResult::outcome)
+                .containsExactly(new Outcome.Failed("timed out"), new Outcome.Failed("boom"));
+        assertThat(store.get("t.a")).as("Jasper's now, so the previous handler stays saved").contains(XCODE);
+        assertThat(store.get("t.b")).as("not Jasper's: the entry this call made goes").isEmpty();
+    }
+
+    @Test void restoreHandsBackOnlyTypesJasperStillOpens() {
+        backend.claimable(".cpp", "t.source", "t.header");
+        var associations = withBackend();
+        store.put("t.source", XCODE);
+        store.put("t.header", XCODE);
+        backend.handlers.put("t.source", JASPER);
+        backend.handlers.put("t.header", new Handler.Other("com.example.clion", "CLion"));
+        assertThat(associations.restore(List.of(".cpp")).join())
+                .containsExactly(new TypeResult(".cpp", "t.source", new Outcome.Done()));
+        assertThat(backend.restored).isEqualTo(Map.of(".cpp", Map.of("t.source", XCODE)));
+        assertThat(store.get("t.header")).as("the user chose another app since").isEmpty();
+        assertThat(store.get("t.source")).isEmpty();
+    }
+
+    @Test void aStatusPassAsksEachSharedTypeOnce() {
+        backend.claimable(".cpp", "t.cpp");
+        backend.claimable(".hpp", "t.cpp");
+        backend.claimable(".cc", "t.cpp");
+        var associations = withBackend();
+        var status = associations.status(List.of(".cpp", ".hpp", ".cc")).join();
+        assertThat(status).hasSize(3);
+        assertThat(backend.calls).filteredOn(call -> call.startsWith("handler ")).containsExactly("handler t.cpp");
     }
 
     @Test void aClaimLeavesNothingForTheNextRefreshToReport() throws Exception {
@@ -239,7 +331,7 @@ class FileAssociationsTest {
                 .containsExactly(new TypeResult(".a", "t.a", new Outcome.Failed("kaput")));
         backend.throwOnHandler = true;
         var status = associations.status(List.of(".a")).join();
-        assertThat(status.getFirst().types().getFirst().handler()).isEqualTo(new Handler.Other("", ""));
+        assertThat(status.getFirst().types().getFirst().handler()).isEqualTo(new Handler.Unknown());
     }
 
     @Test void unsupportedIsAlwaysUnsupported() {
@@ -298,6 +390,9 @@ class FileAssociationsTest {
         final Map<String, Handler> handlers = new HashMap<>();
         final Map<String, Claimability> claimabilities = new HashMap<>();
         final Set<String> failing = new HashSet<>();
+        /** Types whose claim answers Failed but still makes Jasper the handler, as a macOS time-out may. */
+        final Set<String> failingButApplied = new HashSet<>();
+        Optional<FileAssociations.Unavailable> unavailableAnswer = Optional.empty();
         final Map<String, Outcome> restoreOutcomes = new HashMap<>();
         final Map<String, Map<String, Handler>> restored = new LinkedHashMap<>();
         final List<String> calls = new ArrayList<>();
@@ -313,7 +408,7 @@ class FileAssociationsTest {
 
         @Override public Optional<FileAssociations.Unavailable> unavailable() {
             onBackendCall.run();
-            return Optional.empty();
+            return unavailableAnswer;
         }
 
         @Override public Claimability claimability(String extension) {
@@ -334,7 +429,10 @@ class FileAssociationsTest {
             if (throwOnClaim) throw new IllegalStateException("kaput");
             List<TypeResult> out = new ArrayList<>();
             typesByExtension.forEach((extension, types) -> types.forEach(type -> {
-                if (failing.contains(type)) {
+                if (failingButApplied.contains(type)) {
+                    handlers.put(type, JASPER);
+                    out.add(new TypeResult(extension, type, new Outcome.Failed("timed out")));
+                } else if (failing.contains(type)) {
                     out.add(new TypeResult(extension, type, new Outcome.Failed("boom")));
                 } else {
                     handlers.put(type, JASPER);
