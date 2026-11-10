@@ -137,6 +137,75 @@ class FileAssociationsTest {
         }
     }
 
+    @Test void thePreviousHandlerIsSavedBeforeTheBackendClaims() {
+        backend.claimable(".java", "com.sun.java-source");
+        backend.handlers.put("com.sun.java-source", XCODE);
+        var associations = withBackend();
+        backend.beforeClaim = () -> backend.seenInStore = store.get("com.sun.java-source");
+        associations.claim(List.of(".java")).join();
+        assertThat(backend.seenInStore).contains(XCODE);
+    }
+
+    @Test void aFailedClaimRemovesOnlyTheEntryItCreated() {
+        backend.claimable(".a", "t.a");
+        backend.claimable(".b", "t.b");
+        backend.handlers.put("t.a", XCODE);
+        backend.handlers.put("t.b", new Handler.Other("other", "Other"));
+        backend.failing.addAll(List.of("t.a", "t.b"));
+        var associations = withBackend();
+        store.put("t.b", XCODE);
+        associations.claim(List.of(".a", ".b")).join();
+        assertThat(store.get("t.a")).isEmpty();
+        assertThat(store.get("t.b")).as("saved earlier, so kept").contains(XCODE);
+    }
+
+    @Test void refusedExtensionsGetARefusedOutcomeInClaimAndRestore() {
+        backend.claimable(".ok", "t.ok");
+        var associations = withBackend();
+        var expected = List.of(
+                new TypeResult(".html", "", new Outcome.Refused(Refusal.BROWSER_OWNED)),
+                new TypeResult("../x", "", new Outcome.Refused(Refusal.INVALID)),
+                new TypeResult(".nope", "", new Outcome.Refused(Refusal.NO_SYSTEM_TYPE)));
+        assertThat(associations.claim(List.of(".html", "../x", ".nope")).join()).isEqualTo(expected);
+        assertThat(associations.restore(List.of(".html", "../x", ".nope")).join()).isEqualTo(expected);
+    }
+
+    @Test void claimabilityAndUnavailableTakeTheBackendLock() throws Exception {
+        var inside = new java.util.concurrent.atomic.AtomicBoolean();
+        var associations = withBackend();
+        backend.claimable(".a", "t.a");
+        Object lock = lockOf(associations);
+        backend.onBackendCall = () -> inside.set(Thread.holdsLock(lock));
+        associations.claimability(".a").join();
+        assertThat(inside).isTrue();
+        inside.set(false);
+        associations.unavailable();
+        assertThat(inside).isTrue();
+    }
+
+    @Test void aClaimLeavesNothingForTheNextRefreshToReport() throws Exception {
+        backend.claimable(".a", "t.a");
+        backend.handlers.put("t.a", XCODE);
+        var clock = new MutableClock();
+        store = new PreviousHandlers(home.resolve("file-associations.toml"));
+        var associations = new FileAssociations(Runnable::run, backend, store, clock);
+        associations.status(List.of(".a")).join();
+        associations.claim(List.of(".a")).join();
+        var heard = new AtomicInteger();
+        flushEdt();
+        associations.onChanged(heard::incrementAndGet);
+        clock.advance(Duration.ofSeconds(10));
+        associations.refresh();
+        flushEdt();
+        assertThat(heard).hasValue(0);
+    }
+
+    private static Object lockOf(FileAssociations associations) throws Exception {
+        var field = FileAssociations.class.getDeclaredField("lock");
+        field.setAccessible(true);
+        return field.get(associations);
+    }
+
     @Test void aBackendFailureBecomesFailedAndTheFuturesNeverFail() {
         backend.claimable(".a", "t.a");
         backend.throwOnClaim = true;
@@ -207,6 +276,9 @@ class FileAssociationsTest {
         final Map<String, Outcome> restoreOutcomes = new HashMap<>();
         final Map<String, Map<String, Handler>> restored = new LinkedHashMap<>();
         final List<String> calls = new ArrayList<>();
+        Runnable beforeClaim = () -> { };
+        Runnable onBackendCall = () -> { };
+        Optional<Handler> seenInStore = Optional.empty();
         boolean throwOnClaim;
         boolean throwOnHandler;
 
@@ -214,10 +286,14 @@ class FileAssociationsTest {
             claimabilities.put(extension, new Claimability.Claimable(List.of(types), false));
         }
 
-        @Override public Optional<FileAssociations.Unavailable> unavailable() { return Optional.empty(); }
+        @Override public Optional<FileAssociations.Unavailable> unavailable() {
+            onBackendCall.run();
+            return Optional.empty();
+        }
 
         @Override public Claimability claimability(String extension) {
             calls.add("claimability " + extension);
+            onBackendCall.run();
             return claimabilities.getOrDefault(extension, new Claimability.NotClaimable(Refusal.NO_SYSTEM_TYPE));
         }
 
@@ -229,6 +305,7 @@ class FileAssociationsTest {
 
         @Override public List<TypeResult> claim(Map<String, List<String>> typesByExtension) {
             calls.add("claim " + typesByExtension);
+            beforeClaim.run();
             if (throwOnClaim) throw new IllegalStateException("kaput");
             List<TypeResult> out = new ArrayList<>();
             typesByExtension.forEach((extension, types) -> types.forEach(type -> {

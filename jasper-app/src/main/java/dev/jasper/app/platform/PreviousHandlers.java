@@ -16,7 +16,7 @@ import org.tomlj.TomlTable;
  * The handler each file type had before Jasper claimed it, kept in {@code file-associations.toml} as one table per
  * type: {@code [previous."<type>"]} with {@code id} and {@code name}; an empty {@code id} is "no handler". Writes go
  * through a temporary file in the same folder and an atomic move. A file that cannot be read counts as empty and is
- * logged once; a write that fails is logged and swallowed, so the store never blocks a claim.
+ * logged once, and the unreadable file is moved to {@code file-associations.toml.bad} so no write replaces it; a write that fails is logged and swallowed, so the store never blocks a claim.
  */
 final class PreviousHandlers {
     private static final System.Logger LOG = System.getLogger(PreviousHandlers.class.getName());
@@ -72,9 +72,18 @@ final class PreviousHandlers {
             readFailureLogged = false;
         } catch (IOException | RuntimeException e) {
             out.clear();
+            Path bad = file.resolveSibling(file.getFileName() + ".bad");
+            String kept = "";
+            try {
+                // Keep the unreadable file: the next write must not wipe what it may still hold.
+                Files.move(file, bad, StandardCopyOption.REPLACE_EXISTING);
+                kept = "; moved it to " + bad.getFileName();
+            } catch (IOException | RuntimeException moveFailure) {
+                e.addSuppressed(moveFailure);
+            }
             if (!readFailureLogged) {
                 readFailureLogged = true;
-                LOG.log(System.Logger.Level.WARNING, "Could not read " + file + "; treating it as empty", e);
+                LOG.log(System.Logger.Level.WARNING, "Could not read " + file + "; treating it as empty" + kept, e);
             }
         }
         return out;

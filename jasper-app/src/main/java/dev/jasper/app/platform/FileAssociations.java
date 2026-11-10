@@ -104,6 +104,9 @@ public final class FileAssociations {
         /** The saved application is no longer installed. */
         record PreviousGone() implements Outcome { }
 
+        /** The extension was not attempted: it cannot be claimed here. @param refusal why */
+        record Refused(Refusal refusal) implements Outcome { }
+
         /** @param detail the system's own message, for the log and the row */
         record Failed(String detail) implements Outcome { }
     }
@@ -188,13 +191,18 @@ public final class FileAssociations {
     public Optional<Unavailable> unavailable() {
         Optional<Unavailable> known = unavailable;
         if (known == null) {
-            try {
-                known = Objects.requireNonNull(backend.unavailable(), "answer");
-            } catch (RuntimeException | LinkageError failure) {
-                LOG.log(System.Logger.Level.WARNING, "Could not tell whether file associations are available", failure);
-                known = Optional.of(Unavailable.UNSUPPORTED_SYSTEM);
+            synchronized (lock) {
+                known = unavailable;
+                if (known == null) {
+                    try {
+                        known = Objects.requireNonNull(backend.unavailable(), "answer");
+                    } catch (RuntimeException | LinkageError failure) {
+                        LOG.log(System.Logger.Level.WARNING, "Could not tell whether file associations are available", failure);
+                        known = Optional.of(Unavailable.UNSUPPORTED_SYSTEM);
+                    }
+                    unavailable = known;
+                }
             }
-            unavailable = known;
         }
         return known;
     }
@@ -236,6 +244,7 @@ public final class FileAssociations {
             List<TypeResult> results;
             synchronized (lock) {
                 results = claimOf(asked);
+                restatus();
             }
             changed();
             return results;
@@ -253,6 +262,7 @@ public final class FileAssociations {
             List<TypeResult> results;
             synchronized (lock) {
                 results = restoreOf(asked);
+                restatus();
             }
             changed();
             return results;
@@ -347,33 +357,53 @@ public final class FileAssociations {
             worker.execute(() -> {
                 try {
                     future.complete(work.get());
-                } catch (RuntimeException | LinkageError failure) {
+                } catch (Throwable failure) {
                     LOG.log(System.Logger.Level.WARNING, "File association work failed", failure);
                     future.complete(fallback.get());
+                    if (failure instanceof VirtualMachineError error) {
+                        throw error;
+                    }
                 }
             });
-        } catch (RejectedExecutionException closed) {
+        } catch (RuntimeException notRun) {
+            LOG.log(System.Logger.Level.WARNING, "File association work was not run", notRun);
             future.complete(fallback.get());
         }
         return future;
     }
 
+    /** Asks status again for the last extensions after a change, so the next refresh sees no second change. Under lock. */
+    private void restatus() {
+        if (!lastExtensions.isEmpty()) {
+            lastAnswer = statusOf(lastExtensions);
+        }
+    }
+
     private Claimability claimabilityOf(String extension) {
         try {
-            return Objects.requireNonNull(backend.claimability(extension), "claimability");
+            synchronized (lock) {
+                return Objects.requireNonNull(backend.claimability(extension), "claimability");
+            }
         } catch (RuntimeException | LinkageError failure) {
             LOG.log(System.Logger.Level.WARNING, "Could not tell whether " + extension + " can be claimed", failure);
             return new Claimability.NotClaimable(Refusal.NO_SYSTEM_TYPE);
         }
     }
 
-    /** The extension's types, or empty when it is invalid, Browser-owned or refused by the backend. */
-    private List<String> claimableTypes(String extension) {
+    /** The extension's claimability: invalid and Browser-owned ones never reach the backend. */
+    private Claimability resolve(String extension) {
         Optional<String> normal = normalise(extension);
-        if (normal.isEmpty() || BROWSER_OWNED.contains(normal.get())) {
-            return List.of();
+        if (normal.isEmpty()) {
+            return new Claimability.NotClaimable(Refusal.INVALID);
         }
-        return claimabilityOf(normal.get()) instanceof Claimability.Claimable claimable ? claimable.types() : List.of();
+        if (BROWSER_OWNED.contains(normal.get())) {
+            return new Claimability.NotClaimable(Refusal.BROWSER_OWNED);
+        }
+        return claimabilityOf(normal.get());
+    }
+
+    private List<String> claimableTypes(String extension) {
+        return resolve(extension) instanceof Claimability.Claimable claimable ? claimable.types() : List.of();
     }
 
     private List<ExtensionStatus> statusOf(List<String> extensions) {
@@ -399,24 +429,17 @@ public final class FileAssociations {
     private List<TypeResult> claimOf(List<String> extensions) {
         List<TypeResult> results = new java.util.ArrayList<>();
         Map<String, List<String>> toClaim = new LinkedHashMap<>();
-        /* What each type's handler was before the claim, for the types whose handler was read. */
-        Map<String, Handler> before = new LinkedHashMap<>();
+        /* The types whose previous handler this call saved, before the claim, so a crash cannot lose it. */
+        java.util.Set<String> created = new java.util.HashSet<>();
         for (String extension : extensions) {
-            Optional<String> normal = normalise(extension);
-            if (normal.isEmpty()) {
-                results.add(new TypeResult(extension, "", new Outcome.Failed(Refusal.INVALID.name())));
-                continue;
-            }
-            if (BROWSER_OWNED.contains(normal.get())) {
-                results.add(new TypeResult(normal.get(), "", new Outcome.Failed(Refusal.BROWSER_OWNED.name())));
-                continue;
-            }
-            Claimability claimability = claimabilityOf(normal.get());
+            String normalName = normalise(extension).orElse(extension);
+            Claimability claimability = resolve(extension);
             if (!(claimability instanceof Claimability.Claimable claimable)) {
-                String why = ((Claimability.NotClaimable) claimability).refusal().name();
-                results.add(new TypeResult(normal.get(), "", new Outcome.Failed(why)));
+                Refusal why = ((Claimability.NotClaimable) claimability).refusal();
+                results.add(new TypeResult(normalName, "", new Outcome.Refused(why)));
                 continue;
             }
+            Optional<String> normal = Optional.of(normalName);
             Map<String, Handler> read = new LinkedHashMap<>();
             String failure = null;
             for (String type : claimable.types()) {
@@ -434,7 +457,13 @@ public final class FileAssociations {
                 }
                 continue;
             }
-            before.putAll(read);
+            for (Map.Entry<String, Handler> entry : read.entrySet()) {
+                Handler was = entry.getValue();
+                if (!(was instanceof Handler.Jasper) && store.get(entry.getKey()).isEmpty()) {
+                    store.put(entry.getKey(), was);
+                    created.add(entry.getKey());
+                }
+            }
             toClaim.merge(normal.get(), claimable.types(), (a, b) -> a);
         }
         if (toClaim.isEmpty()) {
@@ -451,12 +480,8 @@ public final class FileAssociations {
             claimed = failed;
         }
         for (TypeResult result : claimed) {
-            if (result.outcome() instanceof Outcome.Failed) {
-                continue;
-            }
-            Handler was = before.get(result.type());
-            if (was != null && !(was instanceof Handler.Jasper) && store.get(result.type()).isEmpty()) {
-                store.put(result.type(), was);
+            if (result.outcome() instanceof Outcome.Failed && created.contains(result.type())) {
+                store.remove(result.type());
             }
         }
         results.addAll(claimed);
@@ -469,7 +494,13 @@ public final class FileAssociations {
         for (String extension : extensions) {
             String normal = normalise(extension).orElse(extension);
             Map<String, Handler> saved = new LinkedHashMap<>();
-            for (String type : claimableTypes(extension)) {
+            Claimability resolved = resolve(extension);
+            if (!(resolved instanceof Claimability.Claimable claimable)) {
+                Refusal why = ((Claimability.NotClaimable) resolved).refusal();
+                results.add(new TypeResult(normal, "", new Outcome.Refused(why)));
+                continue;
+            }
+            for (String type : claimable.types()) {
                 store.get(type).ifPresent(handler -> saved.put(type, handler));
             }
             if (!saved.isEmpty()) {

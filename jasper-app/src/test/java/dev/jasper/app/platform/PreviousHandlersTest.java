@@ -46,4 +46,14 @@ class PreviousHandlersTest {
             assertThat(files.map(p -> p.getFileName().toString()).toList()).isEqualTo(List.of("file-associations.toml"));
         }
     }
+
+    @Test void anUnreadableFileIsKeptAsBadAndNotWipedByAWrite(@TempDir Path home) throws Exception {
+        Path file = home.resolve("file-associations.toml");
+        Files.writeString(file, "[[[not toml");
+        var store = new PreviousHandlers(file);
+        store.put("x", new Handler.None());
+        assertThat(Files.readString(home.resolve("file-associations.toml.bad"))).isEqualTo("[[[not toml");
+        assertThat(new PreviousHandlers(file).get("x")).contains(new Handler.None());
+        assertThat(Files.readString(file)).doesNotContain("not toml");
+    }
 }
