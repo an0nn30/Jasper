@@ -399,7 +399,9 @@ template's one feature ([Browser](browser.md#making-jasper-your-default-browser)
 | `Software\Classes\JasperURL\shell\open\command` | (Default) = `"[INSTALLDIR]Jasper.exe" --url "%1"` ([`--url`](command-line.md#launching-jasper-with-options)) |
 
 The uninstall, and so an upgrade before it writes the new version's, removes the `Jasper` value and deletes the
-`Capabilities` and `JasperURL` keys. The portable ZIP and `installWindowsUser` register nothing.
+`Capabilities` and `JasperURL` keys. The setup also registers the `JasperFile` ProgId under `Software\Classes` (the Editor's File associations use it; its
+open command is `"[INSTALLDIR]Jasper.exe" "%1"`), sets no default, and the uninstall removes it. The portable ZIP and
+`installWindowsUser` register nothing.
 
 The package's architecture is that of the selected JBR SDK, which must match the host's. On Windows on Arm, build the
 ARM64 package: an x64 Jasper there runs entirely under Windows' x64 emulation, including the code the JVM compiles as
