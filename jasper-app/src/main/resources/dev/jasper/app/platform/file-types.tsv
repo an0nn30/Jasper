@@ -1,0 +1,37 @@
+# Jasper file-type catalogue. Tab-separated; '#' starts a comment line.
+# Type line:   <extension with dot> <TAB> <macOS UTIs, comma-separated> <TAB> <Linux MIME types, comma-separated>
+# Import line: import <TAB> <UTI> <TAB> <conforms-to UTI> <TAB> <extensions without dots, comma-separated> <TAB> <description>
+# An empty column means that system has no text type for the extension.
+.java	com.sun.java-source	text/x-java
+.kt	dev.jasper.kotlin-source	text/x-kotlin
+.kts	dev.jasper.kotlin-source	text/x-kotlin
+.c	public.c-source	text/x-csrc
+.h	public.c-header	text/x-chdr
+.cpp	public.c-plus-plus-source	text/x-c++src
+.cc	public.c-plus-plus-source	text/x-c++src
+.cxx	public.c-plus-plus-source	text/x-c++src
+.hpp	public.c-plus-plus-header	text/x-c++hdr
+.hh	public.c-plus-plus-header	text/x-c++hdr
+.py	public.python-script	text/x-python3,text/x-python
+.go	dev.jasper.go-source	text/x-go
+.rs	dev.jasper.rust-source	text/rust
+.js	com.netscape.javascript-source	text/javascript
+.mjs	com.netscape.javascript-source	text/javascript
+.ts	dev.jasper.typescript-source	application/x-typescript
+.sh	public.shell-script	application/x-shellscript
+.zsh	public.shell-script	application/x-shellscript
+.bash	public.shell-script	application/x-shellscript
+.md	net.daringfireball.markdown	text/markdown
+.markdown	net.daringfireball.markdown	text/markdown
+.json	public.json	application/json
+.yaml	public.yaml	application/yaml,application/x-yaml
+.yml	public.yaml	application/yaml,application/x-yaml
+.toml	dev.jasper.toml	application/toml
+.xml	public.xml	application/xml,text/xml
+.txt	public.plain-text,com.apple.log	text/plain
+.log	public.plain-text,com.apple.log	text/plain
+import	dev.jasper.kotlin-source	public.source-code	kt,kts	Kotlin source code
+import	dev.jasper.go-source	public.source-code	go	Go source code
+import	dev.jasper.rust-source	public.source-code	rs	Rust source code
+import	dev.jasper.typescript-source	public.source-code	ts	TypeScript source code
+import	dev.jasper.toml	public.plain-text	toml	TOML document
