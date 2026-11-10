@@ -215,4 +215,19 @@ class ToolScriptsTest {
         assertThat(ToolScripts.savePageScript()).startsWith("/*").endsWith("})\n");
         assertThat(SavePayload.PART_LIMIT).as("the bridge's 1 MiB message, which the parts keep to").isEqualTo(1 << 20);
     }
+
+    /**
+     * Ruling D42, as far as Java can see it: the reader and distraction removal tell Save Page As, read only through
+     * their kept objects, what they hold of the page, and {@code save-page.js} gives the page's copy those values back,
+     * the reader's host removed, without ending either mode. The stub harnesses check the behaviour.
+     */
+    @Test void saveRestoresWhatTheReaderAndRemovalHoldInTheCopy() {
+        assertThat(ToolScripts.reader()).contains("return freeze({check, show, hide, root, held});", "function held()",
+            "kept.inert = freeze({element: body, value: was});", "freeze({element: elements[at], name, value, priority})");
+        assertThat(ToolScripts.distractions()).contains("return freeze({start, stop, removeAt, outlined});", "function outlined()");
+        assertThat(ToolScripts.savePageScript()).contains("Symbol.for('dev.jasper.browser.reader')",
+            "Symbol.for('dev.jasper.browser.distractions')", "kept(READER, 'held')", "kept(DISTRACTIONS, 'outlined')", "unhold(root);",
+            "['overflow-x', 'overflow-y']", "['outline-color', 'outline-style', 'outline-width']")
+            .doesNotContain("reader.hide", "'hide'", "'stop'");
+    }
 }

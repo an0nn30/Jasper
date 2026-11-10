@@ -1,5 +1,6 @@
 package dev.jasper.browser.tools;
 
+import dev.jasper.browser.downloads.DownloadAddresses;
 import dev.jasper.browser.http.ProxyRoute;
 import dev.jasper.browser.tools.SavePayload.Kind;
 import dev.jasper.browser.tools.SavePayload.Resource;
@@ -8,6 +9,7 @@ import dev.jasper.sdk.ui.Platform;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.io.Writer;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -20,6 +22,7 @@ import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.NoSuchFileException;
@@ -44,7 +47,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Flow;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
@@ -52,35 +57,42 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Save Page As's fetches and writes (spec section 10; plan 7's Task 7 and rulings F12, F13, F14, F26, D5 and D6): the
- * snapshot {@code save-page.js} took becomes a folder holding {@code index.html} and {@code resources/}, fetched again
- * from Jasper's own process, outside Chromium. The snapshot came from the page, so it is untrusted, as is everything a
- * server sends.
+ * Save Page As's fetches and writes (spec section 10; plan 7's Task 7 and rulings F12, F13, F14, F26, D5, D6 and
+ * D39-D43): the snapshot {@code save-page.js} took becomes a folder holding {@code index.html} and {@code resources/},
+ * fetched again from Jasper's own process, outside Chromium. The snapshot came from the page, so it is untrusted, as is
+ * everything a server sends.
  *
  * <p><b>Fetching.</b> Each http or https resource of the snapshot is fetched once, as are those its style elements and
  * attributes refer to and, from each stylesheet fetched (a resource of kind {@code style}, or one served as
- * {@code text/css}), its {@code url()} and {@code @import} references: four at a time, with the client
- * {@link #client(Optional)} makes, which keeps no cookies and follows no redirect itself, the page's origin as referrer
- * and no {@code Accept-Encoding}, so the caps count what arrives. A redirect is followed by hand, at most
+ * {@code text/css} that is no script), its {@code url()} and {@code @import} references: four at a time, with the
+ * client {@link #client(Optional)} makes, which keeps no cookies and follows no redirect itself, the page's origin as
+ * referrer and no {@code Accept-Encoding}, so the caps count what arrives. A redirect is followed by hand, at most
  * {@value #MOST_REDIRECTS}, within http and https, each target checked before it is asked; and once the client is
- * retired, as the proxy changed (ruling D6), nothing more is asked. Only a final 200 is kept, and
- * {@value #DEADLINE_SECONDS} seconds cover each resource whole, its redirects and body included. A public page's
- * resources are never asked for from this computer, its link, a private network or an unspecified address
- * ({@link PrivateHosts}): the host as written, and while the HTTP proxy is off the addresses its name resolves to, as
- * the proxy resolves names while it is on (ruling D5); a page at such a host itself may fetch from any. Bodies stream
- * to temporary files in {@code resources/}, stylesheets aside, which are kept in memory for their rewrite. The caps,
- * counted as bytes arrive: 20 MiB a resource, 2 MiB a stylesheet, 500 resources and 200 MiB in all.
+ * retired, as the proxy changed (ruling D6), nothing more is asked. Only a final 200 is kept; {@value #DEADLINE_SECONDS}
+ * seconds cover each resource whole, its redirects and body included, and five minutes the save's fetches in all, after
+ * which what is still to come stays absolute. A public page's resources are never asked for from this computer, its
+ * link, a private network or an unspecified address ({@link PrivateHosts}): the host as written, and while the HTTP
+ * proxy is off the addresses its name resolves to, looked up again right before each request to it, as the proxy
+ * resolves names while it is on (rulings D5 and D40). A page whose own host, as written, is such a host may fetch from
+ * any (ruling D39). Bodies stream to temporary files in {@code resources/}, stylesheets aside, which are kept in memory
+ * for their rewrite. The caps, counted as bytes arrive: 20 MiB a resource, 2 MiB a stylesheet and 32 MiB of
+ * stylesheets kept in all, 500 resources and 200 MiB in all.
+ *
+ * <p><b>Stopping.</b> Once the plugin stops, the save's client is shut down at once, ending every exchange under way,
+ * nothing more is written and no file is marked, its temporary files go and so do the folders it made, if they are
+ * empty (ruling D41).
  *
  * <p><b>Writing.</b> Once every fetch has settled, each resource kept gets its name ({@link ResourceNames}) in an order
  * the page fixes; stylesheets are written with their references rewritten to those bare names, the others' temporary
  * files renamed; the style elements' and attributes' texts are rewritten to {@code resources/} names; and each token of
  * the snapshot is replaced, a resource's by its {@code resources/} name or, failed, refused, past a cap or never
- * fetched, by its absolute address, escaped for an attribute. {@code index.html} is written last, in UTF-8. Every file
- * is written beside its target first and moved over it, so no write follows a link; a symbolic link at
- * {@code resources} or {@code index.html} fails the save, and an existing folder is saved into, its same-named files
- * replaced. Each file gets the downloaded-file mark as it lands ({@code Platform.markDownloaded}): from its resource's
- * address, or the page's for {@code index.html}, with the page as referrer; a /dev/null page's with no address at all
- * (ruling F7).
+ * fetched, by its absolute address, escaped for an attribute. {@code index.html} is written last, in UTF-8, streamed.
+ * Every file is an ordinary new file, with the mode the umask gives, written beside its target first and moved over it,
+ * so no write follows a link; a symbolic link at {@code resources} or {@code index.html} fails the save, and an existing
+ * folder is saved into, its same-named files replaced. Each file gets the downloaded-file mark as it lands
+ * ({@code Platform.markDownloaded}): from its resource's address, or the page's for {@code index.html}, with the page as
+ * referrer, as a download's addresses go ({@link DownloadAddresses}); a /dev/null page's with no address at all (ruling
+ * F7).
  *
  * <p>Runs on the plugin's background executor and blocks until the save ends.
  */
@@ -96,26 +108,35 @@ public final class PageSaver {
     private static final URI NO_ADDRESS = URI.create("about:internet");
     private static final String RESOURCES = "resources", INDEX = "index.html", TEMPORARY = ".jasper-save-", PART = ".part";
     private static final System.Logger LOG = System.getLogger(PageSaver.class.getName());
+    /** Why a save ends when the plugin stops (ruling D41). */
+    static final String STOPPED = "the plugin stopped";
+    // How often a fetch that waits asks whether the plugin still runs.
+    private static final long POLL_NANOS = TimeUnit.MILLISECONDS.toNanos(100);
     private static final Pattern CHARSET_RULE = Pattern.compile("^(\uFEFF?)@charset \"([^\"]*)\";"), STYLE_END = Pattern.compile("(?i)</(style)");
     private final URI page;
     private final boolean inMemory, proxied;
-    private final BooleanSupplier current;
+    private final BooleanSupplier current, running;
     private final Platform platform;
-    private final Duration deadline;
     private final Limits limits;
     private final Function<String, List<InetAddress>> resolver;
+    // Whether the save made its folder's resources, which a save that ends early deletes again if empty. The save's thread.
+    private boolean prepared;
 
     /**
-     * The caps of a save: a resource's bytes, all its resources' bytes, how many resources, and a stylesheet's bytes.
+     * The caps of a save: a resource's bytes, all its resources' bytes, how many resources, a stylesheet's bytes, the
+     * bytes of the stylesheets it keeps for their rewrite, how long a resource may take and how long the save may.
      *
      * @param each the most bytes one resource may have
      * @param all the most bytes every resource together may have
      * @param resources the most resources fetched
      * @param stylesheet the most bytes one stylesheet may have
+     * @param stylesheets the most bytes the stylesheets kept may have together (ruling D43)
+     * @param resource how long one resource may take, its redirects and body included
+     * @param whole how long the save's fetches may take in all (ruling D43)
      */
-    record Limits(long each, long all, int resources, long stylesheet) {
-        /** 20 MiB a resource, 200 MiB in all, 500 resources and 2 MiB a stylesheet. */
-        static final Limits DEFAULT = new Limits(20L << 20, 200L << 20, 500, 2L << 20);
+    record Limits(long each, long all, int resources, long stylesheet, long stylesheets, Duration resource, Duration whole) {
+        /** 20 MiB a resource, 200 MiB in all, 500 resources, 2 MiB a stylesheet, 32 MiB of stylesheets, 15 s and 5 minutes. */
+        static final Limits DEFAULT = new Limits(20L << 20, 200L << 20, 500, 2L << 20, 32L << 20, Duration.ofSeconds(15), Duration.ofMinutes(5));
     }
 
     /**
@@ -141,21 +162,22 @@ public final class PageSaver {
      * @param inMemory whether the page is a /dev/null one, whose files are marked with no address
      * @param proxied whether the HTTP proxy is on, so no name is looked up here (ruling D5)
      * @param current whether the client may still be asked; false once the proxy changed (ruling D6). Any thread
+     * @param running whether the plugin still runs; false once it stops, which cancels the save (ruling D41). Any thread
      * @param platform marks each file written
      */
-    public PageSaver(URI page, boolean inMemory, boolean proxied, BooleanSupplier current, Platform platform) {
-        this(page, inMemory, proxied, current, platform, DEADLINE, Limits.DEFAULT, PageSaver::lookUp);
+    public PageSaver(URI page, boolean inMemory, boolean proxied, BooleanSupplier current, BooleanSupplier running, Platform platform) {
+        this(page, inMemory, proxied, current, running, platform, Limits.DEFAULT, PageSaver::lookUp);
     }
 
-    /** As the public constructor, with a test's deadline, caps and name lookups. */
-    PageSaver(URI page, boolean inMemory, boolean proxied, BooleanSupplier current, Platform platform, Duration deadline, Limits limits,
+    /** As the public constructor, with a test's caps and deadlines and its name lookups. */
+    PageSaver(URI page, boolean inMemory, boolean proxied, BooleanSupplier current, BooleanSupplier running, Platform platform, Limits limits,
               Function<String, List<InetAddress>> resolver) {
         this.page = SaveAddresses.withoutUserInfo(Objects.requireNonNull(page, "page"));
         this.inMemory = inMemory;
         this.proxied = proxied;
         this.current = Objects.requireNonNull(current, "current");
+        this.running = Objects.requireNonNull(running, "running");
         this.platform = Objects.requireNonNull(platform, "platform");
-        this.deadline = Objects.requireNonNull(deadline, "deadline");
         this.limits = Objects.requireNonNull(limits, "limits");
         this.resolver = Objects.requireNonNull(resolver, "resolver");
     }
@@ -188,8 +210,12 @@ public final class PageSaver {
         Objects.requireNonNull(folder, "folder");
         Objects.requireNonNull(snapshot, "snapshot");
         Objects.requireNonNull(http, "http");
+        if (!running.getAsBoolean()) throw new IOException(STOPPED);
+        boolean madeFolder = !Files.exists(folder, LinkOption.NOFOLLOW_LINKS);
         Path resources = prepare(folder);
+        boolean madeResources = prepared;
         var run = new Run(http, resources, privatePage());
+        boolean saved = false;
         try {
             List<Entry> byIndex = new ArrayList<>(snapshot.resources().size());
             for (Resource resource : snapshot.resources()) byIndex.add(run.queue(resource.url(), resource.kind()));
@@ -198,14 +224,33 @@ public final class PageSaver {
             css.addAll(snapshot.attributes());
             for (String text : css) for (URI reference : CssLinks.references(text, snapshot.base())) styled.add(run.queue(reference, Kind.OTHER));
             run.fetchAll();
-            return run.write(folder, resources, snapshot, byIndex, styled);
+            Saved written = run.write(folder, resources, snapshot, byIndex, styled);
+            saved = true;
+            return written;
         } finally {
             run.cleanUp();
+            if (!saved) {
+                // A save that ends early, as a stop ends it (ruling D41), leaves no empty folder it made behind.
+                if (madeResources) deleteEmpty(resources);
+                if (madeFolder) deleteEmpty(folder);
+            }
         }
     }
 
-    /** Checks the folder, which is made if missing, and makes its {@code resources}; answers that. */
-    private static Path prepare(Path folder) throws IOException {
+    /** Deletes {@code folder} if it is empty; a folder with something in it stays. */
+    private static void deleteEmpty(Path folder) {
+        try {
+            Files.deleteIfExists(folder);
+        } catch (IOException | SecurityException kept) {
+            // Not empty, or not ours to delete: it stays.
+        }
+    }
+
+    /**
+     * Checks the folder, which is made if missing, and makes its {@code resources}; answers that, and whether it made
+     * {@code resources} is kept in {@link #prepared}.
+     */
+    private Path prepare(Path folder) throws IOException {
         if (Files.exists(folder) && !Files.isDirectory(folder)) throw new IOException(folder + " is a file");
         Files.createDirectories(folder);
         Path resources = folder.resolve(RESOURCES), index = folder.resolve(INDEX);
@@ -216,7 +261,8 @@ public final class PageSaver {
         }
         if (held.isPresent() && !held.get().isDirectory()) throw new IOException(resources + " is a file");
         if (indexed.isPresent() && indexed.get().isDirectory()) throw new IOException(index + " is a folder");
-        if (held.isEmpty()) Files.createDirectory(resources);
+        prepared = held.isEmpty();
+        if (prepared) Files.createDirectory(resources);
         return resources;
     }
 
@@ -229,12 +275,12 @@ public final class PageSaver {
         }
     }
 
-    /** Whether the page itself is at a host a public page may not fetch from, so its save may fetch from any. */
+    /**
+     * Whether the page itself is at a host a public page may not fetch from, so its save may fetch from any: by its host
+     * as written alone (ruling D39), so a public name that also resolves to this computer unlocks nothing.
+     */
     private boolean privatePage() {
-        if (!SaveAddresses.web(page) || page.getHost() == null) return false;
-        String host = page.getHost();
-        if (PrivateHosts.refused(host)) return true;
-        return !proxied && !PrivateHosts.literal(host) && resolver.apply(host).stream().anyMatch(PrivateHosts::refused);
+        return SaveAddresses.web(page) && page.getHost() != null && PrivateHosts.refused(page.getHost());
     }
 
     /** The addresses the system's resolver gives {@code name}; none when it gives none. */
@@ -307,15 +353,33 @@ public final class PageSaver {
         private final Map<String, Entry> entries = new LinkedHashMap<>(); // guarded by this
         private final ArrayDeque<Entry> waiting = new ArrayDeque<>(); // guarded by this
         private int active; // guarded by this
-        private final AtomicLong received = new AtomicLong();
+        // The bytes received in all, and those of the stylesheets kept for their rewrite (ruling D43).
+        private final AtomicLong received = new AtomicLong(), keptCss = new AtomicLong();
         private volatile boolean exhausted;
+        // Whether the client has been shut down, as the plugin stopped (ruling D41).
+        private final AtomicBoolean stopped = new AtomicBoolean();
+        // When the save's fetches must end, in System.nanoTime's terms (ruling D43).
+        private final long wholeEnd;
+        // The hosts judged by their spelling, and the names refused (ruling D40): a name allowed is judged again each time.
         private final Map<String, Boolean> hosts = new ConcurrentHashMap<>();
         private final List<Path> temporary = new ArrayList<>(); // guarded by itself
+        private boolean finished; // guarded by temporary
 
         Run(HttpClient http, Path resources, boolean anywhere) {
             this.http = http;
             this.resources = resources;
             this.anywhere = anywhere;
+            wholeEnd = System.nanoTime() + limits.whole().toNanos();
+        }
+
+        /**
+         * Whether the plugin still runs; once it does not, the save's client is shut down at once, ending every exchange
+         * under way (ruling D41). Any thread.
+         */
+        private boolean live() {
+            if (running.getAsBoolean() && !stopped.get()) return true;
+            if (stopped.compareAndSet(false, true)) http.shutdownNow();
+            return false;
         }
 
         /**
@@ -365,6 +429,7 @@ public final class PageSaver {
                 Thread.currentThread().interrupt();
                 throw new InterruptedIOException("The save was interrupted");
             }
+            if (!live()) throw new IOException(STOPPED);
         }
 
         private void work() {
@@ -384,13 +449,16 @@ public final class PageSaver {
             }
         }
 
-        /** Fetches {@code entry}, following its redirects by hand; what fails leaves it unfetched. A worker's thread. */
+        /**
+         * Fetches {@code entry}, following its redirects by hand, within its own deadline and the save's; what fails leaves
+         * it unfetched. A worker's thread.
+         */
         private void fetch(Entry entry) throws InterruptedException {
-            long end = System.nanoTime() + deadline.toNanos();
+            long end = Math.min(System.nanoTime() + limits.resource().toNanos(), wholeEnd);
             URI at = entry.url;
             for (int redirects = 0; ; redirects++) {
                 long left = end - System.nanoTime();
-                if (left <= 0 || exhausted || !current.getAsBoolean() || !allowed(at)) return;
+                if (left <= 0 || exhausted || !live() || !current.getAsBoolean() || !allowed(at)) return;
                 var body = new Body(entry);
                 CompletableFuture<HttpResponse<Fetched>> sent;
                 try {
@@ -400,9 +468,16 @@ public final class PageSaver {
                 } catch (RuntimeException refused) {
                     return;
                 }
-                HttpResponse<Fetched> response;
+                HttpResponse<Fetched> response = null;
                 try {
-                    response = sent.get(left, TimeUnit.NANOSECONDS);
+                    // In short waits, so a stop is heard at once.
+                    while (response == null) {
+                        try {
+                            response = sent.get(Math.min(POLL_NANOS, Math.max(1, end - System.nanoTime())), TimeUnit.NANOSECONDS);
+                        } catch (TimeoutException late) {
+                            if (System.nanoTime() >= end || !live()) throw late;
+                        }
+                    }
                 } catch (TimeoutException | ExecutionException | CancellationException failed) {
                     sent.cancel(true);
                     body.stop();
@@ -439,18 +514,30 @@ public final class PageSaver {
         /**
          * Whether {@code address} may be asked for (ruling F12): any, for a page at a private host itself; otherwise one
          * whose host, as written, is in no refused range and, while the proxy is off, whose name resolves only to
-         * addresses outside them. A host is judged once a save.
+         * addresses outside them. A host judged by its spelling is judged once a save, and so is a name refused; a name
+         * allowed is looked up again before each of its requests, so the check and the connect see one answer of the
+         * JDK's cache (ruling D40).
          */
         private boolean allowed(URI address) {
             if (anywhere) return true;
             String host = address.getHost();
             if (host == null) return false;
-            return hosts.computeIfAbsent(host.toLowerCase(Locale.ROOT), name -> {
-                if (PrivateHosts.refused(name)) return false;
-                if (proxied || PrivateHosts.literal(name)) return true;
-                List<InetAddress> addresses = resolver.apply(name);
-                return !addresses.isEmpty() && addresses.stream().noneMatch(PrivateHosts::refused);
-            });
+            String name = host.toLowerCase(Locale.ROOT);
+            Boolean known = hosts.get(name);
+            if (known != null) return known;
+            if (PrivateHosts.refused(name)) {
+                hosts.put(name, false);
+                return false;
+            }
+            if (PrivateHosts.literal(name)) {
+                hosts.put(name, true);
+                return true;
+            }
+            if (proxied) return true;
+            List<InetAddress> addresses = resolver.apply(name);
+            boolean allowed = !addresses.isEmpty() && addresses.stream().noneMatch(PrivateHosts::refused);
+            if (!allowed) hosts.put(name, false);
+            return allowed;
         }
 
         /** Names, writes and marks what was fetched, then writes and marks {@code index.html}. */
@@ -464,6 +551,7 @@ public final class PageSaver {
             int files = 0;
             for (Entry entry : order) {
                 if (entry.fetched == null) continue;
+                if (!live()) throw new IOException(STOPPED);
                 Path target = resources.resolve(entry.name);
                 if (entry.stylesheet()) {
                     String css = CssLinks.rewrite(utf8(css(entry.fetched)), entry.finalUrl, address -> local(address, ""));
@@ -475,9 +563,13 @@ public final class PageSaver {
                 files++;
                 marks.mark(target, entry.url);
             }
-            String html = tokens(snapshot);
-            Path index = folder.resolve(INDEX);
-            replace(folder, index, html.getBytes(StandardCharsets.UTF_8));
+            if (!live()) throw new IOException(STOPPED);
+            Path index = folder.resolve(INDEX), file = temporaryFile(folder);
+            try (Writer out = Files.newBufferedWriter(file, StandardCharsets.UTF_8, StandardOpenOption.WRITE,
+                    StandardOpenOption.TRUNCATE_EXISTING)) {
+                tokens(snapshot, out);
+            }
+            move(file, index);
             marks.mark(index, page);
             return new Saved(index, files + 1, marks.failure);
         }
@@ -511,12 +603,16 @@ public final class PageSaver {
             return entry == null || entry.name == null ? Optional.empty() : Optional.of(folder + entry.name);
         }
 
-        /** The snapshot's HTML with each of its tokens replaced. */
-        private String tokens(Snapshot snapshot) {
+        /**
+         * Writes the snapshot's HTML to {@code out} with each of its tokens replaced, streamed, so no second copy of a
+         * large page is made.
+         */
+        private void tokens(Snapshot snapshot, Writer out) throws IOException {
             URI base = snapshot.base();
-            Pattern token = Pattern.compile(Pattern.quote(snapshot.prefix()) + "([rsa])([0-9]{1,9})-");
-            Matcher matcher = token.matcher(snapshot.html());
-            return matcher.replaceAll(found -> {
+            String html = snapshot.html();
+            Matcher found = Pattern.compile(Pattern.quote(snapshot.prefix()) + "([rsa])([0-9]{1,9})-").matcher(html);
+            int written = 0;
+            while (found.find()) {
                 int n = Integer.parseInt(found.group(2));
                 String replacement = switch (found.group(1)) {
                     case "r" -> n < snapshot.resources().size() ? attribute(target(snapshot.resources().get(n).url())) : null;
@@ -526,8 +622,12 @@ public final class PageSaver {
                     default -> n < snapshot.attributes().size()
                         ? attribute(CssLinks.rewrite(snapshot.attributes().get(n), base, address -> local(address, RESOURCES + "/"))) : null;
                 };
-                return Matcher.quoteReplacement(replacement == null ? found.group() : replacement);
-            });
+                if (replacement == null) continue;
+                out.write(html, written, found.start() - written);
+                out.write(replacement);
+                written = found.end();
+            }
+            out.write(html, written, html.length() - written);
         }
 
         /** What a resource's token becomes: its {@code resources/} name, its fragment kept, or its absolute address. */
@@ -552,19 +652,33 @@ public final class PageSaver {
             move(file, target);
         }
 
-        /** A new temporary file of the save in {@code folder}, which the save deletes if it is still there at its end. */
+        /**
+         * A new temporary file of the save in {@code folder}, which the save deletes if it is still there at its end: an
+         * ordinary new file, with the mode the umask gives (ruling D43), under a random hidden name no resource has. None
+         * once the save has cleaned up, so an answer that comes after a stop leaves nothing.
+         */
         Path temporaryFile(Path folder) throws IOException {
-            Path file = Files.createTempFile(folder, TEMPORARY, PART);
-            synchronized (temporary) {
-                temporary.add(file);
+            for (int attempt = 0; ; attempt++) {
+                Path file = folder.resolve(TEMPORARY + Long.toHexString(ThreadLocalRandom.current().nextLong() >>> 1) + PART);
+                synchronized (temporary) {
+                    if (finished) throw new IOException(STOPPED);
+                    try {
+                        Files.createFile(file);
+                    } catch (FileAlreadyExistsException taken) {
+                        if (attempt < 10) continue;
+                        throw taken;
+                    }
+                    temporary.add(file);
+                    return file;
+                }
             }
-            return file;
         }
 
         /** Deletes what is left of the save's temporary files: those of fetches that failed or were not used. */
         void cleanUp() {
             List<Path> left;
             synchronized (temporary) {
+                finished = true;
                 left = List.copyOf(temporary);
                 temporary.clear();
             }
@@ -588,7 +702,8 @@ public final class PageSaver {
 
             @Override public HttpResponse.BodySubscriber<Fetched> apply(HttpResponse.ResponseInfo answer) {
                 String type = answer.headers().firstValue("Content-Type").orElse("");
-                boolean stylesheet = entry.kind == Kind.STYLE || mediaType(type).equals("text/css");
+                // A script stays a script whatever type it is served as (ruling D43).
+                boolean stylesheet = entry.kind == Kind.STYLE || entry.kind != Kind.SCRIPT && mediaType(type).equals("text/css");
                 long cap = stylesheet ? Math.min(limits.stylesheet(), limits.each()) : limits.each();
                 long announced = answer.headers().firstValueAsLong("Content-Length").orElse(-1);
                 var next = new Reading(answer.statusCode() != 200, announced > cap, stylesheet, cap, type);
@@ -618,6 +733,8 @@ public final class PageSaver {
             private Path file; // guarded by this
             private ByteArrayOutputStream kept; // guarded by this
             private long read; // guarded by this
+            // The bytes of this stylesheet counted against the save's stylesheets, given back if it is dropped.
+            private long counted; // guarded by this
             private boolean ended; // guarded by this
 
             Reading(boolean unread, boolean tooLarge, boolean stylesheet, long cap, String type) {
@@ -676,6 +793,13 @@ public final class PageSaver {
                         end(new IOException("past its cap"));
                         return;
                     }
+                    if (kept != null) {
+                        counted += size;
+                        if (keptCss.addAndGet(size) > limits.stylesheets()) {
+                            end(new IOException("past the save's cap of stylesheets"));
+                            return;
+                        }
+                    }
                     try {
                         if (kept != null) {
                             byte[] chunk = new byte[size];
@@ -731,6 +855,10 @@ public final class PageSaver {
             }
 
             private void discard() {
+                if (counted > 0) {
+                    keptCss.addAndGet(-counted);
+                    counted = 0;
+                }
                 try {
                     if (channel != null) channel.close();
                 } catch (IOException ignored) {
@@ -753,9 +881,14 @@ public final class PageSaver {
         private final class Marks {
             private Optional<String> failure = Optional.empty();
 
+            /**
+             * Marks {@code file} as from {@code source} with the page as referrer, as a download's addresses go
+             * ({@link DownloadAddresses}): an address that is no web page's, as a {@code file:} page's, as
+             * {@code about:internet} (ruling D43), and no address at all for a /dev/null page (ruling F7).
+             */
             void mark(Path file, URI source) {
-                URI from = inMemory ? NO_ADDRESS : source;
-                Optional<URI> referrer = inMemory || !SaveAddresses.web(page) ? Optional.empty() : Optional.of(page);
+                URI from = inMemory ? NO_ADDRESS : DownloadAddresses.source(source.toString());
+                Optional<URI> referrer = inMemory ? Optional.empty() : DownloadAddresses.web(page.toString());
                 try {
                     platform.markDownloaded(file, from, referrer);
                 } catch (IOException | RuntimeException refused) {

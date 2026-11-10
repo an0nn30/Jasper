@@ -17,8 +17,9 @@ import java.util.function.IntUnaryOperator;
  * Download file names (spec section 10, rulings F4 and F5): a safe name for what a server suggests, iTerm2's numbering
  * for a name already taken, and the names downloads under way have reserved, so that two downloads of one name at once
  * never write one file. Names compare with case and Unicode normalization folded, as APFS and NTFS compare them.
- * {@link #safeName} and {@link #numbered} are pure; {@link #reserve} and {@link #release} are safe on any thread, and
- * {@code reserve} reads only whether a name exists in the folder. Each reservation is a {@link Reservation} token, which
+ * {@link #safeName} and {@link #numbered} are pure; {@link #reserve}, {@link #reserveFolder}, which holds Save Page
+ * As's folder, and {@link #release} are safe on any thread, and the reserves read only whether a name exists in the
+ * folder. Each reservation is a {@link Reservation} token, which
  * frees only itself.
  */
 public final class DownloadNames {
@@ -139,6 +140,31 @@ public final class DownloadNames {
         }
         for (int n = 0; n <= MOST_NUMBERS; n++) {
             Path file = folder.resolve(n == 0 ? safe : numbered(safe, n));
+            String key = key(file);
+            if (!reserved.containsKey(key) && !Files.exists(file, LinkOption.NOFOLLOW_LINKS)) {
+                var reservation = new Reservation(file, key);
+                reserved.put(key, reservation);
+                return Optional.of(reservation);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Reserves the first free name for Save Page As's folder in {@code parent} (plan 7's D7 and D43): {@code name}, then
+     * {@code name (1)} to {@code name (999)}, numbered at its end as Finder and Explorer number a folder. A name is free
+     * as {@link #reserve} reads it: nothing of that name in {@code parent}, a link included, and no download or save holds
+     * it, case and normalization folded. Reading {@code parent} is the only I/O; nothing is created.
+     *
+     * @param parent the folder the save's folder would go in
+     * @param name the folder's name, a safe one
+     * @return the reservation, whose file's parent is {@code parent}; empty when no name is free
+     */
+    public synchronized Optional<Reservation> reserveFolder(Path parent, String name) {
+        Objects.requireNonNull(parent, "parent");
+        Objects.requireNonNull(name, "name");
+        for (int n = 0; n < MOST_NUMBERS; n++) {
+            Path file = parent.resolve(n == 0 ? name : name + " (" + n + ")");
             String key = key(file);
             if (!reserved.containsKey(key) && !Files.exists(file, LinkOption.NOFOLLOW_LINKS)) {
                 var reservation = new Reservation(file, key);

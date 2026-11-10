@@ -1,5 +1,6 @@
 package dev.jasper.browser.tools;
 
+import dev.jasper.browser.downloads.DownloadNames;
 import dev.jasper.browser.downloads.Downloads;
 import dev.jasper.browser.downloads.FileManager;
 import dev.jasper.browser.page.Page;
@@ -19,8 +20,6 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.FileSystemException;
-import java.nio.file.Files;
-import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -36,17 +35,18 @@ import java.util.function.Function;
 /**
  * One Save Page As (spec section 10, plan 7's Task 7), from the page's right-click menu. On the background executor the
  * first free folder for the page's host is found in the Downloads folder, {@code host}, then {@code host (1)} and on,
- * numbered at its end as Finder and Explorer number a folder (ruling D7), since Jasper's chooser opens an existing folder
- * rather than choosing it; then Jasper's save chooser asks where, starting there. Cancel does nothing. If the page
- * started another document meanwhile, the save fails; otherwise {@code save-page.js} runs in its top frame under a fresh
- * prefix ({@link ToolScripts#savePage}), and its answer comes in parts ({@link #part}), which a load start
- * ({@link #loadStarted}) or the page's close ({@link #pageClosed}) cuts short, and which must all come within
- * {@value #ANSWER_SECONDS} seconds. Then, on the background executor, {@link PageSaver} fetches and writes the folder
- * with a client of its own through the HTTP proxy as it was ({@link Network}), which is shut down at the save's end, and
- * the folder is shown in the file manager. A failure says "Save Failed" / "Could not save the page: REASON." over the
- * item, or, once its tab has closed, as a warning in the Downloads group, which also warns once if a file has no
- * downloaded-file mark. Nothing is shown once the plugin has stopped. UI thread, but for the work it hands the background
- * executor.
+ * numbered at its end as Finder and Explorer number a folder (ruling D7), since Jasper's chooser opens an existing
+ * folder rather than choosing it, and that name is reserved in the downloads' names until the save ends, so two saves
+ * of one host at once are offered two folders (ruling D43); then Jasper's save chooser asks where, starting there.
+ * Cancel does nothing. If the page started another document meanwhile, the save fails; otherwise {@code save-page.js}
+ * runs in its top frame under a fresh prefix ({@link ToolScripts#savePage}), and its answer comes in parts
+ * ({@link #part}), which a load start ({@link #loadStarted}) or the page's close ({@link #pageClosed}) cuts short, and
+ * which must all come within {@value #ANSWER_SECONDS} seconds. Then, on the background executor, {@link PageSaver} fetches
+ * and writes the folder with a client of its own through the HTTP proxy as it was ({@link Network}), which is shut down
+ * at the save's end, and the folder is shown in the file manager; the plugin's stop cancels it ({@link PageSaver},
+ * ruling D41). A failure says "Save Failed" / "Could not save the page: REASON." over the item, or, once its tab has
+ * closed, as a warning in the Downloads group, which also warns once if a file has no downloaded-file mark. Nothing is
+ * shown once the plugin has stopped. UI thread, but for the work it hands the background executor.
  */
 public final class SavePage {
     /** The opener bridge's op that carries the answer's parts. */
@@ -59,8 +59,6 @@ public final class SavePage {
     static final String NAVIGATED = "the page navigated away", NO_ANSWER = "the page did not answer", CLOSED = "the page closed";
     /** How long the page has to answer. */
     static final Duration ANSWER_WAIT = Duration.ofSeconds(30);
-    /** How many folder names are tried for a free one: the host's, then numbered up to 999. */
-    static final int MOST_FOLDERS = 1000;
     private static final long ANSWER_SECONDS = 30;
     private static final String OPEN_QUOTE = "\u201C", CLOSE_QUOTE = "\u201D";
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -72,7 +70,8 @@ public final class SavePage {
      *
      * @param proxy the HTTP proxy; empty while it is off, when names are looked up here (ruling D5)
      * @param current whether the save's client may still be asked: false once the proxy changed (ruling D6). Any thread
-     * @param running whether the plugin still runs, so the save's end may show anything. UI thread
+     * @param running whether the plugin still runs, so the save goes on and its end may show anything; false once it
+     *     stops, which cancels the save (ruling D41). Any thread
      * @param clients makes the save's client through the proxy given ({@link PageSaver#client}), on the background
      *     executor; a test's fails if asked
      */
@@ -93,6 +92,7 @@ public final class SavePage {
     private final ContentTab tab;
     private final PluginContext context;
     private final Path startFolder;
+    private final DownloadNames names;
     private final FileManager files;
     private final Network network;
     private final BiFunction<Duration, Runnable, Runnable> later;
@@ -104,13 +104,16 @@ public final class SavePage {
     private Path folder;
     private SavePayload payload;
     private Runnable wait = NOTHING;
+    // The suggested folder's name, which the save holds until it ends (ruling D43); null for none.
+    private DownloadNames.Reservation reservation;
 
-    private SavePage(Page page, ContentTab tab, PluginContext context, Path startFolder, FileManager files, Network network,
-                     BiFunction<Duration, Runnable, Runnable> later) {
+    private SavePage(Page page, ContentTab tab, PluginContext context, Path startFolder, DownloadNames names, FileManager files,
+                     Network network, BiFunction<Duration, Runnable, Runnable> later) {
         this.page = page;
         this.tab = tab;
         this.context = context;
         this.startFolder = startFolder;
+        this.names = names;
         this.files = files;
         this.network = network;
         this.later = later;
@@ -127,16 +130,18 @@ public final class SavePage {
      * @param tab its item's tab, over which the chooser and a failure show
      * @param context the plugin's context
      * @param startFolder the folder the chooser starts in: the Downloads folder
+     * @param names the plugin's download names, which hold the suggested folder's name until the save ends
      * @param files shows the saved folder
      * @param network how the save fetches
      * @param later runs a task on the UI thread after a delay, answering what cancels it
      * @return the save, whose item hands it the page's parts and load starts
      */
-    public static SavePage start(Page page, ContentTab tab, PluginContext context, Path startFolder, FileManager files, Network network,
-                                 BiFunction<Duration, Runnable, Runnable> later) {
+    public static SavePage start(Page page, ContentTab tab, PluginContext context, Path startFolder, DownloadNames names, FileManager files,
+                                 Network network, BiFunction<Duration, Runnable, Runnable> later) {
         var save = new SavePage(Objects.requireNonNull(page, "page"), Objects.requireNonNull(tab, "tab"),
             Objects.requireNonNull(context, "context"), Objects.requireNonNull(startFolder, "startFolder"),
-            Objects.requireNonNull(files, "files"), Objects.requireNonNull(network, "network"), Objects.requireNonNull(later, "later"));
+            Objects.requireNonNull(names, "names"), Objects.requireNonNull(files, "files"), Objects.requireNonNull(network, "network"),
+            Objects.requireNonNull(later, "later"));
         save.name();
         return save;
     }
@@ -165,7 +170,7 @@ public final class SavePage {
     /** The page's item closed: a save still to choose ends, and one awaiting its answer fails. */
     public void pageClosed() {
         switch (state) {
-            case NAMING, CHOOSING -> state = State.DONE;
+            case NAMING, CHOOSING -> end();
             case ANSWERING -> fail(CLOSED);
             default -> { }
         }
@@ -180,50 +185,57 @@ public final class SavePage {
         return state == State.DONE;
     }
 
-    /** Finds the folder's free name on the background executor, then asks where. */
+    /**
+     * Reserves the folder's free name on the background executor, as it reads the start folder, then asks where. The
+     * name stays the save's until it ends, so another save of the host meanwhile is offered the next (ruling D43).
+     */
     private void name() {
         String host = ResourceNames.folderFor(address);
         try {
             context.background().execute(() -> {
-                String free = free(startFolder, host);
-                EventQueue.invokeLater(() -> choose(free));
+                Optional<DownloadNames.Reservation> free = reserve(host);
+                EventQueue.invokeLater(() -> choose(free, host));
             });
         } catch (RejectedExecutionException stopped) {
-            state = State.DONE;
+            end();
         }
     }
 
-    /** The first of {@code host}, {@code host (1)}, … up to 999 that nothing in {@code folder} has; {@code host} if none. */
-    static String free(Path folder, String host) {
-        for (int n = 0; n < MOST_FOLDERS; n++) {
-            String name = n == 0 ? host : host + " (" + n + ")";
-            try {
-                if (!Files.exists(folder.resolve(name), LinkOption.NOFOLLOW_LINKS)) return name;
-            } catch (SecurityException unreadable) {
-                return host;
-            }
+    /** The first free name for the host's folder, reserved; empty when none is, or the start folder cannot be read. */
+    private Optional<DownloadNames.Reservation> reserve(String host) {
+        try {
+            return names.reserveFolder(startFolder, host);
+        } catch (SecurityException unreadable) {
+            return Optional.empty();
         }
-        return host;
     }
 
-    /** Asks where, starting at {@code name} in the start folder; then, unless cancelled or navigated, asks the page. */
-    private void choose(String name) {
-        if (state != State.NAMING) return;
+    /**
+     * Asks where, starting at the reserved name in the start folder, or the host's when none was free; then, unless
+     * cancelled or navigated, asks the page.
+     */
+    private void choose(Optional<DownloadNames.Reservation> free, String host) {
+        if (state != State.NAMING) {
+            free.ifPresent(names::release);
+            return;
+        }
+        reservation = free.orElse(null);
         if (tab.isClosed() || !network.running().getAsBoolean()) {
-            state = State.DONE;
+            end();
             return;
         }
         state = State.CHOOSING;
+        Path suggested = free.map(DownloadNames.Reservation::file).orElse(startFolder.resolve(host));
         Optional<Path> chosen;
         try {
-            chosen = context.windows().chooseSaveFile(tab, TITLE, Optional.of(startFolder.resolve(name)));
+            chosen = context.windows().chooseSaveFile(tab, TITLE, Optional.of(suggested));
         } catch (IllegalArgumentException | IllegalStateException gone) {
-            state = State.DONE;
+            end();
             return;
         }
         if (state != State.CHOOSING) return;
         if (chosen.isEmpty()) {
-            state = State.DONE;
+            end();
             return;
         }
         if (page.document() != document) {
@@ -259,7 +271,7 @@ public final class SavePage {
                 }
             });
         } catch (RejectedExecutionException stopped) {
-            state = State.DONE;
+            end();
         }
     }
 
@@ -268,7 +280,7 @@ public final class SavePage {
         SavePayload.Snapshot snapshot = answer.snapshot();
         HttpClient http = network.clients().apply(network.proxy());
         try {
-            return new PageSaver(address, inMemory, network.proxy().isPresent(), network.current(), context.platform())
+            return new PageSaver(address, inMemory, network.proxy().isPresent(), network.current(), network.running(), context.platform())
                 .save(target, snapshot, http);
         } finally {
             http.shutdownNow();
@@ -277,7 +289,7 @@ public final class SavePage {
 
     /** The folder is saved: it shows in the file manager, and a file left without its mark is told once. */
     private void saved(PageSaver.Saved saved) {
-        state = State.DONE;
+        end();
         if (!network.running().getAsBoolean()) return;
         Path written = saved.index().getParent();
         files.reveal(written);
@@ -292,7 +304,7 @@ public final class SavePage {
     /** The save failed for {@code reason}: "Save Failed" over the item, or a warning once its tab has closed. */
     private void fail(String reason) {
         endWait();
-        state = State.DONE;
+        end();
         payload = null;
         if (!network.running().getAsBoolean()) return;
         String message = "Could not save the page: " + sentence(reason) + ".";
@@ -320,6 +332,14 @@ public final class SavePage {
         dialog.setContent(view);
         dialog.onClosed(view::close);
         dialog.show();
+    }
+
+    /** The save ends, saved, cancelled or failed: its folder's name is free again. */
+    private void end() {
+        state = State.DONE;
+        DownloadNames.Reservation held = reservation;
+        reservation = null;
+        if (held != null) names.release(held);
     }
 
     private void endWait() {

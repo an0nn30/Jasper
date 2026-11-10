@@ -11,19 +11,22 @@ import java.util.Locale;
 import java.util.regex.Pattern;
 
 /**
- * The hosts Save Page As never fetches from for a public page (plan 7's F12), as Chromium's Private Network Access keeps
- * a public page from them: this computer ({@code localhost} and the names under it, {@code 127.0.0.0/8}, {@code ::1}),
- * a link ({@code 169.254.0.0/16}, {@code fe80::/10}), a private network ({@code 10.0.0.0/8}, {@code 172.16.0.0/12},
- * {@code 192.168.0.0/16}, {@code 100.64.0.0/10}, {@code fc00::/7}, {@code fec0::/10}) and an unspecified address
- * ({@code 0.0.0.0/8}, {@code ::}), an IPv4 one also inside an IPv4-mapped, IPv4-compatible or NAT64 IPv6 address. A
- * host is read as an IP address in any spelling a resolver might take, the BSD forms such as {@code 0177.1} included,
- * without looking anything up. Pure.
+ * The hosts Save Page As never fetches from for a public page (plan 7's F12 and ruling D43), in the spirit of
+ * Chromium's Private Network Access, which keeps a public page's requests from non-public addresses, and wider than it:
+ * this computer ({@code localhost} and the names under it, {@code 127.0.0.0/8}, {@code ::1}), a link
+ * ({@code 169.254.0.0/16}, {@code fe80::/10}), a private network ({@code 10.0.0.0/8}, {@code 172.16.0.0/12},
+ * {@code 192.168.0.0/16}, {@code 100.64.0.0/10}, {@code fc00::/7}, {@code fec0::/10}), benchmarking's
+ * {@code 198.18.0.0/15}, NAT64's local-use {@code 64:ff9b:1::/48} and an unspecified address ({@code 0.0.0.0/8},
+ * {@code ::}), an IPv4 one also inside an IPv4-mapped, IPv4-compatible or well-known NAT64 IPv6 address. A host is read
+ * as an IP address in any spelling a resolver might take, the BSD forms such as {@code 0177.1} included, without
+ * looking anything up. Pure.
  */
 final class PrivateHosts {
     // What an IPv4 address in a BSD spelling is made of: digits, hex digits, x and dots.
     private static final Pattern POSIX = Pattern.compile("[0-9a-fx.]+");
-    // NAT64's well-known prefix, 64:ff9b::/96.
-    private static final byte[] NAT64 = {0, 0x64, (byte) 0xFF, (byte) 0x9B, 0, 0, 0, 0, 0, 0, 0, 0};
+    // NAT64's well-known prefix, 64:ff9b::/96, and the first 48 bits of its local-use one, 64:ff9b:1::/48.
+    private static final byte[] NAT64 = {0, 0x64, (byte) 0xFF, (byte) 0x9B, 0, 0, 0, 0, 0, 0, 0, 0},
+        LOCAL_NAT64 = {0, 0x64, (byte) 0xFF, (byte) 0x9B, 0, 1};
 
     private PrivateHosts() { }
 
@@ -64,9 +67,9 @@ final class PrivateHosts {
         if (address instanceof Inet4Address) {
             int first = bytes[0] & 0xFF, second = bytes[1] & 0xFF;
             return first == 0 || first == 10 || first == 127 || first == 100 && (second & 0xC0) == 64 || first == 169 && second == 254
-                || first == 172 && (second & 0xF0) == 16 || first == 192 && second == 168;
+                || first == 172 && (second & 0xF0) == 16 || first == 192 && second == 168 || first == 198 && (second & 0xFE) == 18;
         }
-        if ((bytes[0] & 0xFE) == 0xFC) return true;
+        if ((bytes[0] & 0xFE) == 0xFC || Arrays.equals(bytes, 0, 6, LOCAL_NAT64, 0, 6)) return true;
         boolean compatible = Arrays.equals(bytes, 0, 12, new byte[12], 0, 12), nat64 = Arrays.equals(bytes, 0, 12, NAT64, 0, 12);
         if (compatible || nat64) {
             try {

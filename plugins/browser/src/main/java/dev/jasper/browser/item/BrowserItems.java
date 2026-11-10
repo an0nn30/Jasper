@@ -1,5 +1,6 @@
 package dev.jasper.browser.item;
 
+import dev.jasper.browser.downloads.DownloadNames;
 import dev.jasper.browser.downloads.FileManager;
 import dev.jasper.browser.engine.AboutScheme;
 import dev.jasper.browser.page.Favicons;
@@ -72,7 +73,8 @@ public final class BrowserItems implements AutoCloseable {
     private volatile boolean closed;
 
     /** What Save Page As needs of the plugin: where the chooser starts, what shows the saved folder, and the save's client. */
-    private record Saving(Supplier<Path> folder, FileManager files, Function<Optional<InetSocketAddress>, HttpClient> clients) { }
+    private record Saving(Supplier<Path> folder, DownloadNames names, FileManager files,
+                          Function<Optional<InetSocketAddress>, HttpClient> clients) { }
 
     /**
      * The items of a plugin run, whose pages {@code start} makes: the plugin's has Chromium make them, and a test's
@@ -280,12 +282,14 @@ public final class BrowserItems implements AutoCloseable {
      * Gives the items' Save Page As what it needs of the plugin (plan 7's Task 7); before this, Save Page As does nothing.
      *
      * @param folder the Downloads folder as it is now, where the save chooser starts
+     * @param names the downloads' names, in which a save holds its suggested folder's name (ruling D43)
      * @param files shows a saved folder in the file manager
      * @param clients makes a save's HTTP client through the proxy given, on the background executor
      */
-    public void useSaving(Supplier<Path> folder, FileManager files, Function<Optional<InetSocketAddress>, HttpClient> clients) {
-        saving = new Saving(Objects.requireNonNull(folder, "folder"), Objects.requireNonNull(files, "files"),
-            Objects.requireNonNull(clients, "clients"));
+    public void useSaving(Supplier<Path> folder, DownloadNames names, FileManager files,
+                          Function<Optional<InetSocketAddress>, HttpClient> clients) {
+        saving = new Saving(Objects.requireNonNull(folder, "folder"), Objects.requireNonNull(names, "names"),
+            Objects.requireNonNull(files, "files"), Objects.requireNonNull(clients, "clients"));
     }
 
     /**
@@ -299,7 +303,7 @@ public final class BrowserItems implements AutoCloseable {
         if (closed || given == null) return Optional.empty();
         long changes = proxyChanges;
         var network = new SavePage.Network(proxy, () -> !closed && proxyChanges == changes, () -> !closed, given.clients());
-        return Optional.of(SavePage.start(page, tab, context, given.folder().get(), given.files(), network, this::later));
+        return Optional.of(SavePage.start(page, tab, context, given.folder().get(), given.names(), given.files(), network, this::later));
     }
 
     /** The fetcher of the items' pages' favicons; one that fetches nothing once the plugin has stopped. */

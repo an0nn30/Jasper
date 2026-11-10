@@ -256,7 +256,7 @@ public class BrowserPlugin implements Plugin {
         this.items = items;
         // Plan 7's Task 7: Save Page As starts its chooser in the Downloads folder and shows the saved folder as Show does;
         // each save makes its own client through the proxy as it is then.
-        items.useSaving(downloads::folder, files, saveClients);
+        items.useSaving(downloads::folder, downloads.names(), files, saveClients);
         about.registerAction(WelcomePage.SETTINGS, () -> { if (running) items.showSettings(); });
         // Plan 6 Task 8: Settings › Tools › Browser is the Browser's own page: the declared rows by section, and the
         // persistent store's Clear Cookies, Clear Website Data and Manage Site Permissions. Making it opens nothing.

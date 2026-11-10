@@ -52,7 +52,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class PageSaverTest {
     private static final String P = "jasper-save-0123456789abcdef-";
     private static final Duration STALL = Duration.ofSeconds(2);
-    private static final BooleanSupplier CURRENT = () -> true;
+    private static final BooleanSupplier CURRENT = () -> true, RUNNING = () -> true;
     @TempDir Path temp;
     private SaveServer server;
     private FakePluginHost host;
@@ -162,8 +162,8 @@ class PageSaverTest {
         assertThat(server.requests()).as("nothing reached this computer's server").isEmpty();
         String written = Files.readString(folder.resolve("index.html"));
         for (String url : refused) assertThat(written).contains("<img src=\"" + url + "\">");
-        assertThat(lookups).as("names looked up while the proxy is off; never a literal address")
-            .containsExactlyInAnyOrder("example.com", "intranet.invalid", "unknown.invalid");
+        assertThat(lookups).as("the resources' names looked up while the proxy is off, each refusal once; never a literal address, "
+            + "nor the page's own name (D39)").containsExactlyInAnyOrder("intranet.invalid", "unknown.invalid");
         assertThat(listed(folder.resolve("resources"))).isEmpty();
     }
 
@@ -227,7 +227,7 @@ class PageSaverTest {
         String html = "<a>" + P + "r0-</a><a>" + P + "r1-</a><a>" + P + "r2-</a><a>" + P + "r3-</a>";
         Path folder = temp.resolve("caps");
 
-        saver(page, false, false, new PageSaver.Limits(1000, 1_000_000, 500, 500))
+        saver(page, false, false, limits(1000, 1_000_000, 500, 500))
             .save(folder, new Snapshot(P, html, resources, List.of(), List.of(), page), client(Optional.empty()));
 
         assertThat(Files.readString(folder.resolve("index.html"))).isEqualTo("<a>" + server.at("/big.png") + "</a><a>" + server.at("/announced.png")
@@ -243,13 +243,14 @@ class PageSaverTest {
         String html = "<a>" + P + "r0-</a><a>" + P + "r1-</a><a>" + P + "r2-</a>";
         Path folder = temp.resolve("count");
 
-        saver(page, false, false, new PageSaver.Limits(1000, 1_000_000, 2, 500))
+        saver(page, false, false, limits(1000, 1_000_000, 2, 500))
             .save(folder, new Snapshot(P, html, resources, List.of(), List.of(), page), client(Optional.empty()));
 
         assertThat(server.hits("/a.css") + server.hits("/b.png")).isEqualTo(2);
         assertThat(server.hits("/d.png") + server.hits("/c.png")).isZero();
         assertThat(Files.readString(folder.resolve("resources").resolve("a.css"))).isEqualTo("x { y: url(\"" + server.at("/c.png") + "\") }");
-        assertThat(PageSaver.Limits.DEFAULT).isEqualTo(new PageSaver.Limits(20L << 20, 200L << 20, 500, 2L << 20));
+        assertThat(PageSaver.Limits.DEFAULT).isEqualTo(new PageSaver.Limits(20L << 20, 200L << 20, 500, 2L << 20, 32L << 20,
+            Duration.ofSeconds(15), Duration.ofMinutes(5)));
     }
 
     /** The total cap counts every resource's bytes as they arrive: past it, what is still arriving stays absolute. */
@@ -260,7 +261,7 @@ class PageSaverTest {
         String html = "<a>" + P + "r0-</a><a>" + P + "r1-</a><a>" + P + "r2-</a>";
         Path folder = temp.resolve("total");
 
-        saver(page, false, false, new PageSaver.Limits(1000, 1500, 500, 500))
+        saver(page, false, false, limits(1000, 1500, 500, 500))
             .save(folder, new Snapshot(P, html, resources, List.of(), List.of(), page), client(Optional.empty()));
 
         assertThat(listed(folder.resolve("resources")).size()).isLessThanOrEqualTo(1);
@@ -280,14 +281,14 @@ class PageSaverTest {
         String html = "<a>" + P + "r0-</a>";
         Path folder = temp.resolve("retired");
 
-        new PageSaver(page, false, false, current::get, platform, STALL, PageSaver.Limits.DEFAULT, this::lookUp)
+        new PageSaver(page, false, false, current::get, RUNNING, platform, limits(), this::lookUp)
             .save(folder, new Snapshot(P, html, List.of(other("/first")), List.of(), List.of(), page), client(Optional.empty()));
 
         assertThat(server.hits("/second")).isZero();
         assertThat(Files.readString(folder.resolve("index.html"))).isEqualTo("<a>" + server.at("/first") + "</a>");
 
         Path never = temp.resolve("never");
-        new PageSaver(page, false, false, () -> false, platform, STALL, PageSaver.Limits.DEFAULT, this::lookUp)
+        new PageSaver(page, false, false, () -> false, RUNNING, platform, limits(), this::lookUp)
             .save(never, new Snapshot(P, html, List.of(other("/logo.png")), List.of(), List.of(), page), client(Optional.empty()));
         assertThat(server.hits("/logo.png")).isZero();
         assertThat(never.resolve("index.html")).isRegularFile();
@@ -354,6 +355,159 @@ class PageSaverTest {
         assertThat(folder.resolve("index.html")).isRegularFile();
     }
 
+    /**
+     * Ruling D39: a page is a private one, whose save may fetch from any host, only by its host as written; a public
+     * name that also resolves to this computer unlocks nothing, while a page at {@code localhost} still saves its own.
+     */
+    @Test void onlyThePagesLiteralHostMakesItPrivate() throws Exception {
+        URI page = URI.create("http://evil.invalid/");
+        names.put("evil.invalid", List.of(InetAddress.getByAddress("evil.invalid", new byte[] {93, (byte) 184, (byte) 216, 34}),
+            InetAddress.getByAddress("evil.invalid", new byte[] {127, 0, 0, 1})));
+        Path folder = temp.resolve("evil");
+        saver(page, false, false).save(folder, new Snapshot(P, "<img src=\"" + P + "r0-\">", List.of(other("/secret")), List.of(), List.of(), page),
+            client(Optional.empty()));
+        assertThat(server.hits("/secret")).isZero();
+        assertThat(lookups).as("the page's name is never looked up").isEmpty();
+        assertThat(Files.readString(folder.resolve("index.html"))).isEqualTo("<img src=\"" + server.at("/secret") + "\">");
+
+        URI local = URI.create("http://localhost:" + server.port() + "/page/");
+        Path mine = temp.resolve("localhost");
+        saver(local, false, false).save(mine, new Snapshot(P, "<img src=\"" + P + "r0-\">", List.of(other("/page/logo.png")), List.of(),
+            List.of(), local), client(Optional.empty()));
+        assertThat(Files.readString(mine.resolve("index.html"))).isEqualTo("<img src=\"resources/logo.png\">");
+    }
+
+    /**
+     * Ruling D40: a resolved name is judged right before each of its requests, so an answer that changes between two
+     * requests, as a rebinding name's does, is refused at the second. The fixture plays a proxy, so the client itself
+     * looks no name up; the save's checks go through the test's resolver.
+     */
+    @Test void aNameIsJudgedBeforeEachOfItsRequests() throws Exception {
+        URI page = URI.create("http://news.invalid/");
+        var answers = new java.util.concurrent.atomic.AtomicInteger();
+        InetAddress outside = InetAddress.getByAddress("flip.invalid", new byte[] {93, (byte) 184, (byte) 216, 34}),
+            here = InetAddress.getByAddress("flip.invalid", new byte[] {127, 0, 0, 1});
+        server.answer("/a.png", "image/png", "A");
+        server.answer("/b.png", "image/png", "B");
+        var resources = List.of(new Resource(URI.create("http://flip.invalid/a.png"), Kind.OTHER),
+            new Resource(URI.create("http://flip.invalid/b.png"), Kind.OTHER));
+        Path folder = temp.resolve("flip");
+        new PageSaver(page, false, false, CURRENT, RUNNING, platform, limits(), name -> {
+            lookups.add(name);
+            return name.equals("flip.invalid") ? List.of(answers.getAndIncrement() == 0 ? outside : here) : List.of();
+        }).save(folder, new Snapshot(P, "<a>" + P + "r0-</a><a>" + P + "r1-</a>", resources, List.of(), List.of(), page),
+            client(Optional.of(InetSocketAddress.createUnresolved("127.0.0.1", server.port()))));
+        assertThat(lookups).containsExactly("flip.invalid", "flip.invalid");
+        assertThat(server.hits("/a.png") + server.hits("/b.png")).as("the second answer, this computer, is refused").isEqualTo(1);
+    }
+
+    /**
+     * Ruling D41: the plugin's stop cancels a save under way: its client is shut down at once, nothing is written, its
+     * temporary files go and no mark is asked for, though a body was still arriving.
+     */
+    @Test void aStopCancelsTheSaveAndWritesNothing() throws Exception {
+        URI page = server.at("/page/");
+        var running = new AtomicBoolean(true);
+        server.handle("/page/one.png", exchange -> {
+            byte[] body = "ONE".getBytes(StandardCharsets.US_ASCII);
+            exchange.sendResponseHeaders(200, body.length);
+            try (OutputStream out = exchange.getResponseBody()) {
+                out.write(body);
+            }
+        });
+        Path folder = temp.resolve("stopped");
+        HttpClient client = client(Optional.empty());
+        Thread.ofVirtual().start(() -> {
+            try {
+                Thread.sleep(300);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+            running.set(false);
+        });
+        long start = System.nanoTime();
+        var saver = new PageSaver(page, false, false, CURRENT, running::get, platform, new PageSaver.Limits(20L << 20, 200L << 20, 500,
+            2L << 20, 32L << 20, Duration.ofSeconds(20), Duration.ofMinutes(5)), this::lookUp);
+        assertThatThrownBy(() -> saver.save(folder, new Snapshot(P, "<img src=\"" + P + "r0-\"><img src=\"" + P + "r1-\">",
+            List.of(other("/page/stall.png"), other("/page/one.png")), List.of(), List.of(), page), client))
+            .isInstanceOf(IOException.class).hasMessage("the plugin stopped");
+        assertThat(Duration.ofNanos(System.nanoTime() - start)).as("at once, not at the resource's deadline").isLessThan(Duration.ofSeconds(5));
+        assertThat(client.awaitTermination(Duration.ofSeconds(5))).as("its client shut down").isTrue();
+        assertThat(folder).as("nothing written, the folder it made gone").doesNotExist();
+        assertThat(host.markedDownloads()).isEmpty();
+    }
+
+    /** Ruling D43: at most 32 MiB of stylesheets are kept for their rewrite in all; later ones stay absolute. */
+    @Test void theStylesheetsKeptInAllHaveACap() throws Exception {
+        URI page = server.at("/");
+        for (String name : List.of("/s1.css", "/s2.css", "/s3.css")) server.answer(name, "text/css", "a { b: c }".repeat(80));
+        var resources = List.of(new Resource(server.at("/s1.css"), Kind.STYLE), new Resource(server.at("/s2.css"), Kind.STYLE),
+            new Resource(server.at("/s3.css"), Kind.STYLE));
+        Path folder = temp.resolve("sheets");
+        saver(page, false, false, new PageSaver.Limits(20L << 20, 200L << 20, 500, 1000, 1500, STALL, Duration.ofMinutes(5)))
+            .save(folder, new Snapshot(P, "<a>" + P + "r0-</a><a>" + P + "r1-</a><a>" + P + "r2-</a>", resources, List.of(), List.of(), page),
+                client(Optional.empty()));
+        assertThat(listed(folder.resolve("resources")).size()).as("800 bytes each, 1,500 in all").isLessThanOrEqualTo(1);
+        String written = Files.readString(folder.resolve("index.html"));
+        assertThat(java.util.regex.Pattern.compile(java.util.regex.Pattern.quote(server.at("/").toString()) + "s[123]\\.css").matcher(written)
+            .results().count()).isGreaterThanOrEqualTo(2);
+    }
+
+    /** Ruling D43: a script stays a script whatever type it is served as: it is neither rewritten nor named a stylesheet. */
+    @Test void aScriptServedAsCssStaysAScript() throws Exception {
+        URI page = server.at("/");
+        server.answer("/odd", "text/css", "x { y: url(never.png) }");
+        Path folder = temp.resolve("script");
+        saver(page, false, false).save(folder, new Snapshot(P, "<script src=\"" + P + "r0-\"></script>",
+            List.of(new Resource(server.at("/odd"), Kind.SCRIPT)), List.of(), List.of(), page), client(Optional.empty()));
+        assertThat(Files.readString(folder.resolve("resources").resolve("odd.js"))).isEqualTo("x { y: url(never.png) }");
+        assertThat(server.hits("/never.png")).isZero();
+    }
+
+    /** Ruling D43: a save has five minutes in all, here a test's second; what is still to come then stays absolute. */
+    @Test void aSaveEndsAtItsOverallDeadline() throws Exception {
+        URI page = server.at("/");
+        var resources = new ArrayList<Resource>();
+        var html = new StringBuilder();
+        for (int at = 1; at <= 4; at++) {
+            server.announced("/hold" + at + ".png", 1000);
+            resources.add(other("/hold" + at + ".png"));
+        }
+        resources.add(other("/logo.png"));
+        for (int at = 0; at < resources.size(); at++) html.append("<a>").append(P).append('r').append(at).append("-</a>");
+        Path folder = temp.resolve("overall");
+        long start = System.nanoTime();
+        saver(page, false, false, new PageSaver.Limits(20L << 20, 200L << 20, 500, 2L << 20, 32L << 20, Duration.ofSeconds(20),
+            Duration.ofSeconds(1))).save(folder, new Snapshot(P, html.toString(), resources, List.of(), List.of(), page), client(Optional.empty()));
+        assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(10));
+        assertThat(server.hits("/logo.png")).as("still to come when the time ran out").isZero();
+        assertThat(listed(folder.resolve("resources"))).isEmpty();
+        assertThat(Files.readString(folder.resolve("index.html"))).contains(server.at("/hold1.png").toString(), server.at("/logo.png").toString());
+    }
+
+    /** Ruling D43: saved files are ordinary new files in the folder, with the mode the umask gives, not owner-only. */
+    @Test void savedFilesHaveTheUmasksMode() throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeTrue(java.nio.file.FileSystems.getDefault().supportedFileAttributeViews().contains("posix"));
+        URI page = server.at("/page/");
+        Path folder = temp.resolve("modes");
+        saver(page, false, false).save(folder, new Snapshot(P, "<img src=\"" + P + "r0-\"><link rel=\"stylesheet\" href=\"" + P + "r1-\">",
+            List.of(other("/page/logo.png"), new Resource(server.at("/page/more.css"), Kind.STYLE)), List.of(), List.of(), page),
+            client(Optional.empty()));
+        var ordinary = Files.getPosixFilePermissions(Files.createFile(temp.resolve("ordinary")));
+        for (Path file : List.of(folder.resolve("index.html"), folder.resolve("resources").resolve("logo.png"),
+                folder.resolve("resources").resolve("more.css")))
+            assertThat(Files.getPosixFilePermissions(file)).as(file.toString()).isEqualTo(ordinary);
+    }
+
+    /** Ruling D43: a page that is no web page gives index.html's mark no address, as a download's mark does. */
+    @Test void aPageThatIsNoWebPageMarksItsIndexWithNoAddress() throws Exception {
+        URI page = URI.create("file:///Users/ada/page.html");
+        Path folder = temp.resolve("file");
+        saver(page, false, false).save(folder, new Snapshot(P, "<p>local</p>", List.of(), List.of(), List.of(), page), client(Optional.empty()));
+        assertThat(host.markedDownloads()).containsExactly(new MarkedDownload(folder.resolve("index.html"), URI.create("about:internet"),
+            Optional.empty()));
+    }
+
     /** The save's client: no cookie handler, no redirect followed, through the proxy as plan 6's clients go. */
     @Test void theClientFollowsNoRedirectAndKeepsNoCookies() {
         HttpClient client = client(Optional.empty());
@@ -365,11 +519,21 @@ class PageSaverTest {
     }
 
     private PageSaver saver(URI page, boolean inMemory, boolean proxied) {
-        return saver(page, inMemory, proxied, PageSaver.Limits.DEFAULT);
+        return saver(page, inMemory, proxied, limits());
     }
 
     private PageSaver saver(URI page, boolean inMemory, boolean proxied, PageSaver.Limits limits) {
-        return new PageSaver(page, inMemory, proxied, CURRENT, platform, STALL, limits, this::lookUp);
+        return new PageSaver(page, inMemory, proxied, CURRENT, RUNNING, platform, limits, this::lookUp);
+    }
+
+    /** The default caps, with {@link #STALL} for each resource. */
+    private static PageSaver.Limits limits() {
+        return limits(20L << 20, 200L << 20, 500, 2L << 20);
+    }
+
+    /** Caps of a test, with 32 MiB of stylesheets, {@link #STALL} for each resource and five minutes for the save. */
+    private static PageSaver.Limits limits(long each, long all, int resources, long stylesheet) {
+        return new PageSaver.Limits(each, all, resources, stylesheet, 32L << 20, STALL, Duration.ofMinutes(5));
     }
 
     /** The names a test gives addresses; any other is unknown. Never the system's resolver. */

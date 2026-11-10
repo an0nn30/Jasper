@@ -15,7 +15,11 @@
  * - every other href, src, action and formaction becomes absolute, so links and frames stay remote; data: addresses and
  *   a fragment alone stay as written;
  * - base elements, charset declarations and Content-Security-Policy meta elements go, as a policy would block the
- *   saved files, and a meta charset="utf-8" comes first in head; the doctype is the document's.
+ *   saved files, and a meta charset="utf-8" comes first in head; the doctype is the document's;
+ * - what Jasper's own tools hold of the page is the page's again (ruling D42), as their kept objects tell it, read only:
+ *   while the reader shows (reader.js's held()), its overlay's host goes and body's inert and the root's and body's
+ *   overflow are their earlier values; while distraction removal outlines an overlay (distractions.js's outlined()),
+ *   that overlay's outline longhands are their earlier values. The page's own mode goes on.
  * No address keeps a user name or password. The answer, {prefix, html, resources: [{url, kind}], styles, attributes,
  * base}, goes to Jasper as JSON in parts, through jasperBridgeQuery (op "savePage"), as {save: prefix, part, parts, text},
  * one at a time, each after the last was answered, each part's text at most 1 MiB once JSON writes it, the bridge's
@@ -59,13 +63,16 @@
     const SAVED = 'img, source, video, audio, track, input, script[src], link[href]';
     const ABSOLUTE = ['href', 'src', 'action', 'formaction'];
     const ICONS = ['icon', 'apple-touch-icon', 'apple-touch-icon-precomposed', 'mask-icon'];
+    // Jasper's tools' kept objects, and the longhands each may hold of the page (ruling D42).
+    const READER = Symbol.for('dev.jasper.browser.reader'), DISTRACTIONS = Symbol.for('dev.jasper.browser.distractions');
+    const OVERFLOW = ['overflow-x', 'overflow-y'], OUTLINES = ['outline-color', 'outline-style', 'outline-width'];
 
     const apply = Reflect.apply, describe = Object.getOwnPropertyDescriptor, freeze = Object.freeze, dictionary = Object.create;
     const stringify = JSON.stringify, Json = JSON, floor = Math.floor, min = Math.min, max = Math.max;
     const query = window.jasperBridgeQuery, later = window.setTimeout, Urls = window.URL;
     const Documents = window.Document, Nodes = window.Node, Elements = window.Element, Types = window.DocumentType,
-      Lists = window.NodeList;
-    const constructors = [Documents, Nodes, Elements, Types, Lists, Urls];
+      Lists = window.NodeList, HtmlElements = window.HTMLElement, Styles = window.CSSStyleDeclaration;
+    const constructors = [Documents, Nodes, Elements, Types, Lists, Urls, HtmlElements, Styles];
     if (typeof query !== 'function' || typeof later !== 'function') return null;
     for (let at = 0; at < constructors.length; at++) if (typeof constructors[at] !== 'function') return null;
     const getter = (type, name) => {
@@ -79,8 +86,12 @@
     const rootOf = getter(Documents, 'documentElement'), doctypeOf = getter(Documents, 'doctype'), headOf = getter(Documents, 'head'),
       createElement = Documents.prototype.createElement;
     const cloneNode = Nodes.prototype.cloneNode, insertBefore = Nodes.prototype.insertBefore, firstChildOf = getter(Nodes, 'firstChild'),
-      baseOf = getter(Nodes, 'baseURI'), textOf = getter(Nodes, 'textContent'), setText = setter(Nodes, 'textContent');
-    const querySelectorAll = Elements.prototype.querySelectorAll, getAttribute = Elements.prototype.getAttribute,
+      baseOf = getter(Nodes, 'baseURI'), textOf = getter(Nodes, 'textContent'), setText = setter(Nodes, 'textContent'),
+      parentOf = getter(Nodes, 'parentNode'), childrenOf = getter(Nodes, 'childNodes');
+    const styleOf = getter(HtmlElements, 'style'), setProperty = Styles.prototype.setProperty,
+      removeProperty = Styles.prototype.removeProperty;
+    const querySelectorAll = Elements.prototype.querySelectorAll, matches = Elements.prototype.matches,
+      getAttribute = Elements.prototype.getAttribute,
       setAttribute = Elements.prototype.setAttribute, removeAttribute = Elements.prototype.removeAttribute,
       hasAttribute = Elements.prototype.hasAttribute, remove = Elements.prototype.remove, localNameOf = getter(Elements, 'localName'),
       namespaceOf = getter(Elements, 'namespaceURI'), outerOf = getter(Elements, 'outerHTML');
@@ -90,11 +101,12 @@
       setPassword = setter(Urls, 'password');
     const slice = String.prototype.slice, charCodeAt = String.prototype.charCodeAt, trim = String.prototype.trim,
       toLowerCase = String.prototype.toLowerCase, splitText = String.prototype.split, test = RegExp.prototype.test,
-      includes = Array.prototype.includes;
+      includes = Array.prototype.includes, hasOwn = Object.prototype.hasOwnProperty;
     const page = document;
     const needed = [rootOf, doctypeOf, headOf, createElement, cloneNode, insertBefore, firstChildOf, baseOf, textOf, setText,
-      querySelectorAll, getAttribute, setAttribute, removeAttribute, hasAttribute, remove, localNameOf, namespaceOf, outerOf, nameOf,
-      publicOf, systemOf, lengthOf, hrefOf, protocolOf, setUser, setPassword];
+      querySelectorAll, matches, getAttribute, setAttribute, removeAttribute, hasAttribute, remove, localNameOf, namespaceOf, outerOf, nameOf,
+      publicOf, systemOf, lengthOf, hrefOf, protocolOf, setUser, setPassword, parentOf, childrenOf, styleOf, setProperty,
+      removeProperty];
     for (let at = 0; at < needed.length; at++) if (typeof needed[at] !== 'function') return null;
 
     /** Takes the snapshot for the save of {@code prefix} and sends it to Jasper; a prefix of no save does nothing. */
@@ -163,6 +175,7 @@
       const numbers = dictionary(null);
       const answer = {prefix: prefix, html: '', resources: resources, styles: styles, attributes: attributes, base: absolute(base, base) || ''};
       if (root === null) return answer;
+      unhold(root);
 
       /** The token of the resource at {@code value}, of {@code kind}; the absolute address of one Jasper does not fetch. */
       function token(value, kind) {
@@ -271,12 +284,114 @@
       return answer;
     }
 
-    /** The elements under {@code root} that {@code selector} matches, as an array. */
+    /**
+     * Gives the copy whose root is {@code copyRoot} what Jasper's own tools hold of the page back (ruling D42): the
+     * reader's host goes, and body's inert and the root's and body's overflow are their earlier values, while the reader
+     * shows; and the outlined overlay's outline longhands are theirs while distraction removal runs. A kept object that is
+     * no tool's, or what fails, changes nothing.
+     */
+    function unhold(copyRoot) {
+      const liveRoot = apply(rootOf, page, []);
+      const held = kept(READER, 'held');
+      if (held !== null) {
+        attempt(() => {
+          const host = counterpart(liveRoot, copyRoot, held.host);
+          if (host !== null && host !== copyRoot) apply(remove, host, []);
+        });
+        attempt(() => {
+          const inert = held.inert;
+          const body = inert !== null && typeof inert === 'object' ? counterpart(liveRoot, copyRoot, inert.element) : null;
+          if (body === null) return;
+          if (inert.value === true) apply(setAttribute, body, ['inert', '']);
+          else if (inert.value === false) apply(removeAttribute, body, ['inert']);
+        });
+        restyle(liveRoot, copyRoot, held.overflow, OVERFLOW, each => each.element);
+      }
+      const outlined = kept(DISTRACTIONS, 'outlined');
+      if (outlined !== null) restyle(liveRoot, copyRoot, outlined.longhands, OUTLINES, () => outlined.element);
+    }
+
+    /** What {@code method} of the kept object under {@code key} answers, an object; null for none or anything else. */
+    function kept(key, method) {
+      try {
+        if (!apply(hasOwn, window, [key])) return null;
+        const tools = window[key];
+        if (tools === null || typeof tools !== 'object' || typeof tools[method] !== 'function') return null;
+        const found = apply(tools[method], tools, []);
+        return found !== null && typeof found === 'object' ? found : null;
+      } catch (failed) {
+        return null;
+      }
+    }
+
+    /**
+     * Each of {@code entries}, {name, value, priority} of one of {@code names}, set again on the copy's counterpart of the
+     * element {@code elementOf} gives it: removed for an empty value.
+     */
+    function restyle(liveRoot, copyRoot, entries, names, elementOf) {
+      if (entries === null || typeof entries !== 'object') return;
+      let count = 0;
+      attempt(() => {
+        count = entries.length;
+      });
+      if (typeof count !== 'number' || !(count >= 0 && count <= 16)) return;
+      for (let at = 0; at < count; at++) {
+        attempt(() => {
+          const each = entries[at];
+          if (each === null || typeof each !== 'object') return;
+          const name = each.name, value = each.value, priority = each.priority;
+          if (typeof name !== 'string' || !apply(includes, names, [name]) || typeof value !== 'string' || typeof priority !== 'string') return;
+          const element = counterpart(liveRoot, copyRoot, elementOf(each));
+          if (element === null || !(element instanceof HtmlElements)) return;
+          const style = apply(styleOf, element, []);
+          if (value === '') apply(removeProperty, style, [name]);
+          else apply(setProperty, style, [name, value, priority]);
+        });
+      }
+    }
+
+    /** Runs {@code change}; a failure changes nothing more. */
+    function attempt(change) {
+      try {
+        change();
+      } catch (failed) {
+        // The copy keeps what it has.
+      }
+    }
+
+    /**
+     * The copy's counterpart of {@code node}, an element of the live document under {@code liveRoot}: the element at the
+     * same place under {@code copyRoot}, as a copy made at once has it; null for a node the document does not hold.
+     */
+    function counterpart(liveRoot, copyRoot, node) {
+      if (!(node instanceof Elements)) return null;
+      const path = [];
+      for (let at = node; at !== liveRoot; ) {
+        const parent = apply(parentOf, at, []);
+        if (parent === null || path.length > 4096) return null;
+        const children = apply(childrenOf, parent, []), count = apply(lengthOf, children, []);
+        let index = -1;
+        for (let each = 0; each < count; each++) if (children[each] === at) { index = each; break; }
+        if (index < 0) return null;
+        path[path.length] = index;
+        at = parent;
+      }
+      let found = copyRoot;
+      for (let at = path.length - 1; at >= 0; at--) {
+        const children = apply(childrenOf, found, []);
+        if (path[at] >= apply(lengthOf, children, [])) return null;
+        found = children[path[at]];
+      }
+      return found instanceof Elements ? found : null;
+    }
+
+    /** {@code root} and the elements under it that {@code selector} matches, as an array in document order. */
     function list(root, selector) {
       const found = apply(querySelectorAll, root, [selector]);
       const count = apply(lengthOf, found, []);
       const elements = [];
-      for (let at = 0; at < count; at++) elements[at] = found[at];
+      if (apply(matches, root, [selector])) elements[0] = root;
+      for (let at = 0; at < count; at++) elements[elements.length] = found[at];
       return elements;
     }
 

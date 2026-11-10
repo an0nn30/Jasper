@@ -1,5 +1,6 @@
 package dev.jasper.browser.tools;
 
+import dev.jasper.browser.downloads.DownloadNames;
 import dev.jasper.browser.downloads.DownloadsTestAccess;
 import dev.jasper.browser.json.StrictJson;
 import dev.jasper.browser.page.Page;
@@ -60,6 +61,8 @@ class SavePageTest {
     private final List<Runnable> timers = new ArrayList<>();
     private final List<Duration> delays = new ArrayList<>();
     private final AtomicInteger clients = new AtomicInteger(), cancelled = new AtomicInteger();
+    // The plugin's names, which downloads and saves reserve.
+    private final DownloadNames names = new DownloadNames();
 
     @BeforeEach void open() throws Exception {
         downloads = Files.createDirectories(temp.resolve("Downloads"));
@@ -106,6 +109,25 @@ class SavePageTest {
         Files.writeString(downloads.resolve("example.com (1)"), "taken");
         start(List.of());
         assertThat(chooser).containsExactly("Save Page As|" + Optional.of(downloads.resolve("example.com (2)")));
+    }
+
+    /**
+     * Ruling D43: a save holds its suggested folder's name until it ends, so a second save of the host meanwhile is offered
+     * the next one; once the first has ended, its name is free again.
+     */
+    @Test void twoSavesOfOneHostAreOfferedTwoFolders() throws Exception {
+        SavePage first = start(List.of(downloads.resolve("example.com")));
+        assertThat(first.done()).isFalse();
+        start(List.of());
+        assertThat(chooser).containsExactly("Save Page As|" + Optional.of(downloads.resolve("example.com")),
+            "Save Page As|" + Optional.of(downloads.resolve("example.com (1)")));
+        onUi(() -> {
+            first.loadStarted();
+            host.windowView(ID, SavePage.FAILED).orElseThrow().emit(new UiEvent.Action(SavePage.FAILED_OK));
+            return null;
+        });
+        start(List.of());
+        assertThat(chooser.getLast()).as("both have ended").isEqualTo("Save Page As|" + Optional.of(downloads.resolve("example.com")));
     }
 
     /**
@@ -273,7 +295,7 @@ class SavePageTest {
             host.queuePathSelection(chosen);
             return null;
         });
-        SavePage save = onUi(() -> SavePage.start(page, tab, context, downloads, DownloadsTestAccess.recordingFiles(Runnable::run, shown),
+        SavePage save = onUi(() -> SavePage.start(page, tab, context, downloads, names, DownloadsTestAccess.recordingFiles(Runnable::run, shown),
             new SavePage.Network(Optional.empty(), () -> true, () -> true, proxy -> {
                 clients.incrementAndGet();
                 return PageSaver.client(proxy);

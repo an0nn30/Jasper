@@ -89,15 +89,20 @@ class SavePayloadTest {
             assertThatThrownBy(() -> new SavePayload(PREFIX).add(request)).as(request).isInstanceOf(IOException.class);
     }
 
-    /** R46: an address the snapshot names keeps no user name or password, and the URI Java reads takes what WHATWG writes. */
+    /**
+     * R46: an address the snapshot names keeps no user name or password, a host Java reads as a registry name's included
+     * (ruling D43), and the URI Java reads takes what WHATWG writes.
+     */
     @Test void addressesLoseTheirUserInformationAndAreEscaped() throws IOException {
         Map<String, Object> answer = members("<html></html>");
         answer.put("resources", List.of(resource("https://user:pw@example.com/a.png", "other"),
-            resource("https://example.com/a|b^c[d].png?q=%zz&r=1", "other"), resource("https://example.com/caf\u00e9.png#x", "other")));
+            resource("https://example.com/a|b^c[d].png?q=%zz&r=1", "other"), resource("https://example.com/caf\u00e9.png#x", "other"),
+            resource("http://u:p@a_b.example/x.png", "other"), resource("http://u@p@a_b.example:8080/y.png", "other")));
         answer.put("base", "https://user:pw@example.com/");
         Snapshot snapshot = new SavePayload(PREFIX).add(part(0, 1, StrictJson.write(answer))).orElseThrow();
         assertThat(snapshot.resources()).extracting(Resource::url).containsExactly(URI.create("https://example.com/a.png"),
-            URI.create("https://example.com/a%7Cb%5Ec%5Bd%5D.png?q=%25zz&r=1"), URI.create("https://example.com/caf%C3%A9.png#x"));
+            URI.create("https://example.com/a%7Cb%5Ec%5Bd%5D.png?q=%25zz&r=1"), URI.create("https://example.com/caf%C3%A9.png#x"),
+            URI.create("http://a_b.example/x.png"), URI.create("http://a_b.example:8080/y.png"));
         assertThat(snapshot.base()).isEqualTo(URI.create("https://example.com/"));
     }
 

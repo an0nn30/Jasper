@@ -189,6 +189,16 @@ public final class Downloads {
     }
 
     /**
+     * The downloads' names, which downloads reserve in the Downloads folder and Save Page As reserves its folder in
+     * (plan 7's D43), so neither takes a name the other holds. Any thread.
+     *
+     * @return the names
+     */
+    public DownloadNames names() {
+        return names;
+    }
+
+    /**
      * The Downloads folder: as last read and made, whether or not a download can go there; before the first page start
      * has read it, {@code Downloads} in the home folder, which nothing creates. Any thread.
      *

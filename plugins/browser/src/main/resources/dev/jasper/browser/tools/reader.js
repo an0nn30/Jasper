@@ -30,7 +30,9 @@
  *
  * The reader is made once per document, kept under window[Symbol.for('dev.jasper.browser.reader')], and calls the
  * built-ins as they were when it was made; its root() is the overlay's shadow root while it shows, else null, where
- * Jasper's find in page (find.js) then searches, and its sheet styles find's highlights there, as find.js colours them.
+ * Jasper's find in page (find.js) then searches, and its sheet styles find's highlights there, as find.js colours them;
+ * its held() tells Save Page As (save-page.js), read only, what the overlay holds of the page while it shows: the
+ * overlay's host, body's earlier inert and the earlier overflow of the root and the body, so the saved copy is the page.
  * The page's own scripts share this world, so they can see and undo all of it, and what they send Jasper is untrusted.
  */
 (function (command, token, css) {
@@ -224,7 +226,7 @@ hr { border: 0; border-top: 1px solid var(--border); }
         end(closing);
         closing = null;
       }
-      const now = {host: null, root: null, scroller: null, token, held: []};
+      const now = {host: null, root: null, scroller: null, token, held: [], kept: {inert: null, overflow: []}};
       try {
         const host = apply(createElement, page, ['div']);
         now.host = host;
@@ -248,7 +250,7 @@ hr { border: 0; border-top: 1px solid var(--border); }
         apply(appendChild, root, [scroller]);
         apply(listen, scroller, ['click', onClick, false]);
         now.scroller = scroller;
-        hold(now.held);
+        hold(now.held, now.kept);
         apply(appendChild, apply(rootOf, page, []), [host]);
         shown = now;
         apply(listen, window, ['keydown', onKeyDown, true]);
@@ -445,9 +447,9 @@ hr { border: 0; border-top: 1px solid var(--border); }
     /**
      * Holds the page while the overlay shows: its earlier focus kept, its own scrolling held on its root and body
      * elements, and its body inert. Each change goes into {@code held} with what undoes it before it is made, so a
-     * failure part way undoes what was done.
+     * failure part way undoes what was done, and what it changed goes into {@code kept}, frozen, for {@code held()}.
      */
-    function hold(held) {
+    function hold(held, kept) {
       const earlier = apply(activeOf, page, []);
       held[held.length] = () => {
         if (earlier instanceof HtmlElements && apply(connectedOf, earlier, []) === true) apply(focus, earlier, [{preventScroll: true}]);
@@ -462,6 +464,7 @@ hr { border: 0; border-top: 1px solid var(--border); }
             if (value === '') apply(removeProperty, style, [name]);
             else apply(setProperty, style, [name, value, priority]);
           };
+          kept.overflow[kept.overflow.length] = freeze({element: elements[at], name, value, priority});
           apply(setProperty, style, [name, 'hidden', 'important']);
         }
       }
@@ -469,6 +472,7 @@ hr { border: 0; border-top: 1px solid var(--border); }
       if (body instanceof HtmlElements) {
         const was = apply(inertOf.get, body, []);
         held[held.length] = () => apply(inertOf.set, body, [was]);
+        kept.inert = freeze({element: body, value: was});
         apply(inertOf.set, body, [true]);
       }
     }
@@ -484,6 +488,19 @@ hr { border: 0; border-top: 1px solid var(--border); }
       }
     }
 
-    return freeze({check, show, hide, root});
+    /**
+     * What the overlay holds of the page while it shows, read only, for Save Page As, which gives the page's copy its own
+     * values back (ruling D42): the overlay's host, body's earlier inert and the root's and body's earlier overflow
+     * longhands with their priorities; null while it does not show. A fresh frozen copy each time.
+     */
+    function held() {
+      const now = shown;
+      if (now === null) return null;
+      const overflow = [];
+      for (let at = 0; at < now.kept.overflow.length; at++) overflow[at] = now.kept.overflow[at];
+      return freeze({host: now.host, inert: now.kept.inert, overflow: freeze(overflow)});
+    }
+
+    return freeze({check, show, hide, root, held});
   }
 })

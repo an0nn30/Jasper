@@ -1,5 +1,6 @@
 package dev.jasper.browser.item;
 
+import dev.jasper.browser.downloads.DownloadNames;
 import dev.jasper.browser.downloads.DownloadsTestAccess;
 import dev.jasper.browser.json.StrictJson;
 import dev.jasper.browser.page.Page;
@@ -208,7 +209,7 @@ class PageToolsHostTest {
         var proxies = new CopyOnWriteArrayList<Optional<java.net.InetSocketAddress>>();
         SwingUtilities.invokeAndWait(() -> {
             open("https://news.example/article");
-            items.useSaving(() -> downloads, DownloadsTestAccess.recordingFiles(Runnable::run, shown), proxy -> {
+            items.useSaving(() -> downloads, new DownloadNames(), DownloadsTestAccess.recordingFiles(Runnable::run, shown), proxy -> {
                 proxies.add(proxy);
                 return PageSaver.client(proxy);
             });
@@ -239,9 +240,10 @@ class PageToolsHostTest {
         Path downloads = Files.createDirectories(temp.resolve("Downloads"));
         SwingUtilities.invokeAndWait(() -> {
             open("https://news.example/article");
-            items.useSaving(() -> downloads, DownloadsTestAccess.recordingFiles(Runnable::run, new ArrayList<>()), proxy -> {
-                throw new AssertionError("no client for a save that fails first");
-            });
+            items.useSaving(() -> downloads, new DownloadNames(), DownloadsTestAccess.recordingFiles(Runnable::run, new ArrayList<>()),
+                proxy -> {
+                    throw new AssertionError("no client for a save that fails first");
+                });
             PageTestAccess.loadStarted(item.page(), "https://news.example/article");
             PageTestAccess.addressChanged(item.page(), "https://news.example/article");
             host.queuePathSelection(List.of(downloads.resolve("news.example")));

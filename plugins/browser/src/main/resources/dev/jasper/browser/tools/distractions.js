@@ -32,7 +32,8 @@
  * locks the page's scrolling, get an inline overflow-y: visible with the important priority, which stays too.
  *
  * It is made once per document, kept under window[Symbol.for('dev.jasper.browser.distractions')], and calls the
- * built-ins as they were when it was made. The page's own scripts share this world, so they can see and undo all of
+ * built-ins as they were when it was made; its outlined() tells Save Page As (save-page.js), read only, the overlay it
+ * outlines and that overlay's earlier outline longhands, so the saved copy has the page's own outline. The page's own scripts share this world, so they can see and undo all of
  * it, and what they send Jasper is untrusted.
  */
 (function (command, first, second) {
@@ -504,6 +505,20 @@
       }
     }
 
-    return freeze({start, stop, removeAt});
+    /**
+     * The overlay removal outlines now, read only, for Save Page As, which gives the page's copy its own outline back
+     * (ruling D42): the element and each outline longhand's earlier value and priority; null while nothing is outlined.
+     * A fresh frozen copy each time.
+     */
+    function outlined() {
+      const now = running;
+      if (now === null || now.outlined === null) return null;
+      const longhands = [];
+      for (let at = 0; at < OUTLINES.length; at++)
+        longhands[at] = freeze({name: OUTLINES[at], value: now.outlined.earlier[at].value, priority: now.outlined.earlier[at].priority});
+      return freeze({element: now.outlined.element, longhands: freeze(longhands)});
+    }
+
+    return freeze({start, stop, removeAt, outlined});
   }
 })

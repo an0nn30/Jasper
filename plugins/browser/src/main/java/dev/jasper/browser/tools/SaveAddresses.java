@@ -51,14 +51,15 @@ final class SaveAddresses {
     }
 
     /**
-     * {@code address} without its user name and password; itself when it has none.
+     * {@code address} without its user name and password, everything before the last {@code @} of its authority, a
+     * host Java reads as a registry name's included (ruling D43); itself when it has none.
      *
      * @param address an address
      * @return the address
      */
     static URI withoutUserInfo(URI address) {
-        if (address.getRawUserInfo() == null || address.isOpaque()) return address;
         String authority = address.getRawAuthority();
+        if (address.isOpaque() || authority == null || authority.indexOf('@') < 0) return address;
         var text = new StringBuilder().append(address.getScheme()).append("://").append(authority.substring(authority.lastIndexOf('@') + 1));
         if (address.getRawPath() != null) text.append(address.getRawPath());
         if (address.getRawQuery() != null) text.append('?').append(address.getRawQuery());

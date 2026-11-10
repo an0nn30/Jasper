@@ -229,6 +229,27 @@ class DownloadNamesTest {
         assertThat(reserve(names, folder, "x.bin")).contains(folder.resolve("x (500).bin"));
     }
 
+    /**
+     * Plan 7's D7 and D43: Save Page As's folder is reserved under the first free name, numbered at its end as Finder and
+     * Explorer number a folder, so two saves of one host at once get two folders; a release frees the name again.
+     */
+    @Test void aSaveFolderIsReservedAndNumberedAtItsEnd() throws IOException {
+        var names = new DownloadNames();
+        var first = names.reserveFolder(folder, "example.com").orElseThrow();
+        assertThat(first.file()).isEqualTo(folder.resolve("example.com"));
+        assertThat(names.reserveFolder(folder, "EXAMPLE.COM").orElseThrow().file()).as("case folded").isEqualTo(folder.resolve("EXAMPLE.COM (1)"));
+        Files.createDirectories(folder.resolve("example.com (2)"));
+        assertThat(names.reserveFolder(folder, "example.com").orElseThrow().file()).isEqualTo(folder.resolve("example.com (3)"));
+        names.release(first);
+        assertThat(names.reserveFolder(folder, "example.com").orElseThrow().file()).isEqualTo(folder.resolve("example.com"));
+        assertThat(names.reserve(folder, "example.com")).as("a download's name clashes with the folder's").map(DownloadNames.Reservation::file)
+            .contains(folder.resolve("example (1).com"));
+        for (int n = 4; n < DownloadNames.MOST_NUMBERS; n++) Files.createDirectories(folder.resolve("full (" + n + ")"));
+        var many = new DownloadNames();
+        for (int n = 0; n < 4; n++) assertThat(many.reserveFolder(folder, "full")).isPresent();
+        assertThat(many.reserveFolder(folder, "full")).as("past 999, none").isEmpty();
+    }
+
     @Test void reservationsAtOnceFromManyThreadsAreAllDifferent() throws Exception {
         var names = new DownloadNames();
         var taken = ConcurrentHashMap.<Path>newKeySet();
