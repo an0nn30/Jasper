@@ -19,7 +19,7 @@ import java.util.regex.Pattern;
  * finish (ruling F19), since a menu that long would not fit on the screen. UI thread.
  */
 public final class DownloadList {
-    /** The most downloads that are not running the list keeps, counted from the newest. */
+    /** How many of the newest downloads the list keeps by their place in it, running or not; an older one stays only while it runs. */
     static final int NEWEST = 20;
     /** Chromium's name for a download's file before its target is set (ruling D11). */
     private static final Pattern PLACEHOLDER = Pattern.compile("Unconfirmed [0-9]+\\.crdownload");
@@ -87,14 +87,10 @@ public final class DownloadList {
             total = Math.max(total, received);
             Path file = named.orElse(d.file());
             String name = named.map(DownloadList::fileName).orElse(d.name());
-            return told(entry, new Download(d.serial(), d.key(), name, file, d.source(), State.RUNNING, total, total, false), Outcome.COMPLETED);
+            return told(entry, copy(d, name, file, State.RUNNING, total, total, false), Outcome.COMPLETED);
         }
-        if (progress.canceled())
-            return told(entry, new Download(d.serial(), d.key(), d.name(), d.file(), d.source(), State.STOPPED, received, total, false),
-                Outcome.STOPPED);
-        if (!progress.inProgress())
-            return told(entry, new Download(d.serial(), d.key(), d.name(), d.file(), d.source(), State.FAILED, received, total, false),
-                Outcome.FAILED);
+        if (progress.canceled()) return told(entry, copy(d, d.name(), d.file(), State.STOPPED, received, total, false), Outcome.STOPPED);
+        if (!progress.inProgress()) return told(entry, copy(d, d.name(), d.file(), State.FAILED, received, total, false), Outcome.FAILED);
         String name = d.name();
         Path file = d.file();
         if (named.isPresent()) {
@@ -106,7 +102,7 @@ public final class DownloadList {
                 name = shown.substring(0, shown.length() - DownloadNames.INTERMEDIATE.length());
             }
         }
-        entry.download = new Download(d.serial(), d.key(), name, file, d.source(), State.RUNNING, received, total, false);
+        entry.download = copy(d, name, file, State.RUNNING, received, total, false);
         return Optional.empty();
     }
 
@@ -121,7 +117,7 @@ public final class DownloadList {
         Entry entry = entry(key).orElse(null);
         if (entry == null || entry.outcome != Outcome.COMPLETED || entry.download.state() != State.RUNNING) return;
         Download d = entry.download;
-        entry.download = new Download(d.serial(), d.key(), d.name(), d.file(), d.source(), State.FINISHED, d.received(), d.total(), openable);
+        entry.download = copy(d, d.name(), d.file(), State.FINISHED, d.received(), d.total(), openable);
         trim();
     }
 
@@ -154,6 +150,11 @@ public final class DownloadList {
         entry.outcome = outcome;
         trim();
         return Optional.of(outcome);
+    }
+
+    /** {@code d} with what an update or {@link #finish} changes; its serial, key and source stay. */
+    private static Download copy(Download d, String name, Path file, State state, long received, long total, boolean openable) {
+        return new Download(d.serial(), d.key(), name, file, d.source(), state, received, total, openable);
     }
 
     private Optional<Entry> entry(DownloadKey key) {

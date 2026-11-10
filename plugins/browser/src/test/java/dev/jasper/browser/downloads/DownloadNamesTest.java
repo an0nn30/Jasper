@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -129,25 +130,25 @@ class DownloadNamesTest {
 
     @Test void aFreeNameIsTakenAsItIsAndInTheFolder() {
         var names = new DownloadNames();
-        assertThat(names.reserve(folder, "report.pdf")).contains(folder.resolve("report.pdf"));
-        assertThat(names.reserve(folder, "../../.ssh/authorized_keys")).as("the safe name").contains(folder.resolve("authorized_keys"));
-        assertThat(names.reserve(folder, "")).contains(folder.resolve("download"));
-        assertThat(names.reserve(folder, "C:\\evil\\x.exe")).contains(folder.resolve("x.exe"));
-        assertThat(names.reserve(folder, "..")).contains(folder.resolve("download (1)"));
+        assertThat(reserve(names, folder, "report.pdf")).contains(folder.resolve("report.pdf"));
+        assertThat(reserve(names, folder, "../../.ssh/authorized_keys")).as("the safe name").contains(folder.resolve("authorized_keys"));
+        assertThat(reserve(names, folder, "")).contains(folder.resolve("download"));
+        assertThat(reserve(names, folder, "C:\\evil\\x.exe")).contains(folder.resolve("x.exe"));
+        assertThat(reserve(names, folder, "..")).contains(folder.resolve("download (1)"));
         for (String name : List.of("a/../../b.txt", "CON", "evil\u202Efdp.exe", "x".repeat(400)))
-            assertThat(names.reserve(folder, name)).as(name).hasValueSatisfying(file -> assertThat(file.getParent()).isEqualTo(folder));
+            assertThat(reserve(names, folder, name)).as(name).hasValueSatisfying(file -> assertThat(file.getParent()).isEqualTo(folder));
     }
 
     /** Review Focus 2: two downloads of one name at once, and a file already there. */
     @Test void aClashOnDiskAndTwoReservationsAtOnceAreNumbered() throws IOException {
         Files.writeString(folder.resolve("report.pdf"), "already here");
         var names = new DownloadNames();
-        assertThat(names.reserve(folder, "report.pdf")).contains(folder.resolve("report (1).pdf"));
-        assertThat(names.reserve(folder, "report.pdf")).contains(folder.resolve("report (2).pdf"));
-        assertThat(names.reserve(folder, "notes.txt")).contains(folder.resolve("notes.txt"));
-        assertThat(names.reserve(folder, "notes.txt")).contains(folder.resolve("notes (1).txt"));
+        assertThat(reserve(names, folder, "report.pdf")).contains(folder.resolve("report (1).pdf"));
+        assertThat(reserve(names, folder, "report.pdf")).contains(folder.resolve("report (2).pdf"));
+        assertThat(reserve(names, folder, "notes.txt")).contains(folder.resolve("notes.txt"));
+        assertThat(reserve(names, folder, "notes.txt")).contains(folder.resolve("notes (1).txt"));
         Files.createDirectory(folder.resolve("data"));
-        assertThat(names.reserve(folder, "data")).as("a folder of that name").contains(folder.resolve("data (1)"));
+        assertThat(reserve(names, folder, "data")).as("a folder of that name").contains(folder.resolve("data (1)"));
         assertThat(Files.readString(folder.resolve("report.pdf"))).as("nothing written").isEqualTo("already here");
         try (var listed = Files.list(folder)) {
             assertThat(listed.map(path -> path.getFileName().toString()).sorted().toList()).as("reserving creates nothing")
@@ -163,52 +164,69 @@ class DownloadNamesTest {
         } catch (UnsupportedOperationException | IOException noLinks) {
             assumeThat(false).as("this file system makes no symbolic links").isTrue();
         }
-        assertThat(new DownloadNames().reserve(folder, "link.txt")).contains(folder.resolve("link (1).txt"));
+        assertThat(reserve(new DownloadNames(), folder, "link.txt")).contains(folder.resolve("link (1).txt"));
     }
 
     /** F5: case and normalization are folded on every platform, as APFS and NTFS fold them. */
     @Test void namesThatDifferOnlyInCaseOrNormalizationClash() {
         var names = new DownloadNames();
-        assertThat(names.reserve(folder, "Report.pdf")).contains(folder.resolve("Report.pdf"));
-        assertThat(names.reserve(folder, "report.pdf")).contains(folder.resolve("report (1).pdf"));
-        assertThat(names.reserve(folder, "REPORT (1).PDF")).as("the numbered one too").contains(folder.resolve("REPORT (1) (1).PDF"));
+        assertThat(reserve(names, folder, "Report.pdf")).contains(folder.resolve("Report.pdf"));
+        assertThat(reserve(names, folder, "report.pdf")).contains(folder.resolve("report (1).pdf"));
+        assertThat(reserve(names, folder, "REPORT (1).PDF")).as("the numbered one too").contains(folder.resolve("REPORT (1) (1).PDF"));
         String composed = "caf\u00E9.txt", decomposed = "cafe\u0301.txt";
-        assertThat(names.reserve(folder, composed)).contains(folder.resolve(composed));
-        assertThat(names.reserve(folder, decomposed)).contains(folder.resolve("cafe\u0301 (1).txt"));
-        assertThat(names.reserve(folder, "CAF\u00C9.TXT")).as("both").contains(folder.resolve("CAF\u00C9 (2).TXT"));
+        assertThat(reserve(names, folder, composed)).contains(folder.resolve(composed));
+        assertThat(reserve(names, folder, decomposed)).contains(folder.resolve("cafe\u0301 (1).txt"));
+        assertThat(reserve(names, folder, "CAF\u00C9.TXT")).as("both").contains(folder.resolve("CAF\u00C9 (2).TXT"));
     }
 
-    @Test void releaseFreesANameByTheSameFolding() {
+    /**
+     * Task 2's review: a reservation is a token that frees only itself, so a second release, after another download
+     * reserved the same name, frees nothing of that one's, and another list's token frees nothing here.
+     */
+    @Test void releaseFreesOnlyItsOwnReservation() {
         var names = new DownloadNames();
-        Path first = names.reserve(folder, "a.txt").orElseThrow();
-        assertThat(names.reserve(folder, "a.txt")).contains(folder.resolve("a (1).txt"));
+        DownloadNames.Reservation first = names.reserve(folder, "a.txt").orElseThrow();
+        assertThat(first.file()).isEqualTo(folder.resolve("a.txt"));
+        DownloadNames.Reservation second = names.reserve(folder, "a.txt").orElseThrow();
+        assertThat(second.file()).isEqualTo(folder.resolve("a (1).txt"));
         names.release(first);
-        assertThat(names.reserve(folder, "a.txt")).as("free again").contains(folder.resolve("a.txt"));
-        names.release(folder.resolve("A (1).TXT"));
-        assertThat(names.reserve(folder, "a.txt")).as("released by its folded name").contains(folder.resolve("a (1).txt"));
-        names.release(folder.resolve("never-reserved.txt"));
-        names.release(folder.resolve("a.txt"));
-        names.release(folder.resolve("a.txt"));
-        assertThat(names.reserve(folder, "a.txt")).as("a second release is nothing").contains(folder.resolve("a.txt"));
+        DownloadNames.Reservation again = names.reserve(folder, "A.TXT").orElseThrow();
+        assertThat(again.file()).as("free again, its case folded").isEqualTo(folder.resolve("A.TXT"));
+        names.release(first);
+        assertThat(reserve(names, folder, "a.txt")).as("a second release frees nothing of the download that took the name since")
+            .contains(folder.resolve("a (2).txt"));
+        names.release(second);
+        DownloadNames.Reservation later = names.reserve(folder, "a.txt").orElseThrow();
+        assertThat(later.file()).isEqualTo(second.file());
+        assertThat(later).as("a token is equal only to itself").isNotEqualTo(second);
+        names.release(second);
+        assertThat(reserve(names, folder, "a.txt")).as("the earlier token frees nothing of the later").contains(folder.resolve("a (3).txt"));
+        DownloadNames.Reservation elsewhere = new DownloadNames().reserve(folder, "a.txt").orElseThrow();
+        assertThat(elsewhere.file()).isEqualTo(folder.resolve("a.txt"));
+        names.release(elsewhere);
+        assertThat(reserve(names, folder, "a.txt")).as("another list's token frees nothing here").contains(folder.resolve("a (4).txt"));
     }
 
     @Test void eachFolderHasItsOwnNames() {
         var names = new DownloadNames();
         Path other = folder.resolve("other");
-        assertThat(names.reserve(folder, "a.txt")).contains(folder.resolve("a.txt"));
-        assertThat(names.reserve(other, "a.txt")).contains(other.resolve("a.txt"));
+        assertThat(reserve(names, folder, "a.txt")).contains(folder.resolve("a.txt"));
+        assertThat(reserve(names, other, "a.txt")).contains(other.resolve("a.txt"));
     }
 
     /** F3: at most 1,000 numbered names are tried, and past them there is no free name. */
     @Test void pastAThousandNumberedNamesThereIsNoFreeName() {
         var names = new DownloadNames();
-        assertThat(names.reserve(folder, "x.bin")).contains(folder.resolve("x.bin"));
-        for (int n = 1; n <= 1000; n++)
-            assertThat(names.reserve(folder, "x.bin")).as("n = " + n).contains(folder.resolve("x (" + n + ").bin"));
-        assertThat(names.reserve(folder, "x.bin")).isEmpty();
-        assertThat(names.reserve(folder, "y.bin")).as("another name is free").contains(folder.resolve("y.bin"));
-        names.release(folder.resolve("x (500).bin"));
-        assertThat(names.reserve(folder, "x.bin")).contains(folder.resolve("x (500).bin"));
+        var taken = new ArrayList<DownloadNames.Reservation>();
+        for (int n = 0; n <= 1000; n++) {
+            DownloadNames.Reservation reservation = names.reserve(folder, "x.bin").orElseThrow();
+            assertThat(reservation.file()).as("n = " + n).isEqualTo(folder.resolve(n == 0 ? "x.bin" : "x (" + n + ").bin"));
+            taken.add(reservation);
+        }
+        assertThat(reserve(names, folder, "x.bin")).isEmpty();
+        assertThat(reserve(names, folder, "y.bin")).as("another name is free").contains(folder.resolve("y.bin"));
+        names.release(taken.get(500));
+        assertThat(reserve(names, folder, "x.bin")).contains(folder.resolve("x (500).bin"));
     }
 
     @Test void reservationsAtOnceFromManyThreadsAreAllDifferent() throws Exception {
@@ -221,7 +239,7 @@ class DownloadNamesTest {
             for (int t = 0; t < 8; t++)
                 done.add(threads.submit(() -> {
                     start.await();
-                    for (int i = 0; i < 50; i++) assertThat(taken.add(names.reserve(folder, "same.txt").orElseThrow())).isTrue();
+                    for (int i = 0; i < 50; i++) assertThat(taken.add(names.reserve(folder, "same.txt").orElseThrow().file())).isTrue();
                     return null;
                 }));
             start.countDown();
@@ -240,19 +258,29 @@ class DownloadNamesTest {
         Path deep = deep(200);
         var names = new DownloadNames();
         String name = "a".repeat(100) + ".pdf";
-        Path first = names.reserve(deep, name, "Windows 11").orElseThrow();
+        Path first = names.reserve(deep, name, "Windows 11").orElseThrow().file();
         assertThat(first).isEqualTo(deep.resolve("a".repeat(36) + ".pdf"));
         assertThat(first.toString().length() + " (1000)".length() + ".crdownload".length()).isEqualTo(259);
-        Path second = names.reserve(deep, name, "Windows 11").orElseThrow();
+        Path second = names.reserve(deep, name, "Windows 11").orElseThrow().file();
         assertThat(second).as("numbered on the shortened stem").isEqualTo(deep.resolve("a".repeat(36) + " (1).pdf"));
         assertThat(second.toString().length() + ".crdownload".length()).isLessThan(260);
-        assertThat(new DownloadNames().reserve(deep, name, "Mac OS X")).as("elsewhere the name stays").contains(deep.resolve(name));
-        assertThat(new DownloadNames().reserve(deep, name, "Linux")).contains(deep.resolve(name));
-        assertThat(new DownloadNames().reserve(deep, "short.pdf", "Windows 10")).as("a short name stays").contains(deep.resolve("short.pdf"));
-        assertThat(new DownloadNames().reserve(deep(233), "CONSOLE.txt", "Windows 11")).as("a stem cut to a device name")
+        assertThat(reserve(new DownloadNames(), deep, name, "Mac OS X")).as("elsewhere the name stays").contains(deep.resolve(name));
+        assertThat(reserve(new DownloadNames(), deep, name, "Linux")).contains(deep.resolve(name));
+        assertThat(reserve(new DownloadNames(), deep, "short.pdf", "Windows 10")).as("a short name stays").contains(deep.resolve("short.pdf"));
+        assertThat(reserve(new DownloadNames(), deep(233), "CONSOLE.txt", "Windows 11")).as("a stem cut to a device name")
             .contains(deep(233).resolve("_CO.txt"));
-        assertThat(new DownloadNames().reserve(deep(236), "ab   cd", "Windows 11")).as("no trailing space").contains(deep(236).resolve("ab"));
-        assertThat(new DownloadNames().reserve(deep(250), "a.pdf", "Windows 11")).as("no name fits").isEmpty();
+        assertThat(reserve(new DownloadNames(), deep(236), "ab   cd", "Windows 11")).as("no trailing space").contains(deep(236).resolve("ab"));
+        assertThat(reserve(new DownloadNames(), deep(250), "a.pdf", "Windows 11")).as("no name fits").isEmpty();
+    }
+
+    /** The file {@code names} reserves for {@code name} in {@code folder}, on this system. */
+    private static Optional<Path> reserve(DownloadNames names, Path folder, String name) {
+        return names.reserve(folder, name).map(DownloadNames.Reservation::file);
+    }
+
+    /** The file {@code names} reserves for {@code name} in {@code folder}, on the system {@code osName} names. */
+    private static Optional<Path> reserve(DownloadNames names, Path folder, String name, String osName) {
+        return names.reserve(folder, name, osName).map(DownloadNames.Reservation::file);
     }
 
     /** A folder under the {@code @TempDir}, never created, whose path is {@code length} characters long. */

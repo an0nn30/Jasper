@@ -1,6 +1,8 @@
 package dev.jasper.browser.downloads;
 
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 
 /**
@@ -24,9 +26,9 @@ public final class DownloadFolder {
      * @param setting the Downloads folder setting
      * @param system the system's Downloads folder
      * @param home the home folder
-     * @return {@code system} for an empty setting, and for one {@link #valid(String)} refuses, as a refused setting
-     *     reads its default; {@code home} or a folder under it for {@code ~} and {@code ~/folder}; otherwise the folder
-     *     as typed
+     * @return {@code system} for an empty setting, and for one {@link #valid(String)} refuses or this system cannot read
+     *     as a path, as a refused setting reads its default; {@code home} or a folder under it for {@code ~} and
+     *     {@code ~/folder}; otherwise the folder as typed
      */
     public static Path resolve(String setting, Path system, Path home) {
         return resolve(setting, system, home, os());
@@ -42,17 +44,36 @@ public final class DownloadFolder {
      * @return the folder
      */
     static Path resolve(String setting, Path system, Path home, String osName) {
+        return resolve(setting, system, home, osName, Path::of);
+    }
+
+    /**
+     * {@link #resolve(String, Path, Path, String)} with {@code paths} reading a path's text, as {@link Path#of} does.
+     *
+     * @param setting the Downloads folder setting
+     * @param system the system's Downloads folder
+     * @param home the home folder
+     * @param osName the {@code os.name} system property
+     * @param paths reads a path's text; it may refuse it with {@link InvalidPathException}
+     * @return the folder; {@code system} for a path {@code paths} refuses
+     */
+    static Path resolve(String setting, Path system, Path home, String osName, Function<String, Path> paths) {
         if (setting == null || setting.isEmpty() || !valid(setting, osName)) return system;
-        if (homeRelative(setting, windows(osName))) return home.resolve(underHome(setting, windows(osName)));
-        return Path.of(setting);
+        boolean windows = windows(osName);
+        try {
+            return homeRelative(setting, windows) ? home.resolve(paths.apply(underHome(setting, windows))) : paths.apply(setting);
+        } catch (InvalidPathException unreadable) {
+            // Not a path here, though valid took it: the system's folder, as for any refused setting.
+            return system;
+        }
     }
 
     /**
      * Whether {@code setting} is a Downloads folder setting on this system: empty, {@code ~}, {@code ~/folder}, or an
      * absolute folder. On Windows {@code ~\folder} is one too, an absolute folder starts with a drive, such as
-     * {@code C:\}, or is a share, {@code \\server\share}, and neither a drive-relative {@code C:folder} nor a rooted
-     * {@code \folder} without a drive is one; elsewhere {@code \} is a file name's character, so {@code ~\folder} is
-     * not.
+     * {@code C:\}, or is a share, {@code \\server\share}, neither a drive-relative {@code C:folder} nor a rooted
+     * {@code \folder} without a drive is one, and no name in it ends in a space, which Windows paths refuse; elsewhere
+     * {@code \} is a file name's character, so {@code ~\folder} is not.
      *
      * @param setting the setting's text
      * @return whether it is one of those forms
@@ -91,11 +112,15 @@ public final class DownloadFolder {
         return setting.substring(start);
     }
 
-    /** Whether {@code path}, from index {@code from}, holds no character a Windows path refuses. */
+    /**
+     * Whether {@code path}, from index {@code from}, holds no character a Windows path refuses, and no name in it ends in
+     * a space: Windows drops such a space, and Java's Windows paths refuse it ("Trailing char").
+     */
     private static boolean windowsPath(String path, int from) {
         for (int i = from; i < path.length(); i++) {
             char c = path.charAt(i);
             if (c < 0x20 || NOT_ON_WINDOWS.indexOf(c) >= 0) return false;
+            if (c == ' ' && (i + 1 == path.length() || path.charAt(i + 1) == '\\' || path.charAt(i + 1) == '/')) return false;
         }
         return true;
     }

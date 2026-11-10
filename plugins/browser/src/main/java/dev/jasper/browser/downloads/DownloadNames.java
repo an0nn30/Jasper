@@ -4,8 +4,11 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.text.Normalizer;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.IntUnaryOperator;
@@ -15,7 +18,8 @@ import java.util.function.IntUnaryOperator;
  * for a name already taken, and the names downloads under way have reserved, so that two downloads of one name at once
  * never write one file. Names compare with case and Unicode normalization folded, as APFS and NTFS compare them.
  * {@link #safeName} and {@link #numbered} are pure; {@link #reserve} and {@link #release} are safe on any thread, and
- * {@code reserve} reads only whether a name exists in the folder.
+ * {@code reserve} reads only whether a name exists in the folder. Each reservation is a {@link Reservation} token, which
+ * frees only itself.
  */
 public final class DownloadNames {
     /** The name of a download whose suggested name leaves nothing. */
@@ -29,7 +33,36 @@ public final class DownloadNames {
     private static final int MAX_PATH = 260;
     private static final String RESERVED = "<>:\"|?*";
     private static final Set<String> DEVICES = devices();
-    private final Set<String> reserved = new HashSet<>();
+    /** Each reserved name's folded path, and the reservation that holds it. */
+    private final Map<String, Reservation> reserved = new HashMap<>();
+
+    /**
+     * A name {@link #reserve} reserved for one download. It is equal only to itself, so {@link #release} frees the
+     * name only while this reservation holds it: a second release, after another download reserved the same name, frees
+     * nothing of that one's.
+     */
+    public static final class Reservation {
+        private final Path file;
+        private final String key;
+
+        private Reservation(Path file, String key) {
+            this.file = file;
+            this.key = key;
+        }
+
+        /**
+         * The file the download goes to.
+         *
+         * @return the file, whose parent is the folder it was reserved in
+         */
+        public Path file() {
+            return file;
+        }
+
+        @Override public String toString() {
+            return "Reservation[" + file + "]";
+        }
+    }
 
     /**
      * The name a download is saved under, from the one a server or a page suggests (ruling F4): the part after the last
@@ -79,9 +112,9 @@ public final class DownloadNames {
      *
      * @param folder the Downloads folder
      * @param name the suggested name
-     * @return the file, whose parent is {@code folder}; empty when no name is free
+     * @return the reservation, whose file's parent is {@code folder}; empty when no name is free
      */
-    public synchronized Optional<Path> reserve(Path folder, String name) {
+    public synchronized Optional<Reservation> reserve(Path folder, String name) {
         return reserve(folder, name, System.getProperty("os.name", ""));
     }
 
@@ -91,9 +124,9 @@ public final class DownloadNames {
      * @param folder the Downloads folder
      * @param name the suggested name
      * @param osName the {@code os.name} system property
-     * @return the file; empty when no name is free
+     * @return the reservation; empty when no name is free
      */
-    synchronized Optional<Path> reserve(Path folder, String name, String osName) {
+    synchronized Optional<Reservation> reserve(Path folder, String name, String osName) {
         String safe = safeName(name);
         if (osName.startsWith("Windows")) {
             // The folder's path and its separator, then the name with the longest number and the intermediate suffix.
@@ -107,22 +140,24 @@ public final class DownloadNames {
         for (int n = 0; n <= MOST_NUMBERS; n++) {
             Path file = folder.resolve(n == 0 ? safe : numbered(safe, n));
             String key = key(file);
-            if (!reserved.contains(key) && !Files.exists(file, LinkOption.NOFOLLOW_LINKS)) {
-                reserved.add(key);
-                return Optional.of(file);
+            if (!reserved.containsKey(key) && !Files.exists(file, LinkOption.NOFOLLOW_LINKS)) {
+                var reservation = new Reservation(file, key);
+                reserved.put(key, reservation);
+                return Optional.of(reservation);
             }
         }
         return Optional.empty();
     }
 
     /**
-     * Frees a name {@link #reserve} gave: a later download may take it again unless something of that name is in the
-     * folder. A name not reserved is nothing.
+     * Frees the name {@code reservation} holds: a later download may take it again unless something of that name is in
+     * the folder. A reservation already released, and another {@code DownloadNames}'s, free nothing.
      *
-     * @param file the file {@code reserve} answered, or the same path in another case or normalization
+     * @param reservation what {@link #reserve} answered
      */
-    public synchronized void release(Path file) {
-        reserved.remove(key(file));
+    public synchronized void release(Reservation reservation) {
+        Objects.requireNonNull(reservation, "reservation");
+        reserved.remove(reservation.key, reservation);
     }
 
     /** {@code file}'s path with case and normalization folded, as APFS and NTFS compare names (ruling F5). */
