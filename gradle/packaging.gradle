@@ -38,7 +38,16 @@ def cameraUsage = "Web pages in Jasper's browser use your camera only when you a
 def microphoneUsage = "Web pages in Jasper's browser use your microphone only when you allow it."
 // Workspace-tabs spec 5.4: Jasper appears in Open With and takes drops on its Dock icon for text, source code and
 // folders, without claiming any of them as their default application.
-def macDocumentTypes = '[{"CFBundleTypeName":"Text","CFBundleTypeRole":"Editor","LSHandlerRank":"Alternate","LSItemContentTypes":["public.text","public.source-code"]},{"CFBundleTypeName":"Folder","CFBundleTypeRole":"Viewer","LSHandlerRank":"Alternate","LSItemContentTypes":["public.folder"]}]'
+ext.macDocumentTypes = groovy.json.JsonOutput.toJson([
+    [CFBundleTypeName: 'Text', CFBundleTypeRole: 'Editor', LSHandlerRank: 'Alternate', LSItemContentTypes: ['public.text', 'public.source-code']],
+    [CFBundleTypeName: 'Folder', CFBundleTypeRole: 'Viewer', LSHandlerRank: 'Alternate', LSItemContentTypes: ['public.folder']],
+    [CFBundleTypeName: 'Source and text', CFBundleTypeRole: 'Editor', LSHandlerRank: 'Alternate',
+     LSItemContentTypes: fileTypeCatalog.types.collectMany { it.mac }.unique()]])
+// The macOS types the catalogue names that the system lacks, which the app declares itself.
+ext.macImportedTypes = groovy.json.JsonOutput.toJson(fileTypeCatalog.imports.collect {
+    [UTTypeIdentifier: it.identifier, UTTypeConformsTo: [it.conformsTo], UTTypeDescription: it.description,
+     UTTypeTagSpecification: ['public.filename-extension': it.extensions]]
+})
 // Browser plan 4c (spec 9): Jasper is one of the web browsers the user can make the default, for http and https; the
 // open-URI handler takes what the system hands it. A project property, so packaging-support-test.gradle checks it too.
 ext.macUrlTypes = '[{"CFBundleURLName":"Web site URL","CFBundleURLSchemes":["http","https"],"CFBundleTypeRole":"Viewer"}]'
@@ -292,6 +301,7 @@ def packageApp = tasks.register('packageApp') {
     inputs.property('cameraUsage', cameraUsage)
     inputs.property('microphoneUsage', microphoneUsage)
     inputs.property('documentTypes', macDocumentTypes)
+    inputs.property('importedTypes', macImportedTypes)
     inputs.property('urlTypes', macUrlTypes)
     inputs.property('version', version)
     inputs.property('host', providers.provider { normalizedHost().toString() })
@@ -339,6 +349,8 @@ def packageApp = tasks.register('packageApp') {
                     new File(image, 'Contents/Info.plist').absolutePath], 'plutil microphone usage')
                 executeNative(['/usr/bin/plutil', '-replace', 'CFBundleDocumentTypes', '-json', macDocumentTypes,
                     new File(image, 'Contents/Info.plist').absolutePath], 'plutil document types')
+                executeNative(['/usr/bin/plutil', '-replace', 'UTImportedTypeDeclarations', '-json', macImportedTypes,
+                    new File(image, 'Contents/Info.plist').absolutePath], 'plutil imported types')
                 executeNative(['/usr/bin/plutil', '-replace', 'CFBundleURLTypes', '-json', macUrlTypes,
                     new File(image, 'Contents/Info.plist').absolutePath], 'plutil URL types')
                 File executable = new File(image, 'Contents/MacOS/Jasper')
@@ -703,6 +715,8 @@ def verifyPackage = tasks.register('verifyPackage') {
             if (microphone != microphoneUsage) throw new GradleException("Package verification failed: plist microphone usage description is '${microphone}'")
             def documentTypes = new groovy.json.JsonSlurper().parseText(executeNative(['/usr/bin/plutil', '-extract', 'CFBundleDocumentTypes', 'json', '-o', '-', plist.absolutePath], 'plutil document types').stdout)
             if (documentTypes != new groovy.json.JsonSlurper().parseText(macDocumentTypes)) throw new GradleException("Package verification failed: plist document types are ${documentTypes}")
+            def importedTypes = new groovy.json.JsonSlurper().parseText(executeNative(['/usr/bin/plutil', '-extract', 'UTImportedTypeDeclarations', 'json', '-o', '-', plist.absolutePath], 'plutil imported types').stdout)
+            if (importedTypes != new groovy.json.JsonSlurper().parseText(macImportedTypes)) throw new GradleException("Package verification failed: plist imported types are ${importedTypes}")
             def urlTypes = new groovy.json.JsonSlurper().parseText(executeNative(['/usr/bin/plutil', '-extract', 'CFBundleURLTypes', 'json', '-o', '-', plist.absolutePath], 'plutil URL types').stdout)
             if (urlTypes != new groovy.json.JsonSlurper().parseText(macUrlTypes)) throw new GradleException("Package verification failed: plist URL types are ${urlTypes}")
             String iconName = executeNative(['/usr/bin/plutil', '-extract', 'CFBundleIconFile', 'raw', '-o', '-', plist.absolutePath], 'plutil icon').stdout.trim()

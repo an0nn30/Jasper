@@ -58,7 +58,46 @@ ext.linuxDesktopFileName = "${linuxPackageName}-Jasper.desktop".toString()
 // Desktops offer the entries that take http and https links as web browsers (browser plan 4c, spec 9). The packages set
 // no default (linuxKeepingSystemDefaults): the user makes Jasper the default in the desktop's settings or with
 // xdg-settings.
-ext.linuxDesktopMimeTypes = 'MimeType=x-scheme-handler/http;x-scheme-handler/https;'
+//
+// The file-type catalogue (file-types.tsv, which FileTypeCatalog in dev.jasper.app.platform parses with the same rules)
+// adds the MIME types of the source and text files Jasper opens, so desktops offer Jasper under Open With.
+ext.fileTypeCatalogFile = project.file('src/main/resources/dev/jasper/app/platform/file-types.tsv')
+ext.parseFileTypeCatalog = { String text ->
+    def fail = { int number, String line, String why ->
+        throw new GradleException("file types, line ${number}: ${why}: ${line}".toString())
+    }
+    def split = { String column ->
+        column.isBlank() ? [] : column.split(',').findAll { !it.isBlank() }.collect { it.trim() }
+    }
+    def body = ~/[a-z0-9_+-]{1,16}/
+    def types = new LinkedHashMap<String, Map>()
+    def imports = []
+    text.split(/\R/, -1).eachWithIndex { String line, int index ->
+        int number = index + 1
+        if (line.isBlank() || line.startsWith('#')) return
+        List<String> cols = line.split('\t', -1) as List
+        if (cols[0] == 'import') {
+            if (cols.size() != 5 || cols[1].isBlank() || cols[2].isBlank() || cols[3].isBlank()) fail(number, line, 'an import line needs 5 columns')
+            def extensions = split(cols[3])
+            extensions.each { if (!body.matcher(it).matches()) fail(number, line, "invalid import extension ${it}".toString()) }
+            imports << [identifier: cols[1], conformsTo: cols[2], extensions: extensions, description: cols[4]]
+        } else {
+            if (cols.size() != 3) fail(number, line, 'a type line needs 3 columns')
+            if (!cols[0].startsWith('.') || !body.matcher(cols[0].substring(1)).matches()) fail(number, line, "invalid extension ${cols[0]}".toString())
+            if (cols[0] in ['.html', '.htm']) fail(number, line, "extension ${cols[0]} is not claimed".toString())
+            if (types.containsKey(cols[0])) fail(number, line, "duplicate extension ${cols[0]}".toString())
+            types[cols[0]] = [ext: cols[0], mac: split(cols[1]), linux: split(cols[2])]
+        }
+    }
+    def used = types.values().collectMany { it.mac } as Set
+    imports.each {
+        if (!(it.identifier in used)) throw new GradleException("import ${it.identifier} is used by no type line".toString())
+    }
+    [types: types.values() as List, imports: imports]
+}
+ext.fileTypeCatalog = parseFileTypeCatalog(fileTypeCatalogFile.getText('UTF-8'))
+ext.linuxDesktopMimeTypes = ('MimeType=x-scheme-handler/http;x-scheme-handler/https;' +
+    fileTypeCatalog.types.collectMany { it.linux }.unique().collect { "${it};" }.join('')).toString()
 
 // The menu entry as jpackage's own template.desktop (template) writes it, with two changes: linuxDesktopMimeTypes
 // replaces the file-association line (DESKTOP_MIMES, which writes an empty MimeType= for a package without file

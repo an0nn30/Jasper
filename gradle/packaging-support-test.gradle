@@ -701,6 +701,19 @@ verifySupport.configure {
         def json = new groovy.json.JsonSlurper()
         assert json.parseText(macUrlTypes) == [[CFBundleURLName: 'Web site URL', CFBundleURLSchemes: ['http', 'https'],
             CFBundleTypeRole: 'Viewer']]
+        def documentTypes = json.parseText(macDocumentTypes)
+        assert documentTypes.size() == 3 && documentTypes.every { it.LSHandlerRank == 'Alternate' }
+        assert 'com.sun.java-source' in documentTypes[2].LSItemContentTypes && 'public.json' in documentTypes[2].LSItemContentTypes
+        assert documentTypes[2].LSItemContentTypes.size() == documentTypes[2].LSItemContentTypes.unique(false).size()
+        def importedTypes = json.parseText(macImportedTypes)
+        assert importedTypes.find { it.UTTypeIdentifier == 'dev.jasper.toml' }.UTTypeTagSpecification['public.filename-extension'] == ['toml']
+        assert fileTypeCatalog.types.find { it.ext == '.java' }.linux == ['text/x-java']
+        try {
+            parseFileTypeCatalog('.html\tpublic.html\ttext/html\n')
+            assert false : 'the catalogue accepted .html'
+        } catch (GradleException expected) {
+            assert expected.message.contains('line 1')
+        }
         if (!System.getProperty('os.name').startsWith('Mac')) {
             logger.lifecycle('Verified the macOS URL types (plutil checked only on macOS)')
             return
@@ -724,6 +737,10 @@ verifySupport.configure {
 </plist>
 ''', 'UTF-8')
         plutil(['-replace', 'CFBundleURLTypes', '-json', macUrlTypes, plist.absolutePath])
+        plutil(['-replace', 'CFBundleDocumentTypes', '-json', macDocumentTypes, plist.absolutePath])
+        plutil(['-replace', 'UTImportedTypeDeclarations', '-json', macImportedTypes, plist.absolutePath])
+        assert json.parseText(plutil(['-extract', 'CFBundleDocumentTypes', 'json', '-o', '-', plist.absolutePath])) == documentTypes
+        assert json.parseText(plutil(['-extract', 'UTImportedTypeDeclarations', 'json', '-o', '-', plist.absolutePath])) == importedTypes
         assert json.parseText(plutil(['-extract', 'CFBundleURLTypes', 'json', '-o', '-', plist.absolutePath])) == json.parseText(macUrlTypes)
         assert plutil(['-extract', 'CFBundleIdentifier', 'raw', '-o', '-', plist.absolutePath]).trim() == 'dev.jasper.app'
         delete(plist.parentFile)
@@ -750,14 +767,16 @@ verifySupport.configure {
              'APPLICATION_LAUNCHER': "${root}/bin/Jasper".toString(), 'APPLICATION_ICON': "${root}/lib/Jasper.png".toString(),
              'APPLICATION_NAME': 'Jasper', 'DESKTOP_MIMES': 'MimeType='].inject(text) { String result, key, value -> result.replace(key, value) }
         }
+        assert linuxDesktopMimeTypes.startsWith('MimeType=x-scheme-handler/http;x-scheme-handler/https;text/x-java;')
+        assert linuxDesktopMimeTypes.endsWith(';') && linuxDesktopMimeTypes.substring(9).split(';').toList().with { it.size() == it.unique(false).size() }
         assert linuxDesktopEntry(template) == '[Desktop Entry]\nName=APPLICATION_NAME\nComment=APPLICATION_DESCRIPTION\n' +
             'Exec=APPLICATION_LAUNCHER --url %u\nIcon=APPLICATION_ICON\nTerminal=false\nType=Application\n' +
-            'Categories=DEPLOY_BUNDLE_CATEGORY\nMimeType=x-scheme-handler/http;x-scheme-handler/https;\n'
+            'Categories=DEPLOY_BUNDLE_CATEGORY\n' + linuxDesktopMimeTypes + '\n'
         String entry = filled(linuxDesktopEntry(template))
         assert linuxDesktopEntryProblem(entry, root, categories) == null
         String stock = linuxDesktopEntryProblem(filled(template), root, categories)
         assert stock != null && stock.contains("Exec=${root}/bin/Jasper --url %u") &&
-            stock.contains('MimeType=x-scheme-handler/http;x-scheme-handler/https;') : stock
+            stock.contains(linuxDesktopMimeTypes) : stock
         assert linuxDesktopEntryProblem(entry.replace('Terminal=false\n', ''), root, categories).contains('Terminal=false')
         assert linuxDesktopEntryProblem(entry.replace('Type=Application\n', 'Type=Link\n'), root, categories).contains('Type=Application')
         assert linuxDesktopEntryProblem(entry.replace('Name=Jasper\n', 'Name=Other\n'), root, categories).contains('Name=Jasper')
