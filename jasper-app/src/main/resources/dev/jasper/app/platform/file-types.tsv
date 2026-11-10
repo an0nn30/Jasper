@@ -17,7 +17,7 @@
 .rs	dev.jasper.rust-source	text/rust
 .js	com.netscape.javascript-source	text/javascript
 .mjs	com.netscape.javascript-source	text/javascript
-.ts		application/x-typescript
+.ts		
 .sh	public.shell-script	application/x-shellscript
 .zsh	public.zsh-script	application/x-shellscript
 .bash	public.bash-script	application/x-shellscript
