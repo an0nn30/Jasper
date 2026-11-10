@@ -23,6 +23,24 @@ class LinuxMimeTest {
         assertThat(LinuxMime.globType(List.of(), "java")).isEmpty();
     }
 
+    @Test void inheritanceFollowsTheSubclassesFilesAndStopsAtACycle() {
+        String system = """
+                application/x-ruby application/x-executable-script
+                application/x-executable-script text/plain
+                video/mp2t video/mpeg
+                application/x-loop-a application/x-loop-b
+                application/x-loop-b application/x-loop-a
+                """;
+        String user = "application/x-user text/x-csrc\ntext/x-csrc text/plain\n";
+        List<String> texts = List.of(user, system);
+        assertThat(LinuxMime.inheritsFrom(texts, "application/x-ruby", "text/plain")).as("two steps").isTrue();
+        assertThat(LinuxMime.inheritsFrom(texts, "application/x-user", "text/plain")).as("across files").isTrue();
+        assertThat(LinuxMime.inheritsFrom(texts, "video/mp2t", "text/plain")).isFalse();
+        assertThat(LinuxMime.inheritsFrom(texts, "application/x-loop-a", "text/plain")).as("a cycle").isFalse();
+        assertThat(LinuxMime.inheritsFrom(texts, "text/plain", "text/plain")).as("not its own ancestor").isFalse();
+        assertThat(LinuxMime.inheritsFrom(List.of("# comment\n\nbroken line here\n"), "broken", "text/plain")).isFalse();
+    }
+
     @Test void aCaseSensitivePatternMatchesOnlyItsOwnCase() {
         String globs2 = "50:text/x-c++src:*.C:cs\n50:text/x-csrc:*.c\n";
         assertThat(LinuxMime.globType(List.of(globs2), "c")).contains("text/x-csrc");

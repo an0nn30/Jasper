@@ -160,6 +160,15 @@ class LinuxFileAssociationsTest {
                 .isEqualTo(new Claimability.Claimable(List.of("text/x-jasper-c++-x"), true));
     }
 
+    @Test void aTypeThatInheritsFromPlainTextIsText() throws IOException {
+        write(system().resolve("mime/globs2"), "50:application/x-ruby:*.rb\n50:video/mp2t:*.m2t\n");
+        write(system().resolve("mime/subclasses"), "application/x-ruby application/x-executable-script\nvideo/mp2t video/mpeg\n");
+        write(other().resolve("mime/subclasses"), "application/x-executable-script text/plain\n");
+        LinuxFileAssociations backend = new FakeTools().backend();
+        assertThat(backend.claimability(".rb")).isEqualTo(new Claimability.Claimable(List.of("application/x-ruby"), false));
+        assertThat(backend.claimability(".m2t")).isEqualTo(new Claimability.NotClaimable(Refusal.NOT_TEXT));
+    }
+
     @Test void theHandlerIsJasperAnotherAppOrNone() throws IOException {
         write(system().resolve("applications/org.gnome.gedit.desktop"), "[Desktop Entry]\nName[de]=Texteditor\nName=Text Editor\n");
         write(other().resolve("applications/kde4/kate.desktop"), "[Desktop Entry]\nName=Kate\n");

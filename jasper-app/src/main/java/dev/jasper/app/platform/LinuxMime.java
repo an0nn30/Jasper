@@ -8,7 +8,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * The text formats of Linux file associations: shared-mime-info's {@code globs2}, the {@code mimeapps.list} the
+ * The text formats of Linux file associations: shared-mime-info's {@code globs2} and {@code subclasses}, the {@code mimeapps.list} the
  * MIME Applications Associations spec defines, the shared-mime-info package Jasper writes for its own types, and
  * desktop entries. Edits keep every byte they do not change, comments and line ends included.
  */
@@ -53,6 +53,34 @@ final class LinuxMime {
             }
         }
         return Optional.ofNullable(best);
+    }
+
+    /**
+     * Whether {@code type} inherits, through any number of steps, from {@code ancestor} in shared-mime-info's
+     * {@code subclasses} files, each line {@code <type> <parent>}. A cycle ends the search; a type is not its own
+     * ancestor.
+     *
+     * @param subclassesTexts the files' texts
+     */
+    static boolean inheritsFrom(List<String> subclassesTexts, String type, String ancestor) {
+        java.util.Map<String, java.util.Set<String>> parents = new java.util.HashMap<>();
+        for (String text : subclassesTexts) {
+            for (String line : text.split("\\R")) {
+                if (line.isBlank() || line.startsWith("#")) continue;
+                String[] fields = line.strip().split("\\s+");
+                if (fields.length != 2) continue;
+                parents.computeIfAbsent(fields[0], key -> new java.util.LinkedHashSet<>()).add(fields[1]);
+            }
+        }
+        java.util.Set<String> seen = new java.util.HashSet<>(java.util.Set.of(type));
+        java.util.ArrayDeque<String> next = new java.util.ArrayDeque<>(java.util.Set.of(type));
+        while (!next.isEmpty()) {
+            for (String parent : parents.getOrDefault(next.poll(), java.util.Set.of())) {
+                if (parent.equals(ancestor)) return true;
+                if (seen.add(parent)) next.add(parent);
+            }
+        }
+        return false;
     }
 
     /**
