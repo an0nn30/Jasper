@@ -98,6 +98,27 @@ class ToolScriptsTest {
             "inertOf.set", "animate, set", "replaceWith", "'is'", "preventScroll: true");
     }
 
+    /**
+     * D31 and D32: while the reader shows, Jasper's Find searches the article in its shadow root, which {@code reader.js}
+     * hands {@code find.js} through the reader's {@code root()}; the overlay's own sheet styles find's highlights there,
+     * with find's names and colours; and pointer, mouse, click and touch events stop at the shadow root, wheel aside.
+     */
+    @Test void theReaderAndFindShareTheArticlesRootAndTheHighlights() throws IOException {
+        String find;
+        try (var in = ToolScriptsTest.class.getResourceAsStream("/dev/jasper/browser/page/find.js")) {
+            assertThat(in).isNotNull();
+            find = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        assertThat(find).contains("const ALL = 'jasper-find', CURRENT = 'jasper-find-current';",
+            "'::highlight(' + ALL + ') { background-color: #FFFF00; color: #000000; }\\n'",
+            "'::highlight(' + CURRENT + ') { background-color: #FF9632; color: #000000; }'",
+            "Symbol.for('dev.jasper.browser.reader')", ".root()");
+        assertThat(ToolScripts.reader()).contains("::highlight(jasper-find) { background-color: #FFFF00; color: #000000; }",
+            "::highlight(jasper-find-current) { background-color: #FF9632; color: #000000; }", "root()",
+            "'pointerdown'", "'mousedown'", "'click'", "'auxclick'", "'dblclick'", "'contextmenu'", "'touchstart'")
+            .doesNotContain("'wheel'");
+    }
+
     @Test void theReaderScriptIsAsciiWithNoControlCharacterButTheNewline() {
         assertThat(ToolScripts.reader().chars().filter(c -> (c < 0x20 && c != '\n') || c >= 0x7F)).isEmpty();
         assertThat(ToolScripts.reader()).startsWith("/*").endsWith("})\n");

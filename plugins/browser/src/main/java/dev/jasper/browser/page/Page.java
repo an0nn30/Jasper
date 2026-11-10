@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntConsumer;
@@ -149,8 +150,9 @@ public final class Page implements AutoCloseable {
     private boolean loading, canGoBack, canGoForward, started, ready, closed;
     // The zoom the page shows at, as Chromium's level; read on Chromium's thread as each main-frame navigation commits.
     private volatile double zoomLevel;
-    // The page's find in page, made the first time it is asked for.
+    // The page's find in page, made the first time it is asked for; and whether its searches reach the top frame alone.
     private PageFind find;
+    private BooleanSupplier findTopFrameOnly = () -> false;
     // The DevTools made for the page last, until they end; null before and after.
     private DevTools devTools;
     // Given DevTools and a point, has Chromium make their browser through the page's and answers what closes it, or empty
@@ -707,9 +709,28 @@ public final class Page implements AutoCloseable {
     public PageFind find() {
         if (find == null) {
             find = PageFind.of(this);
+            find.searchTopFrameOnly(() -> findTopFrameOnly.getAsBoolean());
             if (closed) find.close();
         }
         return find;
+    }
+
+    /**
+     * Has the page's find search its top frame alone while {@code when} says so, as its item's reader mode asks while
+     * the article shows over the page ({@link PageFind#searchTopFrameOnly}). It replaces the one before.
+     *
+     * @param when read as each search starts, on the UI thread
+     */
+    public void findTopFrameOnly(BooleanSupplier when) {
+        findTopFrameOnly = Objects.requireNonNull(when, "when");
+    }
+
+    /**
+     * What the page shows to search has changed, as reader mode opened or closed: its find's search under way ends and
+     * its highlights go ({@link PageFind#restart}). Nothing before the find is made, or after {@link #close()}.
+     */
+    public void restartFind() {
+        if (!closed && find != null) find.restart();
     }
 
     /**
@@ -1598,6 +1619,7 @@ public final class Page implements AutoCloseable {
     /** Has the page find with {@code replacement} from now on, as a test's recording one. */
     void useFind(PageFind replacement) {
         find = Objects.requireNonNull(replacement, "replacement");
+        find.searchTopFrameOnly(() -> findTopFrameOnly.getAsBoolean());
     }
 
     /**

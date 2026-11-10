@@ -1,6 +1,7 @@
 package dev.jasper.browser.item;
 
 import dev.jasper.browser.page.Page;
+import dev.jasper.browser.page.PageFind;
 import dev.jasper.browser.page.PageTestAccess;
 import dev.jasper.browser.settings.BrowserSettings;
 import dev.jasper.browser.store.MemoryStores;
@@ -89,6 +90,44 @@ class PageToolsHostTest {
             assertThat(menu()).extracting(MenuItem::id).doesNotContain(PageTools.READER, PageTools.DISTRACTIONS);
             assertThat(host.failures()).isEmpty();
         });
+    }
+
+    /**
+     * D31: reader mode opening or closing restarts the page's find, every frame clearing its highlights, and while it
+     * shows a search reaches the top frame alone, whose overlay holds the article; once it closes, every frame again.
+     */
+    @Test void readerModeRestartsTheFindAndKeepsItToTheTopFrame() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            BrowserItem item = open("https://news.example/article");
+            show(item);
+            Page page = item.page();
+            var found = new ArrayList<String>();
+            PageFind find = PageTestAccess.recordingFind(List.of("main", "ad"), Optional.of("main"), found, new ArrayList<>());
+            PageTestAccess.useFind(page, find);
+            PageTestAccess.loadStarted(page, "https://news.example/article");
+            PageTestAccess.loadEnded(page);
+            page.toolReported("reader", "{\"op\":\"reader\",\"check\":1,\"length\":120}");
+            find.find("needle", false, false);
+            assertThat(frames(found)).containsExactly("main", "ad");
+            found.clear();
+            view().choose(BrowserToolbar.MENU, PageTools.READER);
+            assertThat(found).containsExactly("main {\"action\":\"clear\"}", "ad {\"action\":\"clear\"}");
+            assertThat(find.result()).isEmpty();
+            found.clear();
+            find.find("needle", false, false);
+            assertThat(frames(found)).as("the article's frame alone").containsExactly("main");
+            found.clear();
+            page.toolReported("reader", "{\"op\":\"reader\",\"check\":1,\"state\":\"off\"}");
+            assertThat(found).containsExactly("main {\"action\":\"clear\"}");
+            found.clear();
+            find.find("needle", false, false);
+            assertThat(frames(found)).containsExactly("main", "ad");
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    private static List<String> frames(List<String> ran) {
+        return ran.stream().map(each -> each.substring(0, each.indexOf(' '))).toList();
     }
 
     /** F24: an item whose page is not showing, as a background tab's, checks its page once it shows. */

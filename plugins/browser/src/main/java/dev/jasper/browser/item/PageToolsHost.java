@@ -19,12 +19,17 @@ import java.util.function.IntSupplier;
  * One browser item's page tools (spec section 10, plan 7's F38): its page's {@link PageTools}, wired to the page's load
  * starts, load ends, address changes and tools reports, and their items first in the menu button. Reader Mode runs
  * through it, and shows the article in the workspace theme's colours as they are when it shows, as Jasper's own pages
- * take them ({@link PageHtml#colours(WorkspacePalette, String)}). Its item tells it each time its page shows, so a page
- * that finished loading in a background tab is checked then. UI thread.
+ * take them ({@link PageHtml#colours(WorkspacePalette, String)}). While the article shows, the page's find searches its
+ * top frame alone, where the overlay is, and the find starts again as reader mode opens and closes. Its item tells it
+ * each time its page shows, so a page that finished loading in a background tab is checked then. UI thread.
  */
 final class PageToolsHost implements AutoCloseable {
+    private final Page page;
+    private final Runnable render;
     private final PageTools tools;
     private final List<Subscription> heard;
+    // Whether reader mode was on when the tools last changed: its opening or closing restarts the page's find.
+    private boolean reading;
 
     /**
      * The tools of {@code page}.
@@ -36,10 +41,12 @@ final class PageToolsHost implements AutoCloseable {
      * @param render draws the item again, as the tools' items change
      */
     PageToolsHost(Page page, Appearance appearance, IntSupplier zoom, BiFunction<Duration, Runnable, Runnable> later, Runnable render) {
-        Objects.requireNonNull(page, "page");
+        this.page = Objects.requireNonNull(page, "page");
+        this.render = Objects.requireNonNull(render, "render");
         Objects.requireNonNull(appearance, "appearance");
         tools = new PageTools(page::run, () -> readerCss(appearance.workspacePalette(), appearance.workspaceVariant() == Variant.DARK),
-            zoom, page.view()::isShowing, later, page::focus, render);
+            zoom, page.view()::isShowing, later, page::focus, this::changed);
+        page.findTopFrameOnly(tools::reading);
         heard = List.of(page.onLoadStart(tools::loadStarted), page.onLoadEnd(tools::loaded), page.onAddressChange(tools::addressChanged),
             page.onToolReport(tools::reported));
     }
@@ -69,6 +76,18 @@ final class PageToolsHost implements AutoCloseable {
             }
         }
         return true;
+    }
+
+    /**
+     * The tools' items changed: as reader mode opens or closes, the page's find starts again, as it then searches the
+     * article in the overlay, or the page again (ruling D31); then the item draws.
+     */
+    private void changed() {
+        if (tools.reading() != reading) {
+            reading = tools.reading();
+            page.restartFind();
+        }
+        render.run();
     }
 
     /** The item's page shows: a check that waited for it runs. */

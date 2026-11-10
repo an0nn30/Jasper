@@ -19,15 +19,19 @@
  *   attribute, gives way to its children, so none of the page's element definitions runs inside the overlay. The
  *   overlay scrolls by itself and takes the focus, and a link to a fragment of the document scrolls the overlay to its
  *   target there. Until the overlay closes, the page's own scrolling is held, its body is inert, so neither Tab nor a
- *   click nor find reaches it, and every key the user presses stops at the window's capture listeners, its default
- *   action kept, so the page's own shortcuts do not act behind the overlay. A capture listener the page added to the
- *   window earlier still hears the keys first. Escape closes the overlay, is stopped and prevented, its keyup is
- *   swallowed, and Jasper is told {check: token, state: "off"}; so is a show that finds no article.
+ *   click reaches it, and every key the user presses stops at the window's capture listeners, its default action
+ *   kept, so the page's own shortcuts do not act behind the overlay. A capture listener the page added to the window
+ *   earlier still hears the keys first. A pointer, mouse, click or touch event in the overlay stops at its shadow root,
+ *   its default action kept, so the page's own listeners never hear it; a wheel goes on. Escape closes the overlay, is
+ *   stopped and prevented, and Jasper is told {check: token, state: "off"}, as for a show that finds no article; the
+ *   overlay's listeners stay until Escape's keyup, which they swallow, or until their end, as the page goes or the
+ *   reader shows again, whichever comes first.
  * - "hide": the overlay closes; the page scrolls, takes keys and clicks again, and its earlier focus comes back.
  *
  * The reader is made once per document, kept under window[Symbol.for('dev.jasper.browser.reader')], and calls the
- * built-ins as they were when it was made. The page's own scripts share this world, so they can see and undo all of
- * it, and what they send Jasper is untrusted.
+ * built-ins as they were when it was made; its root() is the overlay's shadow root while it shows, else null, where
+ * Jasper's find in page (find.js) then searches, and its sheet styles find's highlights there, as find.js colours them.
+ * The page's own scripts share this world, so they can see and undo all of it, and what they send Jasper is untrusted.
  */
 (function (command, token, css) {
   'use strict';
@@ -61,6 +65,11 @@
     const DROPPED = 'script, iframe, frame, frameset, object, embed, form, style, link, meta, base, animate, set';
     const DIRECTIONS = ['ltr', 'rtl', 'auto'];
     const OVERFLOW = ['overflow-x', 'overflow-y'];
+    // What stops at the overlay's shadow root: the page's listeners never hear the reader's pointer, mouse, click and
+    // touch events. A wheel is not among them.
+    const INPUT = ['pointerdown', 'pointerup', 'pointermove', 'pointerover', 'pointerout', 'pointercancel', 'mousedown', 'mouseup',
+      'mousemove', 'mouseover', 'mouseout', 'click', 'auxclick', 'dblclick', 'contextmenu', 'touchstart', 'touchend', 'touchmove',
+      'touchcancel'];
     const WHITE = /\s+/g, IGNORED = /[\x00-\x20\x7f]+/g, SCRIPTED = /^javascript:/i;
     const LAYOUT = `
 :host {
@@ -87,6 +96,8 @@ pre { overflow: auto; padding: 12px 16px; border: 1px solid var(--border); borde
 table { display: block; overflow-x: auto; border-collapse: collapse; }
 th, td { padding: 4px 8px; border: 1px solid var(--border); }
 hr { border: 0; border-top: 1px solid var(--border); }
+::highlight(jasper-find) { background-color: #FFFF00; color: #000000; }
+::highlight(jasper-find-current) { background-color: #FF9632; color: #000000; }
 `;
 
     const apply = Reflect.apply, describe = Object.getOwnPropertyDescriptor, freeze = Object.freeze;
@@ -123,7 +134,8 @@ hr { border: 0; border-top: 1px solid var(--border); }
     const keyOf = getter(KeyEvents, 'key'), buttonOf = getter(MouseEvents, 'button');
     const modifiers = [getter(MouseEvents, 'ctrlKey'), getter(MouseEvents, 'metaKey'), getter(MouseEvents, 'shiftKey'),
       getter(MouseEvents, 'altKey')];
-    const stop = Events.prototype.stopImmediatePropagation, prevent = Events.prototype.preventDefault, targetOf = getter(Events, 'target');
+    const stop = Events.prototype.stopImmediatePropagation, stopHere = Events.prototype.stopPropagation,
+      prevent = Events.prototype.preventDefault, targetOf = getter(Events, 'target'), typeOf = getter(Events, 'type');
     const setProperty = Styles.prototype.setProperty, removeProperty = Styles.prototype.removeProperty,
       getPropertyValue = Styles.prototype.getPropertyValue, getPropertyPriority = Styles.prototype.getPropertyPriority;
     const replace = String.prototype.replace, trim = String.prototype.trim, slice = String.prototype.slice,
@@ -131,17 +143,18 @@ hr { border: 0; border-top: 1px solid var(--border); }
       includes = Array.prototype.includes, decode = decodeURIComponent;
     const page = document;
     const needed = [replaceSync, rootOf, bodyOf, activeOf, urlOf, attachShadow, replaceWith, closest, boundsOf, localNameOf, styleOf,
-      hrefOf, childrenOf, connectedOf, keyOf, buttonOf, targetOf, modifiers[0], modifiers[1], modifiers[2], modifiers[3]];
+      hrefOf, childrenOf, connectedOf, keyOf, buttonOf, targetOf, typeOf, stopHere, modifiers[0], modifiers[1], modifiers[2],
+      modifiers[3]];
     for (let at = 0; at < needed.length; at++) if (typeof needed[at] !== 'function') return null;
     if (!adopted || typeof adopted.set !== 'function' || !textOf || typeof textOf.set !== 'function' || !scrollTop
         || typeof scrollTop.get !== 'function' || typeof scrollTop.set !== 'function' || !inertOf || typeof inertOf.get !== 'function'
         || typeof inertOf.set !== 'function') return null;
 
-    // The overlay while it shows: its element, its shadow root's scroller, the token its Escape reports, and what it
-    // changed in the page, each with what undoes it.
+    // The overlay while it shows: its element, its shadow root and the root's scroller, the token its Escape reports,
+    // and what it changed in the page, each with what undoes it.
     let shown = null;
-    // Whether Escape closed the overlay and its keyup is still to come.
-    let escaping = false;
+    // An overlay Escape closed, whose listeners wait for Escape's keyup.
+    let closing = null;
 
     /** Tells Jasper {@code fields}, through the opener bridge; a failure tells nothing, and the page goes on. */
     function report(fields) {
@@ -207,12 +220,17 @@ hr { border: 0; border-top: 1px solid var(--border); }
         report({op: 'reader', check: token, state: 'off'});
         return;
       }
-      endEscaping();
-      let host = null;
-      const held = [];
+      if (closing !== null) {
+        end(closing);
+        closing = null;
+      }
+      const now = {host: null, root: null, scroller: null, token, held: []};
       try {
-        host = apply(createElement, page, ['div']);
+        const host = apply(createElement, page, ['div']);
+        now.host = host;
         const root = apply(attachShadow, host, [{mode: 'open'}]);
+        now.root = root;
+        for (let at = 0; at < INPUT.length; at++) apply(listen, root, [INPUT[at], onInput, {passive: true}]);
         const sheet = new Sheets();
         apply(replaceSync, sheet, [css + '\n' + LAYOUT]);
         apply(adopted.set, root, [[sheet]]);
@@ -229,9 +247,10 @@ hr { border: 0; border-top: 1px solid var(--border); }
         apply(appendChild, scroller, [body]);
         apply(appendChild, root, [scroller]);
         apply(listen, scroller, ['click', onClick, false]);
-        hold(held);
+        now.scroller = scroller;
+        hold(now.held);
         apply(appendChild, apply(rootOf, page, []), [host]);
-        shown = {host, scroller, token, held};
+        shown = now;
         apply(listen, window, ['keydown', onKeyDown, true]);
         apply(listen, window, ['keypress', onKey, true]);
         apply(listen, window, ['keyup', onKey, true]);
@@ -239,34 +258,49 @@ hr { border: 0; border-top: 1px solid var(--border); }
         apply(focus, scroller, [{preventScroll: true}]);
       } catch (failed) {
         shown = null;
-        end(host, held);
+        close(now);
+        end(now);
         report({op: 'reader', check: token, state: 'off'});
       }
     }
 
-    /** The overlay closes, and the page has its scrolling, keys, clicks and earlier focus again. */
+    /**
+     * The overlay closes, and the page has its scrolling, keys, clicks and earlier focus again; for an overlay Escape
+     * closed already, as the page goes, its listeners end.
+     */
     function hide() {
       const now = shown;
-      if (now === null) return;
-      shown = null;
-      end(now.host, now.held);
+      if (now !== null) {
+        shown = null;
+        close(now);
+        end(now);
+      } else if (closing !== null) {
+        end(closing);
+        closing = null;
+      }
     }
 
-    function end(host, held) {
+    /** {@code now}'s overlay leaves the page, and what it changed there is undone. */
+    function close(now) {
+      try {
+        if (now.host !== null) apply(remove, now.host, []);
+      } catch (kept) {
+        // An overlay the page took away is gone already.
+      }
+      restore(now.held);
+    }
+
+    /** {@code now}'s listeners end: the window's, and its shadow root's. */
+    function end(now) {
       try {
         apply(unlisten, window, ['keydown', onKeyDown, true]);
         apply(unlisten, window, ['keypress', onKey, true]);
         apply(unlisten, window, ['keyup', onKey, true]);
         apply(unlisten, window, ['pagehide', hide, true]);
+        if (now.root !== null) for (let at = 0; at < INPUT.length; at++) apply(unlisten, now.root, [INPUT[at], onInput, false]);
       } catch (kept) {
         // A listener the page took away is gone already.
       }
-      try {
-        if (host !== null) apply(remove, host, []);
-      } catch (kept) {
-        // An overlay the page took away is gone already.
-      }
-      restore(held);
     }
 
     /**
@@ -278,38 +312,36 @@ hr { border: 0; border-top: 1px solid var(--border); }
       apply(stop, event, []);
       if (apply(keyOf, event, []) !== 'Escape') return;
       apply(prevent, event, []);
-      const token = shown.token;
-      hide();
-      escaping = true;
-      apply(listen, window, ['keydown', onAfterEscape, true]);
-      apply(listen, window, ['keyup', onAfterEscape, true]);
-      report({op: 'reader', check: token, state: 'off'});
-    }
-
-    /** A keypress or keyup the user made while the overlay shows stops here, its default action kept. */
-    function onKey(event) {
-      if (shown !== null && event.isTrusted === true) apply(stop, event, []);
+      const now = shown;
+      shown = null;
+      close(now);
+      closing = now;
+      report({op: 'reader', check: now.token, state: 'off'});
     }
 
     /**
-     * After Escape closed the overlay: its keyup stops here too, as its keydown did; the first key event after it, that
-     * keyup or another key's, ends the wait.
+     * A keypress or keyup the user made while the overlay shows stops here, its default action kept. After Escape
+     * closed the overlay, its keyup stops here too, and the overlay's listeners end with it.
      */
-    function onAfterEscape(event) {
-      if (!escaping || event.isTrusted !== true) return;
-      if (apply(keyOf, event, []) === 'Escape' && event.type === 'keyup') apply(stop, event, []);
-      endEscaping();
+    function onKey(event) {
+      if (event.isTrusted !== true) return;
+      if (shown !== null) {
+        apply(stop, event, []);
+      } else if (closing !== null && apply(typeOf, event, []) === 'keyup' && apply(keyOf, event, []) === 'Escape') {
+        apply(stop, event, []);
+        end(closing);
+        closing = null;
+      }
     }
 
-    function endEscaping() {
-      if (!escaping) return;
-      escaping = false;
-      try {
-        apply(unlisten, window, ['keydown', onAfterEscape, true]);
-        apply(unlisten, window, ['keyup', onAfterEscape, true]);
-      } catch (kept) {
-        // A listener the page took away is gone already.
-      }
+    /** A pointer, mouse, click or touch event in the overlay goes no further than its shadow root, its default kept. */
+    function onInput(event) {
+      apply(stopHere, event, []);
+    }
+
+    /** The overlay's shadow root while it shows, where find searches; null otherwise. */
+    function root() {
+      return shown === null ? null : shown.root;
     }
 
     /**
@@ -452,6 +484,6 @@ hr { border: 0; border-top: 1px solid var(--border); }
       }
     }
 
-    return freeze({check, show, hide});
+    return freeze({check, show, hide, root});
   }
 })
