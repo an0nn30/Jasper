@@ -75,6 +75,15 @@ final class WindowChrome {
     private final Map<String, JMenuItem> keyed = new java.util.HashMap<>();
     /** What choosing each keyed command runs now: the newest model's, so a shown item never runs an older snapshot's. */
     private final Map<String, Runnable> choices = new java.util.HashMap<>();
+    /**
+     * Tells this chrome that one of its window's menus closed ({@link #menuClosed}), a turn later: once Swing has cleared
+     * the rest of the selection path and a chosen item's action has run.
+     */
+    private final MenuListener closing = new MenuListener() {
+        @Override public void menuSelected(MenuEvent event) {}
+        @Override public void menuDeselected(MenuEvent event) { SwingUtilities.invokeLater(WindowChrome.this::menuClosed); }
+        @Override public void menuCanceled(MenuEvent event) { SwingUtilities.invokeLater(WindowChrome.this::menuClosed); }
+    };
     /** The current item's plugin the last menu pass built for, which decides its content menus; null for none. */
     private String menuContent;
 
@@ -131,6 +140,9 @@ final class WindowChrome {
         visibility.add(modes); visibility.add(statusVisible); visibility.add(railVisible);
         statusVisible.setAction(owner.action(ActionId.TOGGLE_STATUS_BAR));
         railVisible.setAction(owner.action(ActionId.TOGGLE_RAIL));
+        // The folded bar's More and hamburger menus open and close without any folded menu opening (review round 1, D14).
+        menuBar.overflowMenu().addMenuListener(closing);
+        menuBar.hamburgerMenu().addMenuListener(closing);
         pluginSeparator.setName("pluginSeparator");
         composition.build(this);
         owner.action(ActionId.COMMAND_PALETTE).addPropertyChangeListener(event -> {
@@ -448,7 +460,8 @@ final class WindowChrome {
      */
     void contributionsChanged() {
         refreshKeyed();
-        if (!menuShape().equals(builtShape)) renderContributedMenus();
+        // A pass that waits runs now if it can (D14): no close event may have come, and the shape may be back where it was.
+        if (menusWaiting || !menuShape().equals(builtShape)) renderContributedMenus();
     }
 
     /**
@@ -467,7 +480,9 @@ final class WindowChrome {
             do {
                 menusDirty = false;
                 rebuildContributedMenus();
-            } while (menusDirty);
+            } while (menusDirty && !menuOpen());
+            // A menu opened during the pass: the change made meanwhile waits for it, as any other does.
+            if (menusDirty) menusWaiting = true;
         } finally {
             renderingMenus = false;
         }
@@ -507,7 +522,12 @@ final class WindowChrome {
      * A menu of this window closed, a turn before: a pass that waited for it runs now, unless another of the window's
      * menus is open by then.
      */
-    private void menuClosed() { if (menusWaiting && !menuOpen()) renderContributedMenus(); }
+    private void menuClosed() {
+        if (!menusWaiting || menuOpen()) return;
+        // A closed fold menu puts its menus back in the bar a turn later too; the pass needs them there first.
+        menuBar.restoreMenus();
+        renderContributedMenus();
+    }
 
     /** Runs what choosing the keyed command {@code key} runs now, while the window takes input; nothing for a vanished one. */
     private void choose(String key) {
@@ -515,22 +535,31 @@ final class WindowChrome {
         if (chosen != null && !owner.closed() && !dev.jasper.app.platform.WindowInput.blocked(owner)) chosen.run();
     }
 
-    /** Gives the keyed items and submenus the last pass built their newest text and enabled state, and the commands their newest choices. */
+    /**
+     * Gives the keyed items and submenus the last pass built their newest text and enabled state, and the commands their
+     * newest choices. One whose key left the model is disabled until the next pass removes it: choosing it does nothing.
+     */
     private void refreshKeyed() {
         choices.clear();
         if (contributions == null) return;
+        var seen = new java.util.HashSet<String>();
         for (MenuSection section : contributions.model().menus())
-            if (section.target().type() != MenuTarget.Type.CONTEXT) refreshKeyed(section.entries());
+            if (section.target().type() != MenuTarget.Type.CONTEXT) refreshKeyed(section.entries(), seen);
+        keyed.forEach((key, item) -> { if (!seen.contains(key) && item.isEnabled()) item.setEnabled(false); });
     }
 
-    private void refreshKeyed(List<MenuEntry> entries) {
+    private void refreshKeyed(List<MenuEntry> entries, java.util.Set<String> seen) {
         for (MenuEntry entry : entries) {
             if (entry instanceof MenuEntry.Command command) {
+                seen.add(command.key());
                 choices.put(command.key(), command.chosen());
                 show(keyed.get(command.key()), command.label(), command.enabled());
             } else if (entry instanceof MenuEntry.Submenu submenu) {
-                if (!submenu.key().isEmpty()) show(keyed.get(submenu.key()), submenu.title(), submenu.enabled());
-                refreshKeyed(submenu.entries());
+                if (!submenu.key().isEmpty()) {
+                    seen.add(submenu.key());
+                    show(keyed.get(submenu.key()), submenu.title(), submenu.enabled());
+                }
+                refreshKeyed(submenu.entries(), seen);
             }
         }
     }
@@ -858,10 +887,10 @@ final class WindowChrome {
         NativeStyles.installed().menu(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
         menu.addMenuListener(new MenuListener() {
             @Override public void menuSelected(MenuEvent event) { owner.updateActions(); refreshPaneMoves(menu); }
-            // Later, once Swing has cleared the rest of the selection path and a chosen item's action has run.
-            @Override public void menuDeselected(MenuEvent event) { SwingUtilities.invokeLater(WindowChrome.this::menuClosed); }
-            @Override public void menuCanceled(MenuEvent event) { SwingUtilities.invokeLater(WindowChrome.this::menuClosed); }
+            @Override public void menuDeselected(MenuEvent event) {}
+            @Override public void menuCanceled(MenuEvent event) {}
         });
+        menu.addMenuListener(closing);
         return menu;
     }
 

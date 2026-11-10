@@ -111,7 +111,9 @@ class WindowChromeMenuEntriesTest {
             section.set(model.addMenuSection(MenuTarget.topLevel("dev.x.downloads", "Downloads")));
             section.get().set(downloads("a.zip \u2014 40%", true, () -> { }));
             shown.set(menu(owner.get(), "Downloads"));
-            MenuSelectionManager.defaultManager().setSelectedPath(new MenuElement[]{owner.get().menuBar(), shown.get()});
+            // Swing's selection path alone: it starts at this window's menu bar, and no menu of it is selected.
+            MenuSelectionManager.defaultManager().setSelectedPath(new MenuElement[]{owner.get().menuBar()});
+            assertThat(owner.get().chrome().menuBar().menus()).noneMatch(JMenu::isSelected);
 
             section.get().set(twoDownloads("a.zip \u2014 40%"));
             assertThat(menu(owner.get(), "Downloads")).as("no rebuild while the selection path is set").isSameAs(shown.get());
@@ -119,14 +121,18 @@ class WindowChromeMenuEntriesTest {
             section.get().set(twoDownloads("a.zip \u2014 50%"));
             assertThat(((JMenu) shown.get().getMenuComponent(2)).getText()).as("a label still changes in place")
                 .isEqualTo("a.zip \u2014 50%");
+            // Clearing a path that selected no menu tells no menu it closed: the next change applies what waited (D14).
             MenuSelectionManager.defaultManager().clearSelectedPath();
-            assertThat(menu(owner.get(), "Downloads")).as("the rebuild waits for the turn after the menu closed").isSameAs(shown.get());
+            assertThat(menu(owner.get(), "Downloads")).as("no close event came").isSameAs(shown.get());
+            section.get().set(twoDownloads("a.zip \u2014 51%"));
+            JMenu rebuilt = menu(owner.get(), "Downloads");
+            assertThat(rebuilt).as("rebuilt at the next change").isNotSameAs(shown.get());
+            assertThat(items(rebuilt)).containsExactly("Clear All", "---", "submenu:a.zip \u2014 51%", "submenu:b.zip \u2014 1.2 MB");
+            shown.set(rebuilt);
         });
         edt(() -> {
             JMenu rebuilt = menu(owner.get(), "Downloads");
-            assertThat(rebuilt).as("rebuilt once the menu closed").isNotSameAs(shown.get());
-            assertThat(items(rebuilt)).containsExactly("Clear All", "---", "submenu:a.zip \u2014 50%", "submenu:b.zip \u2014 1.2 MB");
-            shown.set(rebuilt);
+            assertThat(rebuilt).isSameAs(shown.get());
 
             // macOS's screen menu bar: JBR selects the open top-level menu, and Swing's selection path stays empty.
             rebuilt.setSelected(true);
@@ -145,6 +151,155 @@ class WindowChromeMenuEntriesTest {
             section.get().set(twoDownloads("a.zip \u2014 Finished"));
             assertThat(menu(owner.get(), "Downloads")).as("another window's open menu holds nothing back").isNotSameAs(rebuilt);
             assertThat(items(menu(owner.get(), "Downloads"))).hasSize(4);
+        });
+    }
+
+    /**
+     * Review round 1 (D14a): on Windows and Linux a narrow window folds its menus into More, which opens and closes
+     * without any folded menu opening; its closing still lets a held change through, a turn later, its menus back in the bar.
+     */
+    @Test void aClosedOverflowMenuLetsAHeldChangeThrough() throws Exception {
+        var model = new Contributions();
+        var owner = new AtomicReference<WindowContent>();
+        var section = new AtomicReference<MenuSection>();
+        var shown = new AtomicReference<JMenu>();
+        edt(() -> {
+            owner.set(window(model));
+            section.set(model.addMenuSection(MenuTarget.topLevel("dev.x.downloads", "Downloads")));
+            section.get().set(downloads("a.zip \u2014 40%", true, () -> { }));
+            shown.set(menu(owner.get(), "Downloads"));
+            CollapsingMenuBar bar = owner.get().chrome().menuBar();
+            MenuSelectionManager.defaultManager().setSelectedPath(new MenuElement[]{bar, bar.overflowMenu()});
+            section.get().set(twoDownloads("a.zip \u2014 40%"));
+            assertThat(menu(owner.get(), "Downloads")).as("held while More is open").isSameAs(shown.get());
+            MenuSelectionManager.defaultManager().clearSelectedPath();
+        });
+        edt(() -> {
+            CollapsingMenuBar bar = owner.get().chrome().menuBar();
+            JMenu rebuilt = menu(owner.get(), "Downloads");
+            assertThat(rebuilt).as("rebuilt once More closed").isNotSameAs(shown.get());
+            assertThat(items(rebuilt)).hasSize(4);
+            assertThat(bar.overflowMenu().getMenuComponentCount()).as("the folded menus went back").isZero();
+            assertThat(bar.menus()).allSatisfy(each -> assertThat(each.getParent()).isSameAs(bar));
+        });
+    }
+
+    /**
+     * Review round 1 (D14b): a held pass runs at the next change even when the model came back to the shape the menus were
+     * built from, as a placed action removed and registered again under its id does; the item then has the new action.
+     */
+    @Test void aHeldPassRunsAtTheNextChangeEvenWhenTheShapeCameBack() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            WindowContent owner = window(model);
+            var run = model.addAction("dev.x.run", "Run", null, List.of(), Optional.empty(), invocation -> { });
+            model.addMenuSection(MenuTarget.standard(MenuTarget.Slot.TOOLS)).set(List.of(new MenuEntry.Item("dev.x.run")));
+            JMenuItem before = (JMenuItem) menu(owner, "Tools").getMenuComponent(0);
+            // A menu that closes without telling its menus: the path alone.
+            MenuSelectionManager.defaultManager().setSelectedPath(new MenuElement[]{owner.menuBar()});
+            run.close();
+            model.addAction("dev.x.run", "Run Again", null, List.of(), Optional.empty(), invocation -> { });
+            MenuSelectionManager.defaultManager().clearSelectedPath();
+            assertThat(before.isEnabled()).as("the removed action").isFalse();
+
+            model.addAction("dev.x.unplaced", "Unplaced", null, List.of(), Optional.empty(), invocation -> { });
+            JMenuItem now = (JMenuItem) menu(owner, "Tools").getMenuComponent(0);
+            assertThat(now).as("rebuilt at the next change").isNotSameAs(before);
+            assertThat(now.getAction()).isNotSameAs(before.getAction());
+            assertThat(now.isEnabled()).isTrue();
+            assertThat(now.getText()).isEqualTo("Run Again");
+        });
+    }
+
+    /** Review round 1 (Minor 1): a kept entry that left the model while a menu is open is disabled at once. */
+    @Test void aVanishedEntryIsDisabledAtOnce() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            WindowContent owner = window(model);
+            MenuSection section = model.addMenuSection(MenuTarget.topLevel("dev.x.downloads", "Downloads"));
+            section.set(twoDownloads("a.zip \u2014 40%"));
+            JMenu shown = menu(owner, "Downloads");
+            JMenu file = (JMenu) shown.getMenuComponent(2), second = (JMenu) shown.getMenuComponent(3);
+            JMenuItem stop = (JMenuItem) file.getMenuComponent(0);
+            MenuSelectionManager.defaultManager().setSelectedPath(new MenuElement[]{owner.menuBar(), shown});
+            section.set(List.of(new MenuEntry.Command("dev.x/1/clear", "Clear All", true, () -> { }), new MenuEntry.Separator(),
+                new MenuEntry.Submenu("dev.x/1/a", "a.zip \u2014 Finished", true,
+                    List.of(new MenuEntry.Command("dev.x/1/a.open", "Open", true, () -> { })))));
+            assertThat(menu(owner, "Downloads")).as("held").isSameAs(shown);
+            assertThat(file.getText()).isEqualTo("a.zip \u2014 Finished");
+            assertThat(stop.isEnabled()).as("Stop left the model").isFalse();
+            assertThat(second.isEnabled()).as("so did the second download").isFalse();
+            assertThat(((JMenuItem) shown.getMenuComponent(0)).isEnabled()).as("Clear All stays").isTrue();
+        });
+    }
+
+    /**
+     * Review round 1 (Minor 2): a change made during a pass, once a menu of the window has opened meanwhile, waits for that
+     * menu as any other change does, and the next change applies it.
+     */
+    @Test void aChangeDuringAPassWaitsWhenAMenuOpensMeanwhile() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            WindowContent owner = window(model);
+            MenuSection section = model.addMenuSection(MenuTarget.topLevel("dev.x.downloads", "Downloads"));
+            section.set(downloads("a.zip \u2014 40%", true, () -> { }));
+            boolean[] once = {false};
+            owner.menuBar().addContainerListener(new java.awt.event.ContainerAdapter() {
+                @Override public void componentAdded(java.awt.event.ContainerEvent event) {
+                    if (once[0]) return;
+                    once[0] = true;
+                    MenuSelectionManager.defaultManager().setSelectedPath(new MenuElement[]{owner.menuBar()});
+                    section.set(twoDownloads("a.zip \u2014 40%"));
+                }
+            });
+            owner.chrome().renderContributedMenus();
+            assertThat(once[0]).isTrue();
+            assertThat(items(menu(owner, "Downloads"))).as("the nested change waits for the open menu").hasSize(3);
+            MenuSelectionManager.defaultManager().clearSelectedPath();
+            section.set(twoDownloads("a.zip \u2014 41%"));
+            assertThat(items(menu(owner, "Downloads"))).containsExactly("Clear All", "---", "submenu:a.zip \u2014 41%",
+                "submenu:b.zip \u2014 1.2 MB");
+        });
+    }
+
+    /** Review round 1 (Minor 4, D13): renaming and disabling a placed action keeps the built menu and item. */
+    @Test void aPlacedActionsRenameAndDisableKeepItsItem() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            WindowContent owner = window(model);
+            var run = model.addAction("dev.x.run", "Run", null, List.of(), Optional.empty(), invocation -> { });
+            model.addMenuSection(MenuTarget.topLevel("dev.x.tool", "Tool")).set(List.of(new MenuEntry.Item("dev.x.run")));
+            JMenu tool = menu(owner, "Tool");
+            JMenuItem item = (JMenuItem) tool.getMenuComponent(0);
+            run.setTitle("Run Again");
+            run.setEnabled(false);
+            assertThat(menu(owner, "Tool")).isSameAs(tool);
+            assertThat(tool.getMenuComponent(0)).isSameAs(item);
+            assertThat(item.getText()).isEqualTo("Run Again");
+            assertThat(item.isEnabled()).isFalse();
+        });
+    }
+
+    /** Review round 1 (Minor 4, D13): an action a menu places, registered while a menu is open, shows once it closes. */
+    @Test void aPlacedActionAddedWhileAMenuIsOpenWaits() throws Exception {
+        var model = new Contributions();
+        var owner = new AtomicReference<WindowContent>();
+        var shown = new AtomicReference<JMenu>();
+        edt(() -> {
+            owner.set(window(model));
+            model.addAction("dev.x.run", "Run", null, List.of(), Optional.empty(), invocation -> { });
+            model.addMenuSection(MenuTarget.standard(MenuTarget.Slot.TOOLS))
+                .set(List.of(new MenuEntry.Item("dev.x.run"), new MenuEntry.Item("dev.x.later")));
+            shown.set(menu(owner.get(), "Tools"));
+            MenuSelectionManager.defaultManager().setSelectedPath(new MenuElement[]{owner.get().menuBar(), shown.get()});
+            model.addAction("dev.x.later", "Later", null, List.of(), Optional.empty(), invocation -> { });
+            assertThat(menu(owner.get(), "Tools")).as("held").isSameAs(shown.get());
+            assertThat(items(shown.get())).containsExactly("Run");
+            MenuSelectionManager.defaultManager().clearSelectedPath();
+        });
+        edt(() -> {
+            assertThat(menu(owner.get(), "Tools")).as("rebuilt once it closed").isNotSameAs(shown.get());
+            assertThat(items(menu(owner.get(), "Tools"))).containsExactly("Run", "Later");
         });
     }
 
