@@ -26,6 +26,8 @@ final class FileTypeCatalog {
 
     private record Types(List<String> mac, List<String> linux) {}
 
+    private static final java.util.regex.Pattern EXTENSION_BODY = java.util.regex.Pattern.compile("[a-z0-9_+-]{1,16}");
+    private static final Set<String> REFUSED = Set.of(".html", ".htm");
     private static final String RESOURCE = "file-types.tsv";
     private static final class Holder {
         static final FileTypeCatalog BUILT_IN = load();
@@ -69,10 +71,22 @@ final class FileTypeCatalog {
                 if (cols.length != 5 || cols[1].isBlank() || cols[2].isBlank() || cols[3].isBlank()) {
                     throw bad(number, line, "an import line needs 5 columns");
                 }
-                imports.add(new Import(cols[1], cols[2], split(cols[3]), cols[4]));
+                List<String> importExtensions = split(cols[3]);
+                for (String extension : importExtensions) {
+                    if (!EXTENSION_BODY.matcher(extension).matches()) {
+                        throw bad(number, line, "invalid import extension " + extension);
+                    }
+                }
+                imports.add(new Import(cols[1], cols[2], importExtensions, cols[4]));
             } else {
-                if (cols.length != 3 || !cols[0].startsWith(".") || cols[0].length() < 2) {
-                    throw bad(number, line, "a type line needs a dotted extension and 3 columns");
+                if (cols.length != 3) {
+                    throw bad(number, line, "a type line needs 3 columns");
+                }
+                if (!cols[0].startsWith(".") || !EXTENSION_BODY.matcher(cols[0].substring(1)).matches()) {
+                    throw bad(number, line, "invalid extension " + cols[0]);
+                }
+                if (REFUSED.contains(cols[0])) {
+                    throw bad(number, line, "extension " + cols[0] + " is not claimed");
                 }
                 if (types.put(cols[0], new Types(split(cols[1]), split(cols[2]))) != null) {
                     throw bad(number, line, "duplicate extension " + cols[0]);
