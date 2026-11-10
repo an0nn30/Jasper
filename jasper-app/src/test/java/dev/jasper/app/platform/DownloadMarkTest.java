@@ -172,10 +172,14 @@ class DownloadMarkTest {
         assertThat(file).hasContent("zip");
     }
 
+    /**
+     * The earlier mark is written through setxattr, never {@code /usr/bin/xattr -w}: Cortex XDR's
+     * {@code mac.xattr_add_motw} rule kills the whole process tree that runs that command.
+     */
     @Test @EnabledOnOs(OS.MAC) void onMacOsAMarkAlreadyThereIsKept() throws Exception {
         Path file = download("report.zip");
         String chrome = "0081;6543210f;Chrome;0F8FAD5B-D9CB-469F-A165-70867728950E";
-        xattr("-w", DownloadMark.QUARANTINE, chrome, file.toString());
+        DownloadMark.quarantine(file, chrome, DownloadMark.Setxattr.SYSTEM);
         DownloadMark.apply(file, SOURCE, PAGE, System.getProperty("os.name"));
         assertThat(xattr("-p", DownloadMark.QUARANTINE, file.toString())).isEqualTo(chrome + "\n");
     }
