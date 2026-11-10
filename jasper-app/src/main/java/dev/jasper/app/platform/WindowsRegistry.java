@@ -26,7 +26,8 @@ final class WindowsRegistry {
     private static final int KEY_READ = 0x20019;
     private static final int SHCNE_ASSOCCHANGED = 0x08000000;
     private static final int SHCNF_IDLIST = 0;
-    private static final int ASSOCF_NONE = 0;
+    /** Ignores the OpenWith host Windows falls back to for an unregistered extension or a dangling ProgId. */
+    private static final int ASSOCF_INIT_IGNOREUNKNOWN = 0x400;
     private static final int ASSOCSTR_FRIENDLYAPPNAME = 4;
     private static final int S_OK = 0;
     private static final int BUFFER_CHARS = 1024;
@@ -83,13 +84,16 @@ final class WindowsRegistry {
         }
     }
 
-    /** The display name of the application that opens {@code extension} (with its dot); empty when Windows has none. */
+    /**
+     * The display name of the application that opens {@code extension} (with its dot); empty when Windows has none, or
+     * only the OpenWith host ("Pick an app"), which {@code ASSOCF_INIT_IGNOREUNKNOWN} leaves out.
+     */
     static Optional<String> friendlyAppName(String extension) throws IOException {
         requireWindows();
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment buffer = arena.allocate((long) BUFFER_CHARS * 2);
             MemorySegment length = arena.allocateFrom(ValueLayout.JAVA_INT, BUFFER_CHARS);
-            int result = (int) Calls.ASSOC_QUERY_STRING.invokeExact(ASSOCF_NONE, ASSOCSTR_FRIENDLYAPPNAME,
+            int result = (int) Calls.ASSOC_QUERY_STRING.invokeExact(ASSOCF_INIT_IGNOREUNKNOWN, ASSOCSTR_FRIENDLYAPPNAME,
                 arena.allocateFrom(extension, StandardCharsets.UTF_16LE), MemorySegment.NULL, buffer, length);
             if (result != S_OK) return Optional.empty();
             String name = buffer.getString(0, StandardCharsets.UTF_16LE);

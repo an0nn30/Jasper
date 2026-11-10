@@ -8,7 +8,9 @@ import dev.jasper.app.platform.FileAssociations.Unavailable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiFunction;
@@ -133,9 +135,10 @@ final class WindowsFileAssociations implements FileAssociations.Backend {
      * its own and the rest go on to Settings; when Settings cannot open, every written extension fails.
      */
     @Override public List<TypeResult> claim(Map<String, List<String>> typesByExtension) {
-        Map<String, Outcome> failed = new java.util.HashMap<>();
+        Map<String, Outcome> failed = new HashMap<>();
         for (String extension : typesByExtension.keySet()) {
             try {
+                // An empty REG_SZ on purpose: Explorer reads only the value names under OpenWithProgids.
                 write("Software\\Classes\\" + extension + "\\OpenWithProgids", PROG_ID, "");
                 write(CAPABILITIES, extension, PROG_ID);
             } catch (IOException failure) {
@@ -192,7 +195,7 @@ final class WindowsFileAssociations implements FileAssociations.Backend {
     }
 
     private void write(String key, String name, String value) throws IOException {
-        if (key.contains("UserChoice")) throw new IllegalArgumentException("Jasper never writes the user's choice: " + key);
+        if (key.toLowerCase(Locale.ROOT).contains("userchoice")) throw new IllegalArgumentException("Jasper never writes the user's choice: " + key);
         registry.write().write(key, name, value);
     }
 

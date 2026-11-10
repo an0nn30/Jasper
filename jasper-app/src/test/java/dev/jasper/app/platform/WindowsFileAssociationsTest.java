@@ -13,6 +13,7 @@ import java.io.UncheckedIOException;
 import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -60,7 +61,7 @@ class WindowsFileAssociationsTest {
 
     @AfterEach void neverWritesTheUsersChoice() {
         assertThat(system.writes).as("Windows protects UserChoice with a hash; Jasper never writes it")
-                .noneMatch(write -> write.contains("UserChoice"));
+                .noneMatch(write -> write.toLowerCase(Locale.ROOT).contains("userchoice"));
     }
 
     @Test void availableOnlyWhenTheInstallerRegisteredTheProgIdsCommand() {
