@@ -86,6 +86,12 @@ final class FileEditors {
      * @return true when it opened the file; false when no plugin provides an editor, or it declined or threw
      */
     boolean edit(Path file, OptionalInt line, Optional<UUID> windowId) {
+        return edit(file, line, windowId, dev.jasper.sdk.ui.FileOrigin.JASPER);
+    }
+
+    /** As {@link #edit(Path, OptionalInt, Optional)}, telling the editor where the open came from. */
+    boolean edit(Path file, OptionalInt line, Optional<UUID> windowId, dev.jasper.sdk.ui.FileOrigin origin) {
+        Objects.requireNonNull(origin, "origin");
         Objects.requireNonNull(file, "file");
         Objects.requireNonNull(line, "line");
         Objects.requireNonNull(windowId, "windowId");
@@ -94,7 +100,7 @@ final class FileEditors {
         Optional<WindowOwner> window = windowId.flatMap(current.windows());
         var opened = new AtomicBoolean();
         Throwable failure = containment.attempt(current.pluginId(), "file editor", () -> {
-            opened.set(current.editor().edit(file, line, window));
+            opened.set(current.editor().edit(file, line, window, origin));
             return null;
         });
         return failure == null && opened.get();

@@ -841,8 +841,9 @@ class AppContractTest extends PluginContractTest {
                 bundled.add(pluginId);
                 onEdt(() -> host.fileEditors.bundled(Set.copyOf(bundled)));
             }
-            @Override public boolean edit(Path file, java.util.OptionalInt line, Optional<UUID> windowId) {
-                return onEdtValue(() -> host.fileEditors.edit(file, line, windowId));
+            @Override public boolean edit(Path file, java.util.OptionalInt line, Optional<UUID> windowId,
+                                          dev.jasper.sdk.ui.FileOrigin origin) {
+                return onEdtValue(() -> host.fileEditors.edit(file, line, windowId, origin));
             }
             @Override public boolean openLink(java.net.URI address, dev.jasper.sdk.ui.LinkOrigin origin, dev.jasper.sdk.ui.LinkPlacement placement,
                                               Optional<String> target, Optional<UUID> windowId) {
