@@ -185,6 +185,32 @@ class PageCloseTest {
     }
 
     /**
+     * A held browser whose close throws is logged, as a hold that throws is: whether its hold completes on the UI thread,
+     * which closes it in that turn, or elsewhere, which posts the close; neither failure reaches who completed the hold.
+     */
+    @Test void aHeldBrowserWhoseCloseThrowsIsLoggedOnEitherPath() throws Exception {
+        var inline = new CompletableFuture<Void>();
+        var posted = new CompletableFuture<Void>();
+        try (var log = new CapturedLog(Page.class.getName())) {
+            SwingUtilities.invokeAndWait(() -> {
+                Page first = page(), second = page();
+                first.useBrowserEnding(blanked -> { }, closing -> { throw new IllegalStateException("inline close"); });
+                first.setCloseHold(closing -> inline);
+                first.close();
+                inline.complete(null);
+                second.useBrowserEnding(blanked -> { }, closing -> { throw new IllegalStateException("posted close"); });
+                second.setCloseHold(closing -> posted);
+                second.close();
+            });
+            var other = new Thread(() -> posted.complete(null), "chromium-stand-in");
+            other.start();
+            other.join();
+            SwingUtilities.invokeAndWait(() -> { });
+            assertThat(log.records()).extracting(record -> record.getThrown().getMessage()).containsExactly("inline close", "posted close");
+        }
+    }
+
+    /**
      * Plan 6's "no native call after stop": a held browser whose hold completes once Chromium has stopped is not closed
      * again, as Chromium's close has ended every browser.
      */

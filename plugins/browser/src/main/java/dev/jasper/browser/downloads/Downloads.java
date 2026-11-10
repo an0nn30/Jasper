@@ -54,9 +54,10 @@ import java.util.concurrent.RejectedExecutionException;
  * <p><b>A page's downloads.</b> A download counts for its page from the moment {@code before} gives it a target to its
  * outcome (ruling F1), and once the page's close has begun ({@link #drained}), its later starts are refused, under the
  * same lock, so none slips past a close; the page's browser closes once its count ends. A start Chromium could not be
- * given is abandoned ({@link #abandon}), and a save chooser cancelled for the page ends its ask start that had no
- * update ({@link #saveCancelled}, ruling F1.3). A download given a target before its page committed any document tells
- * the page, whose item closes if a page opened it (ruling F28). As Chrome limits them (ruling D1, the user's "Match
+ * given is abandoned ({@link #abandon}), and a save chooser cancelled for the page ends its count of an ask start that
+ * had no update, the download itself kept ({@link #saveCancelled}, rulings F1.3 and D24). A download Chromium starts
+ * before its page committed any document, given a target or refused, tells the page, whose item closes if a page opened
+ * it (ruling F28). As Chrome limits them (ruling D1, the user's "Match
  * Chrome"), a page's first download without a user activation in a document goes and each later one in that document is
  * refused, the first refusal posting "This site tried to download multiple files" with the page's host, never its user
  * name or password ({@link DownloadAddresses}); an activated start, one the user asked to save, a new document, a load
@@ -105,6 +106,9 @@ public final class Downloads {
     // Guards the pages' counts and closing flags, and the stop (F1).
     private final Object lock = new Object();
     private final Map<Page, PageState> pages = new WeakHashMap<>();
+    // Guarded by the lock (F1.3, D24): a page's ask starts that have had no update yet, and the starts whose page count a
+    // cancelled save chooser ended, which their outcome then ends no more.
+    private final Set<DownloadKey> unupdated = new HashSet<>(), uncounted = new HashSet<>();
     private volatile boolean stopped;
     // A test's, run between a start's reservation and the lock that counts it.
     private volatile Runnable afterReservation = () -> { };
@@ -124,11 +128,10 @@ public final class Downloads {
     /**
      * A download Chromium was given a target for, as its first update lists it.
      *
-     * @param ask whether the user asked where to save it, as Save Link As… asks
      * @param folder the folder its intermediate file is in: its reservation's; null for one the user asked to save
      */
     private record Started(DownloadKey key, String name, Path target, String url, String pageUrl, Optional<Page> page, boolean inMemory,
-                           boolean ask, Optional<DownloadNames.Reservation> reservation, Path folder) { }
+                           Optional<DownloadNames.Reservation> reservation, Path folder) { }
 
     /** A running download's intermediate file, and the folder it must be in to be deleted; null for any. */
     private record Intermediate(Path file, Path folder) { }
@@ -197,9 +200,10 @@ public final class Downloads {
 
     /**
      * Where a download Chromium starts goes, or empty to refuse it, which CEF cancels. Chromium's thread: it reads only
-     * whether names are free in the folder. A download given a target while its page has committed no document, its
-     * first navigation become a download, tells the page on the UI thread ({@link Page#firstNavigationDownloaded},
-     * ruling F28).
+     * whether names are free in the folder. A download of a page that has committed no document, its first navigation
+     * become a download, tells the page on the UI thread whether it goes or is refused
+     * ({@link Page#firstNavigationDownloaded}, ruling F28), as either way its tab is left empty; a refusal's notice
+     * says why.
      *
      * @param start the download
      * @return a free file in the Downloads folder, with no ask; the folder and the safe name, with the ask, for a download
@@ -208,6 +212,14 @@ public final class Downloads {
      */
     public Optional<DownloadTarget> before(DownloadStart start) {
         Objects.requireNonNull(start, "start");
+        Optional<DownloadTarget> target = target(start);
+        // Ruling F28: a page that closed, and downloads that stopped, hear nothing of it.
+        start.page().filter(page -> page.committedAddress().isEmpty()).ifPresent(page -> later(page::firstNavigationDownloaded));
+        return target;
+    }
+
+    /** {@link #before}'s answer for {@code start}. Chromium's thread. */
+    private Optional<DownloadTarget> target(DownloadStart start) {
         if (stopped) return Optional.empty();
         String name = DownloadNames.safeName(start.suggestedName());
         Page page = start.page().orElse(null);
@@ -255,10 +267,10 @@ public final class Downloads {
                 state.running++;
                 if (automatic) state.automatic = start.document();
             }
-            starts.put(key, new Started(key, name, target, start.url(), start.pageUrl(), start.page(), start.inMemory(), start.ask(),
-                reservation, reservation.map(held -> held.file().getParent()).orElse(null)));
+            starts.put(key, new Started(key, name, target, start.url(), start.pageUrl(), start.page(), start.inMemory(), reservation,
+                reservation.map(held -> held.file().getParent()).orElse(null)));
+            if (page != null && start.ask()) unupdated.add(key);
         }
-        if (page != null && page.committedAddress().isEmpty()) later(page::firstNavigationDownloaded);
         return Optional.of(new DownloadTarget(target, start.ask()));
     }
 
@@ -272,33 +284,51 @@ public final class Downloads {
      */
     public void abandon(DownloadStart start) {
         Objects.requireNonNull(start, "start");
-        Started kept = starts.remove(new DownloadKey(start.browser(), start.id()));
-        if (kept != null) forgotten(kept);
+        var key = new DownloadKey(start.browser(), start.id());
+        Started kept = starts.remove(key);
+        if (kept == null) return;
+        cancels.remove(key);
+        intermediates.remove(key);
+        kept.reservation().ifPresent(names::release);
+        if (uncount(key)) kept.page().ifPresent(this::ended);
     }
 
     /**
-     * A save chooser Chromium asked for {@code page} was cancelled (ruling F1.3): the page's oldest start that asked
-     * where it goes and has had no update yet is forgotten and its page's count ended, as Chromium may tell nothing of a
-     * download cancelled before it began, which would otherwise hold the page's browser until Jasper quits. Only a
-     * download or the page's own {@code showSaveFilePicker} opens such a chooser, so at worst a count ends early; a start
-     * that has had an update ends with its own outcome. UI thread.
+     * A save chooser Chromium asked for {@code page} was cancelled (rulings F1.3 and D24): the page's count of its oldest
+     * start that asked where it goes and has had no update yet ends, as Chromium may tell nothing of a download cancelled
+     * before it began, which would otherwise hold the page's browser until Jasper quits. Only the count ends: the
+     * download is kept, so a late update still lists it and its file is marked, and its outcome ends no count again.
+     * Only a download or the page's own {@code showSaveFilePicker} opens such a chooser, so at worst a count ends early,
+     * and a page that then closes may close its browser while that download runs; a start that has had an update counts
+     * until its own outcome. Whether a start has had an update is read here and written by {@link #updated} under one
+     * lock. UI thread.
      *
      * @param page the page the chooser was for
      */
     public void saveCancelled(Page page) {
         Objects.requireNonNull(page, "page");
-        starts.values().stream().filter(start -> start.ask() && start.page().orElse(null) == page && !cancels.containsKey(start.key()))
-            .min(Comparator.comparingInt(start -> start.key().id()))
-            .filter(start -> starts.remove(start.key(), start))
-            .ifPresent(this::forgotten);
+        synchronized (lock) {
+            Optional<DownloadKey> oldest = unupdated.stream().filter(key -> {
+                Started start = starts.get(key);
+                return start != null && start.page().orElse(null) == page;
+            }).min(Comparator.comparingInt(DownloadKey::id));
+            if (oldest.isEmpty()) return;
+            unupdated.remove(oldest.get());
+            uncounted.add(oldest.get());
+        }
+        // Outside the lock, as the page's hold may complete and close its browser.
+        ended(page);
     }
 
-    /** A start forgotten before its outcome: what was kept for it goes, its name is freed and its page's count ends. */
-    private void forgotten(Started kept) {
-        cancels.remove(kept.key());
-        intermediates.remove(kept.key());
-        kept.reservation().ifPresent(names::release);
-        kept.page().ifPresent(this::ended);
+    /**
+     * Whether the download {@code key} still counts for its page, which it then no longer does: false once a cancelled
+     * save chooser ended its count (D24). Any thread.
+     */
+    private boolean uncount(DownloadKey key) {
+        synchronized (lock) {
+            unupdated.remove(key);
+            return !uncounted.remove(key);
+        }
     }
 
     /**
@@ -325,6 +355,9 @@ public final class Downloads {
         var key = new DownloadKey(progress.browser(), progress.id());
         Started start = starts.get(key);
         if (start == null) return;
+        synchronized (lock) {
+            unupdated.remove(key);
+        }
         cancels.put(key, cancel);
         if (progress.complete() || progress.canceled() || !progress.inProgress()) intermediates.remove(key);
         else intermediate(progress.fullPath()).ifPresent(file -> intermediates.put(key, new Intermediate(file, start.folder())));
@@ -334,8 +367,9 @@ public final class Downloads {
     /**
      * Whether {@code page}'s downloads have ended: its close has begun, so its later downloads are refused (ruling F1),
      * and the answer completes once its last running download has its outcome, on the UI thread, or its last start is
-     * {@linkplain #abandon abandoned}, on Chromium's, at once when it has none, and at {@link #stopAll}. A close that
-     * waits for it and touches Swing hops to the UI thread, as the page's does ({@link Page#setCloseHold}). Any thread.
+     * {@linkplain #abandon abandoned}, on Chromium's, or its count ended by a cancelled save chooser
+     * ({@link #saveCancelled}), at once when it has none, and at {@link #stopAll}. A close that waits for it and
+     * touches Swing hops to the UI thread, as the page's does ({@link Page#setCloseHold}). Any thread.
      *
      * @param page the page that closes
      * @return complete once it holds no download
@@ -420,7 +454,7 @@ public final class Downloads {
         Runnable cancel = cancels.remove(key);
         if (outcome == Outcome.FAILED && cancel != null) cancel.run();
         start.reservation().ifPresent(names::release);
-        start.page().ifPresent(this::ended);
+        if (uncount(key)) start.page().ifPresent(this::ended);
         switch (outcome) {
             case COMPLETED -> mark(start);
             case FAILED -> {

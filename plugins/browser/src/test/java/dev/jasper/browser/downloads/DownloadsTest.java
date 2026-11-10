@@ -477,11 +477,42 @@ class DownloadsTest {
     }
 
     /**
-     * Ruling F1.3: a save chooser cancelled for a page ends its oldest ask start that has had no update, as Chromium may
-     * tell nothing of a download cancelled before it began; one that had an update ends with its own outcome, and
-     * another page's are its own.
+     * Rulings F1.3 and D24: a save chooser cancelled for a page ends only the page's count of its oldest ask start that
+     * has had no update, as Chromium may tell nothing of a download cancelled before it began. The download itself is
+     * kept: a late update still lists it and its file is marked, and its outcome ends no count again.
      */
-    @Test void aCancelledSaveChooserEndsThePagesOldestAskStartThatHadNoUpdate() throws Exception {
+    @Test void aCancelledSaveChooserEndsOnlyThePagesCountAndALateUpdateStillListsAndMarks() throws Exception {
+        make(MAC);
+        resolve();
+        Page page = page(PageContext.persistent());
+        downloads.before(ask(page, 1, "a.pdf")).orElseThrow();
+        Path other = downloads.before(start(page, 2, "b.pdf")).orElseThrow().file();
+        update(running(2, 1, 10, other + ".crdownload"), () -> { });
+        CompletableFuture<Void> hold = onUi(() -> downloads.drained(page));
+        onUi(() -> {
+            downloads.saveCancelled(page);
+            return null;
+        });
+        assertThat(hold).as("b.pdf still runs").isNotDone();
+        Path chosen = Files.createDirectories(temp.resolve("Chosen")).resolve("mine.pdf");
+        update(running(1, 1, 10, chosen + ".crdownload"), () -> { });
+        assertThat(menu()).as("listed after all").contains("entries:mine.pdf" + DASH + "10%");
+        complete(1, chosen);
+        assertThat(hold).as("its outcome ends no count again").isNotDone();
+        host.runBackground();
+        flush();
+        assertThat(host.markedDownloads()).extracting(MarkedDownload::file).containsExactly(chosen);
+        assertThat(notices()).containsExactly(GROUP + "|INFO|Download finished for \u201Cmine.pdf\u201D.|");
+        update(cancelled(2), () -> { });
+        assertThat(hold).isCompleted();
+    }
+
+    /**
+     * Ruling D24: of two ask starts of a page with no update, a cancelled chooser ends the oldest's count only, and an
+     * ask start that had an update keeps its own; each lands when its updates come, and the page's hold completes only
+     * once the last download that still counts ends. Another page's are its own.
+     */
+    @Test void twoUpdateLessAskStartsOnAPageBothLandWhenOneChooserIsCancelled() throws Exception {
         make(MAC);
         resolve();
         Page page = page(PageContext.persistent()), other = page(PageContext.persistent());
@@ -495,41 +526,48 @@ class DownloadsTest {
             downloads.saveCancelled(page);
             return null;
         });
-        update(running(1, 1, 10, folder.resolve("a.pdf") + ".crdownload"), () -> { });
-        assertThat(menu()).as("its update is dropped").noneMatch(line -> line.startsWith("entries:a.pdf"));
-        assertThat(hold).isNotDone();
+        Path chosen = Files.createDirectories(temp.resolve("Chosen"));
+        for (int id : new int[] { 1, 3 }) {
+            Path file = chosen.resolve(id + ".pdf");
+            update(running(id, 1, 10, file + ".crdownload"), () -> { });
+            complete(id, file);
+        }
+        assertThat(menu()).contains("entries:1.pdf" + DASH + "100%", "entries:3.pdf" + DASH + "100%");
+        assertThat(hold).as("b.pdf, which had an update, still counts").isNotDone();
+        host.runBackground();
+        flush();
+        assertThat(host.markedDownloads()).extracting(MarkedDownload::file).containsExactly(chosen.resolve("1.pdf"),
+            chosen.resolve("3.pdf"));
         onUi(() -> {
             downloads.saveCancelled(page);
             return null;
         });
-        assertThat(hold).as("the one with an update still runs").isNotDone();
+        assertThat(hold).as("b.pdf had an update: no cancelled chooser ends its count").isNotDone();
         update(cancelled(2), () -> { });
         assertThat(hold).isCompleted();
-        assertThat(otherHold).isNotDone();
-        onUi(() -> {
-            downloads.saveCancelled(page);
-            return null;
-        });
         assertThat(otherHold).as("another page's").isNotDone();
-        assertThat(notices()).isEmpty();
     }
 
     /**
      * Ruling F28: a download given a target while its page has committed no document, its first navigation become a
-     * download, tells the page on the UI thread, which tells its item; a page showing a document, and a refused start,
-     * tell nothing.
+     * download, tells the page on the UI thread, which tells its item; so does one refused, as the folder cannot be used,
+     * which leaves the tab as empty, with the refusal's notice saying why. A page showing a document tells nothing, and
+     * a page whose close began has no item left to tell.
      */
-    @Test void aDownloadBeforeThePagesFirstDocumentTellsThePageOnTheUiThread() throws Exception {
+    @Test void aFirstNavigationDownloadTellsThePageOnTheUiThreadWhetherItGoesOrIsRefused() throws Exception {
         make(MAC);
         resolve();
-        Page fresh = page(PageContext.persistent()), shown = page(PageContext.persistent()), closing = page(PageContext.persistent());
+        Page fresh = page(PageContext.persistent()), shown = page(PageContext.persistent()), closing = page(PageContext.persistent()),
+            refused = page(PageContext.persistent());
         var told = new CopyOnWriteArrayList<String>();
         onUi(() -> {
             PageTestAccess.addressChanged(shown, PAGE);
             fresh.onFirstNavigationDownload(() -> told.add("fresh on the UI thread: " + SwingUtilities.isEventDispatchThread()));
             shown.onFirstNavigationDownload(() -> told.add("shown"));
             closing.onFirstNavigationDownload(() -> told.add("closing"));
-            downloads.drained(closing);
+            refused.onFirstNavigationDownload(() -> told.add("refused"));
+            closing.setCloseHold(downloads::drained);
+            closing.close();
             return null;
         });
         assertThat(downloads.before(start(fresh, 1, "a.pdf"))).isPresent();
@@ -537,6 +575,17 @@ class DownloadsTest {
         assertThat(downloads.before(start(closing, 3, "c.pdf"))).isEmpty();
         flush();
         assertThat(told).containsExactly("fresh on the UI thread: true");
+        Path notAFolder = Files.writeString(temp.resolve("NotAFolder"), "a file");
+        onUi(() -> {
+            host.setSetting(ID, "downloads_folder", notAFolder.toString());
+            return null;
+        });
+        host.runBackground();
+        assertThat(downloads.before(start(refused, 4, "d.pdf"))).isEmpty();
+        flush();
+        assertThat(told).containsExactly("fresh on the UI thread: true", "refused");
+        assertThat(notices()).containsExactly(GROUP + "|WARNING|Download failed for \u201Cd.pdf\u201D.|\u201C" + notAFolder
+            + "\u201D is a file, not a folder.");
     }
 
     /**

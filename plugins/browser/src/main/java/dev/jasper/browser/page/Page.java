@@ -47,8 +47,9 @@ import org.cef.browser.CefRequestContext;
  * goes ({@link #askNextDownload}, {@link DownloadAsk}) and start it ({@link #startDownload}). A page closes at once but
  * for its browser, which its close hold keeps while one of its downloads runs ({@link #setCloseHold}, plan 7's F1): it
  * loads {@code about:blank} meanwhile, ending the page's scripts and sound but not its downloads, and closes once they
- * end. Its item hears when its first navigation becomes a download ({@link #onFirstNavigationDownload}, F28), and its
- * downloads when a save chooser for it is cancelled ({@link #onSaveCancelled}, F1.3).
+ * end; {@link PageDownloadState} holds the ask, the start and the hold. Its item hears when its first navigation
+ * becomes a download ({@link #onFirstNavigationDownload}, F28), and its downloads when a save chooser for it is
+ * cancelled ({@link #onSaveCancelled}, F1.3).
  */
 public final class Page implements AutoCloseable {
     /** The longest {@link #source} waits for Chromium's HTML. */
@@ -112,17 +113,8 @@ public final class Page implements AutoCloseable {
     // Plan 7: told when the page's first navigation became a download (F28), its item's; and when a save chooser for the
     // page was cancelled (F1.3), its downloads', kept after the close, as a closing tab cancels the chooser it shows.
     private Runnable firstNavigationDownload = () -> { }, saveCancelled = () -> { };
-    // Plan 7's F32: whether the page's next download asks where it goes; armed on the UI thread, taken on Chromium's.
-    private final DownloadAsk downloadAsk = new DownloadAsk();
-    // Given the page and an address, has Chromium download it: through its browser, or a test's.
-    private BiConsumer<Page, String> downloader = Page::downloadInBrowser;
-    // Plan 7's F1: given the page as it closes, what its browser waits for before it closes: its downloads' end.
-    private Function<Page, CompletableFuture<Void>> closeHold = page -> CompletableFuture.completedFuture(null);
-    // Given the page, loads about:blank in its browser, and closes its browser: Chromium's, or a test's recording ones.
-    private Consumer<Page> blanker = Page::blankBrowser, closer = Page::closeBrowser;
-    // The plugin's Chromium, once the page's client and context are ready; read as a held browser closes, as Chromium
-    // may have stopped by then.
-    private Chromium engine;
+    // Plan 7: the page's own part of its downloads: its ask, how they start, its close hold and its browser's ends.
+    private final PageDownloadState downloadState = new PageDownloadState();
     // Where the page's dialogs and file choosers show, and where its right-click menu shows; its item gives them.
     private DialogPlace dialogPlace;
     private MenuPlace menuPlace;
@@ -1007,7 +999,7 @@ public final class Page implements AutoCloseable {
      */
     public void askNextDownload(String url) {
         Objects.requireNonNull(url, "url");
-        if (!closed) downloadAsk.arm(url, System.currentTimeMillis());
+        if (!closed) downloadState.askNext(url);
     }
 
     /**
@@ -1018,12 +1010,12 @@ public final class Page implements AutoCloseable {
      */
     public void startDownload(String url) {
         Objects.requireNonNull(url, "url");
-        if (!closed) downloader.accept(this, url);
+        if (!closed) downloadState.start(this, url);
     }
 
     /** Whether the page's next download asks where it goes, which the download handler takes. Any thread. */
     DownloadAsk downloadAsk() {
-        return downloadAsk;
+        return downloadState.ask();
     }
 
     /**
@@ -1037,7 +1029,7 @@ public final class Page implements AutoCloseable {
      * @param hold given the page as it closes, answers when its browser may close, on any thread
      */
     public void setCloseHold(Function<Page, CompletableFuture<Void>> hold) {
-        closeHold = Objects.requireNonNull(hold, "hold");
+        downloadState.hold(hold);
     }
 
     /**
@@ -1204,7 +1196,7 @@ public final class Page implements AutoCloseable {
         closed = true;
         // Plan 7's F1: the page's downloads hear first that it closes, so none of its downloads starts after this, and
         // answer when its browser may close.
-        CompletableFuture<Void> held = held();
+        CompletableFuture<Void> held = downloadState.held(this);
         loadStarts.clear();
         selectionGestures.clear();
         view.endSelectionGestures();
@@ -1230,56 +1222,10 @@ public final class Page implements AutoCloseable {
         if (find != null) find.close();
         if (devTools != null) devTools.close();
         view.setHoverUrl("");
-        if (held.isDone()) closer.accept(this);
-        else {
-            blanker.accept(this);
-            // Downloads complete a hold on the UI thread, or on Chromium's for a start it could not be given.
-            held.whenComplete((done, failure) -> onUiThread(this::closeHeld));
-        }
+        downloadState.end(this, held);
         List<Runnable> told = List.copyOf(closes);
         closes.clear();
         for (Runnable listener : told) listener.run();
-    }
-
-    /** What the page's close hold answers, asked once as the page closes; complete when the hold throws. */
-    private CompletableFuture<Void> held() {
-        try {
-            return Objects.requireNonNull(closeHold.apply(this), "held");
-        } catch (RuntimeException failure) {
-            LOG.log(System.Logger.Level.WARNING, "A page's downloads could not hold its browser's close", failure);
-            return CompletableFuture.completedFuture(null);
-        }
-    }
-
-    /**
-     * The page's close hold completed: its browser closes, unless Chromium has stopped, whose close ended every browser,
-     * so no native call is made after it (plan 6). UI thread.
-     */
-    private void closeHeld() {
-        Chromium chromium = engine;
-        if (chromium == null || chromium.state() != Chromium.State.STOPPED) closer.accept(this);
-    }
-
-    /** Runs {@code task} now on the UI thread, else posts it there. */
-    private static void onUiThread(Runnable task) {
-        if (EventQueue.isDispatchThread()) task.run();
-        else EventQueue.invokeLater(task);
-    }
-
-    /** Loads {@code about:blank} in the page's browser, a held one; nothing before it is ready. */
-    private void blankBrowser() {
-        if (ready) browser.loadURL("about:blank");
-    }
-
-    /** Closes the page's browser, which ends only this page; nothing before it is made. */
-    private void closeBrowser() {
-        PageBrowser page = browser;
-        if (page != null) page.close(true);
-    }
-
-    /** Has Chromium download {@code url} in the page's browser; nothing before it is ready. */
-    private void downloadInBrowser(String url) {
-        if (ready) browser.startDownload(url);
     }
 
     /**
@@ -1331,7 +1277,7 @@ public final class Page implements AutoCloseable {
      * sweep makes no native call.
      */
     void make(Chromium chromium, CefClient client, CefRequestContext requestContext) {
-        engine = chromium;
+        downloadState.madeBy(chromium);
         if (closed || chromium.state() == Chromium.State.STOPPED) {
             unused(requestContext);
             return;
@@ -1346,6 +1292,11 @@ public final class Page implements AutoCloseable {
     /** Whether the page has made its browser. */
     boolean hasBrowser() {
         return browser != null;
+    }
+
+    /** The page's browser once made, whether or not it hears what it is asked yet; null before. */
+    PageBrowser browser() {
+        return browser;
     }
 
     /**
@@ -1517,7 +1468,7 @@ public final class Page implements AutoCloseable {
 
     /** Has the page start its downloads with {@code replacement} from now on, as a test's recording one. */
     void useDownloader(BiConsumer<Page, String> replacement) {
-        downloader = Objects.requireNonNull(replacement, "replacement");
+        downloadState.useDownloader(replacement);
     }
 
     /**
@@ -1525,8 +1476,7 @@ public final class Page implements AutoCloseable {
      * from now on, as a test's recording ones.
      */
     void useBrowserEnding(Consumer<Page> blank, Consumer<Page> close) {
-        blanker = Objects.requireNonNull(blank, "blank");
-        closer = Objects.requireNonNull(close, "close");
+        downloadState.useBrowserEnding(blank, close);
     }
 
     /**
