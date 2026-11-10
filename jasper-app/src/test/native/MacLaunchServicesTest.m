@@ -5,6 +5,7 @@
 // Usage: mac-launchservices-tests <file-types.tsv>
 #import "../../main/native/MacLaunchServices.m"
 #include <assert.h>
+#include <string.h>
 
 // How the fake answers a set call: at once with no error, at once with an error, or never.
 typedef NS_ENUM(NSInteger, TestCompletion) { TestCompletionSuccess, TestCompletionError, TestCompletionNever };
@@ -46,6 +47,23 @@ typedef NS_ENUM(NSInteger, TestCompletion) { TestCompletionSuccess, TestCompleti
     }
 }
 @end
+
+// A JNI environment that knows only what the set call uses: GetStringUTFChars fails with an exception pending, as when
+// the JVM is out of memory, and NewStringUTF records what it was given.
+static jboolean TestPending;
+static char TestMade[256];
+static const char *JNICALL TestGetChars(JNIEnv *env, jstring value, jboolean *copy) {
+    TestPending = JNI_TRUE;
+    return NULL;
+}
+static void JNICALL TestReleaseChars(JNIEnv *env, jstring value, const char *chars) { }
+static jboolean JNICALL TestExceptionCheck(JNIEnv *env) { return TestPending; }
+static void JNICALL TestExceptionClear(JNIEnv *env) { TestPending = JNI_FALSE; }
+static jstring JNICALL TestNewString(JNIEnv *env, const char *chars) {
+    if (TestPending) return NULL;
+    strlcpy(TestMade, chars, sizeof TestMade);
+    return (jstring) TestMade;
+}
 
 // An application bundle in the folder whose Info.plist names the identifier, or none when it is nil.
 static NSURL *TestBundle(NSURL *folder, NSString *name, NSString *identifier) {
@@ -205,6 +223,22 @@ int main(int argc, const char *argv[]) {
         assert(JasperSetContentTypeHandler(fake, @"", @"dev.jasper.app", 5) != nil);
         assert(JasperSetContentTypeHandler(fake, nil, nil, 5) != nil);
         assert(workspace.setType == nil);
+
+        // A Java exception pending while the arguments are read is a failure, never the null that means done; the
+        // workspace is never asked.
+        struct JNINativeInterface_ functions = {0};
+        functions.GetStringUTFChars = TestGetChars;
+        functions.ReleaseStringUTFChars = TestReleaseChars;
+        functions.ExceptionCheck = TestExceptionCheck;
+        functions.ExceptionClear = TestExceptionClear;
+        functions.NewStringUTF = TestNewString;
+        const struct JNINativeInterface_ *table = &functions;
+        JNIEnv *env = (JNIEnv *) &table;
+        jstring answer = Java_dev_jasper_app_platform_MacLaunchServices_setContentTypeHandlerOf(
+            env, NULL, (jstring) "uti", (jstring) "bundle", 0.1);
+        assert(answer != NULL);
+        assert(strstr(TestMade, "could not be read") != NULL);
+        assert(!TestPending);
 
         // The real type database, read only: a system text type, and nothing for an extension no type claims.
         assert([JasperTextTypeForExtension(@"swift") isEqualToString:@"public.swift-source"]);

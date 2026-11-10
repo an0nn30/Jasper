@@ -142,7 +142,12 @@ JNIEXPORT jstring JNICALL Java_dev_jasper_app_platform_MacLaunchServices_setCont
     @autoreleasepool {
         NSString *name = JasperString(env, uti);
         NSString *identifier = JasperString(env, bundleId);
-        if ((*env)->ExceptionCheck(env)) return NULL;
+        if ((*env)->ExceptionCheck(env)) {
+            // Null means done to Java, so a pending exception is cleared and reported as a failure instead. Should even
+            // that string fail, its own exception reaches Java, which is not success either.
+            (*env)->ExceptionClear(env);
+            return JasperJavaString(env, @"the content type or application could not be read from Java");
+        }
         return JasperJavaString(env, JasperSetContentTypeHandler(NSWorkspace.sharedWorkspace, name, identifier, seconds));
     }
 }
