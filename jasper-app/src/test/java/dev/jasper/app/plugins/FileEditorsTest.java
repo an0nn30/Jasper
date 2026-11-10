@@ -71,6 +71,19 @@ class FileEditorsTest {
         assertThat(editors.edit(NOTES, OptionalInt.empty(), Optional.empty())).isTrue();
     }
 
+    @Test void theOriginReachesTheEditorAndTheOldCallsAreJaspersOwn() {
+        List<String> calls = new CopyOnWriteArrayList<>();
+        editors.register("dev.x.a", new FileEditor() {
+            @Override public boolean edit(Path file, OptionalInt line, Optional<WindowOwner> window) { calls.add("three"); return true; }
+            @Override public boolean edit(Path file, OptionalInt line, Optional<WindowOwner> window, dev.jasper.sdk.ui.FileOrigin origin) {
+                calls.add(origin.name()); return true;
+            }
+        }, FileEditorsTest::noWindow);
+        editors.edit(NOTES, OptionalInt.empty(), Optional.empty());
+        editors.edit(NOTES, OptionalInt.empty(), Optional.empty(), dev.jasper.sdk.ui.FileOrigin.OUTSIDE);
+        assertThat(calls).containsExactly("JASPER", "OUTSIDE");
+    }
+
     @Test void aWindowIdBecomesTheRegisteringPluginsOwnHandle() {
         UUID open = UUID.randomUUID();
         List<String> calls = new CopyOnWriteArrayList<>();

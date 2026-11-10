@@ -699,18 +699,37 @@ public final class PluginRuntime {
      * @throws IllegalStateException on the UI thread
      */
     public void open(Path file, OptionalInt line, Optional<UUID> window, Consumer<Path> desktop) {
+        open(file, line, window, Origin.JASPER, desktop);
+    }
+
+    /** Where a file open came from, as the application states it; {@code dev.jasper.sdk.ui.FileOrigin} stays in this package. */
+    public enum Origin {
+        /** Jasper's own: a click, a choice, a command. */
+        JASPER,
+        /** Another program handed the file to Jasper (the desktop's open request, the {@code jasper} command). */
+        OUTSIDE
+    }
+
+    /** As {@link #open(Path, OptionalInt, Optional, Consumer)}, telling the editor where the open came from. */
+    public void open(Path file, OptionalInt line, Optional<UUID> window, Origin origin, Consumer<Path> desktop) {
         Objects.requireNonNull(window, "window");
-        openFromWorker(file, line, () -> window, desktop);
+        Objects.requireNonNull(origin, "origin");
+        openFromWorker(file, line, () -> window, origin == Origin.OUTSIDE ? dev.jasper.sdk.ui.FileOrigin.OUTSIDE : dev.jasper.sdk.ui.FileOrigin.JASPER, desktop);
     }
 
     private void openFromWorker(Path file, OptionalInt line, Supplier<Optional<UUID>> window, Consumer<Path> desktop) {
+        openFromWorker(file, line, window, dev.jasper.sdk.ui.FileOrigin.JASPER, desktop);
+    }
+
+    private void openFromWorker(Path file, OptionalInt line, Supplier<Optional<UUID>> window, dev.jasper.sdk.ui.FileOrigin origin,
+                                Consumer<Path> desktop) {
         if (SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Editor operations require a worker thread");
         Objects.requireNonNull(file, "file");
         Objects.requireNonNull(line, "line");
         Objects.requireNonNull(desktop, "desktop");
         PluginHost current = host;
         if (current == null) desktop.accept(file);
-        else current.fileEditors.openFromWorker(file, line, window, desktop);
+        else current.fileEditors.openFromWorker(file, line, window, origin, desktop);
     }
 
     /** Where a web link asks to open, as the application states it; {@code dev.jasper.sdk.ui.LinkPlacement} stays in this package. */
