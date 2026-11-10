@@ -69,9 +69,9 @@ static NSString *JasperSetContentTypeHandler(NSWorkspace *workspace, NSString *u
     UTType *type = JasperContentType(uti);
     if (type == nil) return [NSString stringWithFormat:@"macOS has no content type %@", uti ?: @""];
     if (bundleId.length == 0) return @"no application was named";
+    NSURL *application = [workspace URLForApplicationWithBundleIdentifier:bundleId];
+    if (application == nil) return [NSString stringWithFormat:@"no application %@ is installed", bundleId];
     if (@available(macOS 12.0, *)) {
-        NSURL *application = [workspace URLForApplicationWithBundleIdentifier:bundleId];
-        if (application == nil) return [NSString stringWithFormat:@"no application %@ is installed", bundleId];
         dispatch_semaphore_t done = dispatch_semaphore_create(0);
         // Read only after the semaphore, which orders the handler's write before the read; a late answer writes into
         // storage the block keeps alive and nobody reads.

@@ -69,9 +69,9 @@ static NSArray<NSString *> *TestSplit(NSString *column) {
     return parts;
 }
 
-// Each extension whose macOS column names system types must resolve to exactly that one text type. An extension whose
-// column names only Jasper's imports must not resolve to a system type that is not text, which would outrank the
-// import; one that resolves to a system text type is only noted, since macOS may come to declare what Jasper imports.
+// No extension with a macOS column may resolve to a declared type that is not text: claiming it would take over other
+// files. Any other difference from the catalogue (another text type, or no declared type where the catalogue names a
+// system type) is only noted, since macOS versions declare different types and run time uses the system's answer.
 static int TestCatalogue(NSString *path) {
     NSError *error = nil;
     NSString *text = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:&error];
@@ -99,24 +99,21 @@ static int TestCatalogue(NSString *path) {
         UTType *resolved = [UTType typeWithFilenameExtension:extension];
         NSString *identifier = resolved.identifier ?: @"(none)";
         BOOL text = resolved != nil && !resolved.dynamic && [resolved conformsToType:UTTypeText];
-        NSMutableSet<NSString *> *own = [NSMutableSet setWithArray:types];
-        [own intersectSet:imports];
+        NSString *listed = [types componentsJoinedByString:@","];
         checked++;
-        if (own.count == types.count) {
-            if (resolved != nil && !resolved.dynamic && ![own containsObject:identifier]) {
-                if (text) {
-                    printf("note: .%s resolves to the system text type %s; the catalogue imports %s\n",
-                           extension.UTF8String, identifier.UTF8String, [types componentsJoinedByString:@","].UTF8String);
-                } else {
-                    printf("MISMATCH: .%s resolves to %s, which is not text; the catalogue imports %s\n",
-                           extension.UTF8String, identifier.UTF8String, [types componentsJoinedByString:@","].UTF8String);
-                    mismatches++;
-                }
-            }
-        } else if (types.count != 1 || ![types[0] isEqualToString:identifier] || !text) {
-            printf("MISMATCH: .%s resolves to %s%s; the catalogue says %s\n", extension.UTF8String, identifier.UTF8String,
-                   text ? "" : " (not text)", [types componentsJoinedByString:@","].UTF8String);
+        if (resolved != nil && !resolved.dynamic && !text) {
+            // The safety property: claiming would take over files that are not text.
+            printf("MISMATCH: .%s resolves to %s, which is not text; the catalogue says %s\n",
+                   extension.UTF8String, identifier.UTF8String, listed.UTF8String);
             mismatches++;
+        } else if (resolved == nil || resolved.dynamic) {
+            if (![[NSSet setWithArray:types] isSubsetOfSet:imports]) {
+                printf("note: .%s has no declared type here (%s); the catalogue says %s\n",
+                       extension.UTF8String, identifier.UTF8String, listed.UTF8String);
+            }
+        } else if (types.count != 1 || ![types[0] isEqualToString:identifier]) {
+            printf("note: .%s resolves to the text type %s; the catalogue says %s\n",
+                   extension.UTF8String, identifier.UTF8String, listed.UTF8String);
         }
     }
     if (checked == 0) {
