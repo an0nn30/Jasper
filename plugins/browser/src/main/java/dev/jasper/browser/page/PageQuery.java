@@ -34,6 +34,7 @@ public final class PageQuery {
      */
     public static final int MALFORMED = 1, REFUSED = 2, GONE = 3, BUSY = 5;
     private static final String GONE_WHY = "The document that asked is no longer shown.";
+    private static final System.Logger LOG = System.getLogger(PageQuery.class.getName());
     private final Page page;
     private final Optional<String> origin;
     private final Map<String, Object> request;
@@ -106,7 +107,7 @@ public final class PageQuery {
 
     /**
      * Answers the query with {@code json}, once: the page is sent it only while its main frame shows the origin that
-     * asked, and is otherwise told {@link #GONE}.
+     * asked, and is otherwise told {@link #GONE}, as it is when the origin it shows cannot be read.
      *
      * @param json the answer, a JSON text Jasper wrote
      * @return whether the page was sent {@code json}: false once the query was answered, failed or cancelled, and when
@@ -141,7 +142,8 @@ public final class PageQuery {
 
     /**
      * Tells {@code listener} once, on the UI thread, when the query is cancelled; at once when it has been told
-     * already. A query answered or failed first is never cancelled. UI thread.
+     * already. A query answered or failed first is never cancelled. A listener that throws as the cancel is told is
+     * logged, and the others are told all the same. UI thread.
      *
      * @param listener told on the UI thread
      * @return the registration
@@ -171,15 +173,30 @@ public final class PageQuery {
         return over.get();
     }
 
-    /** Whether the page's main frame shows the origin that asked: never an opaque one, which equals no origin. */
+    /**
+     * Whether the page's main frame shows the origin that asked: never an opaque one, which equals no origin, and not
+     * when the origin it shows cannot be read.
+     */
     private boolean showsAskingOrigin() {
-        return origin.isPresent() && origin.equals(currentOrigin.get());
+        try {
+            return origin.isPresent() && origin.equals(currentOrigin.get());
+        } catch (RuntimeException failure) {
+            LOG.log(System.Logger.Level.WARNING, "A page query could not read the page's origin", failure);
+            return false;
+        }
     }
 
+    /** Tells those who asked {@link #onCancelled}, each contained: one that throws stops no other, nor the close. */
     private void tellCancelled() {
         toldCancelled = true;
         List<Runnable> told = List.copyOf(cancelListeners);
         cancelListeners.clear();
-        for (Runnable listener : told) listener.run();
+        for (Runnable listener : told) {
+            try {
+                listener.run();
+            } catch (RuntimeException failure) {
+                LOG.log(System.Logger.Level.WARNING, "A page query's cancel listener failed", failure);
+            }
+        }
     }
 }

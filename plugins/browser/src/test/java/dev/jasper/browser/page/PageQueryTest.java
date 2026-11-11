@@ -1,5 +1,6 @@
 package dev.jasper.browser.page;
 
+import dev.jasper.browser.store.CapturedLog;
 import java.awt.EventQueue;
 import java.net.URI;
 import java.util.ArrayList;
@@ -170,6 +171,46 @@ class PageQueryTest {
             var told = new AtomicInteger();
             query.onCancelled(told::incrementAndGet);
             assertThat(told).hasValue(1);
+        });
+    }
+
+    /** Review round 1: a page origin that cannot be read is no origin that asked: the page is told it has gone. */
+    @Test void anOriginThatCannotBeReadIsToldGone() throws Exception {
+        onUiThread(() -> {
+            var query = new PageQuery(page(), ASKER, PICK, () -> true, () -> { throw new IllegalStateException("no document"); },
+                (code, text) -> replies.add(code + " " + text));
+            try (var log = new CapturedLog(PageQuery.class.getName())) {
+                assertThat(query.answer("{\"password\":\"pw\"}")).isFalse();
+                assertThat(log.records()).singleElement().satisfies(record -> assertThat(record.getThrown()).hasMessage("no document"));
+            }
+            assertThat(replies).singleElement().asString().startsWith(PageQuery.GONE + " ").doesNotContain("pw");
+            assertThat(query.answer("{}")).isFalse();
+            assertThat(replies).hasSize(1);
+        });
+    }
+
+    /**
+     * Review round 1: a cancel listener that throws is logged with its exception, and stops neither the other listeners
+     * nor the page's close.
+     */
+    @Test void aThrowingCancelListenerStopsNeitherTheOthersNorThePagesClose() throws Exception {
+        onUiThread(() -> {
+            Page page = page();
+            page.handleLogins("login();", query -> { });
+            PageQuery first = query(page, ASKER, () -> true), second = query(page, ASKER, () -> true);
+            page.loginQuery(first);
+            page.loginQuery(second);
+            var told = new ArrayList<String>();
+            first.onCancelled(() -> { throw new IllegalStateException("the picker broke"); });
+            first.onCancelled(() -> told.add("first"));
+            second.onCancelled(() -> told.add("second"));
+            page.onClose(() -> told.add("closed"));
+            try (var log = new CapturedLog(PageQuery.class.getName())) {
+                page.close();
+                assertThat(log.records()).singleElement().satisfies(record -> assertThat(record.getThrown()).hasMessage("the picker broke"));
+            }
+            assertThat(told).containsExactly("first", "second", "closed");
+            assertThat(replies).isEmpty();
         });
     }
 

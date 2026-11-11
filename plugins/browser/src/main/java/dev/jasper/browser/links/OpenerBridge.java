@@ -107,7 +107,8 @@ import org.cef.network.CefResponse;
  * link keeps only what the popup's later documents need: its id, and that the opener has closed.
  *
  * <p>Chromium asks on its own thread; each request is answered on the UI thread, where items open, but a
- * {@code login.pick}, which is answered as the user chooses. A main frame's
+ * {@code login.pick}, which is answered as the user chooses, and none is answered once Chromium has stopped (plan 6's
+ * F43). A main frame's
  * response is noted on Chromium's IO thread, and its load start is answered at once on Chromium's UI thread, so the
  * script runs before Swing would hear of the load.
  */
@@ -160,12 +161,25 @@ final class OpenerBridge {
     // How many requests of each page's main frame, and of its sub-frames together, wait for the UI thread; a queue
     // leaves once none does.
     private final Map<Waiters, Integer> waiting = new ConcurrentHashMap<>();
-    // Plan 8: the login queries handed to their pages and not yet over, for Chromium's cancel; each leaves as it is
-    // answered, failed or cancelled, and its page's close cancels it.
-    private final Map<QueryId, PageQuery> logins = new ConcurrentHashMap<>();
+    // Plan 8: the queries Chromium's cancel reaches, by their id: each admitted one from the moment Chromium's thread
+    // takes it until it is answered, and a login query until it is over; its page's close cancels it.
+    private final Map<QueryId, Pending> pending = new ConcurrentHashMap<>();
+    // Whether Chromium has stopped, after which no query is answered; any thread.
+    private final BooleanSupplier stopped;
 
-    /** A bridge with no links, which no page reaches until {@link #install} wires it to a client. */
-    OpenerBridge() { }
+    /** A bridge with no links whose Chromium never stops, as a test's is. */
+    OpenerBridge() {
+        this(() -> false);
+    }
+
+    /**
+     * A bridge with no links, which no page reaches until {@link #install} wires it to a client.
+     *
+     * @param stopped whether Chromium has stopped, after which no query is answered; any thread
+     */
+    OpenerBridge(BooleanSupplier stopped) {
+        this.stopped = Objects.requireNonNull(stopped, "stopped");
+    }
 
     /**
      * Wires a bridge to {@code client} before any page is made on it: a message router with the page function
@@ -173,10 +187,11 @@ final class OpenerBridge {
      * request handler hands the bridge each main frame's response, through {@link #responses()}. Once per client.
      *
      * @param client the client every page is made on
+     * @param stopped whether Chromium has stopped, after which no query is answered; any thread
      * @return the bridge
      */
-    static OpenerBridge install(CefClient client) {
-        var bridge = new OpenerBridge();
+    static OpenerBridge install(CefClient client, BooleanSupplier stopped) {
+        var bridge = new OpenerBridge(stopped);
         client.addMessageRouter(CefMessageRouter.create(new CefMessageRouter.CefMessageRouterConfig(QUERY, CANCEL), new Queries(bridge)));
         PageEvents.onMainFrameLoadStart(client, bridge::loadStarting);
         return bridge;
@@ -225,6 +240,36 @@ final class OpenerBridge {
      * @param query the query's id
      */
     record QueryId(int browser, long query) { }
+
+    /**
+     * A query Chromium's thread took, until it is answered (plan 8's L16): its id, whether Chromium cancelled it, and
+     * the login query it became, if it did. Chromium's thread registers it ({@link #pending}) before the UI thread can
+     * take the query, so a cancel that comes first stops the hand-off. Its lock is held only for a field's read or
+     * write.
+     */
+    static final class Pending {
+        private final QueryId id;
+        // Guarded by this.
+        private boolean cancelled;
+        private PageQuery query;
+
+        private Pending(QueryId id) {
+            this.id = id;
+        }
+
+        /** Makes {@code made} the login query this one became: false, changing nothing, once Chromium cancelled it. */
+        synchronized boolean attach(PageQuery made) {
+            if (cancelled) return false;
+            query = made;
+            return true;
+        }
+
+        /** Chromium cancelled it: the login query it became, or null for none yet. */
+        synchronized PageQuery cancel() {
+            cancelled = true;
+            return query;
+        }
+    }
 
     /**
      * What a request is answered: {@code code} 0 and the text the script is given, or a failure's code and why.
@@ -549,34 +594,41 @@ final class OpenerBridge {
     }
 
     /**
-     * The login queries handed to their pages that are not yet over.
+     * The queries Chromium's cancel still reaches: those taken and not yet answered, and the login queries handed to
+     * their pages that are not yet over.
      *
      * @return how many
      */
-    int loginQueries() {
-        return logins.size();
+    int cancellable() {
+        return pending.size();
+    }
+
+    /**
+     * Chromium's thread takes the query {@code id}, before it hands it to the UI thread: from now until it is answered,
+     * Chromium's cancel reaches it ({@link #cancelled}). Any thread; Chromium's, from its router.
+     *
+     * @param id the query, as Chromium names it
+     * @return what the UI thread's {@link #answer} is given
+     */
+    Pending pending(QueryId id) {
+        var taken = new Pending(Objects.requireNonNull(id, "id"));
+        pending.put(id, taken);
+        return taken;
     }
 
     /**
      * Chromium cancelled the query {@code query} of the browser {@code browser}, as its frame navigated or closed or
-     * its page cancelled it: a login query handed to its page is cancelled, and sends nothing. One the UI thread has
-     * yet to hand over is cancelled once it has: the task that hands it over was posted first, so the look again posted
-     * now comes after it. Any thread; Chromium's, from its router.
+     * its page cancelled it: a login query handed to its page is cancelled, and sends nothing, and one the UI thread
+     * has yet to take is never handed to its page. Any thread; Chromium's, from its router.
      *
      * @param browser the identifier of the browser that asked
      * @param query the query's id there
      */
     void cancelled(int browser, long query) {
-        var asked = new QueryId(browser, query);
-        if (!cancel(asked)) EventQueue.invokeLater(() -> cancel(asked));
-    }
-
-    /** Cancels the login query {@code asked}, if one is handed to its page and not yet over: whether there was one. */
-    private boolean cancel(QueryId asked) {
-        PageQuery query = logins.remove(asked);
-        if (query == null) return false;
-        query.cancelled();
-        return true;
+        Pending taken = pending.remove(new QueryId(browser, query));
+        if (taken == null) return;
+        PageQuery login = taken.cancel();
+        if (login != null) login.cancelled();
     }
 
     /**
@@ -593,28 +645,37 @@ final class OpenerBridge {
      * Answers an admitted query and settles it: {@code reply} is told the answer once, whatever happens. A failure inside
      * is answered as one; an {@link Error} is answered and then thrown on. A {@code login.pick} of the top frame is
      * handed to its page as a {@link PageQuery}, settled as the page's handler returns, and answered later, once, by
-     * that query; a hand-off that throws fails it, once, and an {@code Error} is thrown on. UI thread.
+     * that query; a hand-off that throws fails it, once, and an {@code Error} is thrown on; one Chromium cancelled
+     * first is neither handed over nor answered. Nothing is answered once Chromium has stopped (plan 6's F43). UI
+     * thread.
      *
      * @param sender the page that asked
      * @param mainFrame whether its main frame asked, as Chromium's thread read it
      * @param from the document that asked, as Chromium's thread saw it
-     * @param asked the query, as Chromium names it
+     * @param asked the query, as Chromium's thread took it ({@link #pending})
      * @param text the request
      * @param nowMillis when it asked
      * @param reply told the answer
      */
-    void answer(Party sender, boolean mainFrame, Sender from, QueryId asked, String text, long nowMillis, Consumer<Answer> reply) {
+    void answer(Party sender, boolean mainFrame, Sender from, Pending asked, String text, long nowMillis, Consumer<Answer> reply) {
+        Consumer<Answer> unlessStopped = answer -> {
+            if (!stopped.getAsBoolean()) reply.accept(answer);
+        };
         Answer answer = UNANSWERED;
         var handed = new PageQuery[1];
         try {
             answer = request(sender, mainFrame, from, text, nowMillis,
-                request -> loginPick(sender, from, asked, request, nowMillis, reply, handed));
+                request -> loginPick(sender, from, asked, request, nowMillis, unlessStopped, handed));
         } catch (RuntimeException failure) {
             LOG.log(System.Logger.Level.WARNING, "The opener bridge could not answer a page", failure);
         } finally {
             settled(sender.page(), mainFrame);
-            if (handed[0] == null) reply.accept(answer);
-            else if (answer != LATER) handed[0].fail(REFUSED, AboutScheme.UNANSWERED);
+            if (handed[0] == null) {
+                pending.remove(asked.id, asked);
+                if (answer != LATER) unlessStopped.accept(answer);
+            } else if (answer != LATER) {
+                handed[0].fail(REFUSED, AboutScheme.UNANSWERED);
+            }
         }
     }
 
@@ -784,22 +845,23 @@ final class OpenerBridge {
      * through {@code reply} once. Its origin is the asking document's, as Chromium's thread saw it; its answer reaches
      * the page only while the page's main frame shows that origin, as the bridge has heard. Its activation needs a
      * mouse press within the activation as well as the page's activation, which it consumes, both as at
-     * {@code nowMillis}, when Chromium took the request (plan 8's F3). It waits for Chromium's cancel until it is over.
-     * UI thread.
+     * {@code nowMillis}, when Chromium took the request (plan 8's F3). It waits for Chromium's cancel until it is over;
+     * one Chromium cancelled before the UI thread took it is never handed over, and spends nothing (plan 8's L16). UI
+     * thread.
      *
      * @return {@code LATER}
      */
-    private Answer loginPick(Party sender, Sender asker, QueryId asked, Map<String, Object> request, long nowMillis,
+    private Answer loginPick(Party sender, Sender asker, Pending asked, Map<String, Object> request, long nowMillis,
                              Consumer<Answer> reply, PageQuery[] handed) {
         Page page = sender.page();
         BooleanSupplier activation = () -> sender.lastPress().get().withinActivation(nowMillis) && sender.activation().consume(nowMillis);
         var query = new PageQuery(page, asker.document().origin(), request, activation, () -> document(page).origin(), (code, text) -> {
-            logins.remove(asked);
+            pending.remove(asked.id, asked);
             reply.accept(new Answer(code, text));
         });
+        if (!asked.attach(query)) return LATER;
         handed[0] = query;
-        logins.put(asked, query);
-        query.onCancelled(() -> logins.remove(asked, query));
+        query.onCancelled(() -> pending.remove(asked.id, asked));
         page.loginQuery(query);
         return LATER;
     }
@@ -944,7 +1006,8 @@ final class OpenerBridge {
     /**
      * The client's one handler for the page function. On Chromium's thread it answers at once what it refuses (a request
      * from anything but a page, one that stays open for more answers, and what {@link #admit} refuses), and hands the
-     * rest to the UI thread. Every query is answered, once, unless Chromium cancels it first, which the bridge hears.
+     * rest to the UI thread, once it has registered it for Chromium's cancel ({@link #pending}). Every query is
+     * answered, once, unless Chromium cancels it first, which the bridge hears, or has stopped.
      */
     private static final class Queries extends CefMessageRouterHandlerAdapter {
         private final OpenerBridge bridge;
@@ -956,6 +1019,7 @@ final class OpenerBridge {
         @Override public boolean onQuery(CefBrowser browser, CefFrame frame, long queryId, String request, boolean persistent,
                                          CefQueryCallback callback) {
             Page page = null;
+            Pending asked = null;
             boolean admitted = false, main = false;
             try {
                 PageBrowser shown = browser instanceof PageBrowser candidate ? candidate : null;
@@ -973,13 +1037,15 @@ final class OpenerBridge {
                 admitted = true;
                 Party sender = Party.of(shown, page);
                 Sender from = bridge.sender(page, frame.getIdentifier(), frame::getURL);
-                var asked = new QueryId(browser.getIdentifier(), queryId);
                 long now = System.currentTimeMillis();
                 boolean mainFrame = main;
-                EventQueue.invokeLater(() -> bridge.answer(sender, mainFrame, from, asked, request, now, answer -> reply(callback, answer)));
+                // Registered before the UI thread can take it, so Chromium's cancel reaches it from now (L16).
+                Pending taken = asked = bridge.pending(new QueryId(browser.getIdentifier(), queryId));
+                EventQueue.invokeLater(() -> bridge.answer(sender, mainFrame, from, taken, request, now, answer -> reply(callback, answer)));
                 return true;
             } catch (RuntimeException failure) {
                 LOG.log(System.Logger.Level.WARNING, "The opener bridge could not take a page's request", failure);
+                if (asked != null) bridge.pending.remove(asked.id, asked);
                 if (admitted) bridge.settled(page, main);
                 reply(callback, new Answer(REFUSED, AboutScheme.UNANSWERED));
                 return true;

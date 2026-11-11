@@ -15,6 +15,7 @@ import java.util.Collections;
 import java.util.Optional;
 import java.util.Set;
 import java.util.WeakHashMap;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import org.cef.CefClient;
@@ -82,9 +83,11 @@ public final class PageNavigation {
     }
 
     private static void install(CefClient client, Chromium chromium, FilterList filters) {
-        OpenerBridge bridge = OpenerBridge.install(client);
+        // Neither router answers a query once Chromium has stopped (plan 6's F43, plan 8's L15).
+        BooleanSupplier stopped = () -> chromium.state() == Chromium.State.STOPPED;
+        OpenerBridge bridge = OpenerBridge.install(client, stopped);
         // The page scripts' privacy router reads what the bridge records of each page's document.
-        PrivacyQueries.install(client, bridge, chromium);
+        PrivacyQueries.install(client, bridge, stopped);
         client.addRequestHandler(new Links(bridge, chromium, filters));
         client.addLifeSpanHandler(new Popups());
     }
