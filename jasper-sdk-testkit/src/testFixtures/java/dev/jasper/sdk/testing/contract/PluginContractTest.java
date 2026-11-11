@@ -4752,6 +4752,36 @@ public abstract class PluginContractTest {
         };
     }
 
+    @Test void theEditorHearsWhereAnOpenCameFrom() {
+        var a = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.EDITOR_PROVIDE), Set.of(), Set.of(), a::set);
+        List<String> calls = new CopyOnWriteArrayList<>();
+        h.ui(() -> a.get().platform().editor(new dev.jasper.sdk.ui.FileEditor() {
+            @Override public boolean edit(java.nio.file.Path file, java.util.OptionalInt line, Optional<dev.jasper.sdk.WindowOwner> window) {
+                calls.add("three"); return false;
+            }
+            @Override public boolean edit(java.nio.file.Path file, java.util.OptionalInt line, Optional<dev.jasper.sdk.WindowOwner> window,
+                                          dev.jasper.sdk.ui.FileOrigin origin) {
+                calls.add(origin.name()); return true;
+            }
+        }));
+        java.nio.file.Path notes = HERE.resolve("notes.txt");
+        assertThat(h.edit(notes, java.util.OptionalInt.empty(), Optional.empty())).isTrue();
+        assertThat(h.edit(notes, java.util.OptionalInt.empty(), Optional.empty(), dev.jasper.sdk.ui.FileOrigin.OUTSIDE)).isTrue();
+        assertThat(calls).as("the three-argument host call is a Jasper open").containsExactly("JASPER", "OUTSIDE");
+    }
+
+    @Test void aLambdaEditorGetsEveryOriginThroughItsThreeArgumentEdit() {
+        var a = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.EDITOR_PROVIDE), Set.of(), Set.of(), a::set);
+        List<String> calls = new CopyOnWriteArrayList<>();
+        h.ui(() -> a.get().platform().editor(recordingEditor(calls, true)));
+        java.nio.file.Path notes = HERE.resolve("notes.txt");
+        assertThat(h.edit(notes, java.util.OptionalInt.of(4), Optional.empty(), dev.jasper.sdk.ui.FileOrigin.OUTSIDE)).isTrue();
+        assertThat(calls).containsExactly("notes.txt|4|-");
+        assertThatNullPointerException().isThrownBy(() -> h.edit(notes, java.util.OptionalInt.empty(), Optional.empty(), null));
+    }
+
     @Test void providingTheEditorNeedsTheCapabilityAndOnePluginProvidesItAtATime() {
         var bare = new AtomicReference<PluginContext>();
         var a = new AtomicReference<PluginContext>();

@@ -171,8 +171,9 @@ class FakeContractTest extends PluginContractTest {
             }
             @Override public java.util.Map<String, String> tabNamePieces(java.util.UUID tabId) { return host.tabNamePieces(tabId); }
             @Override public void declareBundled(String pluginId) { host.declareBundled(pluginId); }
-            @Override public boolean edit(java.nio.file.Path file, java.util.OptionalInt line, java.util.Optional<java.util.UUID> windowId) {
-                return host.edit(file, line, windowId);
+            @Override public boolean edit(java.nio.file.Path file, java.util.OptionalInt line, java.util.Optional<java.util.UUID> windowId,
+                                          dev.jasper.sdk.ui.FileOrigin origin) {
+                return host.edit(file, line, windowId, origin);
             }
             @Override public boolean openLink(java.net.URI address, dev.jasper.sdk.ui.LinkOrigin origin, dev.jasper.sdk.ui.LinkPlacement placement,
                                               java.util.Optional<String> target, java.util.Optional<java.util.UUID> windowId) {

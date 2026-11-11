@@ -815,7 +815,7 @@ public final class JasperApplication {
 
     /** As {@link #openFileAt(Path, int, UUID)}, falling back to {@code desktop}; tests inject its actions. */
     void openFileAt(Path file, int line, UUID window, dev.jasper.app.platform.ConfigEditor desktop) {
-        openFile(file, line, window, desktop::editOrReveal, "Could not open a clicked file", false);
+        openFile(file, line, window, desktop::editOrReveal, "Could not open a clicked file", false, PluginRuntime.Origin.JASPER);
     }
 
     /**
@@ -834,7 +834,7 @@ public final class JasperApplication {
 
     /** As {@link #openClickedFile(Path, int, UUID)}, falling back to {@code desktop}; tests inject its actions. */
     void openClickedFile(Path file, int line, UUID window, dev.jasper.app.platform.ConfigEditor desktop) {
-        openFile(file, line, window, desktop::editOrReveal, "Could not open a clicked file", true);
+        openFile(file, line, window, desktop::editOrReveal, "Could not open a clicked file", true, PluginRuntime.Origin.JASPER);
     }
 
     /**
@@ -849,11 +849,12 @@ public final class JasperApplication {
 
     /** As {@link #openRequestedFile(Path, UUID)}, falling back to {@code desktop}; tests inject its actions. */
     void openRequestedFile(Path file, UUID window, dev.jasper.app.platform.ConfigEditor desktop) {
-        openFile(file, 0, window, desktop::revealOnly, "Could not open a requested file", false);
+        openFile(file, 0, window, desktop::revealOnly, "Could not open a requested file", false, PluginRuntime.Origin.OUTSIDE);
     }
 
     /** Opens {@code file} on a virtual thread; a local web file goes to the browser first only when {@code browserFirst}. */
-    private void openFile(Path file, int line, UUID window, Consumer<Path> fallback, String failed, boolean browserFirst) {
+    private void openFile(Path file, int line, UUID window, Consumer<Path> fallback, String failed, boolean browserFirst,
+                          PluginRuntime.Origin origin) {
         fileOpener.execute(() -> {
             try {
                 if (!java.nio.file.Files.isRegularFile(file)) return;
@@ -863,7 +864,7 @@ public final class JasperApplication {
                     return;
                 }
                 if (browserFirst && LocalWebFiles.matches(file) && browserTook(runtime, file, window)) return;
-                runtime.open(file, line > 0 ? OptionalInt.of(line) : OptionalInt.empty(), Optional.of(window), fallback);
+                runtime.open(file, line > 0 ? OptionalInt.of(line) : OptionalInt.empty(), Optional.of(window), origin, fallback);
             } catch (RuntimeException failure) {
                 LOG.log(System.Logger.Level.WARNING, failed, failure);
             }

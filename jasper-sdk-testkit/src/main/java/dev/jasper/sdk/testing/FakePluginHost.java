@@ -2510,12 +2510,13 @@ public final class FakePluginHost implements AutoCloseable {
     /** Asks the provided editor on the caller's thread; false when there is none, or it declined or threw. */
     boolean editProvided(Path file, OptionalInt line, Optional<dev.jasper.sdk.WindowOwner> window) {
         ProvidedEditor provided = providedEditor;
-        return provided != null && editWith(provided, file, line, window);
+        return provided != null && editWith(provided, file, line, window, dev.jasper.sdk.ui.FileOrigin.JASPER);
     }
 
-    private boolean editWith(ProvidedEditor provided, Path file, OptionalInt line, Optional<dev.jasper.sdk.WindowOwner> window) {
+    private boolean editWith(ProvidedEditor provided, Path file, OptionalInt line, Optional<dev.jasper.sdk.WindowOwner> window,
+                             dev.jasper.sdk.ui.FileOrigin origin) {
         try {
-            return provided.editor().edit(file, line, window);
+            return provided.editor().edit(file, line, window, origin);
         } catch (RuntimeException failure) {
             failures.add(provided.context().plugin().id() + " file editor: " + failure);
             return false;
@@ -2533,6 +2534,22 @@ public final class FakePluginHost implements AutoCloseable {
      * @since 0.17.1
      */
     public boolean edit(Path file, OptionalInt line, Optional<UUID> windowId) {
+        return edit(file, line, windowId, dev.jasper.sdk.ui.FileOrigin.JASPER);
+    }
+
+    /**
+     * Opens a file as Jasper does for a file of the given origin: with the editor a plugin provides through
+     * {@code Platform.editor}, given that plugin's handle for {@code windowId} while the window is open.
+     *
+     * @param file the file
+     * @param line the line to show, or empty
+     * @param windowId the Jasper window the open came from, or empty
+     * @param origin where the open came from
+     * @return what the editor answered; false when no plugin provides one, or it threw, which {@link #failures()} records
+     * @since 0.31.0
+     */
+    public boolean edit(Path file, OptionalInt line, Optional<UUID> windowId, dev.jasper.sdk.ui.FileOrigin origin) {
+        Objects.requireNonNull(origin, "origin");
         Objects.requireNonNull(file, "file");
         Objects.requireNonNull(line, "line");
         Objects.requireNonNull(windowId, "windowId");
@@ -2540,7 +2557,7 @@ public final class FakePluginHost implements AutoCloseable {
         if (provided == null) return false;
         Optional<dev.jasper.sdk.WindowOwner> window = windowId.flatMap(id -> provided.context().terminals.window(id))
             .map(handle -> (dev.jasper.sdk.WindowOwner) handle);
-        return editWith(provided, file, line, window);
+        return editWith(provided, file, line, window, origin);
     }
 
     /**

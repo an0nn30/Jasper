@@ -71,6 +71,19 @@ class FileEditorsTest {
         assertThat(editors.edit(NOTES, OptionalInt.empty(), Optional.empty())).isTrue();
     }
 
+    @Test void theOriginReachesTheEditorAndTheOldCallsAreJaspersOwn() {
+        List<String> calls = new CopyOnWriteArrayList<>();
+        editors.register("dev.x.a", new FileEditor() {
+            @Override public boolean edit(Path file, OptionalInt line, Optional<WindowOwner> window) { calls.add("three"); return true; }
+            @Override public boolean edit(Path file, OptionalInt line, Optional<WindowOwner> window, dev.jasper.sdk.ui.FileOrigin origin) {
+                calls.add(origin.name()); return true;
+            }
+        }, FileEditorsTest::noWindow);
+        editors.edit(NOTES, OptionalInt.empty(), Optional.empty());
+        editors.edit(NOTES, OptionalInt.empty(), Optional.empty(), dev.jasper.sdk.ui.FileOrigin.OUTSIDE);
+        assertThat(calls).containsExactly("JASPER", "OUTSIDE");
+    }
+
     @Test void aWindowIdBecomesTheRegisteringPluginsOwnHandle() {
         UUID open = UUID.randomUUID();
         List<String> calls = new CopyOnWriteArrayList<>();
@@ -83,17 +96,17 @@ class FileEditorsTest {
 
     @Test void aWorkerAsksOnTheUiThreadAndGivesUpAfterItsWait() throws Exception {
         assertThatIllegalStateException().as("the UI thread never waits for itself")
-            .isThrownBy(() -> editors.editFromWorker(NOTES, OptionalInt.empty(), Optional::empty));
+            .isThrownBy(() -> editors.editFromWorker(NOTES, OptionalInt.empty(), Optional::empty, dev.jasper.sdk.ui.FileOrigin.JASPER));
 
         var stuck = new FileEditors(task -> { }, () -> false, containment, Duration.ofMillis(50));
         var asked = new AtomicBoolean();
         stuck.register("dev.x.a", (file, line, window) -> { asked.set(true); return true; }, FileEditorsTest::noWindow);
         long began = System.nanoTime();
-        assertThat(stuck.editFromWorker(NOTES, OptionalInt.empty(), Optional::empty)).as("no answer in time").isFalse();
+        assertThat(stuck.editFromWorker(NOTES, OptionalInt.empty(), Optional::empty, dev.jasper.sdk.ui.FileOrigin.JASPER)).as("no answer in time").isFalse();
         assertThat(Duration.ofNanos(System.nanoTime() - began)).isLessThan(Duration.ofSeconds(5));
         Thread.currentThread().interrupt();
         try {
-            assertThat(stuck.editFromWorker(NOTES, OptionalInt.empty(), Optional::empty)).as("interrupted").isFalse();
+            assertThat(stuck.editFromWorker(NOTES, OptionalInt.empty(), Optional::empty, dev.jasper.sdk.ui.FileOrigin.JASPER)).as("interrupted").isFalse();
             assertThat(Thread.currentThread().isInterrupted()).as("the interrupt is kept").isTrue();
         } finally {
             Thread.interrupted();
@@ -109,7 +122,7 @@ class FileEditorsTest {
         assertThat(hopping.editFromWorker(NOTES, OptionalInt.of(9), () -> {
             windowReadOnUi.set(SwingUtilities.isEventDispatchThread());
             return Optional.of(window);
-        })).isTrue();
+        }, dev.jasper.sdk.ui.FileOrigin.JASPER)).isTrue();
         assertThat(windowReadOnUi.get()).as("the window is read on the UI thread").isTrue();
         assertThat(calls).containsExactly("a|9|window");
     }
@@ -155,7 +168,7 @@ class FileEditorsTest {
 
     @Test void withoutAnEditorAWorkerDoesNotHop() {
         var never = new FileEditors(task -> { throw new AssertionError("nothing to ask"); }, () -> false, containment);
-        assertThat(never.editFromWorker(NOTES, OptionalInt.empty(), Optional::empty)).isFalse();
+        assertThat(never.editFromWorker(NOTES, OptionalInt.empty(), Optional::empty, dev.jasper.sdk.ui.FileOrigin.JASPER)).isFalse();
     }
 
     @Test void aWorkerOpensAtTheLineInTheWindowItWasGiven() {

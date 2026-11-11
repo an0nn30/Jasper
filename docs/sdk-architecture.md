@@ -428,7 +428,8 @@ the UI thread through `FileEditors.editFromWorker`, waits up to 30 s, and otherw
 its edit action, then its open action, then revealing it. A Cmd-click (Ctrl-click on Linux and Windows) on a file
 path in a local terminal pane (`JasperApplication.openClickedFile`) asks the same way, with the line and the clicked
 window, and so does File › Open File… (`openFileAt`), at no line; `openClickedFile` first offers a local web file to
-the web browser role (below). A clicked path is program output, and an OSC 8 link's address can
+the web browser role (below). `JasperApplication.openRequestedFile` passes `PluginRuntime.Origin.OUTSIDE`, which reaches the
+editor as `FileOrigin.OUTSIDE`; every other open is `JASPER`. A clicked path is program output, and an OSC 8 link's address can
 differ from the text shown, so that fallback is the desktop's edit or reveal action, never its open action, and a
 plugin's editor should edit the file and never run it. `Platform.openFile` asks the file editor the same way from the
 plugin's worker, with the active window and no line, and falls back to that edit or reveal action; it never asks the

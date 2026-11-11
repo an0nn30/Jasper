@@ -412,7 +412,12 @@ public interface ContractHarness extends AutoCloseable {
          * Opens a file as Jasper's own opens do, with the editor a plugin provides; false when none does, or it declined or
          * threw. Asked on the UI thread.
          */
-        boolean edit(java.nio.file.Path file, java.util.OptionalInt line, java.util.Optional<java.util.UUID> windowId);
+        default boolean edit(java.nio.file.Path file, java.util.OptionalInt line, java.util.Optional<java.util.UUID> windowId) {
+            return edit(file, line, windowId, dev.jasper.sdk.ui.FileOrigin.JASPER);
+        }
+        /** As the three-argument {@code edit}, for a file of the given origin; the origin must not be null. */
+        boolean edit(java.nio.file.Path file, java.util.OptionalInt line, java.util.Optional<java.util.UUID> windowId,
+                     dev.jasper.sdk.ui.FileOrigin origin);
         /**
          * Opens a web address as Jasper's own routes do (a link clicked in a terminal, the {@code jasper} command), with the
          * browser a plugin provides, as a {@code WebLink} of these parts; false when none does, or it declined or threw.

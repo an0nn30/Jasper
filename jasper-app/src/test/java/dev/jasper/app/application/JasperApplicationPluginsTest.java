@@ -472,6 +472,87 @@ class JasperApplicationPluginsTest {
         }
         """;
 
+    private static final String ORIGIN_EDITOR = """
+        package fix.origin;
+        import dev.jasper.sdk.plugin.Plugin;
+        import dev.jasper.sdk.plugin.PluginContext;
+        import dev.jasper.sdk.ui.FileEditor;
+        import java.nio.file.Files;
+        import java.nio.file.StandardOpenOption;
+        public final class Main implements Plugin {
+            @Override public void start(PluginContext context) {
+                context.platform().editor(new FileEditor() {
+                    @Override public boolean edit(java.nio.file.Path file, java.util.OptionalInt line,
+                                                  java.util.Optional<dev.jasper.sdk.WindowOwner> window) {
+                        throw new AssertionError("Jasper calls the four-argument edit");
+                    }
+                    @Override public boolean edit(java.nio.file.Path file, java.util.OptionalInt line,
+                                                  java.util.Optional<dev.jasper.sdk.WindowOwner> window, dev.jasper.sdk.ui.FileOrigin origin) {
+                        try {
+                            Files.writeString(context.dataDirectory().resolve("edited"), file.getFileName() + "|" + origin + "\\n",
+                                StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+                        } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+                        return true;
+                    }
+                });
+            }
+        }
+        """;
+
+    /** Plan 1 Task 3: openRequestedFile, the funnel for files other programs hand over, is OUTSIDE; Jasper's own opens are JASPER. */
+    @Test void handedInFilesCarryTheOutsideOrigin() throws Exception {
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path dev = home.resolve("origin-plugin");
+        PluginJars.build(dev, "origin.jar", PluginJars.descriptor("dev.example.origin", "1.0.0", "fix.origin.Main")
+            + "capabilities = [\"editor.provide\"]\n", Map.of("fix.origin.Main", ORIGIN_EDITOR), List.of());
+        Path handed = java.nio.file.Files.writeString(home.resolve("Handed.java"), "class Handed { }\n");
+        Path picked = java.nio.file.Files.writeString(home.resolve("Picked.java"), "class Picked { }\n");
+        Path clicked = java.nio.file.Files.writeString(home.resolve("Clicked.java"), "class Clicked { }\n");
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        java.util.UUID window = java.util.UUID.randomUUID();
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].startPlugins(null, dev, false, dirs);
+            application[0].openRequestedFile(handed, window);
+            application[0].openFileAt(picked, 0, window);
+            application[0].openClickedFile(clicked, 0, window);
+        });
+        assertThat(awaitLines(dirs.plugins().resolve("dev.example.origin/data/edited"), 3))
+            .containsExactlyInAnyOrder("Handed.java|OUTSIDE", "Picked.java|JASPER", "Clicked.java|JASPER");
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
+    }
+
+    /** Plan 1 final review: every route a program can hand a file over (launch, open-file event, open-URI, second launch) is OUTSIDE. */
+    @Test void everyHandedInRouteCarriesTheOutsideOrigin() throws Exception {
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path dev = home.resolve("origin-routes-plugin");
+        PluginJars.build(dev, "origin.jar", PluginJars.descriptor("dev.example.origin", "1.0.0", "fix.origin.Main")
+            + "capabilities = [\"editor.provide\"]\n", Map.of("fix.origin.Main", ORIGIN_EDITOR), List.of());
+        Path launched = java.nio.file.Files.writeString(home.resolve("Launched.java"), "class Launched { }\n");
+        Path opened = java.nio.file.Files.writeString(home.resolve("Opened.java"), "class Opened { }\n");
+        Path uri = java.nio.file.Files.writeString(home.resolve("Uri.java"), "class Uri { }\n");
+        Path second = java.nio.file.Files.writeString(home.resolve("Second.java"), "class Second { }\n");
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].startPlugins(null, dev, false, dirs);
+            framesHeadless(application[0]);
+            application[0].openFirstWindow(List.of(launched), List.of()).orElseThrow();
+            application[0].filesOpened(List.of(opened.toFile()));
+            application[0].uriOpened(uri.toUri());
+            application[0].handedOff(List.of(second), List.of(), List.of(), false);
+        });
+        assertThat(awaitLines(dirs.plugins().resolve("dev.example.origin/data/edited"), 4)).containsExactlyInAnyOrder(
+            "Launched.java|OUTSIDE", "Opened.java|OUTSIDE", "Uri.java|OUTSIDE", "Second.java|OUTSIDE");
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
+    }
+
     /** Review Focus 1, the application's half: a clicked file opens at its line when it is an existing regular file. */
     @Test void aClickedFileOpensAtItsLineOnlyWhenItIsAnExistingRegularFile() throws Exception {
         AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));

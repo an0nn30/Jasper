@@ -8,6 +8,7 @@ import dev.jasper.sdk.terminal.OpenRequest;
 import dev.jasper.sdk.terminal.Terminals;
 import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.ui.FileEditor;
+import dev.jasper.sdk.ui.FileOrigin;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
@@ -29,7 +30,7 @@ import java.util.function.Supplier;
  * <p>{@link #findSaved} looks for the saved editor at start, before any shell starts, and {@link #detect} looks for all
  * of them in the background.
  */
-public final class DefaultEditor {
+public final class DefaultEditor implements FileEditor {
     /**
      * What the four Default editor settings hold now.
      *
@@ -248,6 +249,7 @@ public final class DefaultEditor {
      * @param window the window Jasper opened the file from
      * @return whether it opened; false hands the file to the desktop
      */
+    @Override
     public boolean edit(Path file, OptionalInt line, Optional<WindowOwner> window) {
         Path target = file.toAbsolutePath().normalize();
         return switch (choice()) {
@@ -260,6 +262,24 @@ public final class DefaultEditor {
                 yield custom.inTerminal() ? inTab(command, target, window) : launcher.start(command, EditorCommands.program(custom.command()));
             }
             case Choice.System _ -> false;
+        };
+    }
+
+    /**
+     * A file other programs hand to Jasper opens in the Jasper Editor whatever the choice; any other open follows the
+     * choice as {@link #edit(Path, OptionalInt, Optional)} does.
+     *
+     * @param file the file
+     * @param line 1-based, when known
+     * @param window the window Jasper opened the file from
+     * @param origin who asked for the file
+     * @return whether it opened; false hands the file to the desktop
+     */
+    @Override
+    public boolean edit(Path file, OptionalInt line, Optional<WindowOwner> window, FileOrigin origin) {
+        return switch (origin) {
+            case OUTSIDE -> jasper.edit(file.toAbsolutePath().normalize(), line, window);
+            case JASPER -> edit(file, line, window);
         };
     }
 

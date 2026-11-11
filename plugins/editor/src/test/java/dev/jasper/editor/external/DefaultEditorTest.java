@@ -12,6 +12,8 @@ import dev.jasper.sdk.notifications.NotificationGroup;
 import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.testing.FakeNotifications;
 import dev.jasper.sdk.testing.FakePluginHost;
+import dev.jasper.sdk.ui.FileEditor;
+import dev.jasper.sdk.ui.FileOrigin;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -72,13 +74,18 @@ class DefaultEditorTest {
 
     /** The default editor over a machine whose programs are {@link #programs}; the launcher records instead of starting. */
     private DefaultEditor editor(String osName, Optional<Path> jasperCommand) {
+        return editor(osName, jasperCommand, (path, line, window) -> { opened.add(new Opened(path, line, window)); return true; });
+    }
+
+    /** The same, with {@code jasper} as the Jasper Editor's own file editor. */
+    private DefaultEditor editor(String osName, Optional<Path> jasperCommand, FileEditor jasper) {
         return new DefaultEditor(preference::get, () -> {
                 probed.incrementAndGet();
                 if (failing.get()) throw new IllegalStateException("PATH could not be read");
                 return new Detection.Probe(osName, List.of(bin), home, Map.of(), programs::contains);
             },
             context.background(), uiQueue::add, context.terminals(),
-            (path, line, window) -> { opened.add(new Opened(path, line, window)); return true; },
+            jasper,
             (command, program) -> { launched.add(command); named.add(program); return starts; }, jasperCommand, osName, context.log());
     }
 
@@ -125,6 +132,47 @@ class DefaultEditorTest {
         return "export PATH=\"$PATH\":" + EditorCommands.quote(Path.of("/opt/homebrew/bin").toString(), MAC) + ":"
             + EditorCommands.quote(Path.of("/usr/local/bin").toString(), MAC) + ":"
             + EditorCommands.quote(home.resolve(".local").resolve("bin").toString(), MAC) + "; " + command + " " + EditorCommands.quote(file.toString(), MAC);
+    }
+
+    @Test void aHandedInFileOpensHereWhateverTheChoice() {
+        install("nvim");
+        install("code");
+        for (String choice : List.of("jasper", "nvim", "code", "custom", "system")) {
+            preference.set(new DefaultEditor.Preference(choice, "subl -w", true, true));
+            opened.clear();
+            DefaultEditor defaults = detected(MAC);
+            assertThat(defaults.edit(file, OptionalInt.of(9), Optional.empty(), FileOrigin.OUTSIDE)).as(choice).isTrue();
+            assertThat(opened).as(choice).containsExactly(new Opened(file, OptionalInt.of(9), Optional.empty()));
+        }
+        assertThat(launched).isEmpty();
+        assertThat(host.openRequests()).isEmpty();
+    }
+
+    @Test void aJasperOpenStillFollowsTheChoice() {
+        Path code = install("code");
+        choose("code");
+        DefaultEditor defaults = detected(MAC);
+        assertThat(defaults.edit(file, OptionalInt.empty(), Optional.empty(), FileOrigin.JASPER)).isTrue();
+        assertThat(launched).containsExactly(List.of(code.toString(), file.toString()));
+        assertThat(opened).isEmpty();
+    }
+
+    @Test void aHandedInFileTheJasperEditorDeclinesIsNotGivenToTheChoice() {
+        install("code");
+        choose("code");
+        DefaultEditor defaults = editor(MAC, Optional.of(client), (path, line, window) -> false);
+        defaults.detect();
+        drain();
+        assertThat(defaults.edit(file, OptionalInt.empty(), Optional.empty(), FileOrigin.OUTSIDE)).isFalse();
+        assertThat(launched).isEmpty();
+    }
+
+    @Test void withSystemAJasperSideOpenGoesToTheDesktopAndItsHandBackOpensHere() {
+        choose("system");
+        DefaultEditor defaults = detected(MAC);
+        assertThat(defaults.edit(file, OptionalInt.empty(), Optional.empty(), FileOrigin.JASPER)).as("to the desktop").isFalse();
+        assertThat(defaults.edit(file, OptionalInt.empty(), Optional.empty(), FileOrigin.OUTSIDE)).as("handed back").isTrue();
+        assertThat(opened).hasSize(1);
     }
 
     @Test void theJasperEditorOpensTheFileItself() {

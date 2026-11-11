@@ -86,6 +86,12 @@ final class FileEditors {
      * @return true when it opened the file; false when no plugin provides an editor, or it declined or threw
      */
     boolean edit(Path file, OptionalInt line, Optional<UUID> windowId) {
+        return edit(file, line, windowId, dev.jasper.sdk.ui.FileOrigin.JASPER);
+    }
+
+    /** As {@link #edit(Path, OptionalInt, Optional)}, telling the editor where the open came from. */
+    boolean edit(Path file, OptionalInt line, Optional<UUID> windowId, dev.jasper.sdk.ui.FileOrigin origin) {
+        Objects.requireNonNull(origin, "origin");
         Objects.requireNonNull(file, "file");
         Objects.requireNonNull(line, "line");
         Objects.requireNonNull(windowId, "windowId");
@@ -94,7 +100,7 @@ final class FileEditors {
         Optional<WindowOwner> window = windowId.flatMap(current.windows());
         var opened = new AtomicBoolean();
         Throwable failure = containment.attempt(current.pluginId(), "file editor", () -> {
-            opened.set(current.editor().edit(file, line, window));
+            opened.set(current.editor().edit(file, line, window, origin));
             return null;
         });
         return failure == null && opened.get();
@@ -106,9 +112,10 @@ final class FileEditors {
      * interrupt also stays set on the thread, which tells it from a decline: {@link #openFromWorker} then skips the
      * desktop.
      *
+     * @param origin whether Jasper or another program asked for the open
      * @throws IllegalStateException on the UI thread
      */
-    boolean editFromWorker(Path file, OptionalInt line, Supplier<Optional<UUID>> window) {
+    boolean editFromWorker(Path file, OptionalInt line, Supplier<Optional<UUID>> window, dev.jasper.sdk.ui.FileOrigin origin) {
         if (onUi.getAsBoolean()) throw new IllegalStateException("Opening a file for editing waits for the UI thread; ask from a worker");
         Objects.requireNonNull(file, "file");
         Objects.requireNonNull(line, "line");
@@ -119,7 +126,7 @@ final class FileEditors {
         try {
             ui.accept(() -> {
                 if (abandoned.get()) { answer.complete(false); return; }
-                try { answer.complete(edit(file, line, window.get())); }
+                try { answer.complete(edit(file, line, window.get(), origin)); }
                 catch (Throwable failure) { answer.completeExceptionally(failure); throw failure; }
             });
         } catch (RuntimeException rejected) {
@@ -164,8 +171,14 @@ final class FileEditors {
      * @throws IllegalStateException on the UI thread
      */
     boolean openFromWorker(Path file, OptionalInt line, Supplier<Optional<UUID>> window, Consumer<Path> desktop) {
+        return openFromWorker(file, line, window, dev.jasper.sdk.ui.FileOrigin.JASPER, desktop);
+    }
+
+    /** As above, telling the editor where the open came from. */
+    boolean openFromWorker(Path file, OptionalInt line, Supplier<Optional<UUID>> window, dev.jasper.sdk.ui.FileOrigin origin,
+                           Consumer<Path> desktop) {
         Objects.requireNonNull(desktop, "desktop");
-        if (editFromWorker(file, line, window)) return true;
+        if (editFromWorker(file, line, window, origin)) return true;
         if (Thread.currentThread().isInterrupted()) {
             LOG.log(System.Logger.Level.INFO, "The worker was interrupted, so the desktop does not open the file");
             return false;

@@ -337,8 +337,8 @@ download fails with "Operation not permitted"; the choice is in System Settings 
 `public.source-code`) as an editor and folders (`public.folder`) as a viewer, each at `LSHandlerRank` Alternate, so
 Jasper appears in Finder's Open With and takes drops on its Dock icon without becoming any type's default application.
 macOS hands the files and folders to Jasper as an open-file event, to the running Jasper when there is one: each file
-opens in the [default editor](editor.md#default-editor), or is revealed in the file manager when no editor plugin runs or
-the default editor is **System default app**, and each folder as a terminal tab, in the most recently active window
+opens in the [Jasper Editor](editor.md#opening-files), or is revealed in the file manager when no editor plugin runs,
+and each folder as a terminal tab, in the most recently active window
 ([one Jasper per home](command-line.md#one-jasper-per-home)). `verifyPackage` checks the key.
 
 ### macOS web links

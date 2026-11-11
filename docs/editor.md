@@ -46,7 +46,8 @@ Other plugins open files in it through its API: Remote for files on SFTP hosts, 
   messages here; Ctrl+C stops waiting and leaves the tabs open. With no file it does what **Show Editor** does.
 - The files a launch names (`Jasper notes.txt`, or `jasper notes.txt` with the
   [jasper command](command-line.md#the-jasper-command)), and on macOS the files you open with Jasper in Finder (Open
-  With) or drop on its Dock icon, go to the [default editor](#default-editor); this Editor opens them in the most recently active window ([One Jasper per home](command-line.md#one-jasper-per-home)).
+  With) or drop on its Dock icon, open in this Editor whatever [Default editor](#default-editor) says, in the most
+  recently active window ([One Jasper per home](command-line.md#one-jasper-per-home)).
 
 A file opens in a new tab of the window it was opened from, otherwise of the most recently active window. Opening a file that is already
 open selects its tab, of several [views](#views-of-one-file) the one you were in last; `jasper editor` and a Cmd-click
@@ -589,9 +590,8 @@ a recent file".
 **Default editor** on the Editor's settings page (Settings › Tools › Editor) chooses the editor for the files Jasper
 opens itself: `config.toml` (**Open in Editor** in Settings › Appearance & Behavior › System Settings › Configuration
 file, **Open config.toml** on the Settings banner and the configuration notification), a plugin's settings file, the
-custom VM options file, **File › Open File…**, Cmd-clicked paths in terminal panes, the files a launch or Finder hands
-to Jasper ([Opening files](#opening-files)) and other plugins' requests. It also sets the `EDITOR` of Jasper's shells,
-which `git commit`, `crontab -e` and `kubectl edit` use.
+custom VM options file, **File › Open File…**, Cmd-clicked paths in terminal panes and other plugins' requests. It also
+sets the `EDITOR` of Jasper's shells, which `git commit`, `crontab -e` and `kubectl edit` use.
 
 - **Jasper Editor**, the default: files open in a tab here. `EDITOR` is the path of this Jasper's own `jasper` command
   (the one inside the installed app) followed by `editor --wait`, so it works whether or not the command is installed
@@ -601,8 +601,7 @@ which `git commit`, `crontab -e` and `kubectl edit` use.
   otherwise. They run with Jasper's own `PATH`, so when Jasper starts from the Dock their `:!` commands may need full
   paths. App editors start on their own; one that exits with an error posts "Could not open a file in your default
   editor", naming its program. `EDITOR` is the editor's path with the options below.
-- **System default app**: files open with your system's app for them, and Jasper sets no `EDITOR`. A file a launch or
-  Finder hands to Jasper is shown in the file manager instead.
+- **System default app**: files open with your system's app for them, and Jasper sets no `EDITOR`.
 - **Custom command**: `custom_command` with the file's quoted path added, in a terminal tab, or on its own when
   `custom_in_terminal` is off. `/bin/sh` runs it with Jasper's `PATH` plus `/opt/homebrew/bin`, `/usr/local/bin` and
   `~/.local/bin`; on Windows, `cmd` runs it. `EDITOR` is the command as written. Until you enter one, files open with
