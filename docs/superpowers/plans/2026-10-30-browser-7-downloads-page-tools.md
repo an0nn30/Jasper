@@ -169,6 +169,15 @@ text, each with its ruling:
     checklist (D46's line, the reason recorded, the saved files' marks, a page's own `overflow-y` lock, earlier capture
     listeners, and the fix wave's four lines), this banner and STATUS, whose Editor file associations entry says it is
     merged into local `main`.
+  - Verification: after the wave's code and docs, at `fa3137a03`, `./gradlew check --continue` (JBR 25.0.4.1 b635.75
+    jcef, 10m 21s, 30 of 172 tasks run) gave **15,911 tests, 0 failures, 0 errors, 105 skipped** (1,413 classes in the
+    16 build folders, without the example plugin's: jasper-app 5,357 with 92 skipped, Editor 5,391 with 4 skipped,
+    Browser 1,630 with 1 skipped, from W1's check of the same code, jasper-ui 1,020, Remote 659, jasper-terminal 512
+    with 7 skipped, jasper-sdk 136, jasper-sdk-testkit 326), that is, the merge's 15,902 and W1's 9 Browser tests; the
+    example external plugin's `check pluginZip` against `build/sdk-release` passes (1 test, up to date: no SDK change
+    since the merge); `sdkReference` changed nothing; `AppDocumentationTest`, `ConfigTemplateTest`, `VersionRangeTest`,
+    `ThirdPartyNoticesTest` and `verifyPackagingSupport` pass on the docs commit; source hygiene is clean over 3,514
+    Java files, and no file the docs touched holds a raw U+00A0, U+2028 or U+2029. No GUI was launched.
 
 The controller's rulings, one line each:
 - D0: every ruling the pre-flight scan proposed (F1-F38) is adopted and cited as D-F*n*, except where D1-D3 decide

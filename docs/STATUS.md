@@ -56,14 +56,14 @@ the reader's host restored last in the copy; every Escape keydown stopped while 
 closes, until its keyup; the reader's shadow root stopping six more event types; a busy bridge retried; one
 `DownloadAddresses` rule; `Page`'s tools hooks moved into `PageToolHooks`; `COM0` and `LPT0`), and W2's docs (review C's
 fixes, D46-D48 and W1's changes: the Browser guide, the packaging guide, plugin authoring, the checklist, the banner and
-this entry). Verification: after both docs commits, at `5949bdfba`, `./gradlew check --continue` (JBR 25.0.4.1 b635.75
-jcef, 10m 1s) gave **15,891 tests, 0 failures, 0 errors, 105 skipped** (1,413 classes in the 16 build folders, without
-the example plugin's: jasper-app 5,352 with 92 skipped, Editor 5,387 with 4 skipped, Browser 1,621 with 1 skipped,
-jasper-ui 1,020, Remote 659, jasper-terminal 512 with 7 skipped, jasper-sdk 136, jasper-sdk-testkit 324), as at
-`87e4fb7c3` before the docs: plan 6's 15,546 and plan 7's 345; the example external plugin's `check pluginZip` against
-`build/sdk-release` passed after each SDK task and passes (1 test, up to date: no SDK change since Task 1c);
-`sdkReference` changed nothing; source hygiene is clean, and no file the docs touched holds a raw U+00A0, U+2028 or
-U+2029. No GUI was launched.
+this entry). Verification: after the fix wave's code and docs, at `fa3137a03`, `./gradlew check --continue` (JBR
+25.0.4.1 b635.75 jcef, 10m 21s) gave **15,911 tests, 0 failures, 0 errors, 105 skipped** (1,413 classes in the 16 build
+folders, without the example plugin's: jasper-app 5,357 with 92 skipped, Editor 5,391 with 4 skipped, Browser 1,630 with
+1 skipped, jasper-ui 1,020, Remote 659, jasper-terminal 512 with 7 skipped, jasper-sdk 136, jasper-sdk-testkit 326):
+plan 6's 15,546, plan 7's 345 by its docs, the Editor file associations' 11 at the merge and the fix wave's 9; the
+example external plugin's `check pluginZip` against `build/sdk-release` passed after each SDK task and passes (1 test,
+up to date: no SDK change since the merge); `sdkReference` changed nothing; source hygiene is clean, and no file the
+docs touched holds a raw U+00A0, U+2028 or U+2029. No GUI was launched.
 
 Each task's commits (the banner has each one's deviations):
 - Task 1a: `371a94680` "SDK: 0.31.0".
