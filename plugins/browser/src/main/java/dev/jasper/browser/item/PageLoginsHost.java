@@ -17,11 +17,11 @@ import java.util.function.IntSupplier;
 /**
  * One browser item's logins (plan 8, F18), as {@link PageToolsHost} holds the item's tools. Its page's HTTP sign-ins go
  * to the plugin's {@link HttpSignIns}, with or without the Credential Vault, whose dialog shows over the item's tab,
- * and so do the page's final main-frame responses. With the Vault, its page's login fields
- * show the Vault's buttons too, whose picks the item's {@link FieldButtons} answer, the picker anchored on the field's
- * area of the page's canvas, at the zoom the item shows its page at, over the window the item's tab is in, once the
- * click that asked lies in that area (L20). The host sees where the canvas is, not what Chromium draws on it, so the
- * picker closes as the page goes elsewhere (a main frame's load start, a committed address, Jasper sending it
+ * and so do the page's final main-frame responses and the navigations Jasper starts for it. With the Vault, its page's
+ * login fields show the Vault's buttons too, whose picks the item's {@link FieldButtons} answer, the picker anchored on
+ * the field's area of the page's canvas, at the zoom the item shows its page at, over the window the item's tab is in,
+ * once the click that asked lies in that area (L20). The host sees where the canvas is, not what Chromium draws on it,
+ * so the picker closes as the page goes elsewhere (a main frame's load start, a committed address, Jasper sending it
  * elsewhere) and as the item's zoom changes ({@link #zoomChanged}); the page's script closes it as the page scrolls,
  * and its anchor closes it as the canvas is resized (L6). A /dev/null item has the buttons too, as Chrome's Incognito
  * fills saved passwords, and nothing here writes to the Vault (F24); its sign-in dialog offers no Vault. It closes with
@@ -58,6 +58,8 @@ final class PageLoginsHost implements AutoCloseable {
         Objects.requireNonNull(zoom, "zoom");
         heard.add(page.onSignIn(signIn -> signIns.challenged(page, place, devNull, signIn)));
         heard.add(page.onMainFrameResponse((url, status) -> signIns.responded(page, url, status)));
+        // L27: the navigation Jasper starts for the user has its own sign-in shown, whatever the page's dialogs did.
+        heard.add(page.onNavigate(() -> signIns.navigating(page)));
         buttons = vault.map(FieldButtons::new).orElse(null);
         if (buttons == null) return;
         page.handleLogins(FieldButtons.SCRIPT, query -> buttons.query(query, tab.window(),

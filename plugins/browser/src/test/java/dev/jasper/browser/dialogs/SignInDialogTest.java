@@ -18,12 +18,28 @@ import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.testing.FakeKitView;
 import dev.jasper.sdk.testing.FakePluginHost;
+import dev.jasper.sdk.WindowOwner;
+import dev.jasper.sdk.terminal.WindowHandle;
+import dev.jasper.sdk.ui.ContentSpec;
+import dev.jasper.sdk.ui.ContentTab;
+import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.DialogSpec;
 import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.OverlaySpec;
+import dev.jasper.sdk.ui.PluginDialog;
+import dev.jasper.sdk.ui.PluginPopover;
+import dev.jasper.sdk.ui.SplitChoice;
+import dev.jasper.sdk.ui.SplitItemSpec;
 import dev.jasper.sdk.ui.TabPlacement;
+import dev.jasper.sdk.ui.TabRestorer;
 import dev.jasper.sdk.ui.UiAnchor;
 import dev.jasper.sdk.ui.UiEvent;
+import dev.jasper.sdk.ui.UiView;
+import dev.jasper.sdk.ui.ViewSpec;
+import dev.jasper.sdk.ui.Windows;
 import java.net.URI;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -31,6 +47,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiConsumer;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.LongSupplier;
@@ -123,7 +141,7 @@ class SignInDialogTest {
             for (boolean remembers : List.of(false, true)) {
                 var told = new Answers();
                 onUiThread(() -> SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "Corp", false, offers, remembers,
-                    none(), told, unhurried));
+                    false, none(), told, unhurried));
                 onUiThread(() -> {
                     Nodes.Form form = form();
                     String flags = "offers " + offers + ", remembers " + remembers;
@@ -150,7 +168,7 @@ class SignInDialogTest {
             assertThat(shown.host.windows()).as("the dialog closed").isEmpty();
         });
         var entered = new Answers();
-        onUiThread(() -> SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "", false, true, true, none(), entered,
+        onUiThread(() -> SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "", false, true, true, false, none(), entered,
             unhurried));
         onUiThread(() -> {
             view().type(SignInDialog.USER, "v");
@@ -159,8 +177,8 @@ class SignInDialogTest {
             assertThat(entered.calls).as("Enter in the password, not ticked").containsExactly("ok|v|pw2|false");
         });
         var unticked = new Answers();
-        onUiThread(() -> SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "", false, false, false, none(), unticked,
-            unhurried));
+        onUiThread(() -> SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "",
+            false, false, false, false, none(), unticked, unhurried));
         onUiThread(() -> {
             press(user(form()).trailingAction());
             assertThat(unticked.calls).as("Enter in the empty user name").containsExactly("ok|||false");
@@ -172,8 +190,8 @@ class SignInDialogTest {
         shown = show();
         for (String how : List.of("cancel", "escape", "close")) {
             var told = new Answers();
-            onUiThread(() -> SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "Corp", false, true, true, none(), told,
-                unhurried));
+            onUiThread(() -> SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "Corp",
+                false, true, true, false, none(), told, unhurried));
             onUiThread(() -> {
                 view().type(SignInDialog.USER, "u");
                 view().setSecret(SignInDialog.PASSWORD, "pw".toCharArray());
@@ -200,7 +218,7 @@ class SignInDialogTest {
             if (outcome instanceof Outcome.Ok ok) given.set(ok.password());
         };
         for (boolean ok : List.of(true, false)) {
-            onUiThread(() -> SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "Corp", false, false, false, none(),
+            onUiThread(() -> SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "Corp", false, false, false, false, none(),
                 reading, unhurried));
             onUiThread(() -> {
                 view.set(view());
@@ -219,7 +237,7 @@ class SignInDialogTest {
         };
         var told = new Answers();
         onUiThread(() -> SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "Corp", false, true, false,
-            anchor -> late, told, unhurried));
+            false, anchor -> late, told, unhurried));
         onUiThread(() -> {
             press(SignInDialog.MANAGER);
             press(form().cancelAction());
@@ -239,6 +257,11 @@ class SignInDialogTest {
             view().setSecret(SignInDialog.PASSWORD, "typed".toCharArray());
             press(form().actions().getFirst().action());
             assertThat(picker.anchors).singleElement().satisfies(anchor -> assertThat(anchor.isOpen()).as("on the shown button").isTrue());
+            UiAnchor anchor = picker.anchors.getFirst();
+            disable(SignInDialog.CANCEL_BUTTON);
+            assertThat(anchor.isOpen()).as("another button disabled").isTrue();
+            disable(SignInDialog.MANAGER_BUTTON);
+            assertThat(anchor.isOpen()).as("on the Password Manager button, which closes it as it is disabled").isFalse();
             assertThat(answers.calls).as("unanswered while the picker shows").isEmpty();
             picker.picks.getFirst().complete(Optional.of(new Login("u", "pw".toCharArray())));
             assertThat(answers.calls).containsExactly("picked|u|pw");
@@ -299,8 +322,8 @@ class SignInDialogTest {
             assertThat(picker.picks.getFirst().isCancelled()).as("the pick withdrawn").isTrue();
         });
         var later = new Answers();
-        onUiThread(() -> SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "Corp", false, true, true, none(), later,
-            unhurried));
+        onUiThread(() -> SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "Corp",
+            false, true, true, false, none(), later, unhurried));
         onUiThread(() -> {
             assertThat(answers.calls).as("once").containsExactly("cancelled");
             assertThat(later.calls).as("a closed page shows nothing").containsExactly("cancelled");
@@ -326,8 +349,8 @@ class SignInDialogTest {
             other.get().tab().select();
         });
         var waiting = new Answers();
-        onUiThread(() -> SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "", false, false, false, none(), waiting,
-            unhurried));
+        onUiThread(() -> SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "",
+            false, false, false, false, none(), waiting, unhurried));
         onUiThread(() -> {
             assertThat(shown.host.windows()).isEmpty();
             shown.item.close();
@@ -352,7 +375,7 @@ class SignInDialogTest {
         var ended = new Answers();
         var subscription = new AtomicReference<Subscription>();
         onUiThread(() -> subscription.set(SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "", false, false, false,
-            none(), ended, unhurried)));
+            false, none(), ended, unhurried)));
         onUiThread(() -> {
             assertThat(shown.host.windowView(ID, TITLE)).isPresent();
             subscription.get().close();
@@ -362,7 +385,8 @@ class SignInDialogTest {
         });
         var early = new Answers();
         onUiThread(() -> {
-            SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "", false, false, false, none(), early, unhurried).close();
+            SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "",
+                false, false, false, false, none(), early, unhurried).close();
             assertThat(early.calls).as("before it starts").containsExactly("cancelled");
         });
         onUiThread(() -> {
@@ -388,8 +412,8 @@ class SignInDialogTest {
         });
         clock.set(10_600);
         var second = new Answers();
-        onUiThread(() -> SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "Corp", false, false, false, none(), second,
-            clock::get));
+        onUiThread(() -> SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "Corp",
+            false, false, false, false, none(), second, clock::get));
         onUiThread(() -> {
             assertThat(shown.host.windowView(ID, TITLE)).as("the second of the run shows").isPresent();
             clock.set(10_700);
@@ -397,13 +421,13 @@ class SignInDialogTest {
         });
         clock.set(10_700 + DialogFlood.QUICK_MILLIS);
         var third = new Answers();
-        onUiThread(() -> SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "Corp", false, false, false, none(), third,
-            clock::get));
+        onUiThread(() -> SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "Corp",
+            false, false, false, false, none(), third, clock::get));
         onUiThread(() -> assertThat(third.calls).as("a second after the second closed").containsExactly("cancelled"));
         clock.set(120_000);
         var later = new Answers();
-        onUiThread(() -> SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "Corp", false, false, false, none(), later,
-            clock::get));
+        onUiThread(() -> SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "Corp",
+            false, false, false, false, none(), later, clock::get));
         onUiThread(() -> {
             assertThat(shown.host.windows()).as("refused unshown").isEmpty();
             assertThat(alert).containsExactly("true");
@@ -412,7 +436,7 @@ class SignInDialogTest {
             PageTestAccess.loadStarted(shown.page, "https://intranet.example/next");
         });
         var reloaded = new Answers();
-        onUiThread(() -> SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "Corp", false, false, false, none(),
+        onUiThread(() -> SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "Corp", false, false, false, false, none(),
             reloaded, clock::get));
         onUiThread(() -> {
             assertThat(shown.host.windowView(ID, TITLE)).as("a new document may ask again").isPresent();
@@ -444,6 +468,70 @@ class SignInDialogTest {
         });
     }
 
+    /**
+     * The dialog's other ends clear its password field too: on a host that tells the dialog's close before its view
+     * closes, the field is empty by the time the reset's answer is told.
+     */
+    @Test void aCloseThatIsNoButtonClearsThePasswordField() throws Exception {
+        shown = show();
+        var left = new CopyOnWriteArrayList<Integer>();
+        var view = new AtomicReference<FakeKitView>();
+        var place = new AtomicReference<DialogPlace>();
+        onUiThread(() -> place.set(new DialogPlace(shown.place.kit(), new ClosedFirst(shown.place.windows()), shown.place.owner())));
+        onUiThread(() -> SignInDialog.show(shown.page, place.get(), "intranet.example", 443, "Corp", false, false, false, false, none(),
+            outcome -> {
+                view.get().withSecret(SignInDialog.PASSWORD, chars -> left.add(chars.length));
+                answers.accept(outcome);
+            }, unhurried));
+        onUiThread(() -> {
+            view.set(view());
+            view().setSecret(SignInDialog.PASSWORD, "pw".toCharArray());
+            shown.page.dialogsReset();
+            assertThat(answers.calls).containsExactly("cancelled");
+            assertThat(left).as("cleared before the answer, its view still open").containsExactly(0);
+            assertThat(shown.host.windows()).isEmpty();
+            assertThat(shown.host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * L27: the top-level sign-in of the user's own navigation shows past a tripped flood guard, which still counts it,
+     * so the page's own dialogs after it are refused until the page loads again.
+     */
+    @Test void theUsersNavigationShowsPastATrippedGuard() throws Exception {
+        shown = show();
+        LongSupplier moment = () -> 50_000;
+        var first = new Answers();
+        var second = new Answers();
+        var third = new Answers();
+        onUiThread(() -> SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "Corp", false, false, false, false, none(),
+            first, moment));
+        onUiThread(() -> press(form().cancelAction()));
+        onUiThread(() -> SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "Corp", false, false, false, false, none(),
+            second, moment));
+        onUiThread(() -> press(form().cancelAction()));
+        onUiThread(() -> SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "Corp", false, false, false, false, none(),
+            third, moment));
+        var navigation = new Answers();
+        onUiThread(() -> {
+            assertThat(third.calls).as("the third quick one refused").containsExactly("cancelled");
+            SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "Corp", false, false, false, true, none(), navigation,
+                moment);
+        });
+        var page = new Answers();
+        onUiThread(() -> {
+            assertThat(shown.host.windowView(ID, TITLE)).as("the user's navigation asks").isPresent();
+            press(form().cancelAction());
+            assertThat(navigation.calls).containsExactly("cancelled");
+            SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "Corp", false, false, false, false, none(), page, moment);
+        });
+        onUiThread(() -> {
+            assertThat(page.calls).as("the page's own, after it").containsExactly("cancelled");
+            assertThat(shown.host.windows()).isEmpty();
+            assertThat(shown.host.failures()).isEmpty();
+        });
+    }
+
     @Test void noAnswerOrLoginNamesItsUserOrPassword() {
         assertThat(new Login("alice", "pw".toCharArray())).asString().doesNotContain("alice", "pw");
         assertThat(new Outcome.Ok("alice", "pw".toCharArray(), true)).asString().doesNotContain("alice", "pw");
@@ -452,7 +540,7 @@ class SignInDialogTest {
 
     /** Shows a sign-in for intranet.example's Corp realm over the shown item, told to {@link #answers}. UI thread. */
     private void sign(boolean offers, boolean remembers, Function<UiAnchor, CompletableFuture<Optional<Login>>> manager) {
-        SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "Corp", false, offers, remembers, manager, answers,
+        SignInDialog.show(shown.page, shown.place, "intranet.example", 443, "Corp", false, offers, remembers, false, manager, answers,
             unhurried);
     }
 
@@ -489,6 +577,17 @@ class SignInDialogTest {
 
     private FakeKitView view(String title) {
         return shown.host.windowView(ID, title).orElseThrow(() -> new AssertionError("no dialog " + title));
+    }
+
+    /** Disables the sign-in dialog's button {@code id}, as an update of its view would. UI thread. */
+    private void disable(String id) {
+        Nodes.Form form = form();
+        var off = new ControlState(true, false, false, "");
+        List<Nodes.Button> actions = form.actions().stream().map(button -> !button.id().equals(id) ? button
+            : new Nodes.Button(button.id(), off, button.label(), button.icon(), button.kind(), button.action(), button.tooltip(),
+                button.presentation(), button.iconSeverity(), button.selected(), button.holdMenu())).toList();
+        view().update(new ViewSpec(new Nodes.Form(form.id(), form.state(), form.kind(), form.title(), form.hero(), form.sections(),
+            form.preview(), actions, form.cancelAction(), form.submission(), form.footnote())));
     }
 
     /** Presses the button, or the key, that reports {@code action} in the sign-in dialog. UI thread. */
@@ -542,6 +641,63 @@ class SignInDialogTest {
         void close() {
             host.close();
         }
+    }
+
+    /**
+     * The fake host's windows, but each dialog tells those who asked for its close before its view closes, as a host
+     * may: the rest is the fake host's.
+     */
+    private static final class ClosedFirst implements Windows {
+        private final Windows windows;
+
+        ClosedFirst(Windows windows) {
+            this.windows = windows;
+        }
+
+        @Override public PluginDialog dialog(DialogSpec spec) {
+            PluginDialog dialog = windows.dialog(spec);
+            return new PluginDialog() {
+                private final List<Runnable> closed = new ArrayList<>();
+                private boolean done;
+
+                @Override public void setContent(UiView content) { dialog.setContent(content); }
+                @Override public void show() { dialog.show(); }
+                @Override public void toFront() { dialog.toFront(); }
+                @Override public void setTitle(String title) { dialog.setTitle(title); }
+                @Override public Optional<Path> chooseFile(String title, Optional<Path> initial) {
+                    return dialog.chooseFile(title, initial);
+                }
+                @Override public Subscription onClosing(BooleanSupplier guard) { return dialog.onClosing(guard); }
+
+                @Override public Subscription onClosed(Runnable handler) {
+                    closed.add(handler);
+                    return () -> closed.remove(handler);
+                }
+
+                @Override public void close() {
+                    if (done) return;
+                    done = true;
+                    for (Runnable handler : List.copyOf(closed)) handler.run();
+                    dialog.close();
+                }
+            };
+        }
+
+        @Override public PluginPopover popover(UiAnchor anchor) { return windows.popover(anchor); }
+
+        @Override public ContentTab openTab(ContentSpec spec, WindowOwner owner, UiView content, TabPlacement placement) {
+            return windows.openTab(spec, owner, content, placement);
+        }
+
+        @Override public Subscription restorer(String kind, TabRestorer restorer) { return windows.restorer(kind, restorer); }
+
+        @Override public Subscription splitItem(SplitItemSpec spec, BiConsumer<WindowHandle, TabPlacement> opener) {
+            return windows.splitItem(spec, opener);
+        }
+
+        @Override public List<SplitChoice> splitChoices() { return windows.splitChoices(); }
+
+        @Override public PluginDialog overlay(OverlaySpec spec) { return windows.overlay(spec); }
     }
 
     /** A picker that records each anchor it opens on and leaves each pick for the test to answer. */

@@ -34,7 +34,9 @@ import java.util.function.LongSupplier;
  * window's active item, waiting until then; it waits while the page has a permission prompt asked (ruling V19); and it
  * shares the page's {@link DialogFlood}, which refuses the third of the page's dialogs to open within a second of the
  * one before closing, and every later one, until the page loads again (F4), so a page that retries a sign-in after
- * each Cancel cannot hold the window. It names no Chromium type and no Vault type.
+ * each Cancel cannot hold the window. The top-level sign-in of a navigation Jasper started for the user shows even then
+ * (L27): a page cannot start one, so it opens no loop, and the user's own navigation is never refused for what the page
+ * did. It names no Chromium type and no Vault type.
  *
  * <p>The caller is answered exactly once: {@link Outcome.Ok} with what was typed, {@link Outcome.Picked} with the
  * login chosen, or {@link Outcome.Cancelled} for Cancel, Escape, the dialog's own close, its item's close, Chromium's
@@ -61,7 +63,7 @@ public final class SignInDialog {
     private final Page page;
     private final DialogPlace place;
     private final String heading;
-    private final boolean offersVault, remembers;
+    private final boolean offersVault, remembers, usersNavigation;
     private final Function<UiAnchor, CompletableFuture<Optional<Login>>> passwordManager;
     private final Consumer<Outcome> answered;
     private final LongSupplier times;
@@ -137,13 +139,14 @@ public final class SignInDialog {
     }
 
     private SignInDialog(Page page, DialogPlace place, String heading, boolean offersVault, boolean remembers,
-                         Function<UiAnchor, CompletableFuture<Optional<Login>>> passwordManager, Consumer<Outcome> answered,
-                         LongSupplier times) {
+                         boolean usersNavigation, Function<UiAnchor, CompletableFuture<Optional<Login>>> passwordManager,
+                         Consumer<Outcome> answered, LongSupplier times) {
         this.page = page;
         this.place = place;
         this.heading = heading;
         this.offersVault = offersVault;
         this.remembers = remembers;
+        this.usersNavigation = usersNavigation;
         this.passwordManager = passwordManager;
         this.answered = answered;
         this.times = times;
@@ -152,7 +155,8 @@ public final class SignInDialog {
     /**
      * Shows the sign-in dialog over {@code page}'s item, from a later turn of the UI thread, once that item is its
      * window's active item and the page has no permission prompt asked, and tells {@code answered} how it was answered,
-     * once. The page's flood guard may refuse it first, which answers it as cancelled.
+     * once. The page's flood guard may refuse it first, which answers it as cancelled, unless it is the user's
+     * navigation's own.
      *
      * @param page the page whose request was challenged
      * @param place where it shows: over the page's item's tab
@@ -162,26 +166,30 @@ public final class SignInDialog {
      * @param proxy whether a proxy challenged
      * @param offersVault whether the dialog has Password Manager
      * @param remembers whether it has "Remember this password"
+     * @param usersNavigation whether it is the top-level sign-in of a navigation Jasper started for the user, which the
+     *     page's flood guard admits even once a run of the page's dialogs has tripped it (L27)
      * @param passwordManager opens the picker on the anchor of the Password Manager button, which it may close: a
-     *     login once one was chosen, or empty when none was; the dialog's close cancels the future
+     *     future that completes on the UI thread, with a login once one was chosen, or empty when none was; the
+     *     dialog's close cancels it
      * @param answered told how the dialog was answered, once, on the UI thread
      * @return ends the dialog, shown or waiting, answered {@link Outcome.Cancelled}; nothing once it was answered
      */
     public static Subscription show(Page page, DialogPlace place, String host, int port, String realm, boolean proxy,
-                                    boolean offersVault, boolean remembers,
+                                    boolean offersVault, boolean remembers, boolean usersNavigation,
                                     Function<UiAnchor, CompletableFuture<Optional<Login>>> passwordManager,
                                     Consumer<Outcome> answered) {
-        return show(page, place, host, port, realm, proxy, offersVault, remembers, passwordManager, answered, clock);
+        return show(page, place, host, port, realm, proxy, offersVault, remembers, usersNavigation, passwordManager, answered,
+            clock);
     }
 
     /**
-     * As {@link #show(Page, DialogPlace, String, int, String, boolean, boolean, boolean, Function, Consumer)}, timed by
-     * {@code times}, which the page's flood guard reads.
+     * As {@link #show(Page, DialogPlace, String, int, String, boolean, boolean, boolean, boolean, Function, Consumer)},
+     * timed by {@code times}, which the page's flood guard reads.
      *
      * @param times a monotonic clock's milliseconds
      */
     static Subscription show(Page page, DialogPlace place, String host, int port, String realm, boolean proxy,
-                             boolean offersVault, boolean remembers,
+                             boolean offersVault, boolean remembers, boolean usersNavigation,
                              Function<UiAnchor, CompletableFuture<Optional<Login>>> passwordManager, Consumer<Outcome> answered,
                              LongSupplier times) {
         Objects.requireNonNull(page, "page");
@@ -189,8 +197,8 @@ public final class SignInDialog {
         Objects.requireNonNull(passwordManager, "passwordManager");
         Objects.requireNonNull(answered, "answered");
         Objects.requireNonNull(times, "times");
-        var dialog = new SignInDialog(page, place, heading(host, port, realm, proxy), offersVault, remembers, passwordManager,
-            answered, times);
+        var dialog = new SignInDialog(page, place, heading(host, port, realm, proxy), offersVault, remembers, usersNavigation,
+            passwordManager, answered, times);
         EventQueue.invokeLater(dialog::start);
         return dialog::dismiss;
     }
@@ -228,7 +236,10 @@ public final class SignInDialog {
         return System.nanoTime() / 1_000_000;
     }
 
-    /** Admits the dialog as {@code ScriptDialog} admits a page's alert, and shows it: unless it was ended first. */
+    /**
+     * Admits the dialog as {@code ScriptDialog} admits a page's alert, but the user's navigation's own past a tripped
+     * flood guard, and shows it: unless it was ended first.
+     */
     private void start() {
         if (done) return;
         if (page.dialogPlace().isEmpty()) { // the page has closed
@@ -236,7 +247,8 @@ public final class SignInDialog {
             return;
         }
         flood = DialogFlood.of(page);
-        if (!flood.admit(times.getAsLong())) {
+        // L27: the guard still counts it, so the page's own dialogs after it are refused as before.
+        if (!flood.admit(times.getAsLong()) && !usersNavigation) {
             answer(new Outcome.Cancelled());
             return;
         }
@@ -315,6 +327,8 @@ public final class SignInDialog {
         withdrawPick();
         Login login = chosen;
         chosen = null;
+        // A login is held only from a pick's end to the close it asks, which answers CLOSED; another end zeroes it.
+        if (login != null && press != Press.CLOSED) zero(login);
         Outcome outcome = switch (press) {
             case OK -> typed();
             case CANCEL -> {

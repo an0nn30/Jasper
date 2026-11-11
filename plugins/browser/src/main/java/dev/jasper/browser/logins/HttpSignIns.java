@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
@@ -35,10 +36,12 @@ import java.util.function.Function;
  * every challenge stamped earlier, shown or waiting, and closes its dialog (F8), as Chromium never says the request
  * behind one went away; a main frame's own challenge comes before its commit, so its answer always lands first. A user
  * name and password given for one challenge also answer the page's waiting challenges of the same server or proxy,
- * port, realm and scheme (F30), which Chromium does not resupply itself. {@link #closed} cancels every challenge of the
- * page, shown or waiting, exactly once, and withdraws a pick under way. A password reaches Chromium as a
- * {@code String}, which its callback takes and which cannot be zeroed; every array is zeroed once used. Names no
- * Chromium type. UI thread.
+ * port, realm and scheme (F30), which Chromium does not resupply itself. The page's flood guard refuses its dialogs
+ * once they come one straight after another, but not the top-level challenge of a navigation Jasper started for the
+ * user ({@link #navigating}) while that navigation is pending (L27). {@link #closed} cancels every challenge of the
+ * page, shown or waiting, exactly once, and withdraws a pick under way; {@link #close()} does so for every page as the
+ * plugin stops. A password reaches Chromium as a {@code String}, which its callback takes and which cannot be zeroed;
+ * every array is zeroed once used. Names no Chromium type. UI thread.
  */
 public final class HttpSignIns {
     /** The most challenges a page has waiting behind its dialog: one more is cancelled at once. */
@@ -46,8 +49,10 @@ public final class HttpSignIns {
     private final Optional<VaultLogins> vault;
     // Where a failed save is told (the plan's Task 6).
     private final NotificationGroup notices;
-    // The pages that were challenged, each until it closes.
+    // The pages that were challenged or sent elsewhere, each until it closes.
     private final Map<Page, PageSignIns> pages = new IdentityHashMap<>();
+    // Once the plugin stops, every challenge is cancelled at once.
+    private boolean stopped;
 
     /**
      * The plugin's sign-ins, with the Vault's logins when the Vault is present.
@@ -63,7 +68,7 @@ public final class HttpSignIns {
     /**
      * {@code page} was challenged for one of its requests: the sign-in dialog shows over the page's item once the
      * page's earlier challenges have been answered, unless {@link #WAITING_LIMIT} wait already, when it is cancelled at
-     * once. A page that has closed has it cancelled.
+     * once. A page that has closed, or a challenge once the plugin stopped, has it cancelled.
      *
      * @param page the page whose request was challenged
      * @param place where its dialogs show
@@ -74,16 +79,27 @@ public final class HttpSignIns {
         Objects.requireNonNull(page, "page");
         Objects.requireNonNull(place, "place");
         Objects.requireNonNull(signIn, "signIn");
-        if (page.dialogPlace().isEmpty()) {
+        if (stopped || page.dialogPlace().isEmpty()) {
             signIn.cancel();
             return;
         }
-        PageSignIns signIns = pages.get(page);
-        if (signIns == null) {
-            signIns = new PageSignIns(page);
-            pages.put(page, signIns);
-        }
-        signIns.add(new Asked(signIn, Challenge.of(signIn), place, devNull, page.document()));
+        PageSignIns signIns = of(page);
+        Challenge challenge = Challenge.of(signIn);
+        signIns.add(new Asked(signIn, challenge, place, devNull, page.document(), challenge.topLevel() && signIns.navigating));
+    }
+
+    /**
+     * Jasper sends {@code page} elsewhere for the user ({@link Page#onNavigate}), which a page's script cannot do:
+     * until the page's next main-frame load start, a top-level challenge that arrives shows its dialog even once the
+     * page's flood guard has tripped (L27), so the user's own navigation is never refused for what the page did before
+     * it. Nothing for a page that has closed, or once the plugin stopped.
+     *
+     * @param page the page
+     */
+    public void navigating(Page page) {
+        Objects.requireNonNull(page, "page");
+        if (stopped || page.dialogPlace().isEmpty()) return;
+        of(page).navigating = true;
     }
 
     /**
@@ -109,6 +125,40 @@ public final class HttpSignIns {
         if (signIns != null) signIns.end();
     }
 
+    /**
+     * The plugin stops: every page's challenges, shown or waiting, are cancelled once, as {@link #closed} cancels one
+     * page's, before Chromium closes; each that comes later is cancelled at once.
+     */
+    public void close() {
+        stopped = true;
+        List<PageSignIns> open = List.copyOf(pages.values());
+        pages.clear();
+        for (PageSignIns signIns : open) signIns.end();
+    }
+
+    /**
+     * For a test: what answers {@code page}'s shown challenge with an outcome as its dialog would, even once the page's
+     * sign-ins have ended.
+     *
+     * @throws IllegalStateException when none shows
+     */
+    Consumer<Outcome> shownAnswer(Page page) {
+        PageSignIns signIns = pages.get(page);
+        Asked asked = signIns == null ? null : signIns.shown;
+        if (asked == null) throw new IllegalStateException("No challenge shows for the page");
+        return outcome -> signIns.answered(asked, outcome);
+    }
+
+    /** {@code page}'s sign-ins, made the first time they are asked for. */
+    private PageSignIns of(Page page) {
+        PageSignIns signIns = pages.get(page);
+        if (signIns == null) {
+            signIns = new PageSignIns(page);
+            pages.put(page, signIns);
+        }
+        return signIns;
+    }
+
     /** One challenge of a page, as it arrived. */
     private static final class Asked {
         final SignIn signIn;
@@ -117,15 +167,18 @@ public final class HttpSignIns {
         final boolean devNull;
         // The page's document the challenge arrived in (F8).
         final long document;
+        // Whether it arrived as the top-level challenge of the user's navigation, pending then (L27).
+        final boolean usersNavigation;
         // Ends its dialog, once it is shown or waiting to show; null before.
         Subscription dialog;
 
-        Asked(SignIn signIn, Challenge challenge, DialogPlace place, boolean devNull, long document) {
+        Asked(SignIn signIn, Challenge challenge, DialogPlace place, boolean devNull, long document, boolean usersNavigation) {
             this.signIn = signIn;
             this.challenge = challenge;
             this.place = place;
             this.devNull = devNull;
             this.document = document;
+            this.usersNavigation = usersNavigation;
         }
 
         /** Whether {@code other} asks for the same protection space: proxy or not, host, port, realm and scheme (F30). */
@@ -142,6 +195,8 @@ public final class HttpSignIns {
         private final List<Subscription> heard;
         private final ArrayDeque<Asked> waiting = new ArrayDeque<>();
         private Asked shown;
+        // Whether a navigation Jasper started for the user is pending since the page's last main-frame load start.
+        private boolean navigating;
         private boolean ended;
 
         PageSignIns(Page page) {
@@ -175,11 +230,12 @@ public final class HttpSignIns {
                 : anchor -> CompletableFuture.completedFuture(Optional.empty());
             // The dialog shows on a later turn, so what ends it is held at once.
             asked.dialog = SignInDialog.show(page, asked.place, challenge.host(), challenge.port(), challenge.realm(),
-                challenge.proxy(), offers, challenge.remembers(asked.devNull, present), manager, outcome -> answered(asked, outcome));
+                challenge.proxy(), offers, challenge.remembers(asked.devNull, present), asked.usersNavigation, manager,
+                outcome -> answered(asked, outcome));
         }
 
         /** {@code asked}'s dialog was answered: it signs in or is cancelled, and the next challenge's dialog shows. */
-        private void answered(Asked asked, Outcome outcome) {
+        void answered(Asked asked, Outcome outcome) {
             if (shown == asked) shown = null;
             switch (outcome) {
                 case Outcome.Ok ok -> proceed(asked, ok.user(), ok.password());
@@ -214,6 +270,7 @@ public final class HttpSignIns {
 
         /** A main-frame load start: each challenge of an earlier document is cancelled, its dialog closed (F8). */
         private void loadStarted() {
+            navigating = false;
             long now = page.document();
             var stale = new ArrayList<Asked>();
             for (Iterator<Asked> each = waiting.iterator(); each.hasNext(); ) {
@@ -238,6 +295,7 @@ public final class HttpSignIns {
             for (Asked asked : dropped) asked.signIn.cancel();
             if (current != null) {
                 current.dialog.close();
+                // A host whose dialog closes later would answer it then; Chromium's request must not wait for that.
                 current.signIn.cancel();
             }
         }

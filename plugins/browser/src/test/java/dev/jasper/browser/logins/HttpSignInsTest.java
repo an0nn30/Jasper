@@ -2,6 +2,7 @@ package dev.jasper.browser.logins;
 
 import dev.jasper.browser.dialogs.DialogsTestAccess;
 import dev.jasper.browser.dialogs.SignInDialog;
+import dev.jasper.browser.dialogs.SignInDialog.Outcome;
 import dev.jasper.browser.item.BrowserItem;
 import dev.jasper.browser.item.BrowserItems;
 import dev.jasper.browser.item.DataStores;
@@ -27,6 +28,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.SwingUtilities;
@@ -47,7 +49,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class HttpSignInsTest {
     private static final String ID = "dev.jasper.browser";
     private static final String TITLE = SignInDialog.TITLE;
-    private static final String TOP = "https://intranet.example/";
+    private static final String TOP = "https://intranet.example/", NEXT = "https://intranet.example/next";
     private final MemoryStores memory = new MemoryStores();
     private final FakeVault fake = new FakeVault();
     // What Chromium was told, in order: "NAME proceed USER PASSWORD" or "NAME cancel".
@@ -135,8 +137,10 @@ class HttpSignInsTest {
     @Test void closingTheItemCancelsEveryChallengeOnce() throws Exception {
         open(true);
         UUID id = fake.login("https://intranet.example (Corp)", "u", "pw");
+        var withdrawn = new AtomicBoolean();
         var late = new CompletableFuture<Optional<Credential>>() {
             @Override public boolean cancel(boolean interrupt) {
+                withdrawn.set(true);
                 return false; // a Vault that answers after the withdrawal
             }
         };
@@ -152,14 +156,15 @@ class HttpSignInsTest {
                 .containsExactly("credential https://intranet.example (Corp)");
             item.close();
             assertThat(told).containsExactlyInAnyOrder("a cancel", "b cancel", "c cancel");
+            assertThat(withdrawn).as("the close withdrew the Vault's fetch, whose login then goes to no one").isTrue();
             assertThat(host.windows()).isEmpty();
             items.signIns().closed(page);
         });
         Credential credential = fake.issue(id);
         onUiThread(() -> late.complete(Optional.of(credential)));
         onUiThread(() -> {
-            assertThat(FakeVault.closed(credential)).as("a late login is closed unused").isTrue();
-            assertThat(told).as("each once").containsExactlyInAnyOrder("a cancel", "b cancel", "c cancel");
+            assertThat(FakeVault.closed(credential)).as("a late login is closed").isTrue();
+            assertThat(told).as("each once, the late login used for none").containsExactlyInAnyOrder("a cancel", "b cancel", "c cancel");
             challenge("d", TOP, "intranet.example", 443, "Corp", false);
             assertThat(told).as("a closed page's challenge").contains("d cancel");
             assertThat(host.failures()).isEmpty();
@@ -194,10 +199,189 @@ class HttpSignInsTest {
         onUiThread(() -> {
             assertThat(told).containsExactly("a cancel");
             assertThat(heading()).as("the new document's").contains("“Other”");
+            PageTestAccess.loadStarted(page, "https://intranet.example/last");
+            assertThat(told).as("a second load start cancels the challenge that came before it").containsExactly("a cancel", "b cancel");
+            challenge("c", TOP, "intranet.example", 443, "Third", false);
+        });
+        onUiThread(() -> {
+            assertThat(heading()).as("the last document's stays").contains("“Third”");
             type("u", "pw");
             press(ok());
-            assertThat(told).containsExactly("a cancel", "b proceed u pw");
+            assertThat(told).containsExactly("a cancel", "b cancel", "c proceed u pw");
             assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * L27: once a page's dialogs trip its flood guard, three realms quickly one after another here, the page's own
+     * challenges are refused, but the top-level challenge of a navigation Jasper starts for the user shows, and so does
+     * each wrong-password challenge of it, while it is pending; a framed or other challenge during it is still refused,
+     * and the next load start re-arms the guard as before.
+     */
+    @Test void aTrippedGuardStillShowsTheUsersNavigationsOwnSignIn() throws Exception {
+        tripsQuickly();
+        onUiThread(() -> {
+            challenge("a", TOP, "intranet.example", 443, "One", false);
+            challenge("b", TOP, "intranet.example", 443, "Two", false);
+            challenge("c", TOP, "intranet.example", 443, "Three", false);
+        });
+        onUiThread(() -> press(form().cancelAction()));
+        onUiThread(() -> press(form().cancelAction()));
+        onUiThread(() -> {
+            assertThat(told).as("the third refused unshown").containsExactly("a cancel", "b cancel", "c cancel");
+            assertThat(host.windows()).isEmpty();
+            challenge("own", TOP, "intranet.example", 443, "One", false);
+        });
+        onUiThread(() -> {
+            assertThat(told).as("the page's own top-level fetch").endsWith("own cancel");
+            page.load(URI.create(NEXT));
+            items.signIns().challenged(page, place, false,
+                signIn("framed", "https://files.example/", NEXT, "files.example", 443, "One", false, "basic"));
+            items.signIns().challenged(page, place, false,
+                signIn("fetch", TOP + "api", NEXT, "intranet.example", 443, "One", false, "basic"));
+        });
+        onUiThread(() -> {
+            assertThat(told).as("refused during the navigation too").endsWith("framed cancel", "fetch cancel");
+            assertThat(host.windows()).isEmpty();
+            challenge("navigation", NEXT, "intranet.example", 443, "One", false);
+        });
+        onUiThread(() -> {
+            assertThat(heading()).as("the user's navigation asks").contains("“One”");
+            type("u", "wrong");
+            press(ok());
+            assertThat(told).endsWith("navigation proceed u wrong");
+            challenge("again", NEXT, "intranet.example", 443, "One", false);
+        });
+        onUiThread(() -> {
+            assertThat(host.windowView(ID, TITLE)).as("Chromium's challenge again, for the wrong password").isPresent();
+            press(form().cancelAction());
+            assertThat(told).endsWith("again cancel");
+            PageTestAccess.loadStarted(page, NEXT);
+            challenge("rearmed", NEXT, "intranet.example", 443, "One", false);
+        });
+        onUiThread(() -> {
+            assertThat(host.windowView(ID, TITLE)).as("the load start re-armed the guard").isPresent();
+            press(form().cancelAction());
+            assertThat(told).endsWith("rearmed cancel");
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * L27 and V-F25: a page that retries its fetch after each Cancel trips the guard at its third retry; then the
+     * user's navigation still asks, while the old page's retry during it is refused.
+     */
+    @Test void aRetryPageTrippedAfterTwoCancelsStillLetsTheUserNavigate() throws Exception {
+        tripsQuickly();
+        String api = TOP + "api";
+        for (String name : List.of("retry1", "retry2")) {
+            onUiThread(() -> items().signIns().challenged(page, place, false,
+                signIn(name, api, TOP, "intranet.example", 443, "Corp", false, "basic")));
+            onUiThread(() -> press(form().cancelAction()));
+        }
+        onUiThread(() -> {
+            assertThat(told).containsExactly("retry1 cancel", "retry2 cancel");
+            items.signIns().challenged(page, place, false, signIn("retry3", api, TOP, "intranet.example", 443, "Corp", false, "basic"));
+        });
+        onUiThread(() -> {
+            assertThat(told).as("the third retry refused").endsWith("retry3 cancel");
+            page.load(URI.create(NEXT));
+            items.signIns().challenged(page, place, false, signIn("retry4", api, NEXT, "intranet.example", 443, "Corp", false, "basic"));
+            challenge("navigation", NEXT, "intranet.example", 443, "Corp", false);
+        });
+        onUiThread(() -> {
+            assertThat(told).as("the old page's retry during the navigation").endsWith("retry4 cancel");
+            type("u", "pw");
+            press(ok());
+            assertThat(told).endsWith("navigation proceed u pw");
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * Concern C: one answer's password array is zeroed after the last same-realm challenge it signs in, and an answer
+     * that comes once the page's sign-ins ended signs in nothing and is zeroed too.
+     */
+    @Test void anAnswersArrayIsZeroedAfterItsLastUseAndOneAfterTheEndIsUsedForNothing() throws Exception {
+        onUiThread(() -> {
+            challenge("a", TOP, "intranet.example", 443, "Corp", false);
+            challenge("same", TOP, "intranet.example", 443, "Corp", false);
+        });
+        char[] given = "pw".toCharArray();
+        onUiThread(() -> {
+            LoginsTestAccess.answerShown(items.signIns(), page).accept(new Outcome.Ok("u", given, false));
+            assertThat(told).containsExactly("a proceed u pw", "same proceed u pw");
+            assertThat(given).as("zeroed after the last of them").containsOnly((char) 0);
+            press(form().cancelAction()); // the answered challenge's dialog, which answers nothing more
+            assertThat(told).containsExactly("a proceed u pw", "same proceed u pw");
+            challenge("b", TOP, "intranet.example", 443, "Other", false);
+        });
+        char[] late = "pw".toCharArray();
+        onUiThread(() -> {
+            var answer = LoginsTestAccess.answerShown(items.signIns(), page);
+            items.signIns().closed(page);
+            assertThat(told).endsWith("b cancel");
+            answer.accept(new Outcome.Ok("u", late, false));
+            assertThat(told).as("nothing signed in after the end").endsWith("b cancel").doesNotContain("b proceed u pw");
+            assertThat(late).as("zeroed").containsOnly((char) 0);
+        });
+    }
+
+    /** The plugin's stop cancels every page's challenges, shown and waiting, once; and each one after it at once. */
+    @Test void theStopCancelsEveryChallengeOnceAndEachLaterOneAtOnce() throws Exception {
+        onUiThread(() -> {
+            challenge("a", TOP, "intranet.example", 443, "Corp", false);
+            challenge("b", TOP, "intranet.example", 443, "Other", false);
+        });
+        onUiThread(() -> {
+            assertThat(host.windows()).hasSize(1);
+            items.signIns().close();
+            assertThat(told).containsExactlyInAnyOrder("a cancel", "b cancel");
+            assertThat(host.windows()).as("the dialog closed").isEmpty();
+            items.signIns().navigating(page);
+            challenge("c", TOP, "intranet.example", 443, "Corp", false);
+            assertThat(told).as("after the stop").endsWith("c cancel");
+            items.signIns().close();
+            item.close();
+            assertThat(told).as("each once").hasSize(3);
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /** A page's own close, without its item's, cancels its challenges at once, the waiting ones too (deviation 8). */
+    @Test void aPagesOwnCloseCancelsItsChallengesAtOnce() throws Exception {
+        onUiThread(() -> {
+            challenge("a", TOP, "intranet.example", 443, "Corp", false);
+            challenge("b", TOP, "intranet.example", 443, "Other", false);
+        });
+        onUiThread(() -> {
+            page.close();
+            assertThat(told).as("in the same turn").containsExactlyInAnyOrder("a cancel", "b cancel");
+            assertThat(host.windows()).isEmpty();
+        });
+        onUiThread(() -> assertThat(told).as("each once").hasSize(2));
+    }
+
+    /**
+     * L13 and a Digest challenge: with the Vault, a host {@link URI} cannot read (an underscore, which Chromium
+     * accepts) and a Digest challenge each get the plain dialog.
+     */
+    @Test void anUnreadableHostAndADigestChallengeGetThePlainDialog() throws Exception {
+        open(true);
+        String underscore = "https://my_host.example/";
+        onUiThread(() -> items.signIns().challenged(page, place, false,
+            signIn("l13", underscore, underscore, "my_host.example", 443, "Corp", false, "basic")));
+        onUiThread(() -> {
+            assertThat(labels()).containsExactly("Cancel", "OK");
+            assertThat(remember()).isFalse();
+            press(form().cancelAction());
+            items.signIns().challenged(page, place, false, signIn("digest", TOP, TOP, "intranet.example", 443, "Corp", false, "digest"));
+        });
+        onUiThread(() -> {
+            assertThat(labels()).containsExactly("Cancel", "OK");
+            assertThat(remember()).isFalse();
+            press(form().cancelAction());
+            assertThat(told).containsExactly("l13 cancel", "digest cancel");
         });
     }
 
@@ -339,6 +523,18 @@ class HttpSignInsTest {
         if (items == null) open(false);
         return new SignIn(origin, proxy, challenger, port, realm, scheme, top,
             (user, password) -> told.add(name + " proceed " + user + " " + password), () -> told.add(name + " cancel"));
+    }
+
+    /** The sign-in dialogs from now on read one moment, so each opens straight after the one before closed. */
+    private void tripsQuickly() throws Exception {
+        clock.close();
+        clock = DialogsTestAccess.signInsTimedBy(() -> 50_000);
+    }
+
+    /** The plugin's items, opened without the Vault when there are none yet. */
+    private BrowserItems items() {
+        if (items == null) open(false);
+        return items;
     }
 
     /** A started stand-in Browser on a fake host, its one item at {@link #TOP}, with the Vault or without it. */

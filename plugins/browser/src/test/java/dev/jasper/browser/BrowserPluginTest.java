@@ -12,6 +12,7 @@ import dev.jasper.browser.item.BrowserItems;
 import dev.jasper.browser.item.ItemTestAccess;
 import dev.jasper.browser.logins.FakeVault;
 import dev.jasper.browser.page.PageTestAccess;
+import dev.jasper.browser.page.SignIn;
 import dev.jasper.browser.permissions.Decision;
 import dev.jasper.browser.permissions.Permission;
 import dev.jasper.browser.restore.BrowserRestore;
@@ -444,6 +445,38 @@ class BrowserPluginTest {
             assertThat(previews.available()).isFalse();
             assertThat(host.failures()).isEmpty();
         } });
+    }
+
+    /**
+     * Plan 8's L27: the stop cancels each page's HTTP sign-ins, shown and waiting, once, while Chromium still runs, so
+     * no request of Chromium's waits on a dialog as it closes.
+     */
+    @Test void theStopCancelsEveryPagesSignInBeforeChromiumCloses() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            UUID window = host.addTerminalWindow();
+            host.activateTerminalWindow(window);
+            var plugin = plugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            List<String> told = new ArrayList<>();
+            previews(host).create(event -> told.add("Chromium closed"));
+            assertThat(host.invoke(BrowserPlugin.NEW_TAB, window, null)).isTrue();
+            var page = ItemTestAccess.page(plugin.items().items().getFirst());
+            page.signIn(signIn("a", told));
+            page.signIn(signIn("b", told));
+            assertThat(told).as("asked, not answered").isEmpty();
+            host.stopAll();
+            assertThat(told).as("each cancelled once, before Chromium closed")
+                .containsExactlyInAnyOrder("a cancel", "b cancel", "Chromium closed").endsWith("Chromium closed");
+            assertThat(host.windows()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /** A Basic challenge of the top-level navigation to intranet.example, for realm {@code name}, told to {@code told}. */
+    private static SignIn signIn(String name, List<String> told) {
+        String top = "https://intranet.example/";
+        return new SignIn(top, false, "intranet.example", 443, name, "basic", top,
+            (user, password) -> told.add(name + " proceed"), () -> told.add(name + " cancel"));
     }
 
     /**
