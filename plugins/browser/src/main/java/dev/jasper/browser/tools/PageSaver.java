@@ -548,13 +548,15 @@ public final class PageSaver {
          * 100 ms, so the resource's deadline and the save's, both in {@code end}, hold, and a stop is heard while the
          * system's resolver takes its time (ruling D47): none, which refuses the name, once {@code end} passes or the
          * plugin stops first, and when the lookup fails. A lookup given up on is interrupted, which the system's resolver
-         * ignores; its thread ends with it.
+         * ignores; its thread ends with it, holding only the name, the resolver and the lookup, never this save (ruling
+         * D50).
          */
         private List<InetAddress> resolved(String name, long end) throws InterruptedException {
             var lookup = new CompletableFuture<List<InetAddress>>();
+            Function<String, List<InetAddress>> resolve = resolver;
             Thread looking = Thread.ofVirtual().name("jasper-browser-save-lookup").start(() -> {
                 try {
-                    List<InetAddress> found = resolver.apply(name);
+                    List<InetAddress> found = resolve.apply(name);
                     lookup.complete(found == null ? List.of() : found);
                 } catch (RuntimeException | Error failed) {
                     lookup.completeExceptionally(failed);
