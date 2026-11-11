@@ -314,7 +314,7 @@ class PageToolsHostTest {
             settings.set(BrowserSettings.declare(plugin.settings()));
         });
         context = started.get();
-        items = new BrowserItems(context, settings.get()::read, new DataStores(memory.make(), () -> false), page -> { },
+        items = new BrowserItems(context, settings.get()::read, new DataStores(memory.make(), () -> false), Optional.empty(), page -> { },
             (Duration delay, Runnable task) -> () -> { }, request -> new CompletableFuture<>());
         item = items.open(URI.create(url), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
         PageTestAccess.useScriptRunner(item.page(), (script, address) -> ran.add(address + " " + script));

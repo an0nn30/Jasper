@@ -47,7 +47,7 @@ final class PaletteHarness {
             plugin.palette().register(new BookmarksScope(stores.bookmarkIndex(), this::open));
             plugin.palette().register(new VisitedScope(stores.visitIndex(), this::open));
         });
-        items = new BrowserItems(context.get(), settings.get()::read, new DataStores(stores, () -> false), page -> { });
+        items = new BrowserItems(context.get(), settings.get()::read, new DataStores(stores, () -> false), Optional.empty(), page -> { });
         opener = real ? new PaletteOpener(items, unavailable::get, told::add) : null;
     }
 

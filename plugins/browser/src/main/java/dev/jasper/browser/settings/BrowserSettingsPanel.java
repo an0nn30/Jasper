@@ -30,7 +30,9 @@ import java.util.function.Supplier;
  * Clear Website Data and Manage Site Permissions. Each clearing asks first, through the plugin's prompt, and runs only
  * once the user accepts; Clear Website Data tells its success once the clearing has completed, and a clearing that
  * fails is told by the clearing itself. Each clearing runs once at a time: while it runs, its button is busy and asks
- * nothing. Manage Permissions opens the persistent store's site permissions page. In Ad Blocking, after its settings,
+ * nothing. Manage Permissions opens the persistent store's site permissions page. With the Credential Vault, Manage
+ * Saved Passwords follows it: Settings is modal, so its Manage Passwords closes Settings first, asking about unsaved
+ * changes as Cancel does, and the plugin's action then opens the Vault's manager. In Ad Blocking, after its settings,
  * Filter Statistics says how many rules the filter list has and when it was updated, that it is updating, why it
  * could not be updated, or, before the list has been read, that it loads when ad blocking is on and a browser page
  * opens, with Update Now, which downloads the list at once without asking and is busy while the list updates; a list 7
@@ -38,7 +40,8 @@ import java.util.function.Supplier;
  */
 public final class BrowserSettingsPanel implements SettingsPanel {
     static final String PAGE = "browser.settings", CLEAR_COOKIES = "browser.settings.clear-cookies",
-        CLEAR_DATA = "browser.settings.clear-data", PERMISSIONS = "browser.settings.permissions", FILTERS = "browser.settings.filters",
+        CLEAR_DATA = "browser.settings.clear-data", PERMISSIONS = "browser.settings.permissions",
+        SAVED_PASSWORDS = "browser.settings.saved-passwords", FILTERS = "browser.settings.filters",
         STALE = "browser.settings.filters.stale";
     private static final String COOKIES_TITLE = "Clear Cookies", COOKIES_QUESTION = "This will remove all cookies from all websites. Continue?";
     // iTerm2's text, naming all it deletes (ruling V24), with what the next start's wipe does to sign-ins made before it
@@ -62,15 +65,18 @@ public final class BrowserSettingsPanel implements SettingsPanel {
      * @param clearWebsiteData clears the persistent store's website data, history, bookmarks and site permissions; as
      *     {@code clearCookies}
      * @param managePermissions opens the persistent store's site permissions page
+     * @param manageSavedPasswords opens the Credential Vault's manager once Settings has closed; empty without the
+     *     Vault, when the page has no Manage Saved Passwords
      * @param show shows a prompt over the active window
      */
     public record Actions(Supplier<CompletableFuture<Void>> clearCookies, Supplier<CompletableFuture<Void>> clearWebsiteData,
-                          Runnable managePermissions, Consumer<Prompt> show) {
+                          Runnable managePermissions, Optional<Runnable> manageSavedPasswords, Consumer<Prompt> show) {
         /** Requires every action. */
         public Actions {
             Objects.requireNonNull(clearCookies, "clearCookies");
             Objects.requireNonNull(clearWebsiteData, "clearWebsiteData");
             Objects.requireNonNull(managePermissions, "managePermissions");
+            Objects.requireNonNull(manageSavedPasswords, "manageSavedPasswords");
             Objects.requireNonNull(show, "show");
         }
     }
@@ -148,7 +154,10 @@ public final class BrowserSettingsPanel implements SettingsPanel {
     }
 
     @Override public List<String> keywords() {
-        return List.of("cookies", "website data", "cache", "permissions", "privacy", "/dev/null", "ad blocking", "filter", "proxy");
+        var keywords = new ArrayList<>(List.of("cookies", "website data", "cache", "permissions", "privacy", "/dev/null", "ad blocking",
+            "filter", "proxy"));
+        if (actions.manageSavedPasswords().isPresent()) keywords.add("passwords");
+        return List.copyOf(keywords);
     }
 
     @Override public void highlight(String query) {
@@ -175,6 +184,8 @@ public final class BrowserSettingsPanel implements SettingsPanel {
                 if (!running(dataClearing)) actions.show().accept(new Prompt(DATA_TITLE, DATA_QUESTION, true, this::clearWebsiteData));
             }
             case PERMISSIONS -> actions.managePermissions().run();
+            // F7: Settings is modal over the window the Vault's manager and its unlock prompt open over, so it closes first.
+            case SAVED_PASSWORDS -> actions.manageSavedPasswords().ifPresent(host::closeThen);
             case FILTERS -> updateNow();
             default -> { }
         }
@@ -234,6 +245,8 @@ public final class BrowserSettingsPanel implements SettingsPanel {
                 rows.add(row(CLEAR_COOKIES, "Clear All Cookies", "", "Clear Cookies", running(cookiesClearing)));
                 rows.add(row(CLEAR_DATA, "Clear Website Data", "", "Clear All Data", running(dataClearing)));
                 rows.add(row(PERMISSIONS, "Manage Site Permissions", PERMISSIONS_DESCRIPTION, "Manage Permissions", false));
+                if (actions.manageSavedPasswords().isPresent())
+                    rows.add(row(SAVED_PASSWORDS, "Manage Saved Passwords", "", "Manage Passwords", false));
             }
             boolean mixed = false;
             if (section.title().equals(BrowserSettings.AD_BLOCKING)) {

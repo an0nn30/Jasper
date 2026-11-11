@@ -34,6 +34,14 @@ class BrowserManifestTest {
         assertThat(list("exports")).containsExactly("dev.jasper.browser.api");
     }
 
+    /**
+     * Plan 8 Task 3: saved logins come from the Credential Vault, whose API the Browser compiles against; optional, so the
+     * Browser starts without it and shows none of its parts then. 0.9.0 is the Vault whose API saves logins.
+     */
+    @Test void theBrowserOptionallyRequiresTheVault() throws IOException {
+        assertThat(raw("requires")).isEqualTo("[{ id = \"dev.jasper.vault\", version = \">=0.9.0\", optional = true }]");
+    }
+
     private static String manifest() throws IOException {
         try (var in = BrowserPlugin.class.getResourceAsStream("/plugin.toml")) {
             assertThat(in).as("the Browser's plugin.toml").isNotNull();

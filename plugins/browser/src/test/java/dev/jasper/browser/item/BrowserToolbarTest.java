@@ -350,7 +350,7 @@ class BrowserToolbarTest {
             context.set(plugin);
             settings.set(BrowserSettings.declare(plugin.settings()));
         });
-        new BrowserItems(context.get(), settings.get()::read, new DataStores(memory.make(), () -> false), page -> { })
+        new BrowserItems(context.get(), settings.get()::read, new DataStores(memory.make(), () -> false), Optional.empty(), page -> { })
             .open(URI.create(START), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
         return host.contentView(ID, "example.com").orElseThrow();
     }

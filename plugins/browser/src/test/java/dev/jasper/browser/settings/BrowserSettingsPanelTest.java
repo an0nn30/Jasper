@@ -352,6 +352,77 @@ class BrowserSettingsPanelTest {
         });
     }
 
+    /**
+     * Plan 8 Task 3 (F21): with the Vault, Privacy &amp; Data ends with Manage Saved Passwords, after Manage Site
+     * Permissions; without it, the row is not there.
+     */
+    @Test void manageSavedPasswordsShowsOnlyWithTheVaultAfterManageSitePermissions() throws Exception {
+        onUi(() -> {
+            assertThat(rows(page(), "browser.settings.privacy-data")).as("without the Vault")
+                .endsWith(BrowserSettingsPanel.PERMISSIONS + ":row").doesNotContain(BrowserSettingsPanel.SAVED_PASSWORDS + ":row");
+            host.close();
+            host = new FakePluginHost();
+            FakeKitView view = page(Optional.of(() -> ran.add("passwords")));
+            assertThat(rows(view, "browser.settings.privacy-data")).containsExactly("settings:devnull_mode:row",
+                BrowserSettingsPanel.CLEAR_COOKIES + ":row", BrowserSettingsPanel.CLEAR_DATA + ":row", BrowserSettingsPanel.PERMISSIONS + ":row",
+                BrowserSettingsPanel.SAVED_PASSWORDS + ":row");
+            var row = node(view, BrowserSettingsPanel.SAVED_PASSWORDS + ":row", Nodes.SettingRow.class);
+            assertThat(row.title()).isEqualTo("Manage Saved Passwords");
+            assertThat(row.description()).isEmpty();
+            assertThat(button(view, BrowserSettingsPanel.SAVED_PASSWORDS).label()).isEqualTo("Manage Passwords");
+            assertThat(button(view, BrowserSettingsPanel.SAVED_PASSWORDS).state()).isEqualTo(ControlState.READY);
+            assertThat(ran).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * F7: Settings is modal, so Manage Saved Passwords closes it first, asking about unsaved changes as Cancel does, and
+     * runs its action only once it has closed, in a later turn; kept open, it runs nothing.
+     */
+    @Test void manageSavedPasswordsClosesSettingsFirstThenRunsItsAction() throws Exception {
+        onUi(() -> {
+            FakeKitView view = page(Optional.of(() -> ran.add("passwords")));
+            view.emit(new UiEvent.Toggled("settings:devnull_mode", true));
+            host.answerDiscard(false);
+            view.emit(new UiEvent.Action(BrowserSettingsPanel.SAVED_PASSWORDS));
+            assertThat(host.discardQuestions()).as("asked about the unsaved change").isEqualTo(1);
+            assertThat(host.settingsPanelView(ID)).as("kept open").isPresent();
+        });
+        flushUi();
+        assertThat(ran).as("kept open, it runs nothing").isEmpty();
+        onUi(() -> {
+            host.answerDiscard(true);
+            host.settingsPanelView(ID).orElseThrow().emit(new UiEvent.Action(BrowserSettingsPanel.SAVED_PASSWORDS));
+            assertThat(host.discardQuestions()).isEqualTo(2);
+            assertThat(host.settingsPanelView(ID)).as("Settings closed first").isEmpty();
+            assertThat(host.savedSettings(ID)).as("the change discarded, not applied").doesNotContainEntry("devnull_mode", true);
+            assertThat(ran).as("not yet").isEmpty();
+        });
+        flushUi();
+        assertThat(ran).containsExactly("passwords");
+        assertThat(prompts).as("asks nothing of its own").isEmpty();
+        onUi(() -> assertThat(host.failures()).isEmpty());
+    }
+
+    /** Settings search finds Manage Saved Passwords by "passwords", only on a page that has it. */
+    @Test void searchingPasswordsFindsManageSavedPasswords() throws Exception {
+        onUi(() -> {
+            page();
+            assertThat(panel.keywords()).as("without the Vault").doesNotContain("passwords");
+            host.close();
+            host = new FakePluginHost();
+            FakeKitView view = page(Optional.of(() -> ran.add("passwords")));
+            assertThat(panel.keywords()).contains("passwords");
+            host.highlightSettingsPanel(ID, "passwords");
+            assertThat(node(view, BrowserSettingsPanel.SAVED_PASSWORDS + ":row", Nodes.SettingRow.class).highlighted()).isTrue();
+            assertThat(node(view, BrowserSettingsPanel.PERMISSIONS + ":row", Nodes.SettingRow.class).highlighted()).isFalse();
+            host.highlightSettingsPanel(ID, "");
+            assertThat(node(view, BrowserSettingsPanel.SAVED_PASSWORDS + ":row", Nodes.SettingRow.class).highlighted()).isFalse();
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
     @Test void settingsSearchFindsThePageAndItsOwnRowsMarkThemselves() throws Exception {
         onUi(() -> {
             FakeKitView view = page();
@@ -385,6 +456,11 @@ class BrowserSettingsPanelTest {
 
     /** Starts a plugin that gives the Browser's page over its real declarations, then opens the page as Settings would. */
     private FakeKitView page() {
+        return page(Optional.empty());
+    }
+
+    /** As {@link #page()}, with Manage Saved Passwords when {@code savedPasswords} is present, as with the Vault. */
+    private FakeKitView page(Optional<Runnable> savedPasswords) {
         host.start(INFO, Set.of(), Set.of(), context -> {
             BrowserSettings.Declared settings = BrowserSettings.declare(context.settings());
             panel = new BrowserSettingsPanel(context.kit(), settings, new Actions(() -> {
@@ -393,7 +469,7 @@ class BrowserSettingsPanelTest {
             }, () -> {
                 ran.add("data");
                 return data;
-            }, () -> ran.add("permissions"), prompts::add), new FilterStatistics(() -> filterStatus, () -> stale, () -> {
+            }, () -> ran.add("permissions"), savedPasswords, prompts::add), new FilterStatistics(() -> filterStatus, () -> stale, () -> {
                 ran.add("update");
                 return update;
             }));

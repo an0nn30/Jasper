@@ -532,7 +532,7 @@ class PermissionPromptTest {
             var host = new FakePluginHost();
             var started = new AtomicReference<BrowserItems>();
             host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(),
-                plugin -> started.set(new BrowserItems(plugin, BrowserSettings.declare(plugin.settings())::read, new DataStores(memory.make(), () -> false), page -> { })));
+                plugin -> started.set(new BrowserItems(plugin, BrowserSettings.declare(plugin.settings())::read, new DataStores(memory.make(), () -> false), Optional.empty(), page -> { })));
             var items = started.get();
             host.activateTerminalWindow(host.addTerminalWindow());
             BrowserItem item = items.open(URI.create("https://camera.example/call"), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());

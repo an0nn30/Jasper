@@ -41,8 +41,10 @@ matching source file. The Browser (`plugins/browser`) shows Chromium pages throu
 runs in process; only it may name an `org.cef` or `com.jetbrains.cef` type, and only in its `engine`, `page`, `links`
 and `dialogs` packages (`ChromiumBoundaryTest`). It exports `dev.jasper.browser.api`, the Markdown previews Chromium
 draws, which names no JCEF type; the Editor optionally consumes it, and only its `ChromiumPreview` and
-`ChromiumPreviews` name it (`EditorBrowserBoundaryTest`). A plugin built elsewhere is not checked at build time;
-at run time the SDK has no way to mount an ordinary control, and custom content admission (below) refuses one.
+`ChromiumPreviews` name it (`EditorBrowserBoundaryTest`). The Browser optionally consumes the Vault API
+(`dev.jasper.vault.api`), and only its `logins.VaultLogins` names it (`VaultBoundaryTest`). A plugin built elsewhere
+is not checked at build time; at run time the SDK has no way to mount an ordinary control, and custom content
+admission (below) refuses one.
 
 ## Launch
 

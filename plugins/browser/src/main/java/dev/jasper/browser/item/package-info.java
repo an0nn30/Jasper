@@ -41,6 +41,7 @@
  * {@link dev.jasper.browser.tools.PageTools}, whose Reader Mode and Remove Distractions lead the menu button while the
  * page offers them, and gives the reader the theme's colours through {@link dev.jasper.browser.pages.PageHtml}; and holds
  * the item's Save Page As saves ({@link dev.jasper.browser.tools.SavePage}), which {@code BrowserItems} starts in the
- * {@code downloads} package's Downloads folder, showing the saved folder with its {@code FileManager}.
+ * {@code downloads} package's Downloads folder, showing the saved folder with its {@code FileManager}. With the
+ * Credential Vault, {@code BrowserItems} holds the {@code logins} package's {@code VaultLogins} for its items.
  */
 package dev.jasper.browser.item;

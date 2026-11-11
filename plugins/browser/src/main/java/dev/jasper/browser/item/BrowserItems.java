@@ -3,6 +3,7 @@ package dev.jasper.browser.item;
 import dev.jasper.browser.downloads.DownloadNames;
 import dev.jasper.browser.downloads.FileManager;
 import dev.jasper.browser.engine.AboutScheme;
+import dev.jasper.browser.logins.VaultLogins;
 import dev.jasper.browser.page.Favicons;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.restore.BrowserRestore;
@@ -41,8 +42,8 @@ import javax.swing.Timer;
  * pages show ({@link PageNotifications}), and holds the fetchers of their pages' favicons and their address fields'
  * search suggestions until {@link #close()}. Its items' Save Page As saves start here ({@link #savePage}), with the
  * Downloads folder and file manager the plugin gives ({@link #useSaving}) and the HTTP proxy as it is then, whose change
- * retires each save's client (plan 7's D6). A page is made, and Chromium so asked for, only when its item first shows.
- * UI thread.
+ * retires each save's client (plan 7's D6). It holds the Credential Vault's logins for its items while the Vault is
+ * present ({@link #vault()}). A page is made, and Chromium so asked for, only when its item first shows. UI thread.
  */
 public final class BrowserItems implements AutoCloseable {
     /** The globe: a browser item's tab icon, and its actions' and split item's. */
@@ -53,6 +54,7 @@ public final class BrowserItems implements AutoCloseable {
     private final PluginContext context;
     private final Supplier<BrowserSettings> settings;
     private final DataStores stores;
+    private final Optional<VaultLogins> vault;
     private final Consumer<Page> start;
     private final BiFunction<Duration, Runnable, Runnable> later;
     private final Function<URI, CompletableFuture<List<String>>> suggest;
@@ -84,22 +86,25 @@ public final class BrowserItems implements AutoCloseable {
      * @param settings the settings as they are now, which the items read each time they search or suggest
      * @param stores the data stores the items open in, whose history and bookmarks they record into and suggest from;
      *     the plugin closes them
+     * @param vault the Credential Vault's logins, found once at the plugin's start; empty without the Vault
      * @param start makes a page, the first time its item shows
      */
-    public BrowserItems(PluginContext context, Supplier<BrowserSettings> settings, DataStores stores, Consumer<Page> start) {
-        this(context, settings, stores, start, BrowserItems::onUiAfter, null);
+    public BrowserItems(PluginContext context, Supplier<BrowserSettings> settings, DataStores stores, Optional<VaultLogins> vault,
+                        Consumer<Page> start) {
+        this(context, settings, stores, vault, start, BrowserItems::onUiAfter, null);
     }
 
     /**
-     * As {@link #BrowserItems(PluginContext, Supplier, DataStores, Consumer)}, with {@code later} running a task on the UI
-     * thread after a delay, answering what cancels it, and {@code suggest} fetching an engine's suggestions; null fetches
-     * them with the plugin's own {@link SuggestionFetcher}.
+     * As {@link #BrowserItems(PluginContext, Supplier, DataStores, Optional, Consumer)}, with {@code later} running a task
+     * on the UI thread after a delay, answering what cancels it, and {@code suggest} fetching an engine's suggestions;
+     * null fetches them with the plugin's own {@link SuggestionFetcher}.
      */
-    BrowserItems(PluginContext context, Supplier<BrowserSettings> settings, DataStores stores, Consumer<Page> start,
-                 BiFunction<Duration, Runnable, Runnable> later, Function<URI, CompletableFuture<List<String>>> suggest) {
+    BrowserItems(PluginContext context, Supplier<BrowserSettings> settings, DataStores stores, Optional<VaultLogins> vault,
+                 Consumer<Page> start, BiFunction<Duration, Runnable, Runnable> later, Function<URI, CompletableFuture<List<String>>> suggest) {
         this.context = Objects.requireNonNull(context, "context");
         this.settings = Objects.requireNonNull(settings, "settings");
         this.stores = Objects.requireNonNull(stores, "stores");
+        this.vault = Objects.requireNonNull(vault, "vault");
         this.start = Objects.requireNonNull(start, "start");
         this.later = Objects.requireNonNull(later, "later");
         this.suggest = suggest == null ? this::fetchSuggestions : suggest;
@@ -203,6 +208,15 @@ public final class BrowserItems implements AutoCloseable {
         Objects.requireNonNull(origins, "origins");
         if (origins.isEmpty()) return;
         for (BrowserItem item : List.copyOf(open)) if (item.store() == store) item.privacy().reloadShowing(origins);
+    }
+
+    /**
+     * The Credential Vault's logins, which the plugin found once at its start, for the items' sign-ins and fields.
+     *
+     * @return them; empty without the Vault plugin, when none of the Vault's parts appear
+     */
+    public Optional<VaultLogins> vault() {
+        return vault;
     }
 
     /** Opens Settings at the Browser's page. */
