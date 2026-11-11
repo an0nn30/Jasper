@@ -13,8 +13,9 @@
  * could pass for Jasper's own words. {@link dev.jasper.browser.logins.HttpSignIns}, which the plugin makes once and its
  * browser items hand their pages' sign-ins to, with or without the Vault, shows the {@code dialogs} package's
  * {@link dev.jasper.browser.dialogs.SignInDialog} for each, one per page at a time, and gives Chromium what it answers;
- * with the Vault it signs a top-level challenge in with a remembered login without the dialog, and saves one answered
- * with "Remember this password" once the page's next response succeeds.
+ * with the Vault it signs a top-level challenge in with a remembered login without the dialog, once until the login's
+ * own origin answers and commits a page, and saves one answered with "Remember this password" once the page's next
+ * response succeeds.
  * Names no Chromium type. May depend on the {@code page}, {@code permissions}, {@code dialogs} and {@code json}
  * packages, the SDK, the JDK and {@code dev.jasper.vault.api}; the {@code settings} package names none of its types.
  */

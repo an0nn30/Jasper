@@ -26,9 +26,10 @@ import java.util.function.Supplier;
  * A stand-in Credential Vault for the Browser's tests, which never start the Vault plugin or touch a vault file: a
  * {@link VaultApi} that records what it is asked, with switches for its lock state, the logins whose saved grant it
  * refuses, and the members an older Vault lacks, which throw {@link NoSuchMethodError}; a test may give the futures
- * its pick, fetch and save answer. As a plugin it publishes that API to each consumer, as the Vault does. Every
- * {@link Credential} it hands out is kept, so a test can see it was closed. Its {@code saveLogin},
- * {@code credentialIfGranted} and {@code openManager} require the UI thread, as the Vault's do (L9).
+ * its pick, fetch and save answer, or the failures its grant read and save throw. As a plugin it publishes that API
+ * to each consumer, as the Vault does. Every {@link Credential} it hands out is kept, so a test can see it was closed.
+ * Its {@code saveLogin}, {@code credentialIfGranted} and {@code openManager} require the UI thread, as the Vault's do
+ * (L9).
  */
 public final class FakeVault implements Plugin {
     /** The Vault's identity, which a consumer names in its optional {@code requires}. */
@@ -56,6 +57,10 @@ public final class FakeVault implements Plugin {
     public volatile CompletableFuture<Optional<Credential>> credentialAnswer;
     /** What the next save answers; null saves at once. */
     public volatile CompletableFuture<Optional<CredentialDescriptor>> saveAnswer;
+    /** What {@code credentialIfGranted} throws, as a failing Vault would; null for none. */
+    public volatile RuntimeException grantFailure;
+    /** What {@code saveLogin} throws at the call, as a failing Vault would; null for none. */
+    public volatile RuntimeException saveFailure;
     private final Map<UUID, CredentialDescriptor> descriptors = new ConcurrentHashMap<>();
     private final List<UUID> order = new CopyOnWriteArrayList<>();
     private final Map<UUID, Supplier<Credential>> secrets = new ConcurrentHashMap<>();
@@ -193,6 +198,7 @@ public final class FakeVault implements Plugin {
                 char[] password) {
             onUiThread();
             lacks("saveLogin");
+            if (saveFailure != null) throw saveFailure;
             calls.add("saveLogin " + name + " " + username);
             saveOwners.add(owner);
             savedPasswords.add(new String(password));
@@ -204,6 +210,7 @@ public final class FakeVault implements Plugin {
         @Override public Optional<Credential> credentialIfGranted(UUID id) {
             onUiThread();
             lacks("credentialIfGranted");
+            if (grantFailure != null) throw grantFailure;
             calls.add("credentialIfGranted " + descriptors.get(id).name());
             if (state != LockState.UNLOCKED || ungranted.contains(id)) return Optional.empty();
             return Optional.of(issue(id));

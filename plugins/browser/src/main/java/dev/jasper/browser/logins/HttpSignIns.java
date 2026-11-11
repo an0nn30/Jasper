@@ -14,14 +14,13 @@ import dev.jasper.sdk.ui.UiAnchor;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -38,14 +37,16 @@ import java.util.function.Function;
  * Vault the dialog still shows, with neither, so pages can still sign in.
  *
  * <p>A challenge that can be remembered is, as its turn comes and while the vault is unlocked, signed in without the
- * dialog with the Browser's remembered login of its name ({@link VaultLogins#useGranted}), once per name until the
- * page's main frame gets a response other than a challenge's own 401 or 407; Chromium's challenge again for a wrong
- * password so shows the dialog rather than looping (review focus 1). OK with Remember ticked keeps a pending save for
- * the page, with the answer's password array, until the page's next main-frame response: a 2xx from the challenge's
- * origin, after any redirect, saves it in the Vault ({@link VaultLogins#save}); any other response, a new challenge of
- * the page and the page's close drop it, zeroed. A save the Vault cannot make posts "Could not save the password for
- * HOST", with the Vault's reason; one it makes or declines, such as when unlocking is cancelled, posts nothing. Neither
- * a silent fill nor the other challenges one answer serves (F30) is remembered.
+ * dialog with the Browser's remembered login of its name ({@link VaultLogins#useGranted}), once per name until that
+ * name's own origin answers the page's main frame with neither a 401 nor a 407 and the page that answer brings commits
+ * (L30). Chromium's challenge again for a wrong password so shows the dialog rather than looping (review focus 1), and
+ * no other origin's page, nor the origin's own answer that commits nothing, such as a 204 or a download, lets the
+ * password be sent again. OK with Remember ticked keeps a pending save for the page, with the answer's password array,
+ * until the page's next main-frame response: a 2xx from the challenge's origin, after any redirect, saves it in the
+ * Vault ({@link VaultLogins#save}); any other response, a main-frame load start before it, a new challenge of the page
+ * and the page's close drop it, zeroed. A save the Vault cannot make posts "Could not save the password for HOST", with
+ * the Vault's reason; one it makes or declines, such as when unlocking is cancelled, posts nothing. Neither a silent
+ * fill nor the other challenges one answer serves (F30) is remembered.
  *
  * <p>Each challenge is stamped with the page's document as it arrives; the page's next main-frame load start cancels
  * every challenge stamped earlier, shown or waiting, and closes its dialog (F8), as Chromium never says the request
@@ -127,8 +128,9 @@ public final class HttpSignIns {
     /**
      * The page's main frame got the final response to a navigation, a redirect being none: a 2xx from the origin of the
      * page's pending save saves it in the Vault, over the window of the page's item; any other response drops it,
-     * zeroed. A response other than a 401 or a 407 lets the page's next challenge of each name be signed in with a
-     * remembered login again. Nothing for a page with no challenge, or once the plugin stopped.
+     * zeroed. A response that is neither a 401 nor a 407 lets the page's next challenge of each name of its origin be
+     * signed in with a remembered login again, once the page it brings commits. Nothing for a page with no challenge,
+     * or once the plugin stopped.
      *
      * @param page the page
      * @param url the response's address
@@ -248,15 +250,27 @@ public final class HttpSignIns {
         }
     }
 
+    /**
+     * A login name a remembered login was tried for (L30): its origin, and whether the page's latest main-frame
+     * response came from that origin and was neither a 401 nor a 407, for the commit that follows it.
+     */
+    private static final class Tried {
+        final String origin;
+        boolean answered;
+
+        Tried(String origin) {
+            this.origin = origin;
+        }
+    }
+
     /** One page's challenges: the one whose dialog shows or is about to, and those waiting after it, in order. */
     private final class PageSignIns {
         private final Page page;
         private final List<Subscription> heard;
         private final ArrayDeque<Asked> waiting = new ArrayDeque<>();
         private Asked shown;
-        // The login names signed in with a remembered login since the page's main frame last got a response other than
-        // a 401 or a 407 (review focus 1).
-        private final Set<String> tried = new HashSet<>();
+        // The login names a remembered login was tried for, each until its origin's answer commits a page (L30).
+        private final Map<String, Tried> tried = new HashMap<>();
         // The sign-in answered with Remember, until the page's next main-frame response; null for none.
         private Pending pending;
         // The saves under way, which the page's close withdraws.
@@ -268,7 +282,7 @@ public final class HttpSignIns {
 
         PageSignIns(Page page) {
             this.page = page;
-            heard = List.of(page.onLoadStart(address -> loadStarted()), page.onLoadFailure(failure -> navigating = false),
+            heard = List.of(page.onLoadStart(this::loadStarted), page.onLoadFailure(failure -> navigating = false),
                 page.onClose(() -> closed(page)));
         }
 
@@ -297,10 +311,9 @@ public final class HttpSignIns {
 
         /**
          * Signs {@code asked} in with the Browser's remembered login of its name, with no dialog, when it can be
-         * remembered (never in /dev/null), the vault is unlocked and its name was not tried since the page's main frame
-         * last got a response other than a 401 or a 407; the name is marked tried first, so Chromium's challenge again
-         * for a wrong password shows the dialog (review focus 1). A failure of the Vault's is logged with the exception
-         * alone.
+         * remembered (never in /dev/null), the vault is unlocked and its name is not tried; the name is marked tried
+         * first, with its origin, so Chromium's challenge again for a wrong password shows the dialog (review focus 1),
+         * until that origin's answer commits a page (L30). A failure of the Vault's is logged with the exception alone.
          *
          * @return whether it was signed in
          */
@@ -309,12 +322,14 @@ public final class HttpSignIns {
             VaultLogins logins = vault.get();
             String name = asked.challenge.loginName();
             try {
-                if (!logins.unlocked() || !tried.add(name)) return false;
+                if (!logins.unlocked() || tried.containsKey(name)) return false;
+                tried.put(name, new Tried(asked.challenge.origin()));
                 // Chromium's callback takes a String, which cannot be zeroed; the array is the credential's, which the
                 // Vault zeroes as it closes.
                 return logins.useGranted(name, (user, password) -> asked.signIn.proceed(user, new String(password)));
             } catch (RuntimeException failure) {
-                LOG.log(System.Logger.Level.WARNING, "The Credential Vault could not fill a remembered sign-in", failure);
+                LOG.log(System.Logger.Level.WARNING, "The Credential Vault could not fill a remembered sign-in",
+                    failure);
                 return asked.signIn.answered();
             }
         }
@@ -381,12 +396,14 @@ public final class HttpSignIns {
 
         /**
          * The page's main frame got a response: a 2xx from the pending save's origin saves it, and any other drops it.
-         * Any response but a challenge's, a 401 or a 407, ends the page's tried names: Chromium may report the 401 of a
-         * wrong remembered password before it challenges again (L24).
+         * The response decides, for the commit that follows it, which tried names its origin answered (L30): those of
+         * its origin, unless it is a challenge's, a 401 or a 407, which Chromium may report for a wrong remembered
+         * password before it challenges again (L24).
          */
         void responded(String url, int status) {
             if (ended) return;
-            if (status != 401 && status != 407) tried.clear();
+            Optional<String> origin = status == 401 || status == 407 ? Optional.empty() : Origins.of(url);
+            for (Tried name : tried.values()) name.answered = origin.equals(Optional.of(name.origin));
             Pending save = pending;
             pending = null;
             if (save == null) return;
@@ -422,9 +439,18 @@ public final class HttpSignIns {
             if (dropped != null) dropped.zero();
         }
 
-        /** A main-frame load start: each challenge of an earlier document is cancelled, its dialog closed (F8). */
-        private void loadStarted() {
+        /**
+         * A main-frame load start, a commit of {@code address}: the pending save is dropped, as the response it waits
+         * for comes before its commit; a tried name its origin answered in the response before is tried no more if
+         * {@code address} is of that origin, and a commit of another origin ends that answer (L30); and each challenge
+         * of an earlier document is cancelled, its dialog closed (F8).
+         */
+        private void loadStarted(String address) {
             navigating = false;
+            drop();
+            Optional<String> origin = Origins.of(address);
+            tried.values().removeIf(name -> name.answered && origin.equals(Optional.of(name.origin)));
+            for (Tried name : tried.values()) name.answered = false;
             long now = page.document();
             var stale = new ArrayList<Asked>();
             for (Iterator<Asked> each = waiting.iterator(); each.hasNext(); ) {
