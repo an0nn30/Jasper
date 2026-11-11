@@ -82,6 +82,7 @@ a group named after it and an activities group, and may declare more.
 | Index results | `dev.jasper.indexer.results` | finished indexing, such as "Indexed <name>" | history only |
 | Bookmarks | `dev.jasper.browser.bookmarks` | the Browser's "Bookmark Removed" and "Bookmark Deleted" | card |
 | Page notifications | `dev.jasper.browser.pages` | the notifications browser pages show ([Page notifications](browser.md#page-notifications)) | card |
+| Downloads | `dev.jasper.browser.downloads` | the Browser's downloads: finished, failed or refused, a file without its downloaded-file mark, a file that could not be shown or opened, and Save Page As… failures once the page's tab has closed ([Downloads](browser.md#downloads)) | card |
 
 A configuration notification is titled "config.toml has errors" or "config.toml has warnings", or "The configuration
 has …" when any problem lies in another file, such as a plugin settings or theme file. It shows the first problem and

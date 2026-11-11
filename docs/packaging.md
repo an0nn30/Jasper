@@ -323,10 +323,12 @@ browser use your microphone only when you allow it." for macOS's prompts.
 ### macOS Downloads, Desktop and Documents folders
 
 macOS asks before an app reads or writes the Downloads, Desktop or Documents folder. The Browser saves downloads in the
-Downloads folder, or in another folder the Downloads folder setting names, and first creates or checks only the folder
-itself, so macOS asks at the first download. `packageApp` sets `NSDownloadsFolderUsageDescription` to "Jasper saves the
-files you download in the Browser here." and `NSDesktopFolderUsageDescription` and `NSDocumentsFolderUsageDescription`
-to "Jasper saves files from the Browser here when you choose this folder." for those prompts. Without the permission a
+Downloads folder, or in another folder the Downloads folder setting names, and at the first browser page creates or
+checks only the folder itself, so for the Downloads folder macOS asks at the first download, and for a folder inside
+Documents or Desktop at the first browser page. `packageApp` sets `NSDownloadsFolderUsageDescription` to "Jasper saves
+the files you download in the Browser here." and `NSDesktopFolderUsageDescription` and
+`NSDocumentsFolderUsageDescription` to "Jasper saves files from the Browser here when you choose this folder." for
+those prompts. Without the permission a
 download fails with "Operation not permitted"; the choice is in System Settings › Privacy & Security › Files and Folders.
 
 ### macOS Open With
