@@ -473,7 +473,8 @@ class PageNavigationTest {
 
     /**
      * F12, for Task 8: one DEBUG line in Jasper's run names the thread Chromium asks for a sign-in on, and whether it
-     * named the request's full address or only an origin; never a user name, password, realm, host or address.
+     * named the request's full address or only an origin; never a user name, password, realm, host or address. A
+     * sign-in while DEBUG is off spends nothing, so the line comes with the first sign-in once DEBUG is on.
      */
     @Test void oneDebugLineNamesTheSignInsThreadAndTheFormOfItsAddressOnly() throws Exception {
         var logger = java.util.logging.Logger.getLogger(PageNavigation.class.getName());
@@ -483,6 +484,11 @@ class PageNavigationTest {
         try (var log = new CapturedLog(PageNavigation.class.getName())) {
             var made = new AtomicReference<PageBrowser>();
             onUiThread(() -> made.set(PageTestAccess.pageBrowser(page())));
+            logger.setLevel(java.util.logging.Level.INFO);
+            PageNavigation.signIn(made.get(), "https://intranet.example/", false, "intranet.example", 443, "Corp", "basic",
+                new Callback(), () -> false, task -> { });
+            assertThat(PageNavigation.SIGN_IN_LOGGED).as("DEBUG off").isFalse();
+            logger.setLevel(java.util.logging.Level.FINE);
             var askedOn = new AtomicReference<String>();
             Thread chromium = new Thread(() -> {
                 askedOn.set(Thread.currentThread().getName());

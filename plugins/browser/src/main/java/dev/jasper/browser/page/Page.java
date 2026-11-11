@@ -56,8 +56,8 @@ import org.cef.browser.CefRequestContext;
  * {@link #loginQuery}, {@link PageQuery}); {@link PageLoginHooks} holds the script and the handler, and the page's
  * close cancels the queries not answered (plan 8). Each HTTP sign-in Chromium asks for one of the page's requests goes
  * to its item, to answer once ({@link #onSignIn}, {@link SignIn}), judged against the page's top address: its main
- * frame's latest navigation request, after its redirects ({@link #topAddress()}); and so does each final main-frame
- * response's status ({@link #onMainFrameResponse}).
+ * frame's latest navigation request, after its redirects, or its latest commit, whichever came last
+ * ({@link #topAddress()}); and so does each final main-frame response's status ({@link #onMainFrameResponse}).
  */
 public final class Page implements AutoCloseable {
     /** The longest {@link #source} waits for Chromium's HTML. */
@@ -965,7 +965,8 @@ public final class Page implements AutoCloseable {
 
     /**
      * Chromium's IO thread notes that the page's main frame asks for {@code url}, as each of its navigation requests
-     * starts, or is redirected there (F6): the page's top address from now on ({@link #topAddress()}). Any thread.
+     * starts, or is redirected there (F6): the page's top address until the next request or commit
+     * ({@link #topAddress()}). Any thread.
      *
      * @param url the request's address, as Chromium names it; a null is ignored
      */
@@ -974,10 +975,29 @@ public final class Page implements AutoCloseable {
     }
 
     /**
+     * Chromium's thread notes that the page's main frame committed {@code url}, before the UI thread hears of it
+     * ({@link #addressChanged}): the page's top address at once, until the next request or commit (L23). Any thread.
+     */
+    void mainFrameCommitted(String url) {
+        loginHooks.mainFrameCommitted(url);
+    }
+
+    /**
+     * Chromium's thread notes that the page's main-frame request for {@code url} ended without a commit, as it failed
+     * or became a download: while it is the top address, the commit before it is the top address again (L24). Any
+     * thread.
+     */
+    void mainFrameRequestEnded(String url) {
+        loginHooks.mainFrameRequestEnded(url);
+    }
+
+    /**
      * The address an HTTP sign-in of the page is judged against ({@link SignIn#topAddress()}): that of its main frame's
-     * latest navigation request, after its redirects, as Chromium noted it ({@link #mainFrameRequested}), or the
-     * committed address before the first ({@link #committedAddress()}). A request that has not committed counts, as a
-     * main frame's own challenge comes before its commit. Any thread.
+     * latest navigation request, after its redirects ({@link #mainFrameRequested}), or of its latest commit, whichever
+     * came last, as Chromium's threads noted them; a request that failed or became a download falls back to the commit
+     * before it. Before either, the committed address ({@link #committedAddress()}). A request that has not committed
+     * counts, as a main frame's own challenge comes before its commit; a commit with no request of its own, as a
+     * document restored without one, counts too, so it never inherits the request before it (L23). Any thread.
      *
      * @return the address, as Chromium writes it; empty before the page has either
      */

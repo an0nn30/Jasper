@@ -198,12 +198,26 @@ public final class PageEvents {
     /**
      * A load of {@code page} in {@code frame} failed with {@code errorCode}: a main frame's failure is handed to the UI
      * thread through {@code ui}, for the page, by Chromium's name for the error, or empty for one it does not name; a
-     * sub-frame's, and one without a page or frame, are not. Chromium's thread.
+     * sub-frame's, and one without a page or frame, are not. A main frame's failed request is the page's top address no
+     * more, there and then (plan 8's L24). Chromium's thread.
      */
     static void loadError(Page page, CefFrame frame, CefLoadHandler.ErrorCode errorCode, String failedUrl, Consumer<Runnable> ui) {
         if (page == null || frame == null || !frame.isMain()) return;
+        page.mainFrameRequestEnded(failedUrl);
         String code = errorCode == null ? "" : errorCode.name();
         ui.accept(() -> page.loadFailed(failedUrl, code));
+    }
+
+    /**
+     * {@code page}'s main frame committed {@code url}: it is the page's top address at once, there and then on
+     * Chromium's thread, so a sign-in asked meanwhile is judged against the document committed (plan 8's L23), and the
+     * commit is handed to the UI thread through {@code ui}, for the page. A sub-frame's, and one without a page or
+     * frame, are not. Chromium's thread.
+     */
+    static void addressChanged(Page page, CefFrame frame, String url, Consumer<Runnable> ui) {
+        if (page == null || frame == null || !frame.isMain()) return;
+        page.mainFrameCommitted(url);
+        ui.accept(() -> page.addressChanged(url));
     }
 
     /**
@@ -212,7 +226,7 @@ public final class PageEvents {
      */
     private static final class Display extends CefDisplayHandlerAdapter {
         @Override public void onAddressChange(CefBrowser browser, CefFrame frame, String url) {
-            if (frame != null && frame.isMain()) later(browser, page -> page.addressChanged(url));
+            addressChanged(page(browser), frame, url, EventQueue::invokeLater);
         }
 
         @Override public void onTitleChange(CefBrowser browser, String title) {

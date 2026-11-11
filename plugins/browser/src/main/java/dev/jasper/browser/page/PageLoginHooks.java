@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -14,7 +15,7 @@ import java.util.function.Consumer;
  * holds the tools' part: the login script each of its main frames runs as an http or https document starts loading,
  * read on Chromium's thread, and the handler its {@link PageQuery}s go to, with the queries handed to it that are not
  * yet over, which the page's close cancels; and its HTTP sign-ins: who hears each {@link SignIn} Chromium asks for, the
- * page's top address they are judged against, noted on Chromium's IO thread, and who hears each final response to a
+ * page's top address they are judged against, noted on Chromium's threads, and who hears each final response to a
  * main-frame navigation. It reaches no browser. UI thread, but where a method says otherwise.
  */
 final class PageLoginHooks {
@@ -27,9 +28,10 @@ final class PageLoginHooks {
     private boolean handled, closed;
     // The queries handed to the handler; those over leave as the next comes, and the rest are cancelled at the close.
     private final List<PageQuery> open = new ArrayList<>();
-    // The address of the main frame's latest navigation request, after its redirects; null before the first. Written on
-    // Chromium's IO thread, read on any.
-    private volatile String requested;
+    // The top address: the main frame's latest navigation request, after its redirects, or its latest commit, whichever
+    // came last; and that latest commit. Null before the first. Written on Chromium's threads, read on any.
+    private final AtomicReference<String> top = new AtomicReference<>();
+    private volatile String committedTop;
     private final List<Consumer<SignIn>> signIns = new CopyOnWriteArrayList<>();
     private final List<BiConsumer<String, Integer>> responses = new CopyOnWriteArrayList<>();
 
@@ -87,15 +89,36 @@ final class PageLoginHooks {
      * is ignored. Any thread.
      */
     void mainFrameRequested(String url) {
-        if (url != null) requested = url;
+        if (url != null) top.set(url);
     }
 
     /**
-     * The top address: that of the main frame's latest navigation request, after its redirects, else {@code committed}.
-     * Any thread.
+     * The main frame committed {@code url}, a document of its own or a change within one: the top address from now on,
+     * whatever was requested before it (L23). A null is ignored. Any thread.
+     */
+    void mainFrameCommitted(String url) {
+        if (url == null) return;
+        committedTop = url;
+        top.set(url);
+    }
+
+    /**
+     * The main frame's request for {@code url} ended without a commit: it failed, or became a download. When it is the
+     * top address still, the commit before it is from now on; another address's end, such as that of a request the
+     * next one replaced, changes nothing. A null is ignored. Any thread.
+     */
+    void mainFrameRequestEnded(String url) {
+        String current = top.get();
+        if (url != null && url.equals(current)) top.compareAndSet(current, committedTop);
+    }
+
+    /**
+     * The top address: the main frame's latest navigation request, after its redirects, or its latest commit, whichever
+     * came last, as Chromium's threads noted them; else {@code committed}, the commit the page last heard of. Any
+     * thread.
      */
     String topAddress(String committed) {
-        String latest = requested;
+        String latest = top.get();
         return latest != null ? latest : committed;
     }
 

@@ -9,8 +9,9 @@
  * Chromium asks for one of its requests, as a {@link dev.jasper.browser.page.SignIn} over Chromium's callback, posted
  * to the page, whose item answers it later, once ({@link dev.jasper.browser.page.Page#signIn}); it never blocks
  * Chromium's thread, and a browser that is no page's gets none. It notes the address of each main-frame navigation
- * request of a page, and the opener bridge's reader each redirect of one, as the page's top address, which a sign-in
- * is judged against, and that reader posts the page each final main-frame response's status (plan 8).
+ * request of a page, and the opener bridge's reader each redirect of one, as the page's top address until the next
+ * request or commit, which a sign-in is judged against, and that reader posts the page each final main-frame
+ * response's status (plan 8).
  * {@code OpenerBridge}, with its page script {@code opener-bridge.js} and {@code BridgeJson}, opens a script's
  * {@code window.open} the same way and keeps the popup's {@code window.opener} working through the client's message
  * router, within the limits {@code Isolation} reads from each main frame's response: its origin, a sandbox, and its

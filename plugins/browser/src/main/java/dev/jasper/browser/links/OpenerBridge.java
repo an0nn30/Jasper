@@ -1078,9 +1078,9 @@ final class OpenerBridge {
 
     /**
      * A main frame's navigation request: its response's opener policy and content security policies go to the bridge;
-     * the address each redirect sends it to is the page's top address from then on ({@link Page#mainFrameRequested},
-     * plan 8's F6); and the final response's address and status are posted to the page
-     * ({@link Page#mainFrameResponded}). Nothing about the load changes. Chromium's IO thread.
+     * the address each redirect sends it to is the page's top address until the next request or commit
+     * ({@link Page#mainFrameRequested}, plan 8's F6); and the final response's address and status are posted to the
+     * page ({@link Page#mainFrameResponded}). Nothing about the load changes. Chromium's IO thread.
      */
     private static final class Responses extends CefResourceRequestHandlerAdapter {
         private final OpenerBridge bridge;

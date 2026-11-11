@@ -19,12 +19,13 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * What the client's load handler hands a page when a load fails (spec section 14): a main frame's failure, by Chromium's
- * name for its error; that a main frame's load start runs the page's scripts in a page's browser only, never in its
- * DevTools', and its login script (plan 8) only in an http or https document once its item gave one; that the editing
- * keys reach both; and that {@code jasper-about:} answers a page's browser only. Chromium's
- * side is played by the test: the frame it names, the browsers it calls about (made without Chromium,
- * {@link PageTestAccess#pageBrowser}), and its thread, whose hand-offs to the UI thread the test runs. No Chromium.
+ * What the client's load handler hands a page when a load fails (spec section 14): a main frame's failure, by
+ * Chromium's name for its error; that a main frame's commit is the page's top address at once (plan 8's L23); that a
+ * main frame's load start runs the page's scripts in a page's browser only, never in its DevTools', and its login
+ * script (plan 8) only in an http or https document once its item gave one; that the editing keys reach both; and that
+ * {@code jasper-about:} answers a page's browser only. Chromium's side is played by the test: the frame it names, the
+ * browsers it calls about (made without Chromium, {@link PageTestAccess#pageBrowser}), and its thread, whose hand-offs
+ * to the UI thread the test runs. No Chromium.
  */
 class PageEventsTest {
     private static final String FAILED = "https://unknown.example/";
@@ -52,6 +53,29 @@ class PageEventsTest {
             PageEvents.loadError(page, null, CefLoadHandler.ErrorCode.ERR_CONNECTION_REFUSED, FAILED, handedOff::add);
             PageEvents.loadError(null, frame(true), CefLoadHandler.ErrorCode.ERR_CONNECTION_REFUSED, FAILED, handedOff::add);
             assertThat(handedOff).isEmpty();
+        });
+    }
+
+    /**
+     * Plan 8's L23: a main frame's commit is the page's top address at once, on Chromium's thread, before the page
+     * hears of the commit on the UI thread, so a sign-in asked meanwhile is judged against the committed document; a
+     * sub-frame's commit, and one without a page, change nothing.
+     */
+    @Test void aMainFramesCommitIsThePagesTopAddressBeforeItsHandOffRuns() throws Exception {
+        onUiThread(() -> {
+            Page page = page();
+            page.mainFrameRequested("https://bank.example/account");
+            var handedOff = new ArrayList<Runnable>();
+            PageEvents.addressChanged(page, frame(false), "https://frame.example/", handedOff::add);
+            PageEvents.addressChanged(null, frame(true), "https://other.example/", handedOff::add);
+            assertThat(handedOff).isEmpty();
+            assertThat(page.topAddress()).isEqualTo("https://bank.example/account");
+            PageEvents.addressChanged(page, frame(true), "https://other.example/", handedOff::add);
+            assertThat(page.topAddress()).as("before the hand-off").isEqualTo("https://other.example/");
+            assertThat(page.committedAddress()).as("the page has not heard").isEmpty();
+            handedOff.forEach(Runnable::run);
+            assertThat(page.committedAddress()).isEqualTo("https://other.example/");
+            assertThat(page.topAddress()).isEqualTo("https://other.example/");
         });
     }
 

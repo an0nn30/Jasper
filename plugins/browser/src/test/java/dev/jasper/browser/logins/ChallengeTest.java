@@ -135,6 +135,7 @@ class ChallengeTest {
         assertThat(proxy.host()).isEqualTo("proxy.example");
         assertThat(proxy.port()).isEqualTo(8118);
         assertThat(proxy.origin()).as("the address the page asked for").isEqualTo("https://intranet.example");
+        assertThat(proxy.topLevel()).as("a proxy's challenge is no navigation's own").isFalse();
         assertThat(proxy.offersVault(false, true)).isFalse();
     }
 

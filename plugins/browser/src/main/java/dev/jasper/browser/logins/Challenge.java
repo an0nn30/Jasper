@@ -24,8 +24,9 @@ import java.util.Optional;
  * @param scheme the scheme, in lower case, such as {@code basic}
  * @param proxy whether a proxy challenged, not the server
  * @param framed whether the asking origin is not the page's top address's, or either has none
- * @param topLevel whether the challenge is the top-level navigation's own: the address that asked is the top address,
- *     a fragment aside, or, when Chromium named only an origin, that origin is the top address's
+ * @param topLevel whether the challenge is the top-level navigation's own: a server's, not a proxy's, whose asking
+ *     address is the top address, a fragment aside, or, when Chromium named only an origin, whose origin is the top
+ *     address's
  */
 public record Challenge(String origin, String host, int port, String realm, String scheme, boolean proxy, boolean framed,
                         boolean topLevel) {
@@ -59,7 +60,7 @@ public record Challenge(String origin, String host, int port, String realm, Stri
     public static Challenge of(SignIn signIn) {
         Optional<String> asking = Origins.of(signIn.originUrl()), top = Origins.of(signIn.topAddress());
         boolean framed = asking.isEmpty() || !asking.equals(top);
-        boolean topLevel = asking.isPresent() && (signIn.originOnly() ? asking.equals(top)
+        boolean topLevel = !signIn.proxy() && asking.isPresent() && (signIn.originOnly() ? asking.equals(top)
             : withoutFragment(signIn.originUrl()).equals(withoutFragment(signIn.topAddress())));
         return new Challenge(asking.orElse(""), signIn.host(), signIn.port(), signIn.realm(), signIn.scheme(),
             signIn.proxy(), framed, topLevel);

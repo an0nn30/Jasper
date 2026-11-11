@@ -105,7 +105,7 @@ public final class SignIn {
 
     /**
      * The page's top address as Chromium asked: the address of its main frame's latest navigation request, after its
-     * redirects ({@link Page#topAddress()}).
+     * redirects, or of its latest commit, whichever came last ({@link Page#topAddress()}).
      *
      * @return the address; empty when the page had none
      */

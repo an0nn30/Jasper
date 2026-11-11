@@ -84,11 +84,12 @@
  * once, which the page hands its item, or cancels when nothing listens or it has closed
  * ({@link dev.jasper.browser.page.Page#onSignIn}); it is judged against the page's top address, the address of its
  * main frame's latest navigation request after its redirects, which that handler and the opener bridge note on
- * Chromium's IO thread ({@link dev.jasper.browser.page.Page#topAddress}), and the page tells its item each final
- * main-frame response's status ({@link dev.jasper.browser.page.Page#onMainFrameResponse}).
+ * Chromium's IO thread, or of its latest commit, which the display handler notes there and then, whichever came last;
+ * a request that fails or becomes a download falls back to the commit before it
+ * ({@link dev.jasper.browser.page.Page#topAddress}). The page tells its item each final main-frame response's status
+ * ({@link dev.jasper.browser.page.Page#onMainFrameResponse}).
  * {@link dev.jasper.browser.page.LastPress}, {@code Favicons}, {@code DownloadStart}, {@code DownloadTarget},
  * {@code DownloadProgress}, {@code PageQuery}, {@code SignIn}, {@code Page}'s methods and {@code PreviewPage}'s name no
- * Chromium type,
- * and none of these classes loads until a browser item opens or a Markdown preview is made.
+ * Chromium type, and none of these classes loads until a browser item opens or a Markdown preview is made.
  */
 package dev.jasper.browser.page;
