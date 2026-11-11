@@ -110,7 +110,9 @@ import javax.swing.JComponent;
  * Exit Reader Mode, Escape in the page or the page's next load (spec section 10); Remove Distractions hides the overlays
  * the user clicks until Exit Distraction Removal, Escape or the next load, and either mode ends the other. Remove
  * Element, from the page's right-click menu, hides the overlay under the pointer, its point divided by the zoom the page
- * shows at, and Save Page As… saves the page with its resources in a folder the user chooses. UI thread.
+ * shows at, and Save Page As… saves the page with its resources in a folder the user chooses. With the Credential
+ * Vault, its page's login fields show the Vault's buttons, whose picker opens under the field ({@link PageLoginsHost},
+ * plan 8). UI thread.
  */
 public final class BrowserItem implements AutoCloseable {
     static final String ROOT = "browser", PAGE = "browser.page", CONTENT = "browser.page.content";
@@ -143,6 +145,8 @@ public final class BrowserItem implements AutoCloseable {
     private final PrivacyMenu privacy;
     // The page's tools, reader mode first, whose group leads the menu (plan 7's F38).
     private final PageToolsHost pageTools;
+    // The page's field buttons, made once the tab opens, with the Credential Vault (plan 8's F18); null without it.
+    private PageLoginsHost pageLogins;
     // Answers the page's camera, microphone and notification requests until the item closes or the plugin stops.
     private final SitePermissions sitePermissions;
     // The plugin's pages' notifications, which the page's go to.
@@ -307,6 +311,8 @@ public final class BrowserItem implements AutoCloseable {
         page.setDialogPlace(new DialogPlace(items.context().kit(), items.context().windows(), tab));
         page.setMenuPlace(new MenuPlace(tab, items.context().platform()::copy, this::engineName, this::search, errors::canGoBack,
             this::goBack, this::reload, this::savePage, this::viewSource, this::removeElement, this::inspect));
+        // With the Credential Vault, the page's login fields show its buttons, whose picker opens over this tab's window.
+        items.vault().ifPresent(vault -> pageLogins = new PageLoginsHost(page, vault, view, tab, () -> zoom));
         items.opened(this);
         present();
     }
@@ -725,6 +731,7 @@ public final class BrowserItem implements AutoCloseable {
         visitsChanged.close();
         privacy.close();
         pageTools.close();
+        if (pageLogins != null) pageLogins.close();
         sitePermissions.close();
         endSuggestions();
         sources.close();
@@ -819,6 +826,7 @@ public final class BrowserItem implements AutoCloseable {
     private void showZoom(int percent) {
         zoom = percent;
         page.setZoomLevel(Zoom.cefLevel(percent));
+        if (pageLogins != null) pageLogins.zoomChanged();
     }
 
     /** The chosen search engine's name, as the page's right-click menu says it in Search with (P26). */

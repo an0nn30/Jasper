@@ -10,7 +10,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.BiConsumer;
+import java.util.function.BiPredicate;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
@@ -23,9 +23,10 @@ import java.util.function.Supplier;
  * <p>The answer, a failure and the cancel share one atomic, so only the first of them sends or cancels. The answer
  * reaches the page only while its main frame still shows the origin that asked, as far as the bridge has heard; once it
  * shows another, or an opaque one, which equals no origin, not even another opaque one, the page is told {@link #GONE}
- * and sent nothing more. Chromium cancels the request when the frame that asked navigates or closes, or when the page
- * cancels it, and the page's close cancels it too: after {@link #cancelled()} nothing is sent. It names no Chromium
- * type. Any thread, but where a method says otherwise.
+ * and sent nothing more; {@link #live()} says whether an answer would still reach it. Once Chromium has stopped, the
+ * reply sends nothing, and the answer and the failure say so. Chromium cancels the request when the frame that asked
+ * navigates or closes, or when the page cancels it, and the page's close cancels it too: after {@link #cancelled()}
+ * nothing is sent. It names no Chromium type. Any thread, but where a method says otherwise.
  */
 public final class PageQuery {
     /**
@@ -40,7 +41,7 @@ public final class PageQuery {
     private final Map<String, Object> request;
     private final BooleanSupplier activation;
     private final Supplier<Optional<String>> currentOrigin;
-    private final BiConsumer<Integer, String> reply;
+    private final BiPredicate<Integer, String> reply;
     // Whether the query was answered, failed or cancelled; and whether its activation was asked for.
     private final AtomicBoolean over = new AtomicBoolean(), activationAsked = new AtomicBoolean();
     // Who hears the cancel, and whether they have been told. UI thread.
@@ -56,10 +57,11 @@ public final class PageQuery {
      * @param request the request's members, as the page sent them
      * @param activation whether the user's activation allows the request, which it consumes; asked once at most
      * @param currentOrigin the origin of the document the page's main frame shows now; empty when opaque
-     * @param reply told 0 and the answer, or a failure's code and why, once
+     * @param reply told 0 and the answer, or a failure's code and why, once; answers whether the page was sent it, which
+     *     it is not once Chromium has stopped
      */
     public PageQuery(Page page, Optional<String> origin, Map<String, Object> request, BooleanSupplier activation,
-                     Supplier<Optional<String>> currentOrigin, BiConsumer<Integer, String> reply) {
+                     Supplier<Optional<String>> currentOrigin, BiPredicate<Integer, String> reply) {
         this.page = Objects.requireNonNull(page, "page");
         this.origin = Objects.requireNonNull(origin, "origin");
         this.request = Collections.unmodifiableMap(new LinkedHashMap<>(Objects.requireNonNull(request, "request")));
@@ -110,18 +112,17 @@ public final class PageQuery {
      * asked, and is otherwise told {@link #GONE}, as it is when the origin it shows cannot be read.
      *
      * @param json the answer, a JSON text Jasper wrote
-     * @return whether the page was sent {@code json}: false once the query was answered, failed or cancelled, and when
-     *     the document that asked has gone
+     * @return whether the page was sent {@code json}: false once the query was answered, failed or cancelled, when the
+     *     document that asked has gone, and once Chromium has stopped
      */
     public boolean answer(String json) {
         Objects.requireNonNull(json, "json");
         if (!over.compareAndSet(false, true)) return false;
         if (!showsAskingOrigin()) {
-            reply.accept(GONE, GONE_WHY);
+            reply.test(GONE, GONE_WHY);
             return false;
         }
-        reply.accept(0, json);
-        return true;
+        return reply.test(0, json);
     }
 
     /**
@@ -129,15 +130,26 @@ public final class PageQuery {
      *
      * @param code why, such as {@link #REFUSED}: above 0
      * @param why the page script's message
-     * @return whether the page was told: false once the query was answered, failed or cancelled
+     * @return whether the page was told: false once the query was answered, failed or cancelled, and once Chromium has
+     *     stopped
      * @throws IllegalArgumentException for a code of 0 or below, which is no failure's
      */
     public boolean fail(int code, String why) {
         if (code <= 0) throw new IllegalArgumentException("Not a failure's code: " + code);
         Objects.requireNonNull(why, "why");
         if (!over.compareAndSet(false, true)) return false;
-        reply.accept(code, why);
-        return true;
+        return reply.test(code, why);
+    }
+
+    /**
+     * Whether an answer would still reach the page now: the query is not yet answered, failed or cancelled, and the
+     * page's main frame shows the origin that asked, never an opaque one. Its answerer asks before making what only
+     * the document that asked may have, such as a password's text, so none is made for a query that would send nothing.
+     *
+     * @return whether it is live
+     */
+    public boolean live() {
+        return !over.get() && showsAskingOrigin();
     }
 
     /**

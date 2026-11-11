@@ -35,6 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -106,11 +107,10 @@ import org.cef.network.CefResponse;
  * a window group of its own ({@link Isolation#severs}). Both stand-ins then report closed. When the opener closes, the
  * link keeps only what the popup's later documents need: its id, and that the opener has closed.
  *
- * <p>Chromium asks on its own thread; each request is answered on the UI thread, where items open, but a
- * {@code login.pick}, which is answered as the user chooses, and none is answered once Chromium has stopped (plan 6's
- * F43). A main frame's
- * response is noted on Chromium's IO thread, and its load start is answered at once on Chromium's UI thread, so the
- * script runs before Swing would hear of the load.
+ * <p>Chromium asks on its own thread. Each request is answered on the UI thread, where items open, a {@code login.pick}
+ * once the user has chosen, and none once Chromium has stopped (plan 6's F43). A main frame's response is noted on
+ * Chromium's IO thread, and its load start is answered at once on Chromium's UI thread, so the script runs before Swing
+ * would hear of the load.
  */
 final class OpenerBridge {
     /** The page function the router adds to every frame, and the one that cancels a request. */
@@ -243,9 +243,9 @@ final class OpenerBridge {
 
     /**
      * A query Chromium's thread took, until it is answered (plan 8's L16): its id, whether Chromium cancelled it, and
-     * the login query it became, if it did. Chromium's thread registers it ({@link #pending}) before the UI thread can
-     * take the query, so a cancel that comes first stops the hand-off. Its lock is held only for a field's read or
-     * write.
+     * the login query it became, if it did. Chromium's thread registers it ({@link #pending(QueryId)}) before the UI
+     * thread can take the query, so a cancel that comes first stops the hand-off. Its lock is held only for a field's
+     * read or write.
      */
     static final class Pending {
         private final QueryId id;
@@ -642,24 +642,26 @@ final class OpenerBridge {
     }
 
     /**
-     * Answers an admitted query and settles it: {@code reply} is told the answer once, whatever happens. A failure inside
-     * is answered as one; an {@link Error} is answered and then thrown on. A {@code login.pick} of the top frame is
-     * handed to its page as a {@link PageQuery}, settled as the page's handler returns, and answered later, once, by
-     * that query; a hand-off that throws fails it, once, and an {@code Error} is thrown on; one Chromium cancelled
-     * first is neither handed over nor answered. Nothing is answered once Chromium has stopped (plan 6's F43). UI
-     * thread.
+     * Answers an admitted query and settles it: {@code reply} is told the answer once, but for a {@code login.pick},
+     * and nothing once Chromium has stopped (plan 6's F43). A failure inside is answered as one; an {@link Error} is
+     * answered and then thrown on. A {@code login.pick} of the top frame is handed to its page as a {@link PageQuery},
+     * settled as the page's handler returns, and answered later, once, by that query, which is told whether its reply
+     * was sent; a hand-off that throws fails it, once, and an {@code Error} is thrown on; one Chromium cancelled first
+     * is neither handed over nor answered. UI thread.
      *
      * @param sender the page that asked
      * @param mainFrame whether its main frame asked, as Chromium's thread read it
      * @param from the document that asked, as Chromium's thread saw it
-     * @param asked the query, as Chromium's thread took it ({@link #pending})
+     * @param asked the query, as Chromium's thread took it ({@link #pending(QueryId)})
      * @param text the request
      * @param nowMillis when it asked
      * @param reply told the answer
      */
     void answer(Party sender, boolean mainFrame, Sender from, Pending asked, String text, long nowMillis, Consumer<Answer> reply) {
-        Consumer<Answer> unlessStopped = answer -> {
-            if (!stopped.getAsBoolean()) reply.accept(answer);
+        Predicate<Answer> unlessStopped = answer -> {
+            if (stopped.getAsBoolean()) return false;
+            reply.accept(answer);
+            return true;
         };
         Answer answer = UNANSWERED;
         var handed = new PageQuery[1];
@@ -672,7 +674,7 @@ final class OpenerBridge {
             settled(sender.page(), mainFrame);
             if (handed[0] == null) {
                 pending.remove(asked.id, asked);
-                if (answer != LATER) unlessStopped.accept(answer);
+                if (answer != LATER) unlessStopped.test(answer);
             } else if (answer != LATER) {
                 handed[0].fail(REFUSED, AboutScheme.UNANSWERED);
             }
@@ -842,22 +844,22 @@ final class OpenerBridge {
     /**
      * {@code login.pick}: the page's password manager answers it as the user chooses, so it becomes a
      * {@link PageQuery}, put in {@code handed}, which the page is handed ({@link Page#loginQuery}) and which replies
-     * through {@code reply} once. Its origin is the asking document's, as Chromium's thread saw it; its answer reaches
-     * the page only while the page's main frame shows that origin, as the bridge has heard. Its activation needs a
-     * mouse press within the activation as well as the page's activation, which it consumes, both as at
-     * {@code nowMillis}, when Chromium took the request (plan 8's F3). It waits for Chromium's cancel until it is over;
+     * through {@code reply} once, told whether the reply was sent. Its origin is the asking document's, as Chromium's
+     * thread saw it; its answer reaches the page only while the page's main frame shows that origin, as the bridge has
+     * heard. Its activation needs a mouse press within the activation as well as the page's activation, which it
+     * consumes, both as at {@code nowMillis}, when Chromium took the request (plan 8's F3). It waits for Chromium's cancel until it is over;
      * one Chromium cancelled before the UI thread took it is never handed over, and spends nothing (plan 8's L16). UI
      * thread.
      *
      * @return {@code LATER}
      */
     private Answer loginPick(Party sender, Sender asker, Pending asked, Map<String, Object> request, long nowMillis,
-                             Consumer<Answer> reply, PageQuery[] handed) {
+                             Predicate<Answer> reply, PageQuery[] handed) {
         Page page = sender.page();
         BooleanSupplier activation = () -> sender.lastPress().get().withinActivation(nowMillis) && sender.activation().consume(nowMillis);
         var query = new PageQuery(page, asker.document().origin(), request, activation, () -> document(page).origin(), (code, text) -> {
             pending.remove(asked.id, asked);
-            reply.accept(new Answer(code, text));
+            return reply.test(new Answer(code, text));
         });
         if (!asked.attach(query)) return LATER;
         handed[0] = query;
@@ -1006,8 +1008,8 @@ final class OpenerBridge {
     /**
      * The client's one handler for the page function. On Chromium's thread it answers at once what it refuses (a request
      * from anything but a page, one that stays open for more answers, and what {@link #admit} refuses), and hands the
-     * rest to the UI thread, once it has registered it for Chromium's cancel ({@link #pending}). Every query is
-     * answered, once, unless Chromium cancels it first, which the bridge hears, or has stopped.
+     * rest to the UI thread, once it has registered it for Chromium's cancel ({@link #pending(QueryId)}). Every query
+     * is answered, once, unless Chromium cancels it first, which the bridge hears, or has stopped.
      */
     private static final class Queries extends CefMessageRouterHandlerAdapter {
         private final OpenerBridge bridge;

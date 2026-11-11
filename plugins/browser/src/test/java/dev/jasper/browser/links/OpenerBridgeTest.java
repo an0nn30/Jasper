@@ -1153,7 +1153,8 @@ class OpenerBridgeTest {
 
     /**
      * Plan 8's L15, as plan 6's F43: once Chromium has stopped, no query is answered, a login query's late answer and
-     * failure included, nor one taken before the stop and answered after it; each still leaves the bridge.
+     * failure included, which say they sent nothing (L18), nor one taken before the stop and answered after it; each
+     * still leaves the bridge.
      */
     @Test void aLoginQueryAnsweredOnceChromiumHasStoppedIsNeverAnswered() throws Exception {
         var stopped = new AtomicBoolean();
@@ -1170,8 +1171,8 @@ class OpenerBridgeTest {
             OpenerBridge.Pending ordinary = stopping.pending(new QueryId(1, 3));
             assertThat(held).hasSize(2);
             stopped.set(true);
-            assertThat(held.get(0).answer("{\"password\":\"pw\"}")).isTrue();
-            assertThat(held.get(1).fail(PageQuery.BUSY, "Busy.")).isTrue();
+            assertThat(held.get(0).answer("{\"password\":\"pw\"}")).as("nothing reached the page").isFalse();
+            assertThat(held.get(1).fail(PageQuery.BUSY, "Busy.")).as("nothing reached the page").isFalse();
             stopping.answer(page.party(), true, stopping.sender(page.page, "main", () -> APP), ordinary, "{}", NOW, answers::add);
             assertThat(answers).as("Chromium has stopped").isEmpty();
             assertThat(stopping.cancellable()).isZero();

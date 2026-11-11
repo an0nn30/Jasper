@@ -70,6 +70,44 @@ class PageQueryTest {
         });
     }
 
+    /**
+     * Plan 8's F29 and L17: a query is live until it is over or its page's main frame shows another origin, or an opaque
+     * one; a query of an opaque origin never is; asking sends nothing.
+     */
+    @Test void itIsLiveUntilItIsOverOrItsDocumentHasGone() throws Exception {
+        onUiThread(() -> {
+            Page page = page();
+            PageQuery query = query(page, ASKER, () -> true);
+            assertThat(query.live()).isTrue();
+            shown.set(Optional.of("https://other.example"));
+            assertThat(query.live()).as("another origin").isFalse();
+            shown.set(ASKER);
+            assertThat(query.live()).isTrue();
+            assertThat(query(page, Optional.empty(), () -> true).live()).as("an opaque origin").isFalse();
+            shown.set(Optional.empty());
+            assertThat(query.live()).as("now opaque").isFalse();
+            shown.set(ASKER);
+            query.cancelled();
+            assertThat(query.live()).as("cancelled").isFalse();
+            PageQuery answered = query(page, ASKER, () -> true);
+            answered.fail(PageQuery.REFUSED, "Refused.");
+            assertThat(answered.live()).as("failed").isFalse();
+            assertThat(replies).containsExactly("2 Refused.");
+        });
+    }
+
+    /** A reply that tells it sent nothing, as the bridge's once Chromium has stopped, makes the answer and failure false (L18). */
+    @Test void aReplyThatSentNothingMakesTheAnswerFalse() throws Exception {
+        onUiThread(() -> {
+            var refused = new ArrayList<String>();
+            PageQuery query = new PageQuery(page(), ASKER, PICK, () -> true, shown::get, (code, text) -> !refused.add(code + " " + text));
+            assertThat(query.answer("{}")).isFalse();
+            PageQuery failed = new PageQuery(page(), ASKER, PICK, () -> true, shown::get, (code, text) -> !refused.add(code + " " + text));
+            assertThat(failed.fail(PageQuery.BUSY, "Busy.")).isFalse();
+            assertThat(refused).containsExactly("0 {}", "5 Busy.");
+        });
+    }
+
     @Test void nothingIsSentAfterTheCancel() throws Exception {
         onUiThread(() -> {
             PageQuery query = query(page(), ASKER, () -> true);
