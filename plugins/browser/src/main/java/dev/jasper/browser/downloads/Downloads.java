@@ -15,7 +15,6 @@ import dev.jasper.sdk.ui.MenuEntries;
 import dev.jasper.sdk.ui.MenuItem;
 import java.awt.EventQueue;
 import java.io.IOException;
-import java.net.URI;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.FileSystemException;
 import java.nio.file.Files;
@@ -57,11 +56,14 @@ import java.util.concurrent.RejectedExecutionException;
  * given is abandoned ({@link #abandon}), and a save chooser cancelled for the page ends its count of an ask start that
  * had no update, the download itself kept ({@link #saveCancelled}, rulings F1.3 and D24). A download Chromium starts
  * before its page committed any document, given a target or refused, tells the page, whose item closes if a page opened
- * it (ruling F28). As Chrome limits them (ruling D1, the user's "Match
- * Chrome"), a page's first download without a user activation in a document goes and each later one in that document is
- * refused, the first refusal posting "This site tried to download multiple files" with the page's host, never its user
- * name or password ({@link DownloadAddresses}); an activated start, one the user asked to save, a new document, a load
- * Jasper starts for the user (ruling D20) and a browser that is no page's always go.
+ * it (ruling F28). As Chrome limits them (ruling D1, the user's "Match Chrome"), a page's first download without a
+ * user activation in an allowance goes and each later one in that allowance is refused, the first refusal posting "This
+ * site tried to download multiple files" with the page's host, never its user name or password
+ * ({@link DownloadAddresses}). A load Jasper starts for the user (ruling D20) and a main-frame document that starts
+ * with the page's user activation renew the allowance; a document the page starts by itself, as a meta refresh,
+ * {@code location.reload()} or a {@code location.href} without a gesture starts it, keeps the count, as Chrome keeps
+ * its limiter's state (ruling D46). An activated start, one the user asked to save and a browser that is no page's
+ * always go.
  *
  * <p><b>The list and the menu.</b> A download joins the {@link DownloadList}, and the Downloads menu, at its first
  * update: the first creates the menu, whose entries ({@link DownloadsMenu}) are set again only when a title, an enabled
@@ -141,7 +143,7 @@ public final class Downloads {
         int running;
         boolean closing;
         CompletableFuture<Void> hold;
-        // The document whose one download without an activation went, and the one whose refusal was told (D1).
+        // The allowance whose one download without an activation went, and the one whose refusal was told (D1, D46).
         long automatic = Long.MIN_VALUE, refused = Long.MIN_VALUE;
     }
 
@@ -218,7 +220,7 @@ public final class Downloads {
      * @param start the download
      * @return a free file in the Downloads folder, with no ask; the folder and the safe name, with the ask, for a download
      *     the user asked to save; empty after {@link #stopAll}, for a page whose close has begun, past a page's one
-     *     download without an activation in its document, and when the folder or a free name is missing
+     *     download without an activation in its allowance, and when the folder or a free name is missing
      */
     public Optional<DownloadTarget> before(DownloadStart start) {
         Objects.requireNonNull(start, "start");
@@ -449,16 +451,18 @@ public final class Downloads {
             list.begin(key, start.name(), start.target(), DownloadAddresses.source(start.url()));
             start.page().filter(Page::inMemory).ifPresent(page -> page.context().onClosed(() -> groupClosed(key)));
         }
-        list.update(key, progress).ifPresent(outcome -> ended(start, outcome));
+        list.update(key, progress).ifPresent(ended -> ended(start, ended));
         refresh();
     }
 
     /**
      * {@code start}'s outcome: an interrupted download is cancelled, so Chromium never resumes it, before its page's count
-     * ends, which may close the page's browser; its name is freed; then it is marked, told or left. UI thread.
+     * ends, which may close the page's browser; its name is freed; then it is marked, told or left, as the outcome's own
+     * download says, which the list may already have dropped (ruling D47). UI thread.
      */
-    private void ended(Started start, Outcome outcome) {
+    private void ended(Started start, DownloadList.Ended ended) {
         DownloadKey key = start.key();
+        Outcome outcome = ended.outcome();
         listed.remove(key);
         starts.remove(key);
         Runnable cancel = cancels.remove(key);
@@ -466,9 +470,9 @@ public final class Downloads {
         start.reservation().ifPresent(names::release);
         if (uncount(key)) start.page().ifPresent(this::ended);
         switch (outcome) {
-            case COMPLETED -> mark(start);
+            case COMPLETED -> mark(start, ended.download());
             case FAILED -> {
-                download(key).ifPresent(download -> failed(download.name(), ""));
+                failed(ended.download().name(), "");
                 leave(key);
             }
             case STOPPED -> leave(key);
@@ -489,20 +493,17 @@ public final class Downloads {
         if (hold != null) hold.complete(null);
     }
 
-    /** The completed file is marked on the background executor, then finished. UI thread. */
-    private void mark(Started start) {
+    /** The {@code completed} file is marked on the background executor, then finished. UI thread. */
+    private void mark(Started start, Download completed) {
         DownloadKey key = start.key();
-        Optional<Download> completed = download(key);
-        if (completed.isEmpty()) return;
-        Path file = completed.get().file();
+        Path file = completed.file();
         // Ruling F7: a /dev/null download's mark keeps no address; a page that is no web page is no referrer.
-        URI source = start.inMemory() ? DownloadAddresses.NO_ADDRESS : completed.get().source();
-        Optional<URI> referrer = start.inMemory() ? Optional.empty() : DownloadAddresses.web(start.pageUrl());
+        DownloadAddresses.Mark addresses = DownloadAddresses.mark(start.url(), start.pageUrl(), start.inMemory());
         try {
             context.background().execute(() -> {
                 String failure = null;
                 try {
-                    context.platform().markDownloaded(file, source, referrer);
+                    context.platform().markDownloaded(file, addresses.source(), addresses.referrer());
                 } catch (IOException | RuntimeException refused) {
                     failure = reason(refused);
                 }
@@ -515,10 +516,12 @@ public final class Downloads {
         }
     }
 
-    /** The mark is done, or failed for {@code failure}: the download is finished and told. UI thread. */
+    /**
+     * The mark is done, or failed for {@code failure}: the download is finished and told, as its finish says, which the
+     * list may already have dropped (ruling D47). UI thread.
+     */
     private void marked(DownloadKey key, String failure) {
-        list.finish(key, failure == null || !marks);
-        Optional<Download> finished = download(key);
+        Optional<Download> finished = list.finish(key, failure == null || !marks);
         if (!stopped && finished.isPresent()) {
             String name = DownloadsMenu.elided(finished.get().name());
             group.info("Download finished for " + OPEN_QUOTE + name + CLOSE_QUOTE + ".", "");

@@ -19,7 +19,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.BooleanSupplier;
@@ -58,8 +57,6 @@ public final class Page implements AutoCloseable {
     /** How long after a title change the page reads its history, once for the title changes meanwhile. */
     static final int TITLE_READ_MILLIS = 250;
     private static final System.Logger LOG = System.getLogger(Page.class.getName());
-    // Jasper's own pages' scheme, which the tools' scripts stay out of.
-    private static final String JASPER_ABOUT = "jasper-about:";
     private final PageView view = new PageView();
     private final PagePrivacy privacy = new PagePrivacy(this::inEveryFrame);
     private final Runnable changed;
@@ -73,8 +70,6 @@ public final class Page implements AutoCloseable {
     // while the browser lives.
     private volatile IntConsumer browserMade = browser -> { }, browserClosed = browser -> { };
     private volatile OptionalInt browserId = OptionalInt.empty();
-    // Each load Jasper started for the user ({@link #load}); read on Chromium's thread as a download starts (plan 7's D20).
-    private final AtomicLong loads = new AtomicLong();
     private final Function<Page, CompletableFuture<NavigationHistory.History>> historyReader;
     private ObjIntConsumer<Page> historyJumper;
     // Given the page, reads the HTML its main frame shows: Chromium's, or a test's.
@@ -93,14 +88,10 @@ public final class Page implements AutoCloseable {
         page -> page.pageText().map(PageText::selectedText).orElseGet(() -> CompletableFuture.completedFuture(new Selection.None()));
     // Given the page, runs Chromium's copy in its focused frame; or a test's.
     private Consumer<Page> copier = page -> page.onFocusedFrame(CefFrame::copy);
-    // Given a script and the address it goes by, runs it in the page's main frame: through its browser, or a test's.
-    private BiConsumer<String, String> scriptRunner = this::runInMainFrame;
     // The page's text insertion and selection reads through its browser's DevTools, made the first time either is asked
     // for once the browser is ready; null before.
     private PageText pageText;
     private final List<Consumer<String>> loadStarts = new CopyOnWriteArrayList<>();
-    private final List<Runnable> loadEnds = new CopyOnWriteArrayList<>();
-    private final List<BiConsumer<String, String>> toolReports = new CopyOnWriteArrayList<>();
     private final List<Runnable> selectionGestures = new CopyOnWriteArrayList<>();
     private final List<BiConsumer<String, Reached>> visits = new CopyOnWriteArrayList<>();
     private final List<Consumer<NavigationButton>> navigationButtons = new CopyOnWriteArrayList<>();
@@ -122,6 +113,8 @@ public final class Page implements AutoCloseable {
     private Runnable firstNavigationDownload = () -> { }, saveCancelled = () -> { };
     // Plan 7: the page's own part of its downloads: its ask, how they start, its close hold and its browser's ends.
     private final PageDownloadState downloadState = new PageDownloadState();
+    // Plan 7: what the page gives the tools: their scripts, its load ends, their reports and its find's top frame.
+    private final PageToolHooks toolHooks = new PageToolHooks(this);
     // Where the page's dialogs and file choosers show, and where its right-click menu shows; its item gives them.
     private DialogPlace dialogPlace;
     private MenuPlace menuPlace;
@@ -150,9 +143,8 @@ public final class Page implements AutoCloseable {
     private boolean loading, canGoBack, canGoForward, started, ready, closed;
     // The zoom the page shows at, as Chromium's level; read on Chromium's thread as each main-frame navigation commits.
     private volatile double zoomLevel;
-    // The page's find in page, made the first time it is asked for; and whether its searches reach the top frame alone.
+    // The page's find in page, made the first time it is asked for.
     private PageFind find;
-    private BooleanSupplier findTopFrameOnly = () -> false;
     // The DevTools made for the page last, until they end; null before and after.
     private DevTools devTools;
     // Given DevTools and a point, has Chromium make their browser through the page's and answers what closes it, or empty
@@ -318,15 +310,27 @@ public final class Page implements AutoCloseable {
     }
 
     /**
-     * The document a download the page starts counts in, for the one download a document may start without a user
-     * activation (plan 7's D1): it changes with each document the main frame starts and with each load Jasper starts
-     * for the user ({@link #load}, D20), so such a load gives the page a fresh allowance; both counts only grow. Read on
-     * Chromium's thread.
+     * The allowance a download the page starts counts in, for the one download an allowance may start without a user
+     * activation (plan 7's D1): it changes with each load Jasper starts for the user ({@link #load}, D20) and with each
+     * main-frame document that starts while the page has a user activation ({@link #documentStarting}, D46), and only
+     * grows. Read on Chromium's thread.
      *
-     * @return the document's number
+     * @return the allowance's number
      */
     long downloadDocument() {
-        return privacy.documents() + loads.get();
+        return downloadState.allowance();
+    }
+
+    /**
+     * The page's main frame starts loading a document at {@code nowMillis} (plan 7's D46): one that starts while the page
+     * has a user activation, as a click on a link starts it, gives its downloads a fresh allowance; one the page starts
+     * by itself, as a meta refresh, {@code location.reload()} or a {@code location.href} without a gesture starts it,
+     * keeps the count, as Chrome keeps its limiter's state. Chromium's thread.
+     *
+     * @param nowMillis the time now, for the page's activation, which this reads without consuming it
+     */
+    void documentStarting(long nowMillis) {
+        if (activation().active(nowMillis)) downloadState.renew();
     }
 
     /**
@@ -370,7 +374,7 @@ public final class Page implements AutoCloseable {
         Objects.requireNonNull(url, "url");
         if (closed) return;
         // Plan 7's D20: a load Jasper starts for the user gives the page a fresh download allowance.
-        loads.incrementAndGet();
+        downloadState.renew();
         requested = url;
         address = url.toString();
         navigated();
@@ -709,7 +713,7 @@ public final class Page implements AutoCloseable {
     public PageFind find() {
         if (find == null) {
             find = PageFind.of(this);
-            find.searchTopFrameOnly(() -> findTopFrameOnly.getAsBoolean());
+            toolHooks.searchedBy(find);
             if (closed) find.close();
         }
         return find;
@@ -722,7 +726,7 @@ public final class Page implements AutoCloseable {
      * @param when read as each search starts, on the UI thread
      */
     public void findTopFrameOnly(BooleanSupplier when) {
-        findTopFrameOnly = Objects.requireNonNull(when, "when");
+        toolHooks.topFrameOnly(when);
     }
 
     /**
@@ -865,9 +869,7 @@ public final class Page implements AutoCloseable {
      */
     public Subscription onLoadEnd(Runnable listener) {
         Objects.requireNonNull(listener, "listener");
-        if (closed) return () -> { };
-        loadEnds.add(listener);
-        return () -> loadEnds.remove(listener);
+        return closed ? () -> { } : toolHooks.onLoadEnd(listener);
     }
 
     /**
@@ -880,9 +882,7 @@ public final class Page implements AutoCloseable {
      */
     public Subscription onToolReport(BiConsumer<String, String> listener) {
         Objects.requireNonNull(listener, "listener");
-        if (closed) return () -> { };
-        toolReports.add(listener);
-        return () -> toolReports.remove(listener);
+        return closed ? () -> { } : toolHooks.onReport(listener);
     }
 
     /**
@@ -895,8 +895,7 @@ public final class Page implements AutoCloseable {
     public void toolReported(String op, String json) {
         Objects.requireNonNull(op, "op");
         Objects.requireNonNull(json, "json");
-        if (closed) return;
-        for (BiConsumer<String, String> listener : toolReports) listener.accept(op, json);
+        if (!closed) toolHooks.reported(op, json);
     }
 
     /**
@@ -912,7 +911,7 @@ public final class Page implements AutoCloseable {
     public void run(String script, String url) {
         Objects.requireNonNull(script, "script");
         Objects.requireNonNull(url, "url");
-        if (!closed) scriptRunner.accept(script, url);
+        if (!closed) toolHooks.run(script, url);
     }
 
     /**
@@ -1284,8 +1283,7 @@ public final class Page implements AutoCloseable {
         // answer when its browser may close.
         CompletableFuture<Void> held = downloadState.held(this);
         loadStarts.clear();
-        loadEnds.clear();
-        toolReports.clear();
+        toolHooks.close();
         selectionGestures.clear();
         view.endSelectionGestures();
         visits.clear();
@@ -1330,31 +1328,9 @@ public final class Page implements AutoCloseable {
         }
     }
 
-    /**
-     * Runs {@code script} in the main frame of the page's browser, then releases only this handle to the frame; nothing
-     * before the browser is ready, and nothing in a frame {@link #runsScriptsIn} refuses.
-     */
-    private void runInMainFrame(String script, String url) {
-        PageBrowser ready = readyBrowser();
-        CefFrame frame = ready == null ? null : ready.getMainFrame();
-        if (frame == null) return;
-        try {
-            if (frame.isValid() && runsScriptsIn(frame.getURL())) frame.executeJavaScript(script, url, 0);
-        } finally {
-            frame.dispose();
-        }
-    }
-
-    /**
-     * Whether {@link #run} runs a script in a main frame at {@code address}: not at a challenge provider's address
-     * ({@link ChallengeFrames}), and not on one of Jasper's own {@code jasper-about:} pages, in any case, which Jasper's
-     * page scripts stay out of.
-     *
-     * @param address the main frame's address, as Chromium names it
-     * @return whether it does; false for none
-     */
+    /** Whether {@link #run} runs a script in a main frame at {@code address}, as {@link PageToolHooks#runsScriptsIn} says. */
     static boolean runsScriptsIn(String address) {
-        return address != null && !address.regionMatches(true, 0, JASPER_ABOUT, 0, JASPER_ABOUT.length()) && !ChallengeFrames.is(address);
+        return PageToolHooks.runsScriptsIn(address);
     }
 
     /** Jasper sends the page elsewhere. */
@@ -1454,7 +1430,7 @@ public final class Page implements AutoCloseable {
         if (closed) return;
         documentLoaded = true;
         readHistory();
-        for (Runnable listener : loadEnds) listener.run();
+        toolHooks.loadEnded();
     }
 
     /**
@@ -1564,7 +1540,7 @@ public final class Page implements AutoCloseable {
 
     /** Has the page run the scripts asked of it ({@link #run}) with {@code replacement} from now on, as a test's recording one. */
     void useScriptRunner(BiConsumer<String, String> replacement) {
-        scriptRunner = Objects.requireNonNull(replacement, "replacement");
+        toolHooks.useScriptRunner(replacement);
     }
 
     /** Has the page press Return with {@code replacement} from now on, as a test's recording one. */
@@ -1619,7 +1595,7 @@ public final class Page implements AutoCloseable {
     /** Has the page find with {@code replacement} from now on, as a test's recording one. */
     void useFind(PageFind replacement) {
         find = Objects.requireNonNull(replacement, "replacement");
-        find.searchTopFrameOnly(() -> findTopFrameOnly.getAsBoolean());
+        toolHooks.searchedBy(find);
     }
 
     /**

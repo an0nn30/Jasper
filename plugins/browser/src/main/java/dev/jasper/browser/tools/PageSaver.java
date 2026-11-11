@@ -75,10 +75,11 @@ import java.util.regex.Pattern;
  * which what is still to come stays absolute. A public page's resources are never asked for from this computer, its
  * link, a private network or an unspecified address ({@link PrivateHosts}): the host as written, and while the HTTP
  * proxy is off the addresses its name resolves to, looked up again right before each request to it, as the proxy
- * resolves names while it is on (rulings D5 and D40). A page whose own host, as written, is such a host may fetch from
- * any (ruling D39). Bodies stream to temporary files in {@code resources/}, stylesheets aside, which are kept in memory
- * for their rewrite. The caps, counted as bytes arrive: 20 MiB a resource, 2 MiB a stylesheet and 32 MiB of
- * stylesheets kept in all, 500 resources and 200 MiB in all.
+ * resolves names while it is on (rulings D5 and D40). A lookup counts against the resource's deadline and the save's,
+ * and a stop is heard while it runs; one that outlasts either refuses the name (ruling D47). A page whose own host, as
+ * written, is such a host may fetch from any (ruling D39). Bodies stream to temporary files in {@code resources/},
+ * stylesheets aside, which are kept in memory for their rewrite. The caps, counted as bytes arrive: 20 MiB a resource,
+ * 2 MiB a stylesheet and 32 MiB of stylesheets kept in all, 500 resources and 200 MiB in all.
  *
  * <p><b>Stopping.</b> Once the plugin stops, the save's client is shut down at once, ending every exchange under way,
  * nothing more is written and no file is marked, its temporary files go and so do the folders it made, if they are
@@ -108,12 +109,11 @@ public final class PageSaver {
     static final int MOST_REDIRECTS = 5;
     private static final long DEADLINE_SECONDS = 15;
     private static final Set<Integer> REDIRECTS = Set.of(301, 302, 303, 307, 308);
-    private static final URI NO_ADDRESS = URI.create("about:internet");
     private static final String RESOURCES = "resources", INDEX = "index.html", TEMPORARY = ".jasper-save-", PART = ".part";
     private static final System.Logger LOG = System.getLogger(PageSaver.class.getName());
     /** Why a save ends when the plugin stops (ruling D41). */
     static final String STOPPED = "the plugin stopped";
-    // How often a fetch that waits asks whether the plugin still runs.
+    // How often a fetch or a name lookup that waits asks whether the plugin still runs and its deadlines have passed.
     private static final long POLL_NANOS = TimeUnit.MILLISECONDS.toNanos(100);
     private static final Pattern CHARSET_RULE = Pattern.compile("^(\uFEFF?)@charset \"([^\"]*)\";"), STYLE_END = Pattern.compile("(?i)</(style)");
     private final URI page;
@@ -461,7 +461,7 @@ public final class PageSaver {
             URI at = entry.url;
             for (int redirects = 0; ; redirects++) {
                 long left = end - System.nanoTime();
-                if (left <= 0 || exhausted || !live() || !current.getAsBoolean() || !allowed(at)) return;
+                if (left <= 0 || exhausted || !live() || !current.getAsBoolean() || !allowed(at, end)) return;
                 var body = new Body(entry);
                 CompletableFuture<HttpResponse<Fetched>> sent;
                 try {
@@ -517,11 +517,11 @@ public final class PageSaver {
         /**
          * Whether {@code address} may be asked for (ruling F12): any, for a page at a private host itself; otherwise one
          * whose host, as written, is in no refused range and, while the proxy is off, whose name resolves only to
-         * addresses outside them. A host judged by its spelling is judged once a save, and so is a name refused; a name
-         * allowed is looked up again before each of its requests, so the check and the connect see one answer of the
-         * JDK's cache (ruling D40).
+         * addresses outside them, within {@code end} (ruling D47). A host judged by its spelling is judged once a save,
+         * and so is a name refused; a name allowed is looked up again before each of its requests, so the check and the
+         * connect see one answer of the JDK's cache (ruling D40).
          */
-        private boolean allowed(URI address) {
+        private boolean allowed(URI address, long end) throws InterruptedException {
             if (anywhere) return true;
             String host = address.getHost();
             if (host == null) return false;
@@ -537,10 +537,44 @@ public final class PageSaver {
                 return true;
             }
             if (proxied) return true;
-            List<InetAddress> addresses = resolver.apply(name);
+            List<InetAddress> addresses = resolved(name, end);
             boolean allowed = !addresses.isEmpty() && addresses.stream().noneMatch(PrivateHosts::refused);
             if (!allowed) hosts.put(name, false);
             return allowed;
+        }
+
+        /**
+         * The addresses the resolver gives {@code name}, looked up on a thread of its own and waited for in polls of
+         * 100 ms, so the resource's deadline and the save's, both in {@code end}, hold, and a stop is heard while the
+         * system's resolver takes its time (ruling D47): none, which refuses the name, once {@code end} passes or the
+         * plugin stops first, and when the lookup fails. A lookup given up on is interrupted, which the system's resolver
+         * ignores; its thread ends with it.
+         */
+        private List<InetAddress> resolved(String name, long end) throws InterruptedException {
+            var lookup = new CompletableFuture<List<InetAddress>>();
+            Thread looking = Thread.ofVirtual().name("jasper-browser-save-lookup").start(() -> {
+                try {
+                    List<InetAddress> found = resolver.apply(name);
+                    lookup.complete(found == null ? List.of() : found);
+                } catch (RuntimeException | Error failed) {
+                    lookup.completeExceptionally(failed);
+                    // An error is the thread's to report too.
+                    if (failed instanceof Error error) throw error;
+                }
+            });
+            try {
+                while (true) {
+                    try {
+                        return lookup.get(Math.min(POLL_NANOS, Math.max(1, end - System.nanoTime())), TimeUnit.NANOSECONDS);
+                    } catch (TimeoutException late) {
+                        if (System.nanoTime() >= end || !live()) return List.of();
+                    }
+                }
+            } catch (ExecutionException failed) {
+                return List.of();
+            } finally {
+                if (!lookup.isDone()) looking.interrupt();
+            }
         }
 
         /** Names, writes and marks what was fetched, then writes and marks {@code index.html}. */
@@ -892,15 +926,14 @@ public final class PageSaver {
 
             /**
              * Marks {@code file} as from {@code source} with the page as referrer, as a download's addresses go
-             * ({@link DownloadAddresses}): an address that is no web page's, as a {@code file:} page's, as
+             * ({@link DownloadAddresses#mark}): an address that is no web page's, as a {@code file:} page's, as
              * {@code about:internet} (ruling D43), and no address at all for a /dev/null page (ruling F7). Answers whether
              * the mark was written; a refusal's reason is kept, the first one.
              */
             boolean mark(Path file, URI source) {
-                URI from = inMemory ? NO_ADDRESS : DownloadAddresses.source(source.toString());
-                Optional<URI> referrer = inMemory ? Optional.empty() : DownloadAddresses.web(page.toString());
+                DownloadAddresses.Mark addresses = DownloadAddresses.mark(source.toString(), page.toString(), inMemory);
                 try {
-                    platform.markDownloaded(file, from, referrer);
+                    platform.markDownloaded(file, addresses.source(), addresses.referrer());
                     return true;
                 } catch (IOException | RuntimeException refused) {
                     if (failure.isEmpty()) failure = Optional.of(reason(refused));

@@ -292,18 +292,52 @@ class SavePageTest {
             + "This volume cannot keep a downloaded-file mark. Open them from the file manager only if you trust them.");
     }
 
+    /**
+     * Ruling D47 (final review B's minor 6): an Error while saving, as a client that cannot be made throws one, fails the
+     * save too, and frees its folder's name, so the next save of the host is offered the same folder; the Error still
+     * reaches the background executor, which reports it.
+     */
+    @Test void anErrorWhileSavingFailsTheSaveAndFreesItsFolder() throws Exception {
+        Path folder = downloads.resolve("example.com");
+        SavePage save = start(List.of(folder), proxy -> {
+            throw new OutOfMemoryError("Java heap space");
+        });
+        String prefix = prefix();
+        onUi(() -> {
+            save.part(part(prefix, 0, 1, answer(prefix)));
+            return null;
+        });
+        org.assertj.core.api.Assertions.assertThatThrownBy(host::runBackground).isInstanceOf(OutOfMemoryError.class);
+        flush();
+        assertThat(message()).isEqualTo("Could not save the page: Java heap space.");
+        assertThat(save.done()).isTrue();
+        assertThat(shown).isEmpty();
+        onUi(() -> {
+            host.windowView(ID, SavePage.FAILED).orElseThrow().emit(new UiEvent.Action(SavePage.FAILED_OK));
+            return null;
+        });
+        start(List.of());
+        assertThat(chooser.getLast()).as("its folder's name is free again").isEqualTo("Save Page As|" + Optional.of(folder));
+    }
+
     /** Starts a save over the stand-in page, the chooser given {@code chosen}, and runs it up to the script. */
     private SavePage start(List<Path> chosen) throws Exception {
+        return start(chosen, proxy -> {
+            clients.incrementAndGet();
+            return PageSaver.client(proxy);
+        });
+    }
+
+    /** As {@link #start(List)}, the save's client made by {@code made}. */
+    private SavePage start(List<Path> chosen, java.util.function.Function<Optional<java.net.InetSocketAddress>, java.net.http.HttpClient> made)
+            throws Exception {
         int asked = chooser.size();
         onUi(() -> {
             host.queuePathSelection(chosen);
             return null;
         });
         SavePage save = onUi(() -> SavePage.start(page, tab, context, downloads, names, DownloadsTestAccess.recordingFiles(Runnable::run, shown),
-            new SavePage.Network(Optional.empty(), () -> true, () -> true, proxy -> {
-                clients.incrementAndGet();
-                return PageSaver.client(proxy);
-            }), (delay, task) -> {
+            new SavePage.Network(Optional.empty(), () -> true, () -> true, made), (delay, task) -> {
                 delays.add(delay);
                 timers.add(task);
                 return cancelled::incrementAndGet;

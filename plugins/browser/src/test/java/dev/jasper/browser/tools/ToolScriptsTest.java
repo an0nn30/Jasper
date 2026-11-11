@@ -97,6 +97,10 @@ class ToolScriptsTest {
     @Test void theReaderKeepsThePageOutOfTheOverlay() {
         assertThat(ToolScripts.reader()).contains("['keydown', onKeyDown, true]", "['keypress', onKey, true]", "['keyup', onKey, true]",
             "inertOf.set", "animate, set", "replaceWith", "'is'", "preventScroll: true");
+        // D47: the overlay's clipboard, drag, selection and focus events stop at its root too; a held Escape's keydowns
+        // after it closed are judged without their repeat; a busy bridge is asked again.
+        assertThat(ToolScripts.reader()).contains("'copy', 'cut', 'dragstart', 'selectstart', 'focusin', 'focusout'",
+            "const BUSY = 5, RETRIES = 20, RETRY_WAIT = 100;").doesNotContain("'repeat'", ".repeat");
     }
 
     /**
@@ -176,10 +180,12 @@ class ToolScriptsTest {
             "['pointerup', onPress, true]", "['mousedown', onPress, true]", "['mouseup', onPress, true]", "['click', onClick, true]",
             "['keydown', onKeyDown, true]", "['pagehide', onPageHide, true]", "stopImmediatePropagation", "preventDefault",
             "Symbol.for('dev.jasper.browser.reader')", "const COVERING = 0.9;");
-        // Task 6's review: one pointer click hides (D34); Escape's keyup and repeats stop at the window after it ends; a
-        // hidden cookie wall leaves no scroll lock (D35).
-        assertThat(ToolScripts.distractions()).contains("getter(UiEvents, 'detail')", "getter(KeyEvents, 'repeat')",
-            "['keyup', onKeyUp, true]", "['overflow-y', 'visible', 'important']", "'clip'");
+        // Task 6's review: one pointer click hides (D34); Escape's keyup and every Escape keydown stop at the window after
+        // it ends, the keydown's repeat never read (D47); a hidden cookie wall leaves no scroll lock (D35); a busy bridge
+        // is asked again (D47).
+        assertThat(ToolScripts.distractions()).contains("getter(UiEvents, 'detail')", "['keyup', onKeyUp, true]",
+            "['overflow-y', 'visible', 'important']", "'clip'", "const BUSY = 5, RETRIES = 20, RETRY_WAIT = 100;")
+            .doesNotContain("'repeat'", ".repeat");
         assertThat(ToolScripts.distractions().chars().filter(c -> (c < 0x20 && c != '\n') || c >= 0x7F)).isEmpty();
         assertThat(ToolScripts.distractions()).startsWith("/*").endsWith("})\n");
     }

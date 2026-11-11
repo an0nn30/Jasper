@@ -19,7 +19,8 @@
  * - what Jasper's own tools hold of the page is the page's again (ruling D42), as their kept objects tell it, read only:
  *   while the reader shows (reader.js's held()), its overlay's host goes and body's inert and the root's and body's
  *   overflow are their earlier values; while distraction removal outlines an overlay (distractions.js's outlined()),
- *   that overlay's outline longhands are their earlier values. The page's own mode goes on.
+ *   that overlay's outline longhands are their earlier values. Each element's place in the copy is found before the
+ *   copy changes, and the host goes last (ruling D47). The page's own mode goes on.
  * No address keeps a user name or password. The answer, {prefix, html, resources: [{url, kind}], styles, attributes,
  * base}, goes to Jasper as JSON in parts, through jasperBridgeQuery (op "savePage"), as {save: prefix, part, parts, text},
  * one at a time, each after the last was answered, each part's text at most 1 MiB once JSON writes it, the bridge's
@@ -287,28 +288,38 @@
     /**
      * Gives the copy whose root is {@code copyRoot} what Jasper's own tools hold of the page back (ruling D42): the
      * reader's host goes, and body's inert and the root's and body's overflow are their earlier values, while the reader
-     * shows; and the outlined overlay's outline longhands are theirs while distraction removal runs. A kept object that is
-     * no tool's, or what fails, changes nothing.
+     * shows; and the outlined overlay's outline longhands are theirs while distraction removal runs. Every element's
+     * counterpart is found first, by its place as the copy was made, and the host goes last, so removing it shifts the
+     * place of none found after it, such as a body that follows it (ruling D47). A kept object that is no tool's, or
+     * what fails, changes nothing.
      */
     function unhold(copyRoot) {
       const liveRoot = apply(rootOf, page, []);
-      const held = kept(READER, 'held');
+      const held = kept(READER, 'held'), outlined = kept(DISTRACTIONS, 'outlined');
+      let host = null, body = null, inert;
+      const styles = [];
       if (held !== null) {
         attempt(() => {
-          const host = counterpart(liveRoot, copyRoot, held.host);
-          if (host !== null && host !== copyRoot) apply(remove, host, []);
+          const found = counterpart(liveRoot, copyRoot, held.host);
+          if (found !== copyRoot) host = found;
         });
         attempt(() => {
-          const inert = held.inert;
-          const body = inert !== null && typeof inert === 'object' ? counterpart(liveRoot, copyRoot, inert.element) : null;
-          if (body === null) return;
-          if (inert.value === true) apply(setAttribute, body, ['inert', '']);
-          else if (inert.value === false) apply(removeAttribute, body, ['inert']);
+          const was = held.inert;
+          if (was === null || typeof was !== 'object') return;
+          inert = was.value;
+          body = counterpart(liveRoot, copyRoot, was.element);
         });
-        restyle(liveRoot, copyRoot, held.overflow, OVERFLOW, each => each.element);
+        located(styles, liveRoot, copyRoot, held.overflow, OVERFLOW, each => each.element);
       }
-      const outlined = kept(DISTRACTIONS, 'outlined');
-      if (outlined !== null) restyle(liveRoot, copyRoot, outlined.longhands, OUTLINES, () => outlined.element);
+      if (outlined !== null) located(styles, liveRoot, copyRoot, outlined.longhands, OUTLINES, () => outlined.element);
+      if (body !== null) {
+        attempt(() => {
+          if (inert === true) apply(setAttribute, body, ['inert', '']);
+          else if (inert === false) apply(removeAttribute, body, ['inert']);
+        });
+      }
+      restyle(styles);
+      if (host !== null) attempt(() => apply(remove, host, []));
     }
 
     /** What {@code method} of the kept object under {@code key} answers, an object; null for none or anything else. */
@@ -325,10 +336,10 @@
     }
 
     /**
-     * Each of {@code entries}, {name, value, priority} of one of {@code names}, set again on the copy's counterpart of the
-     * element {@code elementOf} gives it: removed for an empty value.
+     * Adds to {@code found} each of {@code entries}, {name, value, priority} of one of {@code names}, with the copy's
+     * counterpart of the element {@code elementOf} gives it, found now: what {@code restyle} sets again.
      */
-    function restyle(liveRoot, copyRoot, entries, names, elementOf) {
+    function located(found, liveRoot, copyRoot, entries, names, elementOf) {
       if (entries === null || typeof entries !== 'object') return;
       let count = 0;
       attempt(() => {
@@ -343,9 +354,18 @@
           if (typeof name !== 'string' || !apply(includes, names, [name]) || typeof value !== 'string' || typeof priority !== 'string') return;
           const element = counterpart(liveRoot, copyRoot, elementOf(each));
           if (element === null || !(element instanceof HtmlElements)) return;
-          const style = apply(styleOf, element, []);
-          if (value === '') apply(removeProperty, style, [name]);
-          else apply(setProperty, style, [name, value, priority]);
+          found[found.length] = {element, name, value, priority};
+        });
+      }
+    }
+
+    /** Sets each of {@code found}'s longhands again on its element: removed for an empty value. */
+    function restyle(found) {
+      for (let at = 0; at < found.length; at++) {
+        attempt(() => {
+          const each = found[at], style = apply(styleOf, each.element, []);
+          if (each.value === '') apply(removeProperty, style, [each.name]);
+          else apply(setProperty, style, [each.name, each.value, each.priority]);
         });
       }
     }

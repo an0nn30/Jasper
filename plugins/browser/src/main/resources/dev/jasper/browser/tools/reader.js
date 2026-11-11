@@ -21,12 +21,17 @@
  *   target there. Until the overlay closes, the page's own scrolling is held, its body is inert, so neither Tab nor a
  *   click reaches it, and every key the user presses stops at the window's capture listeners, its default action
  *   kept, so the page's own shortcuts do not act behind the overlay. A capture listener the page added to the window
- *   earlier still hears the keys first. A pointer, mouse, click or touch event in the overlay stops at its shadow root,
- *   its default action kept, so the page's own listeners never hear it; a wheel goes on. Escape closes the overlay, is
- *   stopped and prevented, and Jasper is told {check: token, state: "off"}, as for a show that finds no article; the
- *   overlay's listeners stay until Escape's keyup, which they swallow, or until their end, as the page goes or the
- *   reader shows again, whichever comes first.
+ *   earlier still hears the keys first. Each pointer, mouse, click and touch event in the overlay, and each copy, cut,
+ *   dragstart, selectstart, focusin and focusout there, stops at its shadow root, its default action kept, so the
+ *   page's bubbling listeners never hear it, though a capture listener the page added to the window, the document or
+ *   the root element hears it first; a wheel goes on. Escape closes the overlay, is stopped and prevented, and Jasper
+ *   is told {check: token, state: "off"}, as for a show that finds no article; the overlay's listeners stay until
+ *   Escape's keyup, which they swallow, or until their end, as the page goes or the reader shows again, whichever
+ *   comes first, and meanwhile every Escape keydown the user makes, as a held Escape repeats, is stopped and prevented
+ *   too, whether or not it says it repeats.
  * - "hide": the overlay closes; the page scrolls, takes keys and clicks again, and its earlier focus comes back.
+ *
+ * A report the bridge refuses because too many of the page's requests wait is sent again a little later, a few times.
  *
  * The reader is made once per document, kept under window[Symbol.for('dev.jasper.browser.reader')], and calls the
  * built-ins as they were when it was made; its root() is the overlay's shadow root while it shows, else null, where
@@ -67,11 +72,15 @@
     const DROPPED = 'script, iframe, frame, frameset, object, embed, form, style, link, meta, base, animate, set';
     const DIRECTIONS = ['ltr', 'rtl', 'auto'];
     const OVERFLOW = ['overflow-x', 'overflow-y'];
-    // What stops at the overlay's shadow root: the page's listeners never hear the reader's pointer, mouse, click and
-    // touch events. A wheel is not among them.
+    // The bridge's answer to a page with too many requests waiting, and how often and how long after a report is sent
+    // again.
+    const BUSY = 5, RETRIES = 20, RETRY_WAIT = 100;
+    // What stops at the overlay's shadow root: the page's bubbling listeners never hear the reader's pointer, mouse,
+    // click and touch events, its clipboard's, drags' and selections' starts and its focus moves; capture listeners on
+    // the window, the document or the root element hear them first. A wheel is not among them.
     const INPUT = ['pointerdown', 'pointerup', 'pointermove', 'pointerover', 'pointerout', 'pointercancel', 'mousedown', 'mouseup',
       'mousemove', 'mouseover', 'mouseout', 'click', 'auxclick', 'dblclick', 'contextmenu', 'touchstart', 'touchend', 'touchmove',
-      'touchcancel'];
+      'touchcancel', 'copy', 'cut', 'dragstart', 'selectstart', 'focusin', 'focusout'];
     const WHITE = /\s+/g, IGNORED = /[\x00-\x20\x7f]+/g, SCRIPTED = /^javascript:/i;
     const LAYOUT = `
 :host {
@@ -158,10 +167,30 @@ hr { border: 0; border-top: 1px solid var(--border); }
     // An overlay Escape closed, whose listeners wait for Escape's keyup.
     let closing = null;
 
-    /** Tells Jasper {@code fields}, through the opener bridge; a failure tells nothing, and the page goes on. */
+    /**
+     * Tells Jasper {@code fields}, through the opener bridge; a busy bridge is asked again a little later, a few times,
+     * and any other failure tells nothing, and the page goes on.
+     */
     function report(fields) {
       try {
-        apply(query, window, [{request: apply(stringify, Json, [fields]), persistent: false, onSuccess() {}, onFailure() {}}]);
+        send(apply(stringify, Json, [fields]), 0);
+      } catch (unsent) {
+        // Jasper hears nothing.
+      }
+    }
+
+    /** Sends {@code request}, the {@code retries}th time again; a busy bridge's refusal sends it again later. */
+    function send(request, retries) {
+      try {
+        apply(query, window, [{request, persistent: false, onSuccess() {},
+          onFailure(code) {
+            if (code !== BUSY || retries >= RETRIES || typeof later !== 'function') return;
+            try {
+              apply(later, window, [() => send(request, retries + 1), RETRY_WAIT]);
+            } catch (unscheduled) {
+              // Jasper hears nothing.
+            }
+          }}]);
       } catch (unsent) {
         // Jasper hears nothing.
       }
@@ -307,10 +336,19 @@ hr { border: 0; border-top: 1px solid var(--border); }
 
     /**
      * A key the user pressed while the overlay shows stops here, its default action kept, so the page's own handlers
-     * never hear it; Escape is prevented too, closes the overlay, and Jasper is told.
+     * never hear it; Escape is prevented too, closes the overlay, and Jasper is told. After Escape closed it, until
+     * Escape's keyup, each Escape keydown the user makes stops here prevented, its repeat never read, as JBR's keys may
+     * not set it (ruling D47); other keys are the page's.
      */
     function onKeyDown(event) {
-      if (shown === null || event.isTrusted !== true) return;
+      if (event.isTrusted !== true) return;
+      if (shown === null) {
+        if (closing !== null && apply(keyOf, event, []) === 'Escape') {
+          apply(stop, event, []);
+          apply(prevent, event, []);
+        }
+        return;
+      }
       apply(stop, event, []);
       if (apply(keyOf, event, []) !== 'Escape') return;
       apply(prevent, event, []);

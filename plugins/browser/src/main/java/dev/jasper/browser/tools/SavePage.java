@@ -253,7 +253,11 @@ public final class SavePage {
         page.run(ToolScripts.savePage(prefix), ToolScripts.SAVE_PAGE_URL);
     }
 
-    /** The whole answer is in: it is read, fetched and written on the background executor. */
+    /**
+     * The whole answer is in: it is read, fetched and written on the background executor. Whatever ends that work, an
+     * Error too, fails the save, which frees its folder's name (ruling D47); an Error then goes on to the executor, which
+     * reports it.
+     */
     private void save() {
         endWait();
         state = State.SAVING;
@@ -265,9 +269,10 @@ public final class SavePage {
                 try {
                     PageSaver.Saved saved = write(answer, target);
                     EventQueue.invokeLater(() -> saved(saved));
-                } catch (IOException | RuntimeException failure) {
+                } catch (IOException | RuntimeException | Error failure) {
                     String why = reason(failure);
                     EventQueue.invokeLater(() -> fail(why));
+                    if (failure instanceof Error error) throw error;
                 }
             });
         } catch (RejectedExecutionException stopped) {
@@ -367,7 +372,7 @@ public final class SavePage {
     }
 
     /** A failure in the user's terms: the system's reason when it gives one. */
-    private static String reason(Exception failure) {
+    private static String reason(Throwable failure) {
         if (failure instanceof AccessDeniedException denied) return "permission denied for " + denied.getFile();
         if (failure instanceof FileSystemException system && system.getReason() != null && !system.getReason().isBlank())
             return system.getReason();

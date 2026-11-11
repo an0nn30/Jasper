@@ -22,16 +22,16 @@ import org.cef.handler.CefDownloadHandlerAdapter;
  * starts, and each of its updates, to the {@code downloads} package in plain values, on Chromium's thread. As Chromium
  * asks where a download goes ({@code onBeforeDownload}), the handler reads a {@link DownloadStart}: the browser's
  * identifier and Chromium's id for it (ruling F21), the suggested name, the file's address, the address the browser
- * shows, and for a page's own browser the page, whether the page has a user activation, read without consuming it, as
- * a download is no popup, how many documents its main frame has started (ruling D1), and whether the download asks
- * where it goes, as Save Link As… and Save Image As… ask, taking the page's {@link DownloadAsk}. A browser that is no
- * page's, as a page's DevTools' is, starts a download that holds no page (ruling F20). The answer refuses it, and the
- * handler returns false, which CEF's off-screen browsers take as a cancel, or names a {@link DownloadTarget}, and the
- * handler continues the download into it once and returns true: JCEF continues a download never answered into
- * Chromium's own folder once its callback is collected, so the handler never returns true without continuing. A start
- * whose answer throws, or cannot be continued, is refused too, and abandoned, so what was kept for it is given back; an
- * abandon that throws as well is logged. A load Jasper starts for the user gives the page's downloads a new document
- * (ruling D20).
+ * shows, and for a page's own browser the page, whether the page has a user activation, read without consuming it, as a
+ * download is no popup, its download allowance (rulings D1 and D46), and whether the download asks where it goes, as
+ * Save Link As… and Save Image As… ask, taking the page's {@link DownloadAsk}. A browser that is no page's, as a page's
+ * DevTools' is, starts a download that holds no page (ruling F20). The answer refuses it, and the handler returns
+ * false, which CEF's off-screen browsers take as a cancel, or names a {@link DownloadTarget}, and the handler continues
+ * the download into it once and returns true: JCEF continues a download never answered into Chromium's own folder once
+ * its callback is collected, so the handler never returns true without continuing. A start whose answer throws, or
+ * cannot be continued, is refused too, and abandoned, so what was kept for it is given back; an abandon that throws as
+ * well is logged. A load Jasper starts for the user gives the page's downloads a fresh allowance (ruling D20), and so
+ * does a main-frame document started with the page's user activation (ruling D46).
  *
  * <p>Each update ({@code onDownloadUpdated}) reaches the {@code downloads} package as a {@link DownloadProgress} with a
  * cancel of its item's own, which cancels nothing once Chromium has stopped (plan 6's "no native call after stop"); an
@@ -96,7 +96,7 @@ public final class PageDownloads {
 
     /**
      * A download a browser starts, from plain values: for a page's own browser, whether the page is activated now, read
-     * without consuming the activation, the document its downloads count in ({@link Page#downloadDocument}), and whether
+     * without consuming the activation, the allowance its downloads count in ({@link Page#downloadDocument}), and whether
      * it asks where it goes, which takes the page's ask ({@link DownloadAsk#take}). Chromium's thread.
      *
      * @param browser the browser's identifier

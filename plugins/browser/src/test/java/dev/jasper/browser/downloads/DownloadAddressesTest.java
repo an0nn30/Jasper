@@ -28,6 +28,20 @@ class DownloadAddressesTest {
         assertThat(DownloadAddresses.web("jasper-about:welcome")).isEqualTo(Optional.empty());
     }
 
+    /**
+     * Ruling D47 (final review A's minor 5): one rule for every mark, a download's and Save Page As's: the web addresses
+     * are kept, any other is {@code about:internet} with no referrer, and a /dev/null page's file keeps no address at all
+     * (ruling F7).
+     */
+    @Test void aMarkKeepsOnlyWebAddressesAndADevNullPagesNone() {
+        assertThat(DownloadAddresses.mark("https://files.example/a|b.zip", "https://news.example/page", false)).isEqualTo(
+            new DownloadAddresses.Mark(URI.create("https://files.example/a%7Cb.zip"), Optional.of(URI.create("https://news.example/page"))));
+        assertThat(DownloadAddresses.mark("data:text/plain,hi", "file:///Users/someone/page.html", false))
+            .isEqualTo(new DownloadAddresses.Mark(URI.create("about:internet"), Optional.empty()));
+        assertThat(DownloadAddresses.mark("https://files.example/a.zip", "https://news.example/page", true)).as("a /dev/null page's")
+            .isEqualTo(new DownloadAddresses.Mark(URI.create("about:internet"), Optional.empty()));
+    }
+
     /** Review finding 3: the notice names the host, and never the address's user name or password. */
     @Test void theHostIsShownWithoutCredentialsAndANameItCannotReadIsThisSite() {
         assertThat(DownloadAddresses.host("https://example.com/page")).isEqualTo("example.com");

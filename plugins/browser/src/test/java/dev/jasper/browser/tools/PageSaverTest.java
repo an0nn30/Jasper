@@ -519,6 +519,70 @@ class PageSaverTest {
         assertThat(Files.readAllBytes(folder.resolve("index.html"))).isEqualTo("<p>truncated ? and ? caf\u00e9</p>".getBytes(StandardCharsets.UTF_8));
     }
 
+    /** Ruling D47: a valid supplementary character, an emoji's surrogate pair, is written whole in UTF-8. */
+    @Test void aSupplementaryCharacterIsWrittenWhole() throws Exception {
+        URI page = server.at("/");
+        Path folder = temp.resolve("emoji");
+        String emoji = new String(Character.toChars(0x1F600));
+        saver(page, false, false).save(folder, new Snapshot(P, "<p>" + emoji + " caf\u00e9</p>", List.of(), List.of(), List.of(), page),
+            client(Optional.empty()));
+        assertThat(Files.readAllBytes(folder.resolve("index.html"))).isEqualTo(new byte[] {'<', 'p', '>', (byte) 0xF0, (byte) 0x9F,
+            (byte) 0x98, (byte) 0x80, ' ', 'c', 'a', 'f', (byte) 0xC3, (byte) 0xA9, '<', '/', 'p', '>'});
+    }
+
+    /**
+     * Ruling D47 (final review B's minor 2): a name lookup is bounded too. With lookups that take 5 s, a save of 1 s a
+     * resource and 2 s in all ends at its own deadline, each name timed out counting as refused, so its resource stays
+     * absolute; and a stop is heard within a poll, not at the lookup's end. The test's resolver answers this computer,
+     * which a public page may not fetch from, so nothing is fetched.
+     */
+    @Test void aSlowNameLookupKeepsTheDeadlinesAndHearsAStop() throws Exception {
+        URI page = URI.create("https://public.invalid/");
+        var resources = new ArrayList<Resource>();
+        var html = new StringBuilder();
+        for (int at = 0; at < 8; at++) {
+            resources.add(new Resource(URI.create("https://n" + at + ".slow.invalid/x.png"), Kind.OTHER));
+            html.append("<img src=\"").append(P).append('r').append(at).append("-\">");
+        }
+        java.util.function.Function<String, List<InetAddress>> slow = name -> {
+            lookups.add(name);
+            try {
+                Thread.sleep(5_000);
+                return List.of(InetAddress.getByAddress(name, new byte[] {127, 0, 0, 1}));
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                return List.of();
+            } catch (java.net.UnknownHostException impossible) {
+                throw new AssertionError(impossible);
+            }
+        };
+        var snapshot = new Snapshot(P, html.toString(), resources, List.of(), List.of(), page);
+        Path folder = temp.resolve("slow");
+        long start = System.nanoTime();
+        new PageSaver(page, false, false, CURRENT, RUNNING, platform, new PageSaver.Limits(20L << 20, 200L << 20, 500, 2L << 20, 32L << 20,
+            Duration.ofSeconds(1), Duration.ofSeconds(2)), slow).save(folder, snapshot, client(Optional.empty()));
+        assertThat(Duration.ofNanos(System.nanoTime() - start)).as("the save's 2 s, not the lookups' 5").isLessThan(Duration.ofMillis(4_000));
+        assertThat(lookups).as("four at a time, then the save's deadline").hasSizeBetween(4, 8);
+        assertThat(Files.readString(folder.resolve("index.html"))).contains("https://n0.slow.invalid/x.png", "https://n7.slow.invalid/x.png");
+
+        var running = new AtomicBoolean(true);
+        var stopped = new java.util.concurrent.atomic.AtomicLong();
+        Thread.ofVirtual().start(() -> {
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+            stopped.set(System.nanoTime());
+            running.set(false);
+        });
+        var saver = new PageSaver(page, false, false, CURRENT, running::get, platform, PageSaver.Limits.DEFAULT, slow);
+        assertThatThrownBy(() -> saver.save(temp.resolve("stopped"), snapshot, client(Optional.empty()))).isInstanceOf(IOException.class)
+            .hasMessage("the plugin stopped");
+        assertThat(Duration.ofNanos(System.nanoTime() - stopped.get())).as("heard within a poll of the stop").isLessThan(Duration.ofMillis(1_000));
+        assertThat(temp.resolve("stopped")).doesNotExist();
+    }
+
     /** Ruling D44: a redirect to a scheme-relative address with user information goes there, without it. */
     @Test void aSchemeRelativeRedirectKeepsItsScheme() throws Exception {
         URI page = server.at("/");

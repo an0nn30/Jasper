@@ -117,6 +117,38 @@ public final class PageTestAccess {
     }
 
     /**
+     * A frame of the page starts loading a document at {@code url}, as the client's load handler hands it to the page's
+     * frame scripts on Chromium's thread ({@link FrameScripts#loadStarting}), with no rule set active: a main frame's
+     * document is counted as Chromium's would be, its download allowance included (plan 7's D46). Any thread, as
+     * Chromium's.
+     *
+     * @param page a page
+     * @param mainFrame whether it is the page's main frame
+     * @param url the document's address
+     */
+    public static void frameStarts(Page page, boolean mainFrame, String url) {
+        var frame = (org.cef.browser.CefFrame) java.lang.reflect.Proxy.newProxyInstance(org.cef.browser.CefFrame.class.getClassLoader(),
+            new Class<?>[] {org.cef.browser.CefFrame.class}, (proxy, method, args) -> switch (method.getName()) {
+                case "isMain" -> mainFrame;
+                case "getURL" -> url;
+                case "executeJavaScript" -> null;
+                default -> throw new UnsupportedOperationException(method.getName());
+            });
+        FrameScripts.loadStarting(pageBrowser(page), frame, new FrameScripts.Hiding(java.util.Optional::empty));
+    }
+
+    /**
+     * The page gets a press or a key at {@code whenMillis}, as its canvas activates it: its user activation, which no
+     * download consumes. Any thread.
+     *
+     * @param page a page
+     * @param whenMillis when, in milliseconds since the epoch
+     */
+    public static void activate(Page page, long whenMillis) {
+        page.activation().activate(whenMillis);
+    }
+
+    /**
      * The page's main frame finished loading its document, as the client's load handler tells it. UI thread.
      *
      * @param page a page

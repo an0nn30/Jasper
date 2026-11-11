@@ -70,8 +70,8 @@ public final class DownloadNames {
      * {@code /} or {@code \}; each control and format character, bidi controls and zero-width characters among them, each
      * line or paragraph separator and unpaired surrogate, and each of {@code <>:"|?*}, replaced with {@code _} on every
      * platform; leading and trailing dots and spaces trimmed; {@code download} for a name that leaves nothing; a leading
-     * {@code _} before a Windows device name, such as {@code CON} or {@code COM1}, in any case, before the first dot; and
-     * a name over 200 UTF-8 bytes cut on a code point, keeping its extension of at most 16 characters.
+     * {@code _} before a Windows device name, such as {@code CON}, {@code COM0} or {@code COM1}, in any case, before the
+     * first dot; and a name over 200 UTF-8 bytes cut on a code point, keeping its extension of at most 16 characters.
      *
      * @param suggested the suggested name; null reads as empty
      * @return a single file name, never empty
@@ -154,7 +154,9 @@ public final class DownloadNames {
      * Reserves the first free name for Save Page As's folder in {@code parent} (plan 7's D7 and D43): {@code name}, then
      * {@code name (1)} to {@code name (999)}, numbered at its end as Finder and Explorer number a folder. A name is free
      * as {@link #reserve} reads it: nothing of that name in {@code parent}, a link included, and no download or save holds
-     * it, case and normalization folded. Reading {@code parent} is the only I/O; nothing is created.
+     * it, case and normalization folded. Reading {@code parent} is the only I/O; nothing is created. It holds the names'
+     * one lock, which {@link #reserve} and {@link #release} take too, for at most 1,000 reads of {@code parent}, so a
+     * download that starts meanwhile, on Chromium's thread, waits at most that long (plan 7's D48).
      *
      * @param parent the folder the save's folder would go in
      * @param name the folder's name, a safe one
@@ -254,14 +256,14 @@ public final class DownloadNames {
     }
 
     /**
-     * Windows' device names: {@code CON}, {@code PRN}, {@code AUX}, {@code NUL}, {@code COM1} to {@code COM9},
-     * {@code LPT1} to {@code LPT9}, {@code CONIN$}, {@code CONOUT$}, and {@code COM} and {@code LPT} with a superscript
-     * one, two or three.
+     * Windows' device names, as Microsoft lists them: {@code CON}, {@code PRN}, {@code AUX}, {@code NUL}, {@code COM0} to
+     * {@code COM9}, {@code LPT0} to {@code LPT9}, {@code CONIN$}, {@code CONOUT$}, and {@code COM} and {@code LPT} with a
+     * superscript one, two or three.
      */
     private static Set<String> devices() {
         var devices = new HashSet<>(Set.of("CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$"));
         for (String port : new String[] { "COM", "LPT" }) {
-            for (int n = 1; n <= 9; n++) devices.add(port + n);
+            for (int n = 0; n <= 9; n++) devices.add(port + n);
             for (char superscript : new char[] { '\u00B9', '\u00B2', '\u00B3' }) devices.add(port + superscript);
         }
         return Set.copyOf(devices);

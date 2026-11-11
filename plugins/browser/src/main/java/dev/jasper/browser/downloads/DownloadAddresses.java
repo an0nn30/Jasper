@@ -2,13 +2,15 @@ package dev.jasper.browser.downloads;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
  * The addresses downloads write and show: a download's source and its page as referrer, for the downloaded-file mark,
- * which Save Page As's files take too, only when they are {@code http} or {@code https} addresses, and the site ruling
- * D1's notice names (D11), which never shows a user name or password. An address Chromium gives may hold characters no {@link URI} takes unescaped, such as
- * {@code |}; they are escaped first. Pure.
+ * which Save Page As's files take too ({@link #mark}), only when they are {@code http} or {@code https} addresses, and
+ * none at all for a /dev/null page's file, and the site ruling D1's notice names (D11), which never shows a user name or
+ * password. An address Chromium gives may hold characters no {@link URI} takes unescaped, such as {@code |}; they are
+ * escaped first. Pure.
  */
 public final class DownloadAddresses {
     /** What the mark writes for a download whose addresses must not be kept, and for one from no web address. */
@@ -19,6 +21,35 @@ public final class DownloadAddresses {
     private static final String UNSAFE = " \"<>\\^`{|}";
 
     private DownloadAddresses() { }
+
+    /**
+     * What a downloaded file's mark records, as {@code Platform.markDownloaded} takes it.
+     *
+     * @param source the address the file came from
+     * @param referrer the page that led to it; empty for none
+     */
+    public record Mark(URI source, Optional<URI> referrer) {
+        /** Rejects nulls. */
+        public Mark {
+            Objects.requireNonNull(source, "source");
+            Objects.requireNonNull(referrer, "referrer");
+        }
+    }
+
+    /**
+     * The addresses the mark of a file downloaded from {@code url} on the page at {@code pageUrl} records, a download's
+     * and each of Save Page As's files alike (ruling D47): {@code url}'s {@linkplain #source source} and the page as
+     * referrer when it is a {@linkplain #web web} address; for a /dev/null page's file, {@code about:internet} and no
+     * referrer, so its mark keeps no address (ruling F7).
+     *
+     * @param url the file's address, as Chromium gives it, or a saved page's
+     * @param pageUrl the page's address
+     * @param inMemory whether the page is a /dev/null one
+     * @return the addresses
+     */
+    public static Mark mark(String url, String pageUrl, boolean inMemory) {
+        return inMemory ? new Mark(NO_ADDRESS, Optional.empty()) : new Mark(source(url), web(pageUrl));
+    }
 
     /**
      * The address a download came from, for its mark: an {@code http} or {@code https} one; any other, a {@code data:}

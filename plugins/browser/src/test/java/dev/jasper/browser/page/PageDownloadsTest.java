@@ -1,6 +1,5 @@
 package dev.jasper.browser.page;
 
-import dev.jasper.browser.permissions.AudioMode;
 import dev.jasper.browser.store.CapturedLog;
 import java.awt.Point;
 import java.lang.reflect.Proxy;
@@ -128,15 +127,18 @@ class PageDownloadsTest {
     /**
      * Rulings F21, D1 and F7: a page's start carries the browser's identifier and the item's id, the names and
      * addresses, its page, whether the page is activated now, which it reads without consuming the activation, the
-     * document its main frame shows, and whether its group keeps its data in memory. Its own browser names the page and
-     * the group; the values are read without a native call.
+     * page's download allowance (D20, D46), and whether its group keeps its data in memory. Its own browser names the
+     * page and the group; the values are read without a native call.
      */
     @Test void aPagesStartCarriesItsPageItsActivationItsDocumentAndItsStore() throws Exception {
         long now = System.currentTimeMillis();
         Page page = onUi(() -> new Page(URI.create("https://example.com/"), () -> { }, PageTestAccess.noFavicons(), Runnable::run,
             PageContext.memory()));
-        page.privacy().documentStarted(AudioMode.ALLOW);
-        page.privacy().documentStarted(AudioMode.ALLOW);
+        onUi(() -> {
+            page.load(URI.create("https://example.com/one"));
+            page.load(URI.create("https://example.com/two"));
+            return null;
+        });
         PageBrowser browser = PageTestAccess.pageBrowser(page);
         assertThat(PageDownloads.page(browser)).containsSame(page);
         assertThat(PageDownloads.inMemory(browser)).isTrue();
@@ -158,8 +160,8 @@ class PageDownloadsTest {
     }
 
     /**
-     * Ruling D20: a load Jasper starts for the user, as the address field's, gives the page's downloads a new document,
-     * as a document the main frame starts does; nothing else the page does changes it.
+     * Ruling D20: a load Jasper starts for the user, as the address field's, gives the page's downloads a new allowance;
+     * a download the page starts changes nothing.
      */
     @Test void aLoadJasperStartsGivesThePagesDownloadsANewDocument() throws Exception {
         long now = System.currentTimeMillis();
@@ -173,8 +175,45 @@ class PageDownloadsTest {
         });
         long loaded = PageDownloads.start(1, "", Optional.of(page), false, 3, "https://example.com/c", "c", now).document();
         assertThat(loaded).isGreaterThan(before);
-        page.privacy().documentStarted(AudioMode.ALLOW);
-        assertThat(PageDownloads.start(1, "", Optional.of(page), false, 4, "https://example.com/d", "d", now).document()).isGreaterThan(loaded);
+        onUi(() -> {
+            page.close();
+            return null;
+        });
+    }
+
+    /**
+     * Ruling D46, through the page's own document counter as Chromium's load starts reach it: a main-frame document the
+     * page starts by itself, as a meta refresh, {@code location.reload()} or a same-site {@code location.href} starts it,
+     * keeps the page's download allowance, and so does a sub-frame's, activated or not; one that starts while the page
+     * has a user activation, as a click on a link starts it, renews it, and so does a load Jasper starts (D20). Each
+     * main-frame document is still counted for the page's audio.
+     */
+    @Test void onlyAnActivatedDocumentOrJaspersLoadRenewsThePagesDownloadAllowance() throws Exception {
+        long now = System.currentTimeMillis();
+        Page page = onUi(() -> new Page(URI.create("https://example.com/"), () -> { }, PageTestAccess.noFavicons(), Runnable::run,
+            PageContext.persistent()));
+        long first = PageDownloads.start(1, "", Optional.of(page), false, 1, "https://example.com/a", "a", now).document();
+        long documents = page.privacy().documents();
+        for (String own : List.of("https://example.com/", "https://example.com/?reloaded", "https://example.com/next"))
+            PageTestAccess.frameStarts(page, true, own);
+        PageTestAccess.activate(page, System.currentTimeMillis());
+        PageTestAccess.frameStarts(page, false, "https://ads.example/frame");
+        assertThat(PageDownloads.start(1, "", Optional.of(page), false, 2, "https://example.com/b", "b", now).document())
+            .as("its own documents and an activated sub-frame's").isEqualTo(first);
+        assertThat(page.privacy().documents()).as("each main-frame document counted for its audio").isEqualTo(documents + 3);
+        PageTestAccess.frameStarts(page, true, "https://example.com/clicked");
+        long clicked = PageDownloads.start(1, "", Optional.of(page), false, 3, "https://example.com/c", "c", now).document();
+        assertThat(clicked).as("a document started with the activation").isGreaterThan(first);
+        PageTestAccess.activate(page, now - 10_000);
+        PageTestAccess.frameStarts(page, true, "https://example.com/later");
+        assertThat(PageDownloads.start(1, "", Optional.of(page), false, 4, "https://example.com/d", "d", now).document())
+            .as("an activation more than 5 s old").isEqualTo(clicked);
+        onUi(() -> {
+            page.load(URI.create("https://example.com/report.pdf"));
+            return null;
+        });
+        assertThat(PageDownloads.start(1, "", Optional.of(page), false, 5, "https://example.com/e", "e", now).document())
+            .as("a load Jasper started").isGreaterThan(clicked);
         onUi(() -> {
             page.close();
             return null;

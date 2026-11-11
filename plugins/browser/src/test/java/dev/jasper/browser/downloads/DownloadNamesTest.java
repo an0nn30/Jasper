@@ -80,6 +80,16 @@ class DownloadNamesTest {
             assertThat(DownloadNames.safeName(name)).as(name).isEqualTo(name);
     }
 
+    /** Ruling D47 (final review A's minor 7): COM0 and LPT0 are Windows device names too, as Microsoft lists them. */
+    @Test void comZeroAndLptZeroAreDeviceNames() {
+        for (String device : List.of("COM0", "LPT0", "com0", "Lpt0")) {
+            assertThat(DownloadNames.safeName(device)).as(device).isEqualTo("_" + device);
+            assertThat(DownloadNames.safeName(device + ".tar.gz")).as(device + ".tar.gz").isEqualTo("_" + device + ".tar.gz");
+            assertThat(DownloadNames.safeName(device + " .txt")).as("spaces before the dot").isEqualTo("_" + device + " .txt");
+        }
+        assertThat(DownloadNames.safeName("COM00.txt")).isEqualTo("COM00.txt");
+    }
+
     /** F4: over 200 UTF-8 bytes a name is cut on a code point, keeping an extension of at most 16 characters. */
     @Test void aLongNameIsCutToTwoHundredBytesKeepingItsExtension() {
         String ascii = DownloadNames.safeName("a".repeat(296) + ".pdf");

@@ -4,21 +4,27 @@ import dev.jasper.browser.engine.Chromium;
 import java.awt.EventQueue;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
  * A page's own part of its downloads (plan 7), which its {@link Page} holds and drives: whether its next download asks
- * where it goes ({@link DownloadAsk}, ruling F32), how a download starts in its browser, and its close hold (ruling F1),
- * which keeps the page's browser, showing {@code about:blank}, while one of its downloads runs, and closes it once they
- * end, on the UI thread, once, unless Chromium has stopped. How a download starts and how the browser is blanked and
- * closed are seams a test replaces. It reaches the browser only through its page, and logs as its page.
+ * where it goes ({@link DownloadAsk}, ruling F32), its download allowance (rulings D1, D20 and D46), how a download
+ * starts in its browser, and its close hold (ruling F1), which keeps the page's browser, showing {@code about:blank},
+ * while one of its downloads runs, and closes it once they end, on the UI thread, once, unless Chromium has stopped. How
+ * a download starts and how the browser is blanked and closed are seams a test replaces. It reaches the browser only
+ * through its page, and logs as its page.
  */
 final class PageDownloadState {
     private static final System.Logger LOG = System.getLogger(Page.class.getName());
     // Plan 7's F32: whether the page's next download asks where it goes; armed on the UI thread, taken on Chromium's.
     private final DownloadAsk ask = new DownloadAsk();
+    // Plan 7's D1: the allowance the page's downloads without a user activation count in, renewed by a load Jasper starts
+    // for the user (D20) and by a main-frame document that starts with the page's activation (D46); only grows. Renewed
+    // on the UI thread and on Chromium's, read on Chromium's.
+    private final AtomicLong allowance = new AtomicLong();
     // Given the page and an address, has Chromium download it: through its browser, or a test's.
     private BiConsumer<Page, String> downloader = PageDownloadState::downloadInBrowser;
     // Plan 7's F1: given the page as it closes, what its browser waits for before it closes: its downloads' end.
@@ -32,6 +38,16 @@ final class PageDownloadState {
     /** Whether the page's next download asks where it goes, which the download handler takes. Any thread. */
     DownloadAsk ask() {
         return ask;
+    }
+
+    /** The allowance the page's downloads count in now: equal values mean nothing renewed it between. Any thread. */
+    long allowance() {
+        return allowance.get();
+    }
+
+    /** The page's downloads get a fresh allowance. Any thread. */
+    void renew() {
+        allowance.incrementAndGet();
     }
 
     /** Has the page's next download of {@code url} ask where it goes, from now. */

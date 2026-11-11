@@ -14,10 +14,12 @@
  *   overlay under it and its backdrops: a key's click, as Enter on a link, and a double click's later clicks hide
  *   nothing, as a hidden element stays hidden. Keys are the page's, but Escape: pressed by the user, it is stopped and
  *   prevented, ends removal, and Jasper is told, through jasperBridgeQuery (op "distractions"), {check: token, state:
- *   "off"}, as for a start that fails; its repeats and its keyup stop at the window too, until that keyup, the next
- *   Escape pressed anew, a stop, the next start or the page going. A second start while it runs only takes the new
- *   token. As the page goes, it ends untold. A capture listener the page added to the window earlier still hears the
- *   pointer and the keys first.
+ *   "off"}, as for a start that fails; every Escape keydown the user makes after it, as a held Escape repeats, whether
+ *   or not it says it repeats, is stopped and prevented at the window too, and its keyup stopped, until that keyup, a
+ *   stop, the next start or the page going. A second start while it runs only takes the new token. As the page goes,
+ *   it ends untold. A capture listener the page added to the window earlier still hears the pointer and the keys
+ *   first. A report the bridge refuses because too many of the page's requests wait is sent again a little later, a
+ *   few times.
  * - "stop": the crosshair, the outline and the listeners go, untold. What was hidden stays hidden.
  * - "removeAt", with a point in CSS pixels from the viewport's top left: the overlay of the element there
  *   (document.elementFromPoint) is hidden, or nothing.
@@ -71,11 +73,14 @@
     const LIMIT = 50000;
     // The pointer's primary button, and its secondary one, whose press and click open the right-click menu.
     const PRIMARY = 0, SECONDARY = 2;
+    // The bridge's answer to a page with too many requests waiting, and how often and how long after a report is sent
+    // again.
+    const BUSY = 5, RETRIES = 20, RETRY_WAIT = 100;
 
     const apply = Reflect.apply, describe = Object.getOwnPropertyDescriptor, prototypeOf = Object.getPrototypeOf,
       define = Object.defineProperty, freeze = Object.freeze, max = Math.max, min = Math.min;
     const isSafeInteger = Number.isSafeInteger, isFinite = Number.isFinite, stringify = JSON.stringify, Json = JSON;
-    const query = window.jasperBridgeQuery, computed = window.getComputedStyle;
+    const query = window.jasperBridgeQuery, computed = window.getComputedStyle, later = window.setTimeout;
     // The page's interfaces, by their constructors; SVG's is optional.
     const Sheets = window.CSSStyleSheet, Documents = window.Document, Elements = window.Element, HtmlElements = window.HTMLElement,
       SvgElements = window.SVGElement, Nodes = window.Node, ShadowRoots = window.ShadowRoot, Targets = window.EventTarget,
@@ -109,14 +114,14 @@
     const listen = Targets.prototype.addEventListener, unlisten = Targets.prototype.removeEventListener;
     const halt = Events.prototype.stopImmediatePropagation, prevent = Events.prototype.preventDefault,
       targetOf = getter(Events, 'target');
-    const keyOf = getter(KeyEvents, 'key'), repeatOf = getter(KeyEvents, 'repeat'), buttonOf = getter(MouseEvents, 'button'),
+    const keyOf = getter(KeyEvents, 'key'), buttonOf = getter(MouseEvents, 'button'),
       detailOf = getter(UiEvents, 'detail');
     const setProperty = Styles.prototype.setProperty, removeProperty = Styles.prototype.removeProperty,
       getPropertyValue = Styles.prototype.getPropertyValue, getPropertyPriority = Styles.prototype.getPropertyPriority;
     const page = document;
     const needed = [replaceSync, elementFromPoint, rootOf, bodyOf, querySelectorAll, boundsOf, parentOf, contains, hostOf, styleOf,
-      listen, unlisten, halt, prevent, targetOf, keyOf, repeatOf, buttonOf, detailOf, setProperty, removeProperty, getPropertyValue,
-      getPropertyPriority];
+      listen, unlisten, halt, prevent, targetOf, keyOf, buttonOf, detailOf, setProperty, removeProperty,
+      getPropertyValue, getPropertyPriority];
     for (let at = 0; at < needed.length; at++) if (typeof needed[at] !== 'function') return null;
     if (!adopted || typeof adopted.get !== 'function' || typeof adopted.set !== 'function') return null;
 
@@ -126,10 +131,30 @@
     // Whether Escape ended removal and its keyup is still to come: the keys' listeners wait for it.
     let closing = false;
 
-    /** Tells Jasper {@code fields}, through the opener bridge; a failure tells nothing, and the page goes on. */
+    /**
+     * Tells Jasper {@code fields}, through the opener bridge; a busy bridge is asked again a little later, a few times,
+     * and any other failure tells nothing, and the page goes on.
+     */
     function report(fields) {
       try {
-        apply(query, window, [{request: apply(stringify, Json, [fields]), persistent: false, onSuccess() {}, onFailure() {}}]);
+        send(apply(stringify, Json, [fields]), 0);
+      } catch (unsent) {
+        // Jasper hears nothing.
+      }
+    }
+
+    /** Sends {@code request}, the {@code retries}th time again; a busy bridge's refusal sends it again later. */
+    function send(request, retries) {
+      try {
+        apply(query, window, [{request, persistent: false, onSuccess() {},
+          onFailure(code) {
+            if (code !== BUSY || retries >= RETRIES || typeof later !== 'function') return;
+            try {
+              apply(later, window, [() => send(request, retries + 1), RETRY_WAIT]);
+            } catch (unscheduled) {
+              // Jasper hears nothing.
+            }
+          }}]);
       } catch (unsent) {
         // Jasper hears nothing.
       }
@@ -274,8 +299,8 @@
 
     /**
      * Escape, pressed by the user, is stopped and prevented, ends removal, and Jasper is told; the keys' listeners stay
-     * for its repeats, which stop here too, and its keyup. Escape pressed anew meanwhile, as when its keyup went
-     * elsewhere, ends the wait and is the page's.
+     * for its keyup, and until then each Escape keydown the user makes stops here prevented, its repeat never read, as
+     * JBR's keys may not set it (ruling D47).
      */
     function onKeyDown(event) {
       if (event.isTrusted !== true || apply(keyOf, event, []) !== 'Escape') return;
@@ -288,10 +313,6 @@
         leave(now);
         report({op: 'distractions', check: now.token, state: 'off'});
       } else if (closing) {
-        if (apply(repeatOf, event, []) !== true) {
-          endClosing();
-          return;
-        }
         apply(halt, event, []);
         apply(prevent, event, []);
       }

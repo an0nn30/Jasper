@@ -19,8 +19,8 @@ import java.util.Optional;
  *     {@link DownloadAsk}, so Chromium shows the save chooser; false for a browser that is no page's
  * @param activated whether the page had a user activation as the download started, read and not consumed: within
  *     5 seconds of a press or key it got (ruling D1); false for a browser that is no page's
- * @param document how many documents the page's main frame had started, which names the document the download comes
- *     from (ruling D1); zero for a browser that is no page's
+ * @param document the page's download allowance, which a load Jasper starts for the user and a main-frame document
+ *     started with the page's user activation renew (rulings D1, D20 and D46); zero for a browser that is no page's
  * @param inMemory whether the browser keeps its data in memory, a /dev/null page's or its DevTools', so no address of
  *     the download may reach the disk (ruling F7)
  */

@@ -52,7 +52,7 @@ class DownloadListTest {
         var list = new DownloadList();
         list.begin(KEY, "report.pdf", folder.resolve("report.pdf"), SOURCE);
         list.update(KEY, running(50, 100, ""));
-        assertThat(list.update(KEY, completed(100, 100, folder.resolve("report.pdf").toString()))).contains(Outcome.COMPLETED);
+        assertThat(list.update(KEY, completed(100, 100, folder.resolve("report.pdf").toString()))).map(DownloadList.Ended::outcome).contains(Outcome.COMPLETED);
         assertThat(only(list)).extracting(Download::state, Download::received, Download::total, Download::openable)
             .containsExactly(State.RUNNING, 100L, 100L, false);
         assertThat(list.update(KEY, completed(100, 100, ""))).as("one outcome").isEmpty();
@@ -74,7 +74,7 @@ class DownloadListTest {
     @Test void aCompletionOfUnknownSizeShowsWhatArrivedAsTheWhole() {
         var list = new DownloadList();
         list.begin(KEY, "stream.bin", folder.resolve("stream.bin"), SOURCE);
-        assertThat(list.update(KEY, completed(5000, 0, ""))).contains(Outcome.COMPLETED);
+        assertThat(list.update(KEY, completed(5000, 0, ""))).map(DownloadList.Ended::outcome).contains(Outcome.COMPLETED);
         assertThat(only(list)).extracting(Download::received, Download::total).containsExactly(5000L, 5000L);
     }
 
@@ -102,7 +102,7 @@ class DownloadListTest {
         var list = new DownloadList();
         list.begin(KEY, "a.zip", folder.resolve("a.zip"), SOURCE);
         list.update(KEY, running(10, 100, ""));
-        assertThat(list.update(KEY, interrupted())).contains(Outcome.FAILED);
+        assertThat(list.update(KEY, interrupted())).map(DownloadList.Ended::outcome).contains(Outcome.FAILED);
         assertThat(only(list).state()).isEqualTo(State.FAILED);
         assertThat(list.update(KEY, interrupted())).as("reported once").isEmpty();
         assertThat(list.update(KEY, completed(100, 100, ""))).isEmpty();
@@ -113,7 +113,7 @@ class DownloadListTest {
     @Test void aCancelledDownloadStopsOnce() {
         var list = new DownloadList();
         list.begin(KEY, "a.zip", folder.resolve("a.zip"), SOURCE);
-        assertThat(list.update(KEY, canceled())).contains(Outcome.STOPPED);
+        assertThat(list.update(KEY, canceled())).map(DownloadList.Ended::outcome).contains(Outcome.STOPPED);
         assertThat(only(list).state()).isEqualTo(State.STOPPED);
         assertThat(list.update(KEY, canceled())).isEmpty();
         assertThat(list.update(KEY, interrupted())).isEmpty();
@@ -237,6 +237,36 @@ class DownloadListTest {
             .endsWith(newest.serial()).hasSize(21);
         list.update(new DownloadKey(1, 3), canceled(new DownloadKey(1, 3)));
         assertThat(list.all()).hasSize(20).noneMatch(download -> download.state() == State.RUNNING && download.serial() != newest.serial());
+    }
+
+    /**
+     * Ruling D47 (final review A's I2): an outcome and a finish answer the download they made, though the 20-newest trim
+     * drops it from the list at once, so its outcome can still be told.
+     */
+    @Test void anOutcomeAndAFinishAnswerTheDownloadThoughTheTrimDropsIt() {
+        var list = new DownloadList();
+        var big = new DownloadKey(1, 1);
+        var other = new DownloadKey(1, 2);
+        list.begin(big, "big.iso", folder.resolve("big.iso"), SOURCE);
+        list.begin(other, "other.iso", folder.resolve("other.iso"), SOURCE);
+        for (int id = 3; id <= DownloadList.NEWEST + 2; id++) {
+            var key = new DownloadKey(1, id);
+            list.begin(key, "s" + id, folder.resolve("s" + id), SOURCE);
+            list.update(key, completed(key, 1, 1, ""));
+            list.finish(key, true);
+        }
+        DownloadList.Ended failed = list.update(other, interrupted(other)).orElseThrow();
+        assertThat(failed.outcome()).isEqualTo(Outcome.FAILED);
+        assertThat(failed.download()).extracting(Download::key, Download::name, Download::state).containsExactly(other, "other.iso", State.FAILED);
+        assertThat(list.all()).as("dropped at its outcome").noneMatch(download -> download.key().equals(other));
+        DownloadList.Ended completed = list.update(big, completed(big, 10, 10, folder.resolve("big.iso").toString())).orElseThrow();
+        assertThat(completed.outcome()).isEqualTo(Outcome.COMPLETED);
+        assertThat(completed.download()).extracting(Download::state, Download::received).containsExactly(State.RUNNING, 10L);
+        assertThat(list.finish(big, false)).as("the finished download").hasValueSatisfying(finished -> assertThat(finished)
+            .extracting(Download::key, Download::name, Download::state, Download::openable).containsExactly(big, "big.iso", State.FINISHED, false));
+        assertThat(list.all()).as("dropped at its finish").noneMatch(download -> download.key().equals(big)).hasSize(DownloadList.NEWEST);
+        assertThat(list.finish(big, true)).as("finished once").isEmpty();
+        assertThat(list.finish(new DownloadKey(9, 9), true)).as("an unknown key").isEmpty();
     }
 
     private static Download only(DownloadList list) {

@@ -626,9 +626,9 @@ class DownloadsTest {
     }
 
     /**
-     * Ruling D1 (the user's "Match Chrome"): a page's first download without a user activation in a document goes, and
-     * each later one in that document is refused, the first refusal telling the page's host once; an activated start,
-     * an ask, a new document and a browser that is no page's each go.
+     * Ruling D1 (the user's "Match Chrome"): a page's first download without a user activation in an allowance goes, and
+     * each later one in that allowance is refused, the first refusal telling the page's host once; an activated start,
+     * an ask, a renewed allowance and a browser that is no page's each go.
      */
     @Test void aPageDownloadsOnceWithoutActivationInEachDocument() throws Exception {
         make(MAC);
@@ -664,7 +664,8 @@ class DownloadsTest {
     /**
      * Ruling D20: a load Jasper starts for the user, as the address field's or a bookmark's, gives the page a fresh
      * download allowance, so two such loads in a row that each become a download both go; within one load the second
-     * automatic download is refused, and a page's own navigation, such as {@code location.href = ...}, renews nothing.
+     * automatic download is refused, and the page's own navigation to a second file, which starts no document, renews
+     * nothing.
      */
     @Test void aLoadJasperStartsGivesThePageAFreshDownloadAllowance() throws Exception {
         make(MAC);
@@ -678,6 +679,67 @@ class DownloadsTest {
         assertThat(downloads.before(pageStart(page, 4))).as("the next load too").isPresent();
         assertThat(downloads.before(pageStart(page, 5))).as("within one load, the second").isEmpty();
         assertThat(downloads.before(pageStart(page, 6))).isEmpty();
+    }
+
+    /**
+     * Ruling D46: a page that loads itself again, by a meta refresh, {@code location.reload()} or a same-site
+     * {@code location.href}, keeps its download allowance, through its own document counter as Chromium's load starts
+     * reach it: one automatic download goes, every later one is refused, and the refusals post one notice; a document
+     * the user's click starts renews the allowance.
+     */
+    @Test void aPageThatReloadsItselfGetsOneAutomaticDownloadAndOneNotice() throws Exception {
+        make(MAC);
+        resolve();
+        Page page = page(PageContext.persistent());
+        assertThat(downloads.before(pageStart(page, 1))).as("the first").isPresent();
+        for (int id = 2; id <= 5; id++) {
+            PageTestAccess.frameStarts(page, true, id % 2 == 0 ? PAGE : PAGE + "?again=" + id);
+            assertThat(downloads.before(pageStart(page, id))).as("after reload " + (id - 1)).isEmpty();
+        }
+        flush();
+        String notice = GROUP + "|WARNING|This site tried to download multiple files|example.com";
+        assertThat(notices()).containsExactly(notice);
+        assertThat(onUi(() -> host.notifications().posts().getLast().count())).as("one notice for the allowance").isEqualTo(1);
+        PageTestAccess.activate(page, System.currentTimeMillis() - 6_000);
+        PageTestAccess.frameStarts(page, true, PAGE + "?clicked");
+        assertThat(downloads.before(pageStart(page, 6))).as("an activation past Chromium's 5 s").isEmpty();
+        PageTestAccess.activate(page, System.currentTimeMillis());
+        PageTestAccess.frameStarts(page, true, PAGE + "?clicked");
+        PageTestAccess.activate(page, System.currentTimeMillis() - 6_000);
+        assertThat(downloads.before(pageStart(page, 7))).as("in a document the user's click started, without an activation now")
+            .isPresent();
+        assertThat(downloads.before(pageStart(page, 8))).as("its second").isEmpty();
+    }
+
+    /**
+     * Ruling D47 (final review A's I2): an old download's own outcome is told though the 20-newest trim drops it from the
+     * list at that outcome: a failed one's "Download failed" and a completed one's "Download finished" and failed-mark
+     * warning each post once.
+     */
+    @Test void anOldDownloadsOwnOutcomeIsToldThoughTheTrimDropsIt() throws Exception {
+        make(MAC);
+        resolve();
+        Path a = downloads.before(start(null, 1, "old-a.pdf")).orElseThrow().file();
+        Path b = downloads.before(start(null, 2, "old-b.pdf")).orElseThrow().file();
+        update(running(1, 1, 10, a + ".crdownload"), () -> { });
+        update(running(2, 1, 10, b + ".crdownload"), () -> { });
+        for (int id = 3; id <= DownloadList.NEWEST + 2; id++) finished(id, "new-" + id + ".pdf");
+        assertThat(menu().stream().filter(line -> line.startsWith("entries:")).count()).as("both old ones run, with 20 newer")
+            .isEqualTo(DownloadList.NEWEST + 2);
+        update(interrupted(2), () -> { });
+        host.failMarks(new IOException("Operation not permitted"));
+        complete(1, a);
+        host.runBackground();
+        flush();
+        assertThat(menu()).as("each left the list at its outcome").noneMatch(line -> line.contains("old-"));
+        String failedB = GROUP + "|WARNING|Download failed for \u201Cold-b.pdf\u201D.|",
+            finishedA = GROUP + "|INFO|Download finished for \u201Cold-a.pdf\u201D.|",
+            unmarkedA = GROUP + "|WARNING|\u201Cold-a.pdf\u201D has no downloaded-file mark|Jasper could not mark it as downloaded from the "
+                + "internet, so the system may open it without checking it first: Operation not permitted. Open it from the file manager "
+                + "only if you trust it.";
+        assertThat(notices()).filteredOn(line -> line.contains("old-")).containsExactly(failedB, finishedA, unmarkedA);
+        assertThat(onUi(() -> host.notifications().posts().stream().filter(post -> post.line().contains("old-"))
+            .map(post -> post.count()).toList())).as("each once").containsExactly(1, 1, 1);
     }
 
     /** Review finding 6: a mark the background executor refuses still finishes the download, without Open on macOS. */

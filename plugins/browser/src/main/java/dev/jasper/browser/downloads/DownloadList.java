@@ -16,7 +16,8 @@ import java.util.regex.Pattern;
  * outcome, and its later updates are ignored. A completed download stays {@link State#RUNNING running} at 100% until
  * {@link #finish} says it has been marked. The list keeps the 20 newest downloads, and every running one however many;
  * an older one that is not running leaves it, as Remove from List would remove it, at each {@link #begin}, outcome and
- * finish (ruling F19), since a menu that long would not fit on the screen. UI thread.
+ * finish (ruling F19), since a menu that long would not fit on the screen. An outcome and a finish answer the download
+ * they made, which their own trim may have dropped, so it can still be told (ruling D47). UI thread.
  */
 public final class DownloadList {
     /** How many of the newest downloads the list keeps by their place in it, running or not; an older one stays only while it runs. */
@@ -35,6 +36,14 @@ public final class DownloadList {
         /** It was cancelled. */
         STOPPED
     }
+
+    /**
+     * A download's outcome, the first time it has one, and the download as that update left it.
+     *
+     * @param outcome how it ended
+     * @param download the download
+     */
+    public record Ended(Outcome outcome, Download download) { }
 
     /** A download and whether its outcome has been told. */
     private static final class Entry {
@@ -73,10 +82,10 @@ public final class DownloadList {
      *
      * @param key the download's key
      * @param progress Chromium's update
-     * @return the download's outcome, the first time it has one; empty for progress, for any update after the
-     *     outcome, and for a key the list does not hold
+     * @return the download's outcome, the first time it has one, with the download as it left it, which the list may
+     *     no longer hold; empty for progress, for any update after the outcome, and for a key the list does not hold
      */
-    public Optional<Outcome> update(DownloadKey key, DownloadProgress progress) {
+    public Optional<Ended> update(DownloadKey key, DownloadProgress progress) {
         Objects.requireNonNull(progress, "progress");
         Entry entry = entry(key).orElse(null);
         if (entry == null || entry.outcome != null) return Optional.empty();
@@ -112,13 +121,16 @@ public final class DownloadList {
      *
      * @param key the download's key
      * @param openable whether Open is offered: false when the downloaded-file mark failed on macOS or Windows (ruling F6)
+     * @return the finished download, which the list may no longer hold; empty when nothing was finished
      */
-    public void finish(DownloadKey key, boolean openable) {
+    public Optional<Download> finish(DownloadKey key, boolean openable) {
         Entry entry = entry(key).orElse(null);
-        if (entry == null || entry.outcome != Outcome.COMPLETED || entry.download.state() != State.RUNNING) return;
+        if (entry == null || entry.outcome != Outcome.COMPLETED || entry.download.state() != State.RUNNING) return Optional.empty();
         Download d = entry.download;
         entry.download = copy(d, d.name(), d.file(), State.FINISHED, d.received(), d.total(), openable);
+        Download finished = entry.download;
         trim();
+        return Optional.of(finished);
     }
 
     /**
@@ -145,11 +157,11 @@ public final class DownloadList {
         return entries.stream().map(entry -> entry.download).toList();
     }
 
-    private Optional<Outcome> told(Entry entry, Download download, Outcome outcome) {
+    private Optional<Ended> told(Entry entry, Download download, Outcome outcome) {
         entry.download = download;
         entry.outcome = outcome;
         trim();
-        return Optional.of(outcome);
+        return Optional.of(new Ended(outcome, download));
     }
 
     /** {@code d} with what an update or {@link #finish} changes; its serial, key and source stay. */
