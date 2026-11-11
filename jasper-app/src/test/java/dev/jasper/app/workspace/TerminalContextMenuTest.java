@@ -92,9 +92,9 @@ class TerminalContextMenuTest {
             model.addAction("dev.x.down", "Open URL in Split Down", null, List.of(), Optional.empty(), seen::add);
             model.addMenuSection(MenuTarget.terminalContext()).set(List.of(new MenuEntry.Item("dev.x.plain")));
             model.addMenuSection(MenuTarget.terminalContext()).set(List.of(new MenuEntry.WebAddressItem("dev.x.split"),
-                new MenuEntry.Submenu("More", List.of(new MenuEntry.WebAddressItem("dev.x.down")))));
+                new MenuEntry.Submenu("", "More", true, List.of(new MenuEntry.WebAddressItem("dev.x.down")))));
             model.addMenuSection(MenuTarget.terminalContext()).set(List.of(
-                new MenuEntry.Submenu("Later", List.of(new MenuEntry.WebAddressItem("dev.x.split")))));
+                new MenuEntry.Submenu("", "Later", true, List.of(new MenuEntry.WebAddressItem("dev.x.split")))));
         });
         pending.remove().run();
         until(() -> owner[0].currentPane().view() != null);

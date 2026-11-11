@@ -711,3 +711,251 @@ The user has no Windows or Linux host yet. Every line above waits for each of th
   its marker until a later start; while another program holds `browser.sqlite` after a marked clear, the next start
   runs history in memory with the "unavailable" notice, and the start after that deletes the file.
 - **Linux:** the camera through PipeWire or V4L2: Allow opens it.
+
+## Plan 7: downloads and page tools
+
+### Batch 1: the user's check on macOS (pending)
+
+- **How to run it:** with the user's OK for each batch, `./gradlew :jasper-app:run` from
+  `claude/browser-downloads-page-tools` (worktree `.claude/worktrees/browser-4b-4c-e6deab`), on JBR 25.0.4.1 b635.75
+  with JCEF. The lines about macOS's folder prompts need the packaged `Jasper.app` (`./gradlew :jasper-app:packageApp`,
+  without `-Pjasper.aot=true`), whose `Info.plist` has the usage descriptions
+  ([macOS Downloads, Desktop and Documents folders](packaging.md#macos-downloads-desktop-and-documents-folders)). A
+  killed transfer uses a local `python3 -m http.server`, and the proxy line a local proxy on port 8118 (`privoxy`, or
+  `mitmproxy -p 8118`). The network the lines use, which the user has accepted: a large file from the web, article
+  pages, sites with cookie banners, `github.com`, a site behind Cloudflare and a Save Page As… of a public page. Marks
+  are read with `xattr -p` only: this Mac's endpoint agent ends the whole process tree of an `xattr -w` that adds a
+  quarantine attribute (D17).
+- Each line is recorded pass or fail. Every line is pending.
+
+#### First: what only the GUI can show
+
+1. **A closed browser's download (F1, D25):** a page that starts a blob download and calls `window.close()` in the same
+   task ends with either a marked file in Downloads and its entry in the list, or no file and no entry; never an
+   unmarked file. CEF lets a closed browser's download finish. Pending.
+2. **The title during progress (F2, D11):** a running download's title reads "name — 42%", without `.crdownload` or
+   "Unconfirmed". Pending.
+3. **The open menu (F9, D13, D14):** with Downloads open on macOS's screen menu bar during a download, the title
+   counts up in place and Stop stays clickable; a download that finishes while it is open changes its entries once it
+   closes. Record whether Chromium's progress pauses while AppKit tracks the menu. Pending.
+4. **Quitting mid-download (F29):** no `.crdownload` file remains in the Downloads folder, and a download that finished
+   keeps its mark through Chromium's rename (`xattr -p com.apple.quarantine` on the file). Pending.
+
+#### The plan's checklist
+
+1. **The first download:** a large file goes to `~/Downloads` without asking. The Downloads menu appears with it, and
+   its title shows the progress. Pending.
+
+   From the task reviews:
+   - **Task 3 (F8, D4), the packaged app:** macOS's prompt for the Downloads folder comes at the first download, not at
+     the first tab, with "Jasper saves the files you download in the Browser here."; Allow lets downloads go; Deny makes
+     them fail with the notification (record the reason); `plutil -extract NSDownloadsFolderUsageDescription raw` on
+     the bundle shows the string. With the Downloads folder set to a folder inside `~/Documents`, and once inside
+     `~/Desktop`, the prompt comes at the first browser tab, with "Jasper saves files from the Browser here when you
+     choose this folder.".
+   - **D1, D20 and D46:** a page that downloads twice without a click downloads once and posts one "This site tried to
+     download multiple files" with its host; a click downloads again; a page that reloads itself without a click (a
+     meta refresh or `location.reload()`) and downloads at each load downloads once in all, with one notice; a link
+     clicked in the page to such a page allows one more; two file addresses typed into the address field one after the
+     other both download.
+   - **D22 (known gaps; record):** one click on a page that starts three downloads within 5 seconds; a click whose
+     download the server answers after more than 5 seconds, which counts as the page's one download without a click;
+     a click on a link whose page the server answers after more than 5 seconds, which allows no new download (D49).
+   - **D19 (known gap; record):** whether any download stays running with no progress, as one Chromium never updates
+     after it starts would.
+2. **The menu:** with the menu open during progress, Stop works. Then Open, Show in Finder, Remove from List and Clear
+   All. Pending.
+
+   From the task reviews (**Task 1b**):
+   - JBR shows an in-place text or enabled change on an open native menu;
+   - a menu opened from the keyboard (Ctrl+F2, then the arrows) holds structural changes too;
+   - while any Jasper menu is open, a plugin that registers or removes a placed action, such as Remote's Connect
+     appearing, leaves the open menu as it is, and the change shows once it closes; a placed action's enabled change
+     shows at once, the screen menu included.
+3. **Names:** the same file again gives `name (1).ext`. Pending.
+4. **The mark:** `xattr -p com.apple.quarantine` on the file shows Jasper's mark, `0081;<hex>;Jasper;<UUID>`, or
+   Chromium's own; record which (F35). A downloaded app is checked by Gatekeeper when opened. Pending.
+
+   From the task reviews:
+   - **Task 1c:** opening a downloaded `.command`, `.app` or `.jar` from Finder brings Gatekeeper's "downloaded from the
+     Internet" question; Jasper writes no QuarantineEventsV2 entry, so record whether it names the site.
+   - **Task 3 (F35, F7):** a /dev/null tab's download is marked, and its entry leaves the menu once the group's last tab
+     closes, while the file stays; a DevTools download (the Network panel's "Save all as HAR") lands in the list and
+     holds no page.
+5. **Notifications:** finished, and failed, by killing a local `python3 -m http.server` mid-transfer. A navigation
+   that turns into a download shows no error page. Pending.
+
+   From the task reviews (**Task 3**): Stop posts nothing.
+6. **Alt-click and Save Link As…:** Alt-click on a link loads it. Save Link As… asks in Jasper's chooser, and Cancel
+   downloads nothing. Pending.
+
+   From the task reviews (**Task 4**):
+   - Save Image As… asks in Jasper's chooser, and a `data:` image saves (D9); each chooser starts at the Downloads
+     folder and the file's name;
+   - Option-click loads in place; Cmd+Option-click still opens a new tab, Shift+Option-click does what Shift-click
+     does, and an Option-drag of a link still drags it; an Option-click made as the pointer reaches a link (D23, the
+     hover address's lag; record);
+   - Save Link As… on a link that redirects (an `http://` link to its `https://` file) asks once (F32), and a page that
+     starts its own download a few seconds after Save Link As… does not take the chooser;
+   - a tab closed after a cancelled Save Link As… chooser closes at once, and so does a tab closed while the chooser
+     shows, which cancels it (F1);
+   - D24: Save Link As… whose chooser is cancelled while another Save Link As… download waits for its chooser: the
+     other, once saved, is listed and marked;
+   - F28: a `target=_blank` link to a file, and a `window.open` of one, leave no empty tab, and the file downloads; a
+     file address typed into a new tab's address field keeps its tab; with a Downloads folder that cannot be used, the
+     empty tab closes and "Download failed" says why.
+7. **Closing and quitting:** closing the tab mid-download lets the file finish, with the page silent. Quitting
+   mid-download leaves no file under its name. Pending.
+
+   From the task reviews (**Task 4**):
+   - closing a tab mid-download keeps the entry, the page goes to `about:blank` at once, the file is marked, and the
+     held browser then closes; the same for a /dev/null tab that is its group's last;
+   - quitting with a closed tab's download still running stops it, leaves no partial file and does not hang.
+8. **The Downloads folder:** a custom folder works. One that cannot be created fails with the notification. Pending.
+
+   From the task reviews:
+   - **Task 2:** the Downloads folder row shows in Settings › Tools › Browser › General after Page zoom, with its
+     description, and `relative/dir` shows "Enter an absolute folder path, or leave it empty.";
+   - **Task 3:** a folder that is a file fails with "“PATH” is a file, not a folder.";
+   - a folder on another volume works.
+9. **Reader mode:** on an article, ☰ offers both items, and Reader Mode shows the article in Jasper's colours. Escape
+   and Exit Reader Mode end it, a navigation resets it, and `about:blank` offers nothing. Pending.
+
+   From the task reviews (**Task 5**):
+   - `jasper-about:` pages offer nothing; a single-page app's route change withdraws the offer and offers again about a
+     second after it settles; a background tab that loaded an article is offered once it shows; a /dev/null tab offers
+     and shows reader mode too;
+   - Trusted Types (D30): on a site that enforces them, reader mode is offered on most articles; only one that needs
+     Readability's second pass, or whose images sit in `noscript`, gives nothing;
+   - a site behind Cloudflare still passes its check (R7), and D10's known gap: a site's own "Just a moment…" page is
+     checked after its load ends (record);
+   - F11: reader mode on `github.com`, whose `style-src` is strict, shows styled;
+   - the article in a light and a dark theme, its scroll bars following; an RTL article shows right to left; none of
+     the page's scripts, frames or forms run or show in it; a site built of custom elements shows their text, and none
+     of its components run in the overlay;
+   - links: a link loads in the item and ends reader mode; a table-of-contents link scrolls the article to its heading,
+     the address and the page behind unchanged and the offer kept; after following a link out, Back shows the page
+     without the overlay;
+   - scrolling and keys: the wheel, the trackpad, the arrows, Space and Page Down scroll the overlay and not the page;
+     a site's own shortcuts (GitHub's `s`, `/`, `j` and `k`) do nothing behind it; Tab moves only among the overlay's
+     links, and clicks and typing reach nothing of the page; after the reader closes, the page is where it was and
+     scrolls again;
+   - focus: after choosing Reader Mode from ☰, the arrows and Space scroll the article at once; after Escape or Exit
+     Reader Mode, what had the focus has it again, and the page did not scroll;
+   - Escape: holding it, then releasing it, leaves nothing for the page to hear; pressing another key before releasing
+     it gives that key to the page; a page that stops Escape in a window capture listener of its own keeps the reader
+     open, and Exit Reader Mode closes it;
+   - Find (D31): with the reader showing, a query counts and highlights matches in the article only, yellow with the
+     current one orange, Next and Previous scroll the overlay and never the page, and a page's iframes count nothing;
+     a find open when Reader Mode opens is cleared, and Enter searches the article; after Escape or Exit Reader Mode it
+     is cleared again, and Enter searches the page;
+   - clicks (D32): on a page with a "click anywhere" popunder or document-level click analytics, clicks, double clicks
+     and right-clicks in the article do nothing on the page, while links, text selection and Jasper's right-click menu
+     still work;
+   - zoom (F25): the overlay follows the item's zoom and a 150% Page zoom;
+   - hash routing (D30, known gap): on a hash-routed app (`#/inbox` to `#/sent`), the first check's offer stays across
+     route changes, and Reader Mode reads the current view.
+10. **Distraction removal:** the crosshair and the red outline show. A click hides a cookie banner and its backdrop.
+    Escape ends it, and what was hidden stays hidden. Pending.
+
+    From the task reviews (**Task 6**):
+    - Exit Distraction Removal ends it too, and ☰'s label follows; a link, a reload or Back ends it, and ☰ shows
+      Remove Distractions again; after choosing it from ☰, Escape works without a click in the page;
+    - F11: on `github.com` the crosshair and the outline show;
+    - while it runs, a click on a link neither follows it nor runs the page's handler, a middle click opens no tab, a
+      double click selects no word, and a right-click shows Jasper's menu, whose Remove Element works;
+    - D34: Tab to a link and Enter hides nothing and follows nothing; a double click on a banner hides it once, and
+      nothing the second click lands on;
+    - Escape held: removal ends once, and the page hears neither the repeats nor the release; a later Escape reaches
+      the page;
+    - frames: on a site whose consent banner is an iframe, the pointer outlines the banner's holder, the crosshair shows
+      over the frame, and a click hides it; record what the outline and a click pick on a page with a full-width
+      embedded video;
+    - a cookie banner whose dimmer is appended at the end of the document is hidden with it;
+    - D35: after hiding a cookie wall that locked scrolling, the page scrolls, also after Escape, and hiding a small
+      banner leaves the page's overflow alone; record a wall whose page locks the body with `position: fixed`, a modal
+      `<dialog>` hidden by a click, and a page that locks `overflow-y` for its own layout, which scrolls after a hide
+      that covers the viewport (known gaps);
+    - Remove Distractions while Reader Mode shows closes the reader first, and Reader Mode while removal runs ends
+      removal and the crosshair;
+    - capture listeners (D29, known gap; record): on a test page whose capture listeners on `window`, added before
+      Jasper's scripts, log keys and clicks, they log both in reader mode and in distraction removal; in reader mode one
+      on `document` logs the article's clicks too.
+11. **Remove Element** hides a banner under the pointer, at 100% and 150% zoom. Pending.
+
+    From the task reviews (**Task 6**): also on an item reset to a 150% Page zoom (Page zoom 150, then Reset Font
+    Size, F25); on a `jasper-about:` page, such as the welcome page, the item is dimmed; over reader mode's article it
+    hides nothing.
+12. **Save Page As…:** it saves a folder named after the host, shown in Finder, whose `index.html` opens offline with
+    its images and styles. A read-only location shows "Save Failed". Pending.
+
+    From the task reviews (**Task 7**):
+    - offline, `srcset` and `<picture>` images, `@import`ed style sheets and web fonts show;
+    - F26 and D7: a second save of the same host offers `host (1)`; a page that navigates while the chooser is open
+      fails with "the page navigated away"; Save Page As… is dimmed on `jasper-about:welcome`;
+    - F13: after the save, `xattr -p com.apple.quarantine` on the folder's `index.html` and on a file in its
+      `resources/` shows the mark, which each took before its rename;
+    - F27: a page with a `Content-Security-Policy` meta element that limits images opens offline with its images, and a
+      page of more than 1 MiB of HTML saves whole;
+    - F12: a public page whose image is at a `192.168.x.x` address keeps that image's web address;
+    - D5 and D6: with the proxy on 8118, the save's fetches go through it; switching the proxy during a long save leaves
+      the resources not yet fetched at their web addresses, and the save finishes;
+    - the copy loads nothing: during a save, DevTools' Network panel shows no request to a `jasper-save-` address;
+    - a page with `<base href>` and with `&` in its addresses saves with working absolute links, and `#` links scroll
+      within the saved page;
+    - D36 and D42: a save while reader mode shows, and one while distraction removal outlines a banner, open without
+      the overlay, inert or locked scrolling, and without the red outline;
+    - D41: quitting during a long save ends without the 10 s stop warning and leaves no unmarked file.
+
+#### Lines the final review's fix wave added
+
+Each is pending.
+
+- **The folder prompt (D48):** in the packaged app, while macOS's prompt for the Downloads folder shows, record whether
+  Jasper's windows still answer the pointer and keys, as Jasper reads the folder for the download's name on Chromium's
+  thread.
+- **A held Escape on a page with its own handler (D47, D48):** on a page whose own Escape handler shows that it ran,
+  such as a test page that logs its keys, holding Escape closes reader mode, and in another run ends distraction
+  removal, and the page's handler hears no Escape until the key is released; the next Escape reaches it. Record, in
+  both, whether releasing Escape after Cmd+Tab has left Jasper keeps the page's next Escape from it (D49: until a
+  stop, the next start or the page going).
+- **A modal `<dialog>` over the reader (D48):** a page that opens a modal `<dialog>` with `showModal()` from a timer
+  while reader mode shows: record whether it shows over the article and takes keys and clicks, as only the page's body
+  is inert.
+- **Back to a cached page (D48):** Reader Mode on an article, a link out, then Back to the page restored from the
+  back-forward cache: record whether ☰ offers Reader Mode again.
+
+### Batch 2: start-up and memory (pending, F35)
+
+At the benchmark sitting, with the user's OK: the start-up and memory batch (`tools/benchmarks/run-macos.sh`), checking
+that the downloads made at the plugin's start cost nothing (F35, as plan 6's V4), with the reader check's parse at each
+load end on an article page (D30) and a large Save Page As… (a maximal save completes in a 320 MiB heap, or 512 MiB for
+HTML held as UTF-16, D43). Pending.
+
+### Plan 7 on Windows and Linux (not run)
+
+The user has no Windows or Linux host yet. Every line above waits for each of them too, with Ctrl in place of Cmd and
+Alt in place of Option; a window manager may take Alt with a drag.
+
+- **Windows:**
+  - `Get-Content <file> -Stream Zone.Identifier` shows `[ZoneTransfer]`, `ZoneId=3`, `ReferrerUrl` and `HostUrl`,
+    without user names and passwords, on a download and on a Save Page As… file; a /dev/null tab's download shows only
+    `ZoneId=3` and `HostUrl=about:internet` (F7);
+  - Show in Explorer selects the file (F31), also for a name with a comma and a space under a user folder with a space
+    (D21);
+  - a Downloads folder on a FAT32 or exFAT stick fails the mark with "This volume cannot keep a downloaded-file mark",
+    and the download has no Open (F33, F6);
+  - with Downloads moved to another drive (Downloads › Properties › Location), downloads go there after a restart;
+  - a deep custom folder keeps the path under `MAX_PATH` (F4), and a Downloads folder value ending in a space is
+    refused;
+  - a title growing while its popup is open ("9%" to "10%") may clip (F18); record it;
+  - a narrow window's More menu, opened and closed without entering a folded menu, lets a held change through
+    (Task 1b);
+  - distraction removal's crosshair shows.
+- **Linux:**
+  - with `XDG_DOWNLOAD_DIR="$HOME/Téléchargements"` in `~/.config/user-dirs.dirs`, and once with `XDG_CONFIG_HOME`
+    pointing elsewhere, downloads go to that folder after a restart;
+  - Show in Folder opens the file's folder, through `xdg-open` where AWT has no `Desktop`, and Open uses `xdg-open`
+    there (F31);
+  - Open still opens a file, as Linux has no mark (F6), and `getfattr -d <file>` shows no attribute Jasper added;
+  - the F18 clip line, the More menu line and the crosshair, as on Windows.

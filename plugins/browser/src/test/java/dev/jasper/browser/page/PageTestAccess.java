@@ -117,6 +117,38 @@ public final class PageTestAccess {
     }
 
     /**
+     * A frame of the page starts loading a document at {@code url}, as the client's load handler hands it to the page's
+     * frame scripts on Chromium's thread ({@link FrameScripts#loadStarting}), with no rule set active: a main frame's
+     * document is counted as Chromium's would be, its download allowance included (plan 7's D46). Any thread, as
+     * Chromium's.
+     *
+     * @param page a page
+     * @param mainFrame whether it is the page's main frame
+     * @param url the document's address
+     */
+    public static void frameStarts(Page page, boolean mainFrame, String url) {
+        var frame = (org.cef.browser.CefFrame) java.lang.reflect.Proxy.newProxyInstance(org.cef.browser.CefFrame.class.getClassLoader(),
+            new Class<?>[] {org.cef.browser.CefFrame.class}, (proxy, method, args) -> switch (method.getName()) {
+                case "isMain" -> mainFrame;
+                case "getURL" -> url;
+                case "executeJavaScript" -> null;
+                default -> throw new UnsupportedOperationException(method.getName());
+            });
+        FrameScripts.loadStarting(pageBrowser(page), frame, new FrameScripts.Hiding(java.util.Optional::empty));
+    }
+
+    /**
+     * The page gets a press or a key at {@code whenMillis}, as its canvas activates it: its user activation, which no
+     * download consumes. Any thread.
+     *
+     * @param page a page
+     * @param whenMillis when, in milliseconds since the epoch
+     */
+    public static void activate(Page page, long whenMillis) {
+        page.activation().activate(whenMillis);
+    }
+
+    /**
      * The page's main frame finished loading its document, as the client's load handler tells it. UI thread.
      *
      * @param page a page
@@ -193,6 +225,30 @@ public final class PageTestAccess {
      */
     public static void useReloader(Page page, java.util.function.Consumer<Page> reloader) {
         page.useReloader(reloader);
+    }
+
+    /**
+     * Has {@code page} run the scripts asked of it ({@link Page#run}) with {@code runner} from now on, which is told each
+     * script and the address it goes by: a test's recording one, as a page without Chromium runs nothing. UI thread.
+     *
+     * @param page a page
+     * @param runner told each script and its address
+     */
+    public static void useScriptRunner(Page page, java.util.function.BiConsumer<String, String> runner) {
+        page.useScriptRunner(runner);
+    }
+
+    /**
+     * Has {@code page} load {@code about:blank} in its browser with {@code blank}, and close its browser with
+     * {@code close}, from now on, each told the page: a test's recording ones, as a page without Chromium has no browser
+     * to load or close. UI thread.
+     *
+     * @param page a page
+     * @param blank told each {@code about:blank} load, as a held browser's
+     * @param close told each close of its browser
+     */
+    public static void useBrowserEnding(Page page, java.util.function.Consumer<Page> blank, java.util.function.Consumer<Page> close) {
+        page.useBrowserEnding(blank, close);
     }
 
     /**
@@ -294,6 +350,24 @@ public final class PageTestAccess {
      */
     public static DevTools devTools(Page page, java.awt.Point at) {
         return page.devTools(at);
+    }
+
+    /**
+     * The start the download handler reads as {@code page}'s own browser starts a download at {@code nowMillis}: its
+     * activation, read without consuming it, and the document its downloads count in, which a load Jasper starts for the
+     * user renews (plan 7's D1 and D20); no native call is made. Any thread, as Chromium's.
+     *
+     * @param page the page whose browser starts it
+     * @param browser the browser's identifier
+     * @param id Chromium's id for the download
+     * @param url the file's address
+     * @param suggestedName the suggested name
+     * @param pageUrl the address the page shows
+     * @param nowMillis the time now
+     * @return the start
+     */
+    public static DownloadStart downloadStart(Page page, int browser, int id, String url, String suggestedName, String pageUrl, long nowMillis) {
+        return PageDownloads.start(browser, pageUrl, java.util.Optional.of(page), page.inMemory(), id, url, suggestedName, nowMillis);
     }
 
     /**

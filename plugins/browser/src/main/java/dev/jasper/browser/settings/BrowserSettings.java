@@ -1,11 +1,13 @@
 package dev.jasper.browser.settings;
 
 import dev.jasper.browser.adblock.ListDownload;
+import dev.jasper.browser.downloads.DownloadFolder;
 import dev.jasper.browser.item.AddressInput;
 import dev.jasper.browser.item.SearchEngine;
 import dev.jasper.browser.item.Zoom;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.settings.Choice;
+import dev.jasper.sdk.settings.EditorHint;
 import dev.jasper.sdk.settings.PluginSettings;
 import dev.jasper.sdk.settings.Setting;
 import dev.jasper.sdk.settings.SettingKind;
@@ -53,10 +55,10 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
     public static final String WELCOME = "jasper-about:welcome";
     /** EasyList's content blocker list, the default filter list (spec section 12). */
     public static final String EASYLIST = "https://easylist-downloads.adblockplus.org/easylist_content_blocker.json";
-    static final String START_PAGE = "start_page", PAGE_ZOOM = "page_zoom", LINKS = "open_links_from_terminal",
-        LOCAL_FILES = "open_local_web_files", SEARCH_ENGINE = "search_engine", CUSTOM_SEARCH = "custom_search_url",
-        CUSTOM_SUGGESTIONS = "custom_suggestions_url", DEVNULL_MODE = "devnull_mode", AD_BLOCKING_ON = "ad_blocking",
-        FILTER_LIST_URL = "filter_list_url", HTTP_PROXY = "http_proxy", PROXY_HOST = "proxy_host",
+    static final String START_PAGE = "start_page", PAGE_ZOOM = "page_zoom", DOWNLOADS_FOLDER = "downloads_folder",
+        LINKS = "open_links_from_terminal", LOCAL_FILES = "open_local_web_files", SEARCH_ENGINE = "search_engine",
+        CUSTOM_SEARCH = "custom_search_url", CUSTOM_SUGGESTIONS = "custom_suggestions_url", DEVNULL_MODE = "devnull_mode",
+        AD_BLOCKING_ON = "ad_blocking", FILTER_LIST_URL = "filter_list_url", HTTP_PROXY = "http_proxy", PROXY_HOST = "proxy_host",
         PROXY_PORT = "proxy_port";
     static final String GENERAL = "General", LINK_OPENING = "Link Opening", SEARCH = "Search Engine", PRIVACY = "Privacy & Data",
         AD_BLOCKING = "Ad Blocking", PROXY = "Proxy";
@@ -66,6 +68,7 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
     // Ruling F10: the list's only integrity is TLS, so http only from this computer.
     private static final String NO_LIST_ADDRESS = "Enter an https address, or an http address on this computer.";
     private static final String NO_PROXY_HOST = "Enter a host name or IP address.";
+    private static final String NO_FOLDER = "Enter an absolute folder path, or leave it empty.";
     // A host name's label: letters, digits and inner hyphens, at most 63 characters (RFC 1123); an IPv4 address's part,
     // 0 to 255 with no leading zero; and what an IPv6 address is written with, which Inet6Address then reads.
     private static final Pattern LABEL = Pattern.compile("[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?");
@@ -139,13 +142,14 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
     }
 
     /**
-     * Declares the Browser's settings, which Settings › Tools › Browser shows: Start page and Page zoom, a percent from 25
-     * to 500, under General, Open Links From Terminal and Open Local Web Files under Link Opening, then Default Search
-     * Engine, Custom Search URL and Custom Search Suggestions URL under Search Engine, each custom URL empty or an http or
-     * https address with {@code %s} in it, Use /dev/null mode under Privacy &amp; Data, Enable Ad Blocking and Filter
-     * List URL, an https address or an http one on this computer, under Ad Blocking, and Enable HTTP Proxy, Proxy Server,
-     * a host name or an IP address, and Proxy Port, from 1 to 65535, under Proxy. Each is recorded under its section
-     * ({@link Declared#sections()}). UI thread, while the plugin starts.
+     * Declares the Browser's settings, which Settings › Tools › Browser shows: Start page, Page zoom, a percent from 25 to
+     * 500, and Downloads folder, empty for the system's Downloads folder, {@code ~}, {@code ~/folder} or an absolute
+     * folder ({@link DownloadFolder#valid(String)}), under General, Open Links From Terminal and Open Local Web Files
+     * under Link Opening, then Default Search Engine, Custom Search URL and Custom Search Suggestions URL under Search
+     * Engine, each custom URL empty or an http or https address with {@code %s} in it, Use /dev/null mode under Privacy
+     * &amp; Data, Enable Ad Blocking and Filter List URL, an https address or an http one on this computer, under Ad
+     * Blocking, and Enable HTTP Proxy, Proxy Server, a host name or an IP address, and Proxy Port, from 1 to 65535, under
+     * Proxy. Each is recorded under its section ({@link Declared#sections()}). UI thread, while the plugin starts.
      *
      * @param plugin the plugin's settings
      * @return the declared settings, which read the current values
@@ -162,6 +166,11 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
             .description("The zoom web pages show at until you zoom them, and that Reset Font Size returns a page to. Increase "
                 + "and Decrease Font Size zoom a page in steps of 5%, and Jasper keeps that zoom with the page.")
             .keywords("zoom", "scale", "magnify", "size", "font size", "browser"));
+        Setting<String> downloadsFolder = settings.declare(SettingSpec.of(DOWNLOADS_FOLDER,
+                SettingKind.text(DownloadFolder::valid, NO_FOLDER), "")
+            .label("Downloads folder").section(GENERAL).editor(EditorHint.directory())
+            .description("Where downloaded files go, without asking. Empty uses the system's Downloads folder.")
+            .keywords("downloads", "download", "folder", "save", "directory", "browser"));
         Setting<LinkOpening> links = settings.declare(SettingSpec.of(LINKS, SettingKind.choice(List.of(
                 choice(LinkOpening.ASK), choice(LinkOpening.BUILT_IN), choice(LinkOpening.DEFAULT_BROWSER))), LinkOpening.ASK)
             .label("Open Links From Terminal").section(LINK_OPENING)
@@ -218,8 +227,8 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
             .label("Proxy Port").section(PROXY)
             .description("The proxy server's port, from 1 to 65535.")
             .keywords("proxy", "port", "network"));
-        return new Declared(startPage, pageZoom, links, localFiles, engine, customSearch, customSuggestions, devNull, adBlocking, filterList,
-            proxy, proxyHost, proxyPort, settings.sections());
+        return new Declared(startPage, pageZoom, downloadsFolder, links, localFiles, engine, customSearch, customSuggestions, devNull, adBlocking,
+            filterList, proxy, proxyHost, proxyPort, settings.sections());
     }
 
     /** Declares each setting in the plugin's settings and records it under its section, one of {@link #SECTIONS}. */
@@ -301,6 +310,7 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
     public static final class Declared {
         private final Setting<String> startPage;
         private final Setting<Integer> pageZoom;
+        private final Setting<String> downloadsFolder;
         private final Setting<LinkOpening> links;
         private final Setting<LocalFileOpening> localFiles;
         private final Setting<SearchEngine> engine;
@@ -310,13 +320,14 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
         private final Setting<Integer> proxyPort;
         private final List<Section> sections;
 
-        private Declared(Setting<String> startPage, Setting<Integer> pageZoom, Setting<LinkOpening> links,
+        private Declared(Setting<String> startPage, Setting<Integer> pageZoom, Setting<String> downloadsFolder, Setting<LinkOpening> links,
                          Setting<LocalFileOpening> localFiles, Setting<SearchEngine> engine, Setting<String> customSearch,
                          Setting<String> customSuggestions, Setting<Boolean> devNull, Setting<Boolean> adBlocking, Setting<String> filterList,
                          Setting<Boolean> proxy, Setting<String> proxyHost, Setting<Integer> proxyPort,
                          List<Section> sections) {
             this.startPage = startPage;
             this.pageZoom = pageZoom;
+            this.downloadsFolder = downloadsFolder;
             this.links = links;
             this.localFiles = localFiles;
             this.engine = engine;
@@ -339,6 +350,16 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
          */
         public List<Section> sections() {
             return sections;
+        }
+
+        /**
+         * Downloads folder, as typed: empty for the system's Downloads folder, {@code ~}, {@code ~/folder} or an absolute
+         * folder, which {@link DownloadFolder#resolve} reads.
+         *
+         * @return the setting
+         */
+        public Setting<String> downloadsFolder() {
+            return downloadsFolder;
         }
 
         /**

@@ -122,8 +122,8 @@ class WindowChromeContributionsTest {
             ActionEntry run = model.addAction("dev.x.run", "Run Tool", null, List.of(), Optional.empty(), seen::add);
             MenuSection view = model.addMenuSection(MenuTarget.standard(MenuTarget.Slot.VIEW));
             view.set(List.of(new MenuEntry.Item("dev.x.run"), new MenuEntry.Separator(),
-                new MenuEntry.Submenu("More", List.of(new MenuEntry.Item("dev.x.run"))),
-                new MenuEntry.Submenu("Empty", List.of(new MenuEntry.Item("dev.x.gone")))));
+                new MenuEntry.Submenu("", "More", true, List.of(new MenuEntry.Item("dev.x.run"))),
+                new MenuEntry.Submenu("", "Empty", true, List.of(new MenuEntry.Item("dev.x.gone")))));
             MenuSection top = model.addMenuSection(MenuTarget.topLevel("dev.x.menu", "Tool"));
             top.set(List.of(new MenuEntry.Item("dev.x.run")));
             model.addMenuSection(MenuTarget.terminalContext()).set(List.of(new MenuEntry.Item("dev.x.run")));

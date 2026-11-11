@@ -10,7 +10,8 @@ import java.util.regex.Pattern;
 /**
  * What Jasper's own {@code jasper-about:} pages share (spec section 14): the workspace theme's colours as CSS custom
  * properties, text escaped for HTML and cut to a length, and the random tokens by which an item knows its own pages and
- * {@link AboutPages} its scripts. The {@code item} package's error and source pages use it too.
+ * {@link AboutPages} its scripts. The {@code item} package's error and source pages, and its reader overlay's CSS, use it
+ * too.
  */
 public final class PageHtml {
     private static final Pattern TOKENS = Pattern.compile("[0-9a-f]{32}");
@@ -28,8 +29,21 @@ public final class PageHtml {
      * @return the rule, one property to a line
      */
     public static String colours(WorkspacePalette palette) {
+        return colours(palette, ":root");
+    }
+
+    /**
+     * The theme's colours as a CSS rule that sets them on what {@code selector} selects, as {@link #colours(WorkspacePalette)}
+     * sets them on the document: inside a shadow root, which {@code :root} does not reach, the element that holds the
+     * rest, as the {@code tools} package's reader overlay does.
+     *
+     * @param palette the workspace palette
+     * @param selector the selector, which Jasper wrote
+     * @return the rule, one property to a line
+     */
+    public static String colours(WorkspacePalette palette, String selector) {
         return """
-            :root {
+            %s {
               --background: %s;
               --card: %s;
               --text: %s;
@@ -38,7 +52,7 @@ public final class PageHtml {
               --accent: %s;
               --warning: %s;
               --error: %s;
-            }""".formatted(css(palette.background()), css(palette.surfaceRaised()), css(palette.text()), css(palette.textMuted()),
+            }""".formatted(selector, css(palette.background()), css(palette.surfaceRaised()), css(palette.text()), css(palette.textMuted()),
             css(palette.border()), css(palette.accent()), css(palette.warning()), css(palette.error()));
     }
 

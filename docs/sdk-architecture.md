@@ -167,7 +167,7 @@ checks the open context and the UI thread, enforces namespaces (ids start with `
 the plugin's own actions, contains callbacks, and writes the single application-wide `Contributions` model. Everything
 a plugin registered is removed, newest first, when it stops or fails to start. Each `WindowContent` connects to the
 model once: `WindowContributions` turns every contributed action into a Swing `Action` in the window's
-`CommandRegistry` (so each is also a command palette command), and the window's chrome and status bar rebuild only their plugin sections when the model changes. Every window takes the actions, the menus, the palette scopes, the panels and the status entries. Workspace code never sees an SDK type.
+`CommandRegistry` (so each is also a command palette command), and the window's chrome and status bar rebuild only their plugin sections when the model changes. A plugin's menu entries (`PluginMenu.addEntries`) are snapshotted with keys, so a change of their labels and enabled states alone updates a window's built items in place; a menu bar rebuild waits while one of the window's menus is open. Every window takes the actions, the menus, the palette scopes, the panels and the status entries. Workspace code never sees an SDK type.
 
 A toolbar view (`ToolbarItem.View`) is built by the plugin's factory, inside containment, each time a window opens. `ToolbarViewAdmission` admits only an INLINE `Stack` of LABEL `Text`, DROPDOWN,
 SEARCHABLE or PICKER `Choice`, at most one PRIMARY `Button`, icon-only GHOST `Button`s (a blank label), `MenuButton`s
@@ -340,6 +340,12 @@ does. The testkit's `FakePluginHost.setTerminalTypography` mirrors it, and share
 `Platform.copyOnSelect()` reads `PluginHost.copyOnSelect`, a volatile field, so any thread can read it;
 `JasperApplication` passes `terminal.copy_on_select` to `PluginRuntime.copyOnSelect` before plugins start and with
 every configuration snapshot.
+`Platform.downloadsFolder()` returns `platform.DownloadsFolder.current()`, found once per process at the first call
+(the only one that reads `user-dirs.dirs` or calls `SHGetKnownFolderPath`) by the pure `DownloadsFolder.of`.
+`Platform.markDownloaded` refuses the UI thread and runs `platform.DownloadMark.apply` on the caller's thread: on macOS
+one `setxattr` of `com.apple.quarantine` through JNA with `XATTR_NOFOLLOW | XATTR_CREATE`, so a mark already there
+stays; on Windows the `Zone.Identifier` stream through `UserDefinedFileAttributeView`, written only when the file has
+no non-empty one. The testkit's `FakePluginHost` records marks instead of writing them.
 
 `Appearance.presentation()` returns one immutable `Presentation` per run, read from any thread.
 `PluginRuntime.presentation(Kit, PluginLook, DefaultSource)` hands the host the installed kit, the presentation's

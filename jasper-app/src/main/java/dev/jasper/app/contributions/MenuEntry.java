@@ -3,10 +3,11 @@ package dev.jasper.app.contributions;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 /** One immutable node of a contributed menu section. */
-public sealed interface MenuEntry permits MenuEntry.Item, MenuEntry.WebAddressItem, MenuEntry.Separator, MenuEntry.Submenu {
+public sealed interface MenuEntry permits MenuEntry.Item, MenuEntry.WebAddressItem, MenuEntry.Separator, MenuEntry.Submenu, MenuEntry.Command {
     /** A contributed action. */
     record Item(String actionId) implements MenuEntry { }
 
@@ -37,8 +38,41 @@ public sealed interface MenuEntry permits MenuEntry.Item, MenuEntry.WebAddressIt
     /** A separator. */
     record Separator() implements MenuEntry { }
 
-    /** A nested menu. */
-    record Submenu(String title, List<MenuEntry> entries) implements MenuEntry {
-        public Submenu { entries = List.copyOf(entries); }
+    /**
+     * A nested menu.
+     *
+     * @param key empty for a submenu of actions; for a submenu of a plugin's menu entries ({@code PluginMenu.addEntries};
+     *     browser plan 7 Task 1b), a key, not blank, that no other entry a window shows has, by which the window keeps the
+     *     menu it built across a change of its title or enabled state
+     * @param title its title, plain text
+     * @param enabled false shows it disabled, and it does not open; a submenu of actions is enabled
+     * @param entries its entries
+     */
+    record Submenu(String key, String title, boolean enabled, List<MenuEntry> entries) implements MenuEntry {
+        public Submenu {
+            Objects.requireNonNull(key, "key");
+            if (!key.isEmpty() && key.isBlank()) throw new IllegalArgumentException("A submenu of menu entries needs a key");
+            Objects.requireNonNull(title, "title");
+            entries = List.copyOf(entries);
+        }
+    }
+
+    /**
+     * A plugin's menu entry that is not an action ({@code PluginMenu.addEntries}; browser plan 7 Task 1b): never in the
+     * palette or the keymap, and it shows no key.
+     *
+     * @param key a key, not blank, that no other entry a window shows has, by which the window keeps the item it built
+     *     across a change of its label or enabled state; the item runs the newest {@code chosen} for it
+     * @param label its label, plain text
+     * @param enabled false shows it disabled, and choosing it does nothing
+     * @param chosen what choosing it runs, the plugin's code contained
+     */
+    record Command(String key, String label, boolean enabled, Runnable chosen) implements MenuEntry {
+        public Command {
+            Objects.requireNonNull(key, "key");
+            if (key.isBlank()) throw new IllegalArgumentException("A menu entry needs a key");
+            Objects.requireNonNull(label, "label");
+            Objects.requireNonNull(chosen, "chosen");
+        }
     }
 }

@@ -7,7 +7,7 @@ code, and must return promptly. Slow work goes to the plugin's background execut
 thread before they touch the SDK.</p>
 
 <h3>The UI thread rule</h3>
-<p>Registering anything (actions, menus, toolbar and status items, tool windows, content tabs, split items, restorers, palette scopes, file sources,
+<p>Registering anything (actions, menus and their entries, toolbar and status items, tool windows, content tabs, split items, restorers, palette scopes, file sources,
 subcommands, event subscriptions, services), creating and updating views, and every query or command on
 {@link Terminals} and its handles must happen on the UI thread. A call from another thread throws
 {@code IllegalStateException}: "<i>what</i> must be called on the UI thread: <i>plugin id</i>", or "Kit requires EDT" from the
@@ -28,11 +28,14 @@ listed per type in the API reference; the main ones:</p>
 <tr><td>{@link CommandCall#out(String)}, {@link CommandCall#err(String)}</td><td>Write to the caller's terminal while the call runs.</td></tr>
 <tr><td>{@link Platform#openInEditor(Path)}, {@link Platform#browse(URI)}, {@link Platform#openInBrowser(URI)}</td><td>They do their work in the background.</td></tr>
 <tr><td>{@link Platform#copyOnSelect()}</td><td>The user's Copy on select setting; a change applies from the next read.</td></tr>
+<tr><td>{@link Platform#downloadsFolder()}</td><td>Found once, at the first call; reading it creates nothing.</td></tr>
 <tr><td>{@link Appearance#variant()}, {@link Appearance#workspaceVariant()}</td><td>Whether the chrome or the workspace is dark or light.</td></tr>
 <tr><td>{@link Appearance#presentation()}</td><td>The look Jasper runs with, the same value until it restarts.</td></tr>
 <tr><td>{@link Appearance#terminalTypography()}</td><td>The saved terminal font; it already returns a new value when its change handlers run.</td></tr>
 </tbody>
 </table>
+<p>{@link Platform#markDownloaded(Path,URI,Optional)} is the opposite: it does file work, so on the UI thread it throws
+{@code IllegalStateException}. Call it from the plugin's background executor.</p>
 <p>A few callbacks run off the UI thread, and must not touch Swing or UI-thread-only SDK methods:</p>
 <ul>
 <li>{@link FileBrowser}'s methods run on one of Jasper's worker threads, one call at a time, and may block.</li>
@@ -69,7 +72,7 @@ needs the UI thread, such as updating a view or a status item, does need it.</p>
 
 <h3>Subscriptions and lifetimes</h3>
 <p>Most registrations return a {@link Subscription}, or a handle that is one: {@link PluginAction}, {@link PluginMenu},
-{@link StatusItem}, {@link StatusProgress}, {@link UiView}, {@link UiAnchor}, {@link PluginPopover} and every dialog
+{@link MenuEntries}, {@link StatusItem}, {@link StatusProgress}, {@link UiView}, {@link UiAnchor}, {@link PluginPopover} and every dialog
 ({@link WindowSurface}). Closing it ends that one registration. Declared settings, a settings page, published
 services and notification groups are not; they last until the plugin stops. A {@link ContentTab} closes, without
 asking, with {@link ContentTab#close()} or when the plugin stops. A plugin rarely needs to close anything: when it stops, Jasper

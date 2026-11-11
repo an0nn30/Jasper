@@ -332,6 +332,52 @@ class PageFindTest {
         assertThat(find.result()).isEmpty();
     }
 
+    /**
+     * D31: while reader mode shows, a search reaches the page's top frame alone, whose reader overlay holds the article,
+     * and none of the frames behind it; the frames an earlier search reached clear their highlights. Afterwards a search
+     * reaches every frame again.
+     */
+    @Test void aSearchReachesTheTopFrameAloneWhileAsked() {
+        boolean[] reading = {true};
+        find.searchTopFrameOnly(() -> reading[0]);
+        find.find("needle", false, false);
+        assertThat(ran).extracting(each -> each.substring(0, each.indexOf(' '))).containsExactly("main");
+        long search = search(0);
+        find.answered("ad", search, 7, false);
+        find.answered("main", search, 2, false);
+        assertThat(find.result()).as("only the frame it reached counts").hasValue(new Result(2, 1, false));
+        reading[0] = false;
+        ran.clear();
+        find.find("needle", false, false);
+        assertThat(ran).extracting(each -> each.substring(0, each.indexOf(' '))).containsExactly("main", "ad", "chat");
+        settle(1, 1, 1);
+        reading[0] = true;
+        ran.clear();
+        find.find("needle", false, false);
+        assertThat(ran).containsExactly("ad {\"action\":\"clear\"}", "chat {\"action\":\"clear\"}",
+            "main " + ran.get(2).substring("main ".length()));
+        assertThat(command(ran.get(2))).containsEntry("action", "search");
+    }
+
+    /**
+     * D31: reader mode opening or closing restarts the find: every frame the search reached clears its highlights, the
+     * search ends, and the bar hears of it, so its next search reaches what then shows. Without a search, nothing.
+     */
+    @Test void aRestartClearsEveryFrameEndsTheSearchAndTellsTheBar() {
+        var told = new AtomicInteger();
+        find.onChange(told::incrementAndGet);
+        find.restart();
+        assertThat(ran).isEmpty();
+        assertThat(told).hasValue(0);
+        settle(2, 0, 1);
+        ran.clear();
+        find.restart();
+        assertThat(ran).containsExactly("main {\"action\":\"clear\"}", "ad {\"action\":\"clear\"}", "chat {\"action\":\"clear\"}");
+        assertThat(find.result()).isEmpty();
+        assertThat(told).hasValue(1);
+        assertThat(find.next()).as("no search to step").isEqualTo(new Result(0, 0, false));
+    }
+
     /** A search whose frames answered {@code counts}, in the order {@link #frames} lists them. */
     private void settle(int... counts) {
         find.find("needle", false, false);

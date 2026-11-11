@@ -61,7 +61,8 @@ class BrowserSettingsPanelTest {
             assertThat(page.role()).isEqualTo(Nodes.LayoutRole.SETTINGS_PAGE);
             assertThat(page.children()).extracting(node -> ((Nodes.Section) node).title())
                 .containsExactly("General", "Link Opening", "Search Engine", "Privacy & Data", "Ad Blocking", "Proxy");
-            assertThat(rows(view, "browser.settings.general")).containsExactly("settings:start_page:row", "settings:page_zoom:row");
+            assertThat(rows(view, "browser.settings.general")).containsExactly("settings:start_page:row", "settings:page_zoom:row",
+                "settings:downloads_folder:row");
             assertThat(rows(view, "browser.settings.link-opening"))
                 .containsExactly("settings:open_links_from_terminal:row", "settings:open_local_web_files:row");
             assertThat(rows(view, "browser.settings.search-engine"))

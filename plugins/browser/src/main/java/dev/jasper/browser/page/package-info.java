@@ -59,7 +59,22 @@
  * handlers and message router, which refuse every navigation but the shell's first load, every request off the
  * preview's origin, popups, dialogs, the right-click menu and the camera and microphone, and its Find runs
  * {@code find.js} too.
- * {@link dev.jasper.browser.page.LastPress}, {@code Favicons}, {@code Page}'s methods and {@code PreviewPage}'s name no
- * Chromium type, and none of these classes loads until a browser item opens or a Markdown preview is made.
+ * {@link dev.jasper.browser.page.PageDownloads} is the client's one download handler: it hands the {@code downloads}
+ * package each download Chromium starts as a {@link dev.jasper.browser.page.DownloadStart}, and continues it into the
+ * {@link dev.jasper.browser.page.DownloadTarget} the answer names or refuses it, and each update as a
+ * {@link dev.jasper.browser.page.DownloadProgress}, in plain values; the preview client has none, so CEF cancels a
+ * preview's downloads. The right-click menu's Save Link As… and Save Image As… start a download that asks where it goes
+ * ({@code DownloadAsk}), and a page that closes keeps its browser while its downloads run, as its close hold says
+ * ({@link dev.jasper.browser.page.Page#setCloseHold}). A page's {@link dev.jasper.browser.page.PageContext} tells as its
+ * group's store closes it, so the Downloads menu forgets a /dev/null group's downloads.
+ * For the {@code tools} package, a page runs a script in its top frame ({@link dev.jasper.browser.page.Page#run}), but
+ * never in a challenge provider's, tells each main-frame load end ({@link dev.jasper.browser.page.Page#onLoadEnd}),
+ * hands on the reports its tools' scripts send through the {@code links} package's opener bridge
+ * ({@link dev.jasper.browser.page.Page#onToolReport}), Save Page As's parts among them, and counts its documents
+ * ({@link dev.jasper.browser.page.Page#document}), which tells Save Page As whether the page navigated meanwhile; the
+ * right-click menu's Save Page As… is its item's, through the menu place.
+ * {@link dev.jasper.browser.page.LastPress}, {@code Favicons}, {@code DownloadStart}, {@code DownloadTarget},
+ * {@code DownloadProgress}, {@code Page}'s methods and {@code PreviewPage}'s name no Chromium type, and none of these
+ * classes loads until a browser item opens or a Markdown preview is made.
  */
 package dev.jasper.browser.page;

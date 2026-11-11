@@ -6,9 +6,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Which addresses a page's links open (4a's R36), and which a page may open with Jasper's rights: the {@code links}
- * package's links, popups and opener bridge, the page's DevTools' links and its right-click menu ask here. It names no
- * Chromium type.
+ * Which addresses a page's links open (4a's R36), which a page may open with Jasper's rights, and which its right-click
+ * menu's Save Link As… and Save Image As… download: the {@code links} package's links, popups and opener bridge, the
+ * page's DevTools' links and its right-click menu ask here. It names no Chromium type.
  */
 public final class LinkSchemes {
     /** The schemes the address field loads, in lower case: the only ones a page's links and popups open. */
@@ -44,6 +44,24 @@ public final class LinkSchemes {
             case "http", "https" -> true;
             case "about" -> BLANK.matcher(url).matches();
             case "file", "jasper-about" -> scheme.equals(scheme(sender));
+            default -> false;
+        };
+    }
+
+    /**
+     * Whether Save Link As… or Save Image As… in a frame at {@code sender} downloads {@code url} (plan 7's F10 and D9): an
+     * {@code http} or {@code https} address the frame could open itself ({@link #opensFrom}), or a {@code data:} address,
+     * which {@code opensFrom} refuses; nothing else. They download with Jasper's rights, so a page cannot have Jasper copy
+     * a local file, one of Jasper's own pages or a {@code blob:} into the Downloads folder.
+     *
+     * @param sender the address of the page or frame the menu is over
+     * @param url the link's or the image's address
+     * @return whether it may be saved; false for a null {@code url}
+     */
+    static boolean saves(String sender, String url) {
+        return switch (scheme(url)) {
+            case "http", "https" -> opensFrom(sender, url);
+            case "data" -> true;
             default -> false;
         };
     }

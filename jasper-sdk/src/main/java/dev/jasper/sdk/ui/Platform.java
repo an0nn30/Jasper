@@ -1,6 +1,7 @@
 package dev.jasper.sdk.ui;
 
 import dev.jasper.sdk.Subscription;
+import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.Optional;
@@ -141,6 +142,48 @@ public interface Platform {
      */
     default boolean copyOnSelect() {
         throw new UnsupportedOperationException("The Copy on select setting is unavailable");
+    }
+
+    /**
+     * The system's Downloads folder, where the user expects downloaded files: on macOS {@code ~/Downloads}; on Windows
+     * the Downloads known folder, else {@code %USERPROFILE%\Downloads}; on Linux {@code XDG_DOWNLOAD_DIR} from
+     * {@code user-dirs.dirs} in {@code $XDG_CONFIG_HOME} ({@code ~/.config} by default), with {@code $HOME} expanded,
+     * else {@code ~/Downloads}. Jasper finds it at the first call and gives the same folder until it restarts. The folder
+     * may not exist yet: reading it creates nothing, so a plugin that saves there creates it first. Callable from any
+     * thread; only the first call reads the system's settings, which may block while it does, and a call made meanwhile
+     * waits for it, so a plugin makes its first call off the UI thread.
+     *
+     * @return the folder, an absolute path
+     * @throws UnsupportedOperationException if the host predates this query
+     * @since 0.31.0
+     */
+    default Path downloadsFolder() {
+        throw new UnsupportedOperationException("The Downloads folder is unavailable");
+    }
+
+    /**
+     * Gives a file the plugin downloaded the system's downloaded-file mark, which the system checks before the file is
+     * opened or run: on macOS the quarantine attribute ({@code com.apple.quarantine}) that Gatekeeper reads; on Windows
+     * the {@code Zone.Identifier} stream (the mark of the web) that SmartScreen and Office read, naming {@code referrer},
+     * when there is one, and {@code source}. Linux has no such mark, so nothing is written there. A mark the file already
+     * has is kept. An address is written without its user name and password, and one that is not {@code http} or
+     * {@code https}, such as a {@code data:} address, as {@code about:internet}; {@code about:internet} with no referrer
+     * keeps no address at all, for a download whose addresses must not be stored. It does file work, so call it off the
+     * UI thread; on the UI thread it throws {@code IllegalStateException}.
+     *
+     * @param file the downloaded file
+     * @param source the address the file came from
+     * @param referrer the page that led to it, if any
+     * @throws java.nio.file.NoSuchFileException when the file does not exist
+     * @throws IOException when the mark cannot be written, with the system's reason, such as on a Windows volume
+     *     without streams (FAT32, exFAT): "This volume cannot keep a downloaded-file mark"
+     * @throws IllegalStateException on the UI thread
+     * @throws NullPointerException when an argument is null
+     * @throws UnsupportedOperationException if the host predates this call
+     * @since 0.31.0
+     */
+    default void markDownloaded(Path file, URI source, Optional<URI> referrer) throws IOException {
+        throw new UnsupportedOperationException("Marking downloaded files is unavailable");
     }
 
     /**

@@ -21,6 +21,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntConsumer;
@@ -41,6 +42,14 @@ import org.cef.browser.CefRequestContext;
  * Its browser is made in its browsing group's {@link PageContext}: Chromium's global context, or a /dev/null group's
  * own in memory. Every method runs on the UI thread, and so does every callback it makes, except where a method says
  * otherwise. This is the one class that makes a {@link PageView}: the page's, and each of its DevTools'.
+ *
+ * <p><b>Downloads.</b> Save Link As… and Save Image As… have the page's next download of their address ask where it
+ * goes ({@link #askNextDownload}, {@link DownloadAsk}) and start it ({@link #startDownload}). A page closes at once but
+ * for its browser, which its close hold keeps while one of its downloads runs ({@link #setCloseHold}, plan 7's F1): it
+ * loads {@code about:blank} meanwhile, ending the page's scripts and sound but not its downloads, and closes once they
+ * end; {@link PageDownloadState} holds the ask, the start and the hold. Its item hears when its first navigation
+ * becomes a download ({@link #onFirstNavigationDownload}, F28), and its downloads when a save chooser for it is
+ * cancelled ({@link #onSaveCancelled}, F1.3).
  */
 public final class Page implements AutoCloseable {
     /** The longest {@link #source} waits for Chromium's HTML. */
@@ -99,6 +108,13 @@ public final class Page implements AutoCloseable {
     private String refusedUrl;
     private BiFunction<String, TabPlacement, Optional<Page>> opener = (url, placement) -> Optional.empty();
     private Runnable itemCloser = () -> { }, itemShower = () -> { };
+    // Plan 7: told when the page's first navigation became a download (F28), its item's; and when a save chooser for the
+    // page was cancelled (F1.3), its downloads', kept after the close, as a closing tab cancels the chooser it shows.
+    private Runnable firstNavigationDownload = () -> { }, saveCancelled = () -> { };
+    // Plan 7: the page's own part of its downloads: its ask, how they start, its close hold and its browser's ends.
+    private final PageDownloadState downloadState = new PageDownloadState();
+    // Plan 7: what the page gives the tools: their scripts, its load ends, their reports and its find's top frame.
+    private final PageToolHooks toolHooks = new PageToolHooks(this);
     // Where the page's dialogs and file choosers show, and where its right-click menu shows; its item gives them.
     private DialogPlace dialogPlace;
     private MenuPlace menuPlace;
@@ -283,6 +299,49 @@ public final class Page implements AutoCloseable {
         return context.inMemory();
     }
 
+    /**
+     * The request context of the page's browsing group, which says whether it keeps its data in memory and tells as its
+     * group's store closes it ({@link PageContext#onClosed}). Any thread.
+     *
+     * @return the context the page's browser is made in
+     */
+    public PageContext context() {
+        return context;
+    }
+
+    /**
+     * The allowance a download the page starts counts in, for the one download an allowance may start without a user
+     * activation (plan 7's D1): it changes with each load Jasper starts for the user ({@link #load}, D20) and with each
+     * main-frame document that starts while the page has a user activation ({@link #documentStarting}, D46), and only
+     * grows. Read on Chromium's thread.
+     *
+     * @return the allowance's number
+     */
+    long downloadDocument() {
+        return downloadState.allowance();
+    }
+
+    /**
+     * The page's main frame starts loading a document at {@code nowMillis} (plan 7's D46): one that starts while the page
+     * has a user activation, as a click on a link starts it, gives its downloads a fresh allowance; one the page starts
+     * by itself, as a meta refresh, {@code location.reload()} or a {@code location.href} without a gesture starts it,
+     * keeps the count, as Chrome keeps its limiter's state. Chromium's thread.
+     *
+     * @param nowMillis the time now, for the page's activation, which this reads without consuming it
+     */
+    void documentStarting(long nowMillis) {
+        if (activation().active(nowMillis)) downloadState.renew();
+    }
+
+    /**
+     * The page's user activation, which its canvas keeps. Any thread.
+     *
+     * @return the activation
+     */
+    Activation activation() {
+        return view.activation();
+    }
+
     /** Chromium made the page's browser, whose identifier is {@code id}. Chromium's thread. */
     void browserMade(int id) {
         browserId = OptionalInt.of(id);
@@ -306,13 +365,16 @@ public final class Page implements AutoCloseable {
     }
 
     /**
-     * Loads {@code url}. Before the page has its browser, it is what the browser loads first.
+     * Loads {@code url}. Before the page has its browser, it is what the browser loads first. Only Jasper's own UI loads a
+     * page so, for the user, so the load gives the page a fresh download allowance (plan 7's D20).
      *
      * @param url the address
      */
     public void load(URI url) {
         Objects.requireNonNull(url, "url");
         if (closed) return;
+        // Plan 7's D20: a load Jasper starts for the user gives the page a fresh download allowance.
+        downloadState.renew();
         requested = url;
         address = url.toString();
         navigated();
@@ -651,9 +713,28 @@ public final class Page implements AutoCloseable {
     public PageFind find() {
         if (find == null) {
             find = PageFind.of(this);
+            toolHooks.searchedBy(find);
             if (closed) find.close();
         }
         return find;
+    }
+
+    /**
+     * Has the page's find search its top frame alone while {@code when} says so, as its item's reader mode asks while
+     * the article shows over the page ({@link PageFind#searchTopFrameOnly}). It replaces the one before.
+     *
+     * @param when read as each search starts, on the UI thread
+     */
+    public void findTopFrameOnly(BooleanSupplier when) {
+        toolHooks.topFrameOnly(when);
+    }
+
+    /**
+     * What the page shows to search has changed, as reader mode opened or closed: its find's search under way ends and
+     * its highlights go ({@link PageFind#restart}). Nothing before the find is made, or after {@link #close()}.
+     */
+    public void restartFind() {
+        if (!closed && find != null) find.restart();
     }
 
     /**
@@ -777,6 +858,60 @@ public final class Page implements AutoCloseable {
         Objects.requireNonNull(listener, "listener");
         loadStarts.add(listener);
         return () -> loadStarts.remove(listener);
+    }
+
+    /**
+     * Tells {@code listener} each time the page's main frame finishes loading its document, as Chromium reports the
+     * load's end ({@link #documentLoaded}).
+     *
+     * @param listener told on the UI thread
+     * @return the registration; the page's close ends it
+     */
+    public Subscription onLoadEnd(Runnable listener) {
+        Objects.requireNonNull(listener, "listener");
+        return closed ? () -> { } : toolHooks.onLoadEnd(listener);
+    }
+
+    /**
+     * Tells {@code listener} each report the {@code tools} package's scripts, such as {@code reader.js}, send through the
+     * {@code links} package's opener bridge from the page's top frame, as {@link #toolReported} hands them on. Any script
+     * of the page can send one, so each is untrusted.
+     *
+     * @param listener told the bridge op and the request as the page sent it, a JSON object, on the UI thread
+     * @return the registration; the page's close ends it
+     */
+    public Subscription onToolReport(BiConsumer<String, String> listener) {
+        Objects.requireNonNull(listener, "listener");
+        return closed ? () -> { } : toolHooks.onReport(listener);
+    }
+
+    /**
+     * The page's top frame sent a report of its tools through the opener bridge, which has checked only its op and
+     * length: those who asked {@link #onToolReport} are told. Nothing after {@link #close()}. UI thread.
+     *
+     * @param op the bridge op, such as {@code reader}
+     * @param json the request, as the page sent it
+     */
+    public void toolReported(String op, String json) {
+        Objects.requireNonNull(op, "op");
+        Objects.requireNonNull(json, "json");
+        if (!closed) toolHooks.reported(op, json);
+    }
+
+    /**
+     * Runs {@code script}, which Jasper wrote, in the document the page's main frame shows now, under the name
+     * {@code url} in the page's console and stack traces, then releases the frame: as the {@code tools} package's page
+     * scripts run. Nothing before the page's browser is ready, after {@link #close()}, or in a main frame at a challenge
+     * provider's address ({@link ChallengeFrames}) or on one of Jasper's own pages, which Jasper's page scripts stay out
+     * of.
+     *
+     * @param script the script
+     * @param url the address it goes by, such as {@code jasper-about:reader.js}
+     */
+    public void run(String script, String url) {
+        Objects.requireNonNull(script, "script");
+        Objects.requireNonNull(url, "url");
+        if (!closed) toolHooks.run(script, url);
     }
 
     /**
@@ -940,6 +1075,85 @@ public final class Page implements AutoCloseable {
     }
 
     /**
+     * Has the page's next download of {@code url} ask where it goes, in Jasper's save chooser, as Save Link As… and Save
+     * Image As… ask before they start it (spec section 10, ruling F32): the page's first start of that address within
+     * 10 s, or its first start of any within 1 s, as a redirect changes the address. Every other download goes into the
+     * Downloads folder without asking. Nothing after {@link #close()}.
+     *
+     * @param url the address about to be downloaded
+     */
+    public void askNextDownload(String url) {
+        Objects.requireNonNull(url, "url");
+        if (!closed) downloadState.askNext(url);
+    }
+
+    /**
+     * Has Chromium download {@code url} in the page's browser, as Save Link As… and Save Image As… do, so the download is
+     * the page's, in its browsing group. Nothing before the page has its browser or after {@link #close()}.
+     *
+     * @param url the address, as Chromium gave it
+     */
+    public void startDownload(String url) {
+        Objects.requireNonNull(url, "url");
+        if (!closed) downloadState.start(this, url);
+    }
+
+    /** Whether the page's next download asks where it goes, which the download handler takes. Any thread. */
+    DownloadAsk downloadAsk() {
+        return downloadState.ask();
+    }
+
+    /**
+     * Has {@code hold} decide when the page's browser closes (plan 7's F1): the page's close asks it first, before it
+     * does anything else, and closes the browser at once if the answer is complete; otherwise the browser loads
+     * {@code about:blank}, which ends the page's scripts and sound but not its downloads, and closes once the answer
+     * completes, normally or not, on the UI thread, once. A hold that throws closes the browser at once. Once Chromium
+     * has stopped, its own close has ended every browser, and a held one is not closed again. Give it before
+     * {@link #start}; it replaces the one before.
+     *
+     * @param hold given the page as it closes, answers when its browser may close, on any thread
+     */
+    public void setCloseHold(Function<Page, CompletableFuture<Void>> hold) {
+        downloadState.hold(hold);
+    }
+
+    /**
+     * Has {@code listener} told, on the UI thread, when the page's first main-frame navigation became a download, before
+     * the page committed any document (plan 7's F28): the page's item sets it, and closes if a page opened it, as Chrome
+     * closes such a tab. It replaces the one before.
+     *
+     * @param listener told on the UI thread
+     */
+    public void onFirstNavigationDownload(Runnable listener) {
+        firstNavigationDownload = Objects.requireNonNull(listener, "listener");
+    }
+
+    /**
+     * The page's downloads gave one of its downloads a target while the page had committed no document, so its first
+     * navigation became a download: tells the page's item while the page still has none. Nothing after {@link #close()}.
+     */
+    public void firstNavigationDownloaded() {
+        if (!closed && committed.isEmpty()) firstNavigationDownload.run();
+    }
+
+    /**
+     * Has {@code listener} told, on the UI thread, each time a save chooser Chromium asked for the page is cancelled, also
+     * after the page closed, as closing its item cancels the chooser it shows (plan 7's F1.3): the page's downloads set
+     * it, and end the count of the download that asked, as Chromium may tell nothing of one cancelled before it began. It
+     * replaces the one before.
+     *
+     * @param listener told on the UI thread
+     */
+    public void onSaveCancelled(Runnable listener) {
+        saveCancelled = Objects.requireNonNull(listener, "listener");
+    }
+
+    /** A save chooser Chromium asked for the page was cancelled, and its callback with it: tells the page's downloads. */
+    public void saveCancelled() {
+        saveCancelled.run();
+    }
+
+    /**
      * Has {@code shower} select the page's item in its window and raise that window, when the page asks: the page's item
      * sets it. It replaces the one before.
      *
@@ -1059,12 +1273,17 @@ public final class Page implements AutoCloseable {
 
     /**
      * Closes the page's browser, which ends only this page, tells those who asked {@link #onClose}, and stops telling
-     * anything of it. Once.
+     * anything of it. Once. Its close hold is asked first ({@link #setCloseHold}): while it holds, the browser loads
+     * {@code about:blank} instead and closes once the hold completes.
      */
     @Override public void close() {
         if (closed) return;
         closed = true;
+        // Plan 7's F1: the page's downloads hear first that it closes, so none of its downloads starts after this, and
+        // answer when its browser may close.
+        CompletableFuture<Void> held = downloadState.held(this);
         loadStarts.clear();
+        toolHooks.close();
         selectionGestures.clear();
         view.endSelectionGestures();
         visits.clear();
@@ -1080,6 +1299,7 @@ public final class Page implements AutoCloseable {
         opener = (url, placement) -> Optional.empty();
         itemCloser = () -> { };
         itemShower = () -> { };
+        firstNavigationDownload = () -> { };
         dialogPlace = null;
         menuPlace = null;
         privacy.close();
@@ -1088,8 +1308,7 @@ public final class Page implements AutoCloseable {
         if (find != null) find.close();
         if (devTools != null) devTools.close();
         view.setHoverUrl("");
-        PageBrowser page = browser;
-        if (page != null) page.close(true);
+        downloadState.end(this, held);
         List<Runnable> told = List.copyOf(closes);
         closes.clear();
         for (Runnable listener : told) listener.run();
@@ -1107,6 +1326,11 @@ public final class Page implements AutoCloseable {
         } finally {
             frame.dispose();
         }
+    }
+
+    /** Whether {@link #run} runs a script in a main frame at {@code address}, as {@link PageToolHooks#runsScriptsIn} says. */
+    static boolean runsScriptsIn(String address) {
+        return PageToolHooks.runsScriptsIn(address);
     }
 
     /** Jasper sends the page elsewhere. */
@@ -1144,6 +1368,7 @@ public final class Page implements AutoCloseable {
      * sweep makes no native call.
      */
     void make(Chromium chromium, CefClient client, CefRequestContext requestContext) {
+        downloadState.madeBy(chromium);
         if (closed || chromium.state() == Chromium.State.STOPPED) {
             unused(requestContext);
             return;
@@ -1158,6 +1383,11 @@ public final class Page implements AutoCloseable {
     /** Whether the page has made its browser. */
     boolean hasBrowser() {
         return browser != null;
+    }
+
+    /** The page's browser once made, whether or not it hears what it is asked yet; null before. */
+    PageBrowser browser() {
+        return browser;
     }
 
     /**
@@ -1200,6 +1430,7 @@ public final class Page implements AutoCloseable {
         if (closed) return;
         documentLoaded = true;
         readHistory();
+        toolHooks.loadEnded();
     }
 
     /**
@@ -1307,6 +1538,11 @@ public final class Page implements AutoCloseable {
         reloader = Objects.requireNonNull(replacement, "replacement");
     }
 
+    /** Has the page run the scripts asked of it ({@link #run}) with {@code replacement} from now on, as a test's recording one. */
+    void useScriptRunner(BiConsumer<String, String> replacement) {
+        toolHooks.useScriptRunner(replacement);
+    }
+
     /** Has the page press Return with {@code replacement} from now on, as a test's recording one. */
     void useReturnPresser(Consumer<Page> replacement) {
         returnPresser = Objects.requireNonNull(replacement, "replacement");
@@ -1325,6 +1561,19 @@ public final class Page implements AutoCloseable {
     /** Has the page run Chromium's copy with {@code replacement} from now on, as a test's recording one. */
     void useCopier(Consumer<Page> replacement) {
         copier = Objects.requireNonNull(replacement, "replacement");
+    }
+
+    /** Has the page start its downloads with {@code replacement} from now on, as a test's recording one. */
+    void useDownloader(BiConsumer<Page, String> replacement) {
+        downloadState.useDownloader(replacement);
+    }
+
+    /**
+     * Has the page load {@code about:blank} in its browser with {@code blank}, and close its browser with {@code close},
+     * from now on, as a test's recording ones.
+     */
+    void useBrowserEnding(Consumer<Page> blank, Consumer<Page> close) {
+        downloadState.useBrowserEnding(blank, close);
     }
 
     /**
@@ -1346,6 +1595,7 @@ public final class Page implements AutoCloseable {
     /** Has the page find with {@code replacement} from now on, as a test's recording one. */
     void useFind(PageFind replacement) {
         find = Objects.requireNonNull(replacement, "replacement");
+        toolHooks.searchedBy(find);
     }
 
     /**
@@ -1403,8 +1653,13 @@ public final class Page implements AutoCloseable {
         return iconFetch != null;
     }
 
-    /** Which document the main frame shows, counted by its load starts. */
-    long document() {
+    /**
+     * Which document the main frame shows, counted by its load starts: what changed since a count was read tells a load
+     * start came in between, as Save Page As checks after its chooser (plan 7's F26). UI thread.
+     *
+     * @return the count
+     */
+    public long document() {
         return document;
     }
 

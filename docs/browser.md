@@ -61,7 +61,8 @@ Along the top of each page, from left to right:
   ([Certificate errors](#certificate-errors));
 - the address field, with the site icon at its left;
 - in a [/dev/null](#devnull-mode) tab, the /dev/null indicator;
-- the menu button (☰): **Add Bookmark**, or **Remove Bookmark** while the page is bookmarked
+- the menu button (☰): **Reader Mode** and **Remove Distractions** while the page reads as an article
+  ([Page tools](#page-tools)); **Add Bookmark**, or **Remove Bookmark** while the page is bookmarked
   ([Bookmarks](#bookmarks)); **Manage Bookmarks** and **History**, which load the bookmarks and [history](#history)
   pages; the Reset items of the page's [site permissions](#site-permissions) and, while the page is muted, **Unmute
   Current Page** ([Audio](#audio)); and **Settings**, which opens Settings › Tools › Browser.
@@ -323,7 +324,8 @@ closed they open it and search again from the first match.
   `hidden="until-found"` element or a section whose control has `aria-expanded="false"` opens to show it.
 - The search reads the page's visible text a block at a time, each run of white space as one space, so it finds words
   across links, other inline elements and line breaks in the page's source; a space in a plain query matches any run
-  of white space. Text in form fields and in shadow roots is not searched.
+  of white space. Text in form fields and in shadow roots is not searched, except [reader mode](#page-tools)'s
+  article, which is all Find searches while it shows.
 - It searches every frame of the page, cross-origin frames included, up to 100, and adds up their counts. A frame
   counts at most 10,000 matches, and on a very large page those in the text it read within a quarter of a second.
 - While the bar is open, the count follows changes to the page, until a search runs out of time. The page's next
@@ -355,14 +357,15 @@ actions.
 A right-click on a page (Control-click on macOS) opens Jasper's menu for what is under the pointer, in groups:
 
 - over the page itself, **Back**, **Forward** and **Reload**;
-- over a link, **Open Link in New Tab** and **Copy Link**;
-- over an image, **Open Image in New Tab** and **Copy Image Address**;
+- over a link, **Open Link in New Tab**, **Copy Link** and **Save Link As…**;
+- over an image, **Open Image in New Tab**, **Save Image As…** and **Copy Image Address**;
 - in a text field, **Cut**, **Copy** and **Paste**, Cut and Copy dimmed without a selection; elsewhere, with a
   selection, **Copy** and **Search with** *engine*;
 - **Select All**, always;
 - the pane items of a terminal's right-click menu: **Split ▸**, **Move Pane to Tab ▸** and **Close Pane**;
-- **Print…**, and **Copy Page Title**, which is dimmed while the page has no title;
-- **View Source** and **Inspect Element** ([View Source](#view-source), [Inspect Element](#inspect-element)).
+- **Save Page As…**, **Print…**, and **Copy Page Title**, which is dimmed while the page has no title;
+- **View Source**, **Remove Element** and **Inspect Element** ([View Source](#view-source), [Page tools](#page-tools),
+  [Inspect Element](#inspect-element)).
 
 **Open Link in New Tab** and **Open Image in New Tab** open the address in a new browser tab right after this one. As
 the page could open it itself, they open an `http`, `https` or `about:blank` address, or a `file:` or `jasper-about:`
@@ -370,6 +373,10 @@ address from a page of the same kind, and are dimmed for any other. **Copy Link*
 it. **Search with** *engine* searches for the selection, each run of white space as one space and at most 1,000
 characters of it, with the Default Search Engine, in a new tab right after this one; it names the engine, a Custom
 engine by its search URL's host, and does not show for a selection of only white space. **Print…** prints the page.
+**Save Link As…** and **Save Image As…** download the address after asking where ([Downloads](#downloads)); they are
+dimmed for any address but an `http` or `https` one the page could open itself and a `data:` one. **Save Page As…** and
+**Remove Element** ([Page tools](#page-tools)) are dimmed on Jasper's own `jasper-about:` pages and on a challenge
+provider's, such as Cloudflare Turnstile's.
 
 ## View Source
 
@@ -407,6 +414,82 @@ In the DevTools pane:
 - a link DevTools open in a new tab, such as one in the console, opens in a new browser tab right after the page's,
   when the page could open it itself, as for [Open Link in New Tab](#the-right-click-menu).
 
+## Page tools
+
+Once a page's document has loaded, Jasper checks in its top frame whether the page reads as an article, with Mozilla's
+Readability.js, which the Browser bundles. When it finds more than 10 characters of article text, ☰ offers **Reader
+Mode** and **Remove Distractions** at its top.
+
+- The check runs again a second after the page last changed its address without loading, as a single-page app does
+  between its views, unless only the fragment changed; until then ☰ offers neither. A page that is not showing, such
+  as one in a tab behind another, is checked when it shows.
+- Jasper's own `jasper-about:` pages, a challenge provider's page (Cloudflare Turnstile, hCaptcha, reCAPTCHA, Arkose
+  Labs) and a page of more than 50,000 elements offer neither. On a page that enforces Trusted Types, Readability may
+  find no article when it needs a second pass over a page whose first found too little text, or the page has an image
+  inside `noscript`.
+
+**Reader Mode** lays the article over the page in the workspace theme's colours: its title, or "Article", then its
+text, images and links, without the page's scripts, frames, forms and styles. The article scrolls by itself and has
+the keyboard; behind it the page does not scroll, Tab and clicks do not reach it, and its own shortcuts do not act. A
+link loads in the page, and a link to a heading of the article scrolls the article there. [Find](#find-in-page)
+searches the article. **Exit Reader Mode** in ☰, Escape, or the page's next load ends it, and gives the page its
+scrolling and its focus back.
+
+**Remove Distractions** makes the pointer a crosshair over the page and outlines in red what it is over: the element,
+or the outermost fixed or sticky element holding it, such as a banner or a cookie notice. A click hides that, and with
+it every other fixed element covering at least 90% of the visible page, such as the dimmed backdrop behind a dialog;
+when what it hides covers 90% of it, a page that had locked its scrolling scrolls again. Only a single click of the
+main button hides: a double click hides once, and Enter on a link hides nothing. While it runs, clicks reach neither
+the page's handlers nor its links, the pointer over a frame is over the element holding the frame, and a right-click
+still opens Jasper's menu. **Exit Distraction Removal** in ☰, Escape, or the page's next load ends it; what it hid
+stays hidden until the page loads again. Starting reader mode ends distraction removal, and the other way round.
+
+**Remove Element**, in the page's [right-click menu](#the-right-click-menu), hides at once what is under the pointer:
+the element, or the outermost fixed or sticky element holding it, whatever the page's zoom; when that covers 90% of the
+visible page, a page that had locked its scrolling scrolls again. It works on any web page, whether or not ☰ offers the
+tools; over reader mode's article it hides nothing.
+
+**Save Page As…**, in the right-click menu, saves the page as it is now in a folder: `index.html`, and in `resources/`
+the images, style sheets, fonts, scripts and media it uses, so that it opens offline. Jasper's
+[save chooser](workspace.md#the-file-chooser) asks where, starting at a folder in the [Downloads folder](#downloads)
+named after the page's host, such as `example.com`, or `example.com (1)` and on when that name is taken (`page` for a
+page without a host); Cancel saves nothing. Once saved, the folder shows in Finder (Explorer on Windows, the file
+manager on Linux).
+
+- **The copy:** Jasper reads a copy of the page's document, so the page does not change. Each image (those of a `srcset`
+  too), video, audio, script, style sheet and icon, and what the page's styles and its style sheets' `url()` and
+  `@import` name, is saved, and the copy points to it; every other link, frame and form address is made absolute, so
+  links work and frames load from the web. The page's `Content-Security-Policy` meta elements go, so that they do not
+  block the saved files. Scripts are kept and run when the saved page opens, from its `file:` address, where they can
+  reach the network. What a shadow root holds is not saved. The saved page has neither reader mode's overlay nor
+  distraction removal's outline.
+- **Fetching:** Jasper fetches each resource again itself ([Jasper's own requests](#jaspers-own-requests)), without
+  your cookies, so what a site shows only to you may differ or fail. Only a successful answer (200) is kept, within 15
+  seconds a resource, its name lookups, redirects (at most 5) and body included: at most 20 MiB a resource and 2 MiB a
+  style sheet, 500 resources and 200 MiB in all, and 5 minutes for the save's fetches. A resource that fails or passes
+  a bound keeps its web address in the saved page, and the save goes on; so do those not yet fetched when the HTTP
+  proxy changes.
+- **Private networks:** for a page on the web, Jasper fetches nothing from this computer, a link-local or private
+  network address, such as `192.168.1.1`, `10.0.0.1` or `100.64.0.1`, or an unspecified one: neither from a host
+  written as one, such as `localhost`, nor, while the HTTP proxy is off, from a name that resolves to one. Such a
+  resource keeps its web address. A page whose own address is written as such a host, such as `http://192.168.1.10/`,
+  saves from any host; a page reached by a name counts as on the web. A name whose answer changes between Jasper's
+  check and its request (DNS rebinding) can still reach such an address.
+- **The files:** each file gets the [downloaded-file mark](#downloads), a /dev/null page's naming no address; when a
+  mark cannot be written, the file is still saved, and Jasper warns once, in the Downloads group, "“FOLDER” has
+  files without a downloaded-file mark". A style sheet or script whose name does not end in `.css` or `.js` gets it
+  added, and any other resource keeps its extension only when it is a web resource's, such as an image's, a font's, a
+  media file's or a data file's; otherwise it gets `.bin` added. Saving into a folder that exists replaces its files of
+  the same names; a symbolic link at `resources` or `index.html` there fails the save.
+- **Failures:** "Save Failed" says "Could not save the page: …" with the reason, such as a folder that cannot be
+  written, "the page navigated away" when the page went to another document first, "the page did not answer" after 30
+  seconds, or "the page is too large to save" for a copy of more than 64 MiB. Once the page's tab has closed, the
+  failure is a notification in the Downloads group instead. Quitting, or turning the Browser off, cancels a save under
+  way: Jasper writes no more of it and deletes its unfinished files.
+
+Reader mode, distraction removal, Remove Element and Save Page As… run as scripts in the page's own JavaScript world,
+as [Find](#find-in-page) does, so the page's scripts can see and undo what they do.
+
 ## Links in a page
 
 | Gesture | macOS | Linux and Windows | Opens the link |
@@ -416,8 +499,8 @@ In the DevTools pane:
 | Split | Cmd+Shift-click | Ctrl+Shift-click | in a new pane beside this one: to the right when the page is wider than tall, otherwise below |
 | Middle click | middle click | middle click | in a new tab right after this one |
 
-A Shift-click loads the link in the same page. A link or page that downloads a file does nothing, and so does an
-Alt-click, which Chromium makes a download.
+A Shift-click loads the link in the same page, and so does an Alt-click (Option-click on macOS), which Chromium would
+make a download. A link or page that downloads a file saves it in the [Downloads folder](#downloads).
 
 Links that open a new tab or pane, and popups, open only at `http`, `https`, `file`, `about` and `jasper-about`
 addresses. A `mailto:` or `tel:` link opens nothing, however it is clicked. A `jasper-about:` address loads only as a
@@ -467,6 +550,60 @@ Not supported:
 - popups of a frame inside the page: a `window.open` there opens a new tab but returns `null`, and the new page has no
   `window.opener`.
 
+## Downloads
+
+A file a page downloads goes, without asking, into the Downloads folder: the system's own, unless the **Downloads
+folder** setting names another ([Settings](#settings)). The system's is `~/Downloads` on macOS; on Windows the
+Downloads known folder, else `%USERPROFILE%\Downloads`; on Linux `XDG_DOWNLOAD_DIR` from `user-dirs.dirs` (in
+`$XDG_CONFIG_HOME`, `~/.config` by default), else `~/Downloads`. Jasper makes the folder when it is missing, the first
+time a browser page starts and after each change of the setting; while it is a file, or cannot be made, each download
+fails with the reason. **Save Link As…** and **Save Image As…** ([The right-click menu](#the-right-click-menu)) ask
+where instead, in Jasper's [save chooser](workspace.md#the-file-chooser), starting in the Downloads folder; Cancel
+downloads nothing.
+
+- **Names:** a file takes the name its server or page suggests, after its last `/` or `\`, with each control or format
+  character (bidi controls and zero-width characters among them), line or paragraph separator and each of `<>:"|?*`
+  made `_`, its leading and trailing dots and spaces trimmed, so that `.bashrc` saves as `bashrc`, a `_` before a
+  Windows device name such as `CON`, and a name over 200 UTF-8 bytes cut, its extension kept; a name that leaves
+  nothing is `download`. A name already taken in the folder,
+  or by another download under way, is numbered before its extension, `report (1).pdf`, `report (2).pdf` and on, and
+  when 1,000 are taken the download fails. On Windows a long name is shortened, its extension kept, so that the path
+  stays under `MAX_PATH`.
+- **The mark:** each finished file gets the system's downloaded-file mark, which the system checks before the file is
+  opened or run: on macOS the quarantine attribute (`com.apple.quarantine`) that Gatekeeper reads; on Windows the
+  `Zone.Identifier` stream (the mark of the web), `ZoneId=3` with the page's address as `ReferrerUrl`, when it is a web
+  page, and the file's as `HostUrl`, without user names and passwords. Linux has no such mark. A mark the file already
+  has is kept. Jasper writes the stream itself. When the mark cannot be written, as on a Windows volume without streams
+  (FAT32 or exFAT: "This volume cannot keep a downloaded-file mark"), Jasper warns "“NAME” has no downloaded-file
+  mark", and on macOS and Windows the download has no Open: open it from the file manager only if you trust it.
+- **The Downloads menu** joins the menu bar with the first download. It lists the 20 newest downloads, and any older one
+  still running, oldest first, each a submenu titled with its name and its progress, such as "report.pdf — 42%", or
+  what has arrived while its size is unknown, such as "1.2 MB"; then Finished, Failed or Stopped. A running download's
+  submenu has **Stop**; a finished one's **Open**, with the application the system opens it with, and **Show in
+  Finder**, which shows it selected in its folder (**Show in Explorer** on Windows; **Show in Folder** on Linux, which
+  opens its folder); one that no longer runs, **Remove from List**. **Clear All** removes every download that no
+  longer runs. While the menu is open, a title changes in place, and a change to its entries waits until it closes.
+  The list lasts until Jasper quits.
+- **Notifications,** in the Downloads group ([Notifications](notifications.md#groups)): "Download finished for “NAME”."
+  and "Download failed for “NAME”.", when a download fails or Jasper refuses it, with the reason when Jasper has one; a
+  download you stop posts none.
+- **Downloads without a click:** as in Chrome, a download that does not come within 5 seconds of a click or key press
+  in the page goes once; each later one is refused, and the first refusal posts "This site tried to download multiple
+  files" with the page's host. A document that starts loading within 5 seconds of a click or key press in the page,
+  such as the one a clicked link opens, and each page you open from Jasper, such as from the address field, a bookmark
+  or History, allow one again; a document the page loads by itself, through a meta refresh, `location.reload()` or a
+  change of `location`, does not. A download within 5 seconds of a click or key press, and Save Link As… and Save
+  Image As…, always go.
+- **Closing a tab** while one of its page's downloads runs lets the download finish: the page goes blank at once, and
+  its browser closes once the download ends. A tab a page opened, through a `target=_blank` link or `window.open`, whose
+  first page becomes a download closes, as in Chrome, and the download goes on.
+- **Quitting,** or turning the Browser off, stops the running downloads, and once Chromium has closed, Jasper deletes
+  the partial files (`.crdownload`) they left in their folders.
+- **On macOS,** in the packaged Jasper.app, macOS asks whether Jasper may use the Downloads folder, or a Downloads
+  folder setting inside Documents or Desktop, when Jasper first uses it
+  ([macOS Downloads, Desktop and Documents folders](packaging.md#macos-downloads-desktop-and-documents-folders)); while
+  it is denied, downloads there fail. System Settings › Privacy & Security › Files and Folders changes the choice.
+
 ## Page dialogs
 
 - `alert()` shows a dialog in the window headed "Web Page Alert", with the message and **OK**; `confirm()` shows "Web
@@ -505,7 +642,7 @@ When a page cannot load, its pane shows Jasper's error page in its place: a titl
 | Page Can’t Be Loaded | Any other |
 
 A load you stop, or one that would download a file (`ERR_ABORTED`), shows no error page, and neither does a
-`jasper-about:` address that fails.
+`jasper-about:` address that fails; a file Chromium downloads goes to [Downloads](#downloads).
 
 While the error page shows, the address field, the tab's tooltip, the status bar and the saved workspace keep the
 address that failed, and the tab is named by the error's title. **Try Again** and **Reload** load that address again,
@@ -557,6 +694,9 @@ or off changes no open tab.
 - A /dev/null tab's pages show no notifications ([Page notifications](#page-notifications)).
   [Ad blocking](#ad-blocking) and the [HTTP proxy](#the-http-proxy) apply to them as to any page, and Settings'
   [clearing](#clearing-data) leaves them alone.
+- A /dev/null tab's [downloads](#downloads) go to the Downloads folder too, and the files stay. Its group's finished
+  downloads leave the Downloads menu when the group's last tab closes, and a running one once it ends. On Windows their
+  mark names no address: `ZoneId=3`, `HostUrl=about:internet` and no `ReferrerUrl`.
 - The saved workspace keeps no address of a /dev/null tab, and "Web Browser" as its title. After a relaunch the tab
   comes back at the start page, in /dev/null mode, in a group of its own ([Restore](#restore)).
 
@@ -927,7 +1067,8 @@ Jasper fetches these itself, apart from Chromium, without your pages' cookies or
 - the search engine's suggestions for what you type ([Search and suggestions](#search-and-suggestions)): at most 64
   KiB, within 3 seconds;
 - View Source's copy of an `http` or `https` page ([View Source](#view-source));
-- the [filter list](#ad-blocking).
+- the [filter list](#ad-blocking);
+- Save Page As…'s copies of a page's resources, within its bounds ([Page tools](#page-tools)).
 
 While the [HTTP proxy](#the-http-proxy) is on, they go through it, except those to this computer and to link-local
 addresses. While it is off, they go directly rather than through a proxy your system's settings name, unless Jasper
@@ -949,6 +1090,7 @@ in the file or on the page apply without a restart. A bad value is reported and 
 |---|---|---|---|---|
 | `start_page` | `"jasper-about:welcome"` | What a new browser tab, window or pane loads, read as the address field reads typed text; not empty and not a `chrome:` address ("Enter a web address.") | Start page | Browser pages opened afterwards |
 | `page_zoom` | `100` | The [zoom](#zoom) pages open at and Reset Font Size returns to: a whole percent from 25 to 500 | Page zoom | Browser pages opened afterwards without a zoom of their own; Reset Font Size |
+| `downloads_folder` | `""` | Where [downloads](#downloads) go, and where Save Page As… starts: empty for the system's Downloads folder; `~` or `~/folder` under your home folder (`~\folder` too on Windows); or an absolute folder, on Windows a drive's (`C:\…`) or a share's (`\\server\share\…`) ("Enter an absolute folder path, or leave it empty.") | Downloads folder | The next download, and the next Save Page As… |
 | `open_links_from_terminal` | `"ask"` | `ask` (Always Ask), `builtin` (Built-in Browser), `default` (Default Browser) | Open Links From Terminal | The next link; the right-click items at once |
 | `open_local_web_files` | `"ask"` | `ask` (Always Ask), `builtin` (Built-in Browser), `editor` (Default Editor) | Open Local Web Files | The next local web file |
 | `search_engine` | `"google"` | `google` (Google), `duckduckgo` (DuckDuckGo), `bing` (Bing), `kagi` (Kagi), `custom` (Custom): what the address field and the right-click menu's Search with search with, and where the field's suggestions come from ([Search and suggestions](#search-and-suggestions)) | Default Search Engine | The next keystroke in the address field, search and right-click menu |

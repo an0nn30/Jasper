@@ -85,8 +85,9 @@ Jasper's is `<home>/plugins/<id>/data`.
 | `invoke(actionId, windowId, paneIdOrNull)` | Runs an action as a window would; false when it is disabled or unknown |
 | `toolbar()` | The plugin toolbar section as `button:<id>`, `menu:<title>:<id>,<id>` and `view` |
 | `toolbarViews(windowId)`, `closeToolbarViews(windowId)` | Builds a window's toolbar views, as the window does when it opens; closes them, as closing the window does |
-| `menu(target)` | One menu's contributed entries (`FILE`, `EDIT`, `VIEW`, `TAB`, `TOOLS`, `SESSION`, `TRANSFER`, `context` or `top:<menuId>`) as `item:<id>`, `web-address:<id>` (an `addForWebAddress` item), `---` and `submenu:<title>` lines, children indented, sections separated by `===` |
-| `menuBar(windowId)` | The plugin menus a window's menu bar shows, as `top:<menuId>`: each `create` menu, and each `createForContent` menu while one of its plugin's content tabs is the window's current item; a menu with no item of a registered action is left out |
+| `menu(target)` | One menu's contributed entries (`FILE`, `EDIT`, `VIEW`, `TAB`, `TOOLS`, `SESSION`, `TRANSFER`, `context` or `top:<menuId>`) as `item:<id>`, `web-address:<id>` (an `addForWebAddress` item), `---` and `submenu:<title>` lines, children indented, sections separated by `===`; menu entries (`addEntries`) as `entry:<id>:<label>` lines and `entries:<label>` lines for their submenus, each followed by `:disabled` while disabled |
+| `menuBar(windowId)` | The plugin menus a window's menu bar shows, as `top:<menuId>`: each `create` menu, and each `createForContent` menu while one of its plugin's content tabs is the window's current item; a menu with no item of a registered action and no menu entry is left out |
+| `chooseMenuEntry(entryId)` | Chooses the first enabled menu entry with that id that opens no submenu, outside disabled submenus, as a person would: its `chosen` hears the id, and a throw is recorded in `failures()`; false when there is none |
 | `contextMenu(paneId)`, `chooseFromContextMenu(paneId, actionId)` | The terminal context menu's model lines for a pane, as `menu("context")` lists them (empty submenus and separators included), with each `web-address:<id>` line present only while the pane's selection (`setSelection`) is one web address; runs the action of the first item listed there for it, for that pane, and only a `web-address` item gives the handler the address as `webAddress()`; false when none is listed |
 | `status()`, `progress()` | Visible status items as `id\|side\|text\|tooltip\|actionId`; visible progress states by id |
 | `rail()` | Rail buttons' action ids |
@@ -137,6 +138,8 @@ Jasper's is `<home>/plugins/<id>/data`.
 | `setCommandClient(path)` | What `CommandLine.client()` returns |
 | `setDefaultBrowser(jasper)` | What `Platform.isDefaultBrowser()` returns, false until set, and whether another plugin's `browse` asks the provided browser first; a change runs the `onDefaultBrowserChanged` handlers at once, on the EDT |
 | `setCopyOnSelect(on)` | What `Platform.copyOnSelect()` returns from the next read, false until set |
+| `setDownloadsFolder(folder)` | What `Platform.downloadsFolder()` returns from the next call, an absolute folder; until set, `home/Downloads` under the host's data root, never the user's own. The host creates neither |
+| `markedDownloads()`, `failMarks(failure)` | Each `Platform.markDownloaded` that succeeded, as a `MarkedDownload(file, source, referrer)` in call order, with nothing written to the file; every later mark throws `failure`. As in Jasper, a missing file throws `NoSuchFileException` first, and a call on the EDT `IllegalStateException`, except from a background task `runBackground()` runs there |
 | `declareSubcommand(pluginId, name, summary)`, `call(name, arguments, workingDirectory[, paneId])` | Declares a subcommand as `[[subcommands]]` would, before the plugin starts; calls it as `jasper <name> …` would and returns a `FakeCommandCall` |
 
 ### Settings and appearance

@@ -36,6 +36,11 @@
  * plugin inserts into an item, such as a snippet, goes into its page's focused field, or is typed where the page's focus
  * is, through DevTools and never the clipboard. While Copy on select is on, each item copies the selections the user
  * finishes in its page, but none in a frame of another origin. Each item
- * saves its restore state through the {@code restore} package, and {@code BrowserItems} opens saved ones again.
+ * saves its restore state through the {@code restore} package, and {@code BrowserItems} opens saved ones again. Each
+ * item's {@code PageToolsHost} wires its page to the {@code tools} package's
+ * {@link dev.jasper.browser.tools.PageTools}, whose Reader Mode and Remove Distractions lead the menu button while the
+ * page offers them, and gives the reader the theme's colours through {@link dev.jasper.browser.pages.PageHtml}; and holds
+ * the item's Save Page As saves ({@link dev.jasper.browser.tools.SavePage}), which {@code BrowserItems} starts in the
+ * {@code downloads} package's Downloads folder, showing the saved folder with its {@code FileManager}.
  */
 package dev.jasper.browser.item;

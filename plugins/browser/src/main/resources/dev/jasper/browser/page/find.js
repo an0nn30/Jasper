@@ -32,7 +32,11 @@
  *   hidden, as when it goes into the back-forward cache, does the same.
  *
  * Text counts as visible when it shows, or when only those three hide it. Text in scripts, styles, templates, form
- * fields and shadow roots is not searched.
+ * fields and shadow roots is not searched, but for one: while the Browser's reader mode shows its article over the page,
+ * which reader.js hands find through window[Symbol.for('dev.jasper.browser.reader')].root(), a search reads that
+ * shadow root's text, and nothing behind it, highlights its matches there, which the overlay's own sheet styles, and
+ * watches the article for changes. Jasper ends the search as reader mode opens and closes, so the next search reaches
+ * what then shows.
  */
 (function (command, router) {
   'use strict';
@@ -54,6 +58,8 @@
     // Jasper takes only a few of a page's requests at a time, and refuses the rest as busy: an answer then waits its turn.
     const BUSY = 5, TRIES = 6;
     const ALL = 'jasper-find', CURRENT = 'jasper-find-current';
+    // Where reader mode keeps itself, in a page's top frame; its root() is the overlay's shadow root while it shows.
+    const READER = Symbol.for('dev.jasper.browser.reader');
     // Elements whose text is not the page's own, which the walk leaves out whole.
     const UNSEARCHED = new Set(['script', 'style', 'noscript', 'template', 'textarea', 'select']);
     const FILTER = {
@@ -75,6 +81,8 @@
     const all = new Highlight(), now = new Highlight();
     now.priority = 1;
     let search = 0, pattern = null, ranges = [], current = -1, observer = null, timer = 0;
+    // What the search under way reads: the document, or the reader's shadow root while reader mode shows.
+    let area = document;
     // How long the last search took, in milliseconds, and whether it ran out of time.
     let cost = 0, exhausted = false;
     window.addEventListener('pagehide', end);
@@ -91,10 +99,22 @@
       });
     }
 
+    // What a search reads now: the reader's shadow root while reader mode shows its article, else the document.
+    function scope() {
+      let root = null;
+      try {
+        const reader = window[READER];
+        root = reader !== null && typeof reader === 'object' && typeof reader.root === 'function' ? reader.root() : null;
+      } catch (unreadable) {
+        root = null;
+      }
+      return typeof ShadowRoot === 'function' && root instanceof ShadowRoot ? root : document;
+    }
+
     // The regions a collapsed aria-expanded control names, by id, with the control.
     function controlled() {
       const named = new Map();
-      for (const control of document.querySelectorAll('[aria-expanded="false"][aria-controls]')) {
+      for (const control of area.querySelectorAll('[aria-expanded="false"][aria-controls]')) {
         for (const id of control.getAttribute('aria-controls').split(/\s+/)) if (id !== '' && !named.has(id)) named.set(id, control);
       }
       return named;
@@ -272,7 +292,7 @@
       const started = performance.now();
       const pass = {deadline: started + BUDGET, late: false, found: [], named: controlled(), displays: new Map(), blocks: new Map(),
         counted: new Map()};
-      const walker = document.createTreeWalker(document, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, FILTER);
+      const walker = document.createTreeWalker(area, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, FILTER);
       let run = null;
       for (let node = walker.nextNode(); node !== null && !over(pass); node = walker.nextNode()) {
         if (node.nodeType === Node.ELEMENT_NODE) {
@@ -317,6 +337,7 @@
       current = -1;
       cost = 0;
       exhausted = false;
+      area = document;
       all.clear();
       now.clear();
       if (CSS.highlights.get(ALL) === all) CSS.highlights.delete(ALL);
@@ -368,6 +389,8 @@
       const element = boxed(range.startContainer.parentElement);
       if (element === null) return;
       element.scrollIntoView({behavior: 'instant', block: 'center', inline: 'nearest'});
+      // In the reader, the overlay scrolled to it; the page behind stays where it is.
+      if (area !== document) return;
       const box = range.getBoundingClientRect();
       if (box.top < 0 || box.bottom > window.innerHeight) window.scrollBy({top: box.top - window.innerHeight / 2, behavior: 'instant'});
     }
@@ -377,6 +400,7 @@
       const element = boxed(range.startContainer.parentElement);
       if (element === null) return;
       element.scrollIntoView({behavior: 'instant', block: 'nearest', inline: 'nearest'});
+      if (area !== document) return;
       const box = range.getBoundingClientRect();
       if (box.top < 0) window.scrollBy({top: box.top, behavior: 'instant'});
       else if (box.bottom > window.innerHeight) window.scrollBy({top: box.bottom - window.innerHeight, behavior: 'instant'});
@@ -410,18 +434,25 @@
       end();
       search = command.search;
       pattern = compiled;
+      area = scope();
       ranges = String(command.query) === '' ? [] : matches();
       paint();
       if (!exhausted) {
         observer = new MutationObserver(changed);
-        observer.observe(document, WATCHED);
+        observer.observe(area, WATCHED);
       }
+    }
+
+    // The selection in where, the search's area unless given: a shadow root's own, where it has one, else the window's.
+    function selectionIn(where) {
+      const within = where === undefined ? area : where;
+      return within !== document && typeof within.getSelection === 'function' ? within.getSelection() : window.getSelection();
     }
 
     // The match a step goes to: the first that starts at or after the selection's end, or the last that ends at or
     // before its start, round from the end to the start; without a selection, the first or the last.
     function following(forward) {
-      const selection = window.getSelection();
+      const selection = selectionIn();
       if (selection === null || selection.rangeCount === 0) return forward ? 0 : ranges.length - 1;
       const selected = selection.getRangeAt(0), point = document.createRange();
       if (forward) {
@@ -464,7 +495,7 @@
               paint();
               reveal(ranges[current]);
               if (observer !== null) observer.takeRecords();
-              const selection = window.getSelection();
+              const selection = selectionIn();
               if (selection !== null) {
                 selection.removeAllRanges();
                 selection.addRange(ranges[current].cloneRange());
@@ -486,9 +517,9 @@
             }
             return;
           case 'selection': {
-            const selected = String(window.getSelection() || '');
-            const line = selected.length <= LIMIT && !/[\n\r\u2028\u2029]/.test(selected);
-            tell({search: command.search, selection: line ? selected : ''}, 0);
+            const text = String(selectionIn(scope()) || '');
+            const line = text.length <= LIMIT && !/[\n\r\u2028\u2029]/.test(text);
+            tell({search: command.search, selection: line ? text : ''}, 0);
             return;
           }
           case 'clear':

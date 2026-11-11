@@ -61,10 +61,13 @@ import javax.swing.Timer;
  * Chromium.
  *
  * <p><b>Mouse.</b> An event the window consumes before the view hears it, as the pane drag's press, does not reach the
- * page. Each press the page gets is its {@link #lastPress()} and activates it. On macOS a Control-click reaches the page
- * as it is, and Chromium asks for the page's right-click menu for it as for a right-click ({@code PageMenu}), as Chrome
- * does there. The mouse's back and forward buttons, on Windows and Linux, never reach the page: releasing one tells the
- * view's {@link #onNavigationButton listener}. Nor, there, does Ctrl+wheel, which touchpad pinch sends on Windows, so
+ * page. Each press the page gets is its {@link #lastPress()} and activates it. On macOS a Control-click reaches the
+ * page as it is, and Chromium asks for the page's right-click menu for it as for a right-click ({@code PageMenu}), as
+ * Chrome does there. Chromium downloads an Alt-click on a link, and Jasper loads it in place (spec section 8): a left
+ * press with Alt and without the menu key, Cmd on macOS and Ctrl elsewhere, while the pointer is over a link, reaches
+ * the page without Alt, and so do its drags and its release; its {@code lastPress()} keeps Alt. The mouse's back and
+ * forward buttons, on Windows and Linux, never reach the page: releasing one tells the view's
+ * {@link #onNavigationButton listener}. Nor, there, does Ctrl+wheel, which touchpad pinch sends on Windows, so
  * Chromium's own Ctrl+wheel zoom never applies: it tells the view's {@link #onMagnify magnifier} a step, away from the
  * user bigger, as Chromium counts the notches. They add up, a turn gives a step once they round to a whole notch, at
  * most one step a turn, and what is left over carries to the next turn. With Shift down too, as Java reports a
@@ -117,6 +120,9 @@ public final class PageView extends JComponent {
     volatile PageBrowser browser;
     private volatile LastPress lastPress = LastPress.NONE;
     private final Activation activation = new Activation();
+    // UI thread: whether the left button's press was an Alt-click on a link, which reaches the page without Alt until
+    // its release.
+    private boolean altCleared;
     // UI thread: whether drops are refused rather than handed to the page, as a preview's canvas refuses them.
     private boolean dropsRefused;
     private volatile String hoverUrl = "";
@@ -143,9 +149,9 @@ public final class PageView extends JComponent {
     // UI thread: whether a key press the page got selects, so the next release the page gets ends a selection.
     private boolean keySelecting;
 
-    /** Where the view's showing state and keys go: its browser's, or before it has one, nowhere. */
-    record Hooks(Consumer<Boolean> visibility, IntConsumer frameRate, Consumer<KeyEvent> keys) {
-        static final Hooks NONE = new Hooks(shown -> { }, rate -> { }, key -> { });
+    /** Where the view's showing state, keys and mouse events go: its browser's, or before it has one, nowhere. */
+    record Hooks(Consumer<Boolean> visibility, IntConsumer frameRate, Consumer<KeyEvent> keys, Consumer<MouseEvent> mouse) {
+        static final Hooks NONE = new Hooks(shown -> { }, rate -> { }, key -> { }, event -> { });
     }
 
     /**
@@ -174,7 +180,7 @@ public final class PageView extends JComponent {
              IntFunction<Optional<NavigationButton>> navigationButtons, BiFunction<Duration, Runnable, Runnable> later) {
         this.taken = Objects.requireNonNull(taken, "taken");
         hooks = new Hooks(Objects.requireNonNull(visibility, "visibility"), Objects.requireNonNull(frameRate, "frameRate"),
-            Objects.requireNonNull(keys, "keys"));
+            Objects.requireNonNull(keys, "keys"), event -> { });
         this.navigationButtons = Objects.requireNonNull(navigationButtons, "navigationButtons");
         this.later = Objects.requireNonNull(later, "later");
         install();
@@ -209,9 +215,9 @@ public final class PageView extends JComponent {
     }
 
     /**
-     * The view's page is the browser that set {@link #browser}: it takes the page's showing state, keys, input methods
-     * and drops. The page's native browser is made once the view is in a window, and the page is told whether the view
-     * shows. UI thread; once, from {@link PageBrowser#attach()}.
+     * The view's page is the browser that set {@link #browser}: it takes the page's showing state, keys, mouse events,
+     * input methods and drops. The page's native browser is made once the view is in a window, and the page is told
+     * whether the view shows. UI thread; once, from {@link PageBrowser#attach()}.
      */
     void attached(Hooks page, ImeAdapter adapter, DropTargetListener drops) {
         hooks = Objects.requireNonNull(page, "page");
@@ -334,6 +340,18 @@ public final class PageView extends JComponent {
         selectionListener = Objects.requireNonNull(listener, "listener");
     }
 
+    /**
+     * Has the view hand the mouse events the page gets to {@code page} from now on, as a test's recording one: a Chromium
+     * browser cannot be made without Chromium. UI thread.
+     *
+     * @param page told each mouse event that reaches the page, but the wheel's
+     */
+    void useMouse(Consumer<MouseEvent> page) {
+        Objects.requireNonNull(page, "page");
+        Hooks now = hooks;
+        hooks = new Hooks(now.visibility(), now.frameRate(), now.keys(), page);
+    }
+
     /** Nothing listens for selection gestures any more: a gesture not yet told is dropped, and none is timed. UI thread. */
     void endSelectionGestures() {
         selectionListener = null;
@@ -435,7 +453,10 @@ public final class PageView extends JComponent {
     @Override protected void processMouseEvent(MouseEvent event) {
         super.processMouseEvent(event);
         if (event.isConsumed()) { // the window's, as the pane drag's press and click are
-            if (event.getID() == MouseEvent.MOUSE_PRESSED || event.getID() == MouseEvent.MOUSE_RELEASED) leftPressedAt = null;
+            if (event.getID() == MouseEvent.MOUSE_PRESSED || event.getID() == MouseEvent.MOUSE_RELEASED) {
+                leftPressedAt = null;
+                altCleared = false;
+            }
             return;
         }
         Optional<NavigationButton> navigationButton = navigationButtons.apply(event.getButton());
@@ -445,12 +466,14 @@ public final class PageView extends JComponent {
             return;
         }
         boolean press = event.getID() == MouseEvent.MOUSE_PRESSED;
+        boolean left = event.getButton() == MouseEvent.BUTTON1;
         if (press) {
             lastPress = new LastPress(event.getButton(), event.getModifiersEx(), event.getWhen());
             activation.activate(event.getWhen());
+            if (left) altCleared = loadsInPlace(event.getModifiersEx(), hoverUrl, osName);
         }
-        PageBrowser target = browser;
-        if (target != null) target.sendMouseEvent(event);
+        toPage(event);
+        if (left && event.getID() == MouseEvent.MOUSE_RELEASED) altCleared = false;
         if (press) requestFocusInWindow();
         selectingWithMouse(event);
     }
@@ -458,9 +481,39 @@ public final class PageView extends JComponent {
     @Override protected void processMouseMotionEvent(MouseEvent event) {
         super.processMouseMotionEvent(event);
         if (event.isConsumed()) return;
-        PageBrowser target = browser;
-        if (target != null) target.sendMouseEvent(event);
+        toPage(event);
         selectingWithMouse(event);
+    }
+
+    /**
+     * Hands {@code event} to the page: from an Alt-click's press on a link to its release, the left button's events and
+     * the pointer's moves without Alt; any other event as it is.
+     */
+    private void toPage(MouseEvent event) {
+        int button = event.getButton();
+        boolean cleared = altCleared && (button == MouseEvent.BUTTON1 || button == MouseEvent.NOBUTTON);
+        hooks.mouse().accept(cleared ? withoutAlt(event) : event);
+    }
+
+    /**
+     * Whether a left press with {@code modifiers}, AWT's extended modifiers, while the pointer is over the link at
+     * {@code hoverUrl}, reaches the page without Alt on the platform {@code osName} names, as do its drags and its release
+     * (spec section 8): Alt without the menu key, Cmd on macOS and Ctrl elsewhere, with which Chromium opens a new tab
+     * instead, over a link. Chromium would download the link; without Alt, it loads it in place.
+     */
+    static boolean loadsInPlace(int modifiers, String hoverUrl, String osName) {
+        int menu = osName.startsWith("Mac") ? InputEvent.META_DOWN_MASK : InputEvent.CTRL_DOWN_MASK;
+        return (modifiers & InputEvent.ALT_DOWN_MASK) != 0 && (modifiers & menu) == 0 && !hoverUrl.isEmpty();
+    }
+
+    /**
+     * {@code event} with Alt up: made from its extended modifiers without {@code ALT_DOWN_MASK}, from which AWT derives the
+     * old {@code ALT_MASK} too, so neither is set; its source, time, place, click count and button are kept.
+     */
+    private static MouseEvent withoutAlt(MouseEvent event) {
+        return new MouseEvent(event.getComponent(), event.getID(), event.getWhen(), event.getModifiersEx() & ~InputEvent.ALT_DOWN_MASK,
+            event.getX(), event.getY(), event.getXOnScreen(), event.getYOnScreen(), event.getClickCount(), event.isPopupTrigger(),
+            event.getButton());
     }
 
     /**

@@ -16,6 +16,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 import javax.swing.Timer;
 import org.cef.browser.CefFrame;
@@ -39,7 +40,10 @@ import org.cef.browser.CefFrame;
  * when its document's nodes, text or some of their attributes change, less often the longer its search takes, and no
  * more once a search ran out of time. A search settles once every frame has answered or {@link #ANSWER_WAIT} has
  * passed, and its first match is then the current one; a later answer still counts. The main frame's next document
- * ends the search. Find runs in the page's own world, so the page's scripts can see the query.
+ * ends the search. While its item's reader mode shows, a search reaches the top frame alone, whose {@code find.js}
+ * then searches the article in the reader's overlay, and the search starts again as reader mode opens and closes
+ * ({@link #searchTopFrameOnly}, {@link #restart}). Find runs in the page's own world, so the page's scripts can see the
+ * query.
  *
  * <p>Any script in a frame could send that frame's answers, so an answer is only shown: a count of 0 to
  * {@value #MAX_MATCHES}, taken for the search under way and from a frame that search reached. UI thread.
@@ -80,6 +84,8 @@ public final class PageFind {
     private final BiConsumer<String, String> scripts;
     private final BiFunction<Duration, Runnable, Runnable> later;
     private final List<Runnable> changes = new CopyOnWriteArrayList<>();
+    // Whether a search reaches the top frame alone, read as each starts.
+    private BooleanSupplier topFrameOnly = () -> false;
     // The last id given to a search or a selection request; the search under way, 0 for none; the frames it reached,
     // and each one's count, -1 until it answers; whether one said the pattern is invalid; the current match.
     private long issued, search;
@@ -136,7 +142,8 @@ public final class PageFind {
             clear();
             return CompletableFuture.completedFuture(NONE);
         }
-        List<String> listed = frames.get().stream().filter(Objects::nonNull).distinct().limit(MAX_FRAMES).toList();
+        List<String> listed = frames.get().stream().filter(Objects::nonNull).distinct()
+            .limit(topFrameOnly.getAsBoolean() ? 1 : MAX_FRAMES).toList();
         for (String gone : searched) if (!listed.contains(gone)) run(gone, CLEAR);
         end();
         search = ++issued;
@@ -269,6 +276,29 @@ public final class PageFind {
         selecting = null;
         dropSelection();
         answer.complete(text.length() <= MAX_QUERY && text.indexOf('\n') < 0 && text.indexOf('\r') < 0 ? text : "");
+    }
+
+    /**
+     * Has each search from now on reach the page's top frame alone while {@code when} says so, as while reader mode
+     * shows its article over the page (ruling D31): the frames behind it are not searched, and an earlier search's
+     * highlights there are cleared as the next search starts.
+     *
+     * @param when read as each search starts, on the UI thread
+     */
+    public void searchTopFrameOnly(BooleanSupplier when) {
+        topFrameOnly = Objects.requireNonNull(when, "when");
+    }
+
+    /**
+     * Ends the search because what the page shows to search has changed, as when reader mode opens or closes: every
+     * frame the search reached removes its highlights, and those who asked {@link #onChange} are told, so the bar's
+     * next search reaches what then shows. Nothing without a search under way.
+     */
+    public void restart() {
+        if (closed || search == 0) return;
+        for (String frame : searched) run(frame, CLEAR);
+        end();
+        tell();
     }
 
     /** The main frame starts loading another document: the search ends, as its highlights went with the one before. */

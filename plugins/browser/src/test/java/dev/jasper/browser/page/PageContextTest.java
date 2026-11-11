@@ -209,6 +209,49 @@ class PageContextTest {
         chromium.close();
     }
 
+    /**
+     * Plan 7's F7: an in-memory context tells those who asked once, as its group's store closes, whether or not a page
+     * ever asked Chromium for it; one that has closed tells a later listener at once, and a listener whose registration
+     * was closed hears nothing. The persistent context never closes, so it tells nobody.
+     */
+    @Test void anInMemoryContextTellsItsListenersOnceAsItClosesAndThePersistentOneNever() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var told = new ArrayList<String>();
+            PageContext memory = PageContext.memory();
+            memory.onClosed(() -> told.add("first"));
+            memory.onClosed(() -> told.add("second"));
+            memory.onClosed(() -> told.add("withdrawn")).close();
+            assertThat(told).isEmpty();
+            memory.close();
+            memory.close();
+            assertThat(told).as("once each, in order, never asked of Chromium").containsExactly("first", "second");
+            memory.onClosed(() -> told.add("late"));
+            assertThat(told).as("closed already: at once").containsExactly("first", "second", "late");
+
+            var asked = new PageContext(true, chromium -> CompletableFuture.completedFuture(new RecordingContext(5)), (chromium, released) -> { });
+            asked.context(chromium());
+            asked.onClosed(() -> told.add("asked"));
+            asked.close();
+            assertThat(told).endsWith("asked");
+
+            PageContext persistent = PageContext.persistent();
+            persistent.onClosed(() -> told.add("persistent"));
+            persistent.close();
+            assertThat(told).doesNotContain("persistent");
+        });
+    }
+
+    /** Plan 7's F7: a page names its browsing group's context, for the downloads of a /dev/null group. */
+    @Test void aPageNamesItsGroupsContext() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            PageContext memory = PageContext.memory();
+            var page = new Page(java.net.URI.create("https://example.com/"), () -> { }, PageTestAccess.noFavicons(), Runnable::run, memory);
+            assertThat(page.context()).isSameAs(memory);
+            assertThat(page.inMemory()).isTrue();
+            page.close();
+        });
+    }
+
     /** A Chromium that never starts: nothing here asks for its client. */
     private Chromium chromium() {
         return new Chromium(data, () -> { }, task -> { throw new AssertionError("Chromium was started"); }, new AboutScheme(),

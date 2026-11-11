@@ -613,7 +613,7 @@ final class WindowContributions implements AutoCloseable {
                 if (structural) owner.rebind();
                 // Titles label toolbar buttons, and a vanished or disabled action changes every placement of it.
                 owner.chrome().renderContributedToolbar();
-                owner.chrome().renderContributedMenus();
+                owner.chrome().contributionsChanged();
                 renderStatus();
                 // Which actions the stripe shows changes only when one is added or removed, which rebuilds it. A title or
                 // enabled change renames and repaints the buttons it has, so that it does not end a drag.
@@ -625,7 +625,7 @@ final class WindowContributions implements AutoCloseable {
             case BADGES -> updateBadges();
             case SCOPES -> syncScopes();
             case TOOLBAR -> owner.chrome().renderContributedToolbar();
-            case MENUS -> owner.chrome().renderContributedMenus();
+            case MENUS -> owner.chrome().contributionsChanged();
             case STATUS -> renderStatus();
         }
     }
