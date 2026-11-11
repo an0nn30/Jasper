@@ -8,16 +8,18 @@ import java.util.function.BiConsumer;
 /**
  * An HTTP authentication challenge to one of a page's requests, a server's or a proxy's, as Chromium asks Jasper for a
  * sign-in (plan 8), in plain values: the address that asked, who challenged and for which realm and scheme, the
- * page's top address as Chromium asked ({@link Page#topAddress()}), and the one answer Chromium waits for, a user name
- * and password or a cancel. Chromium's request waits until it is answered, so each sign-in is answered exactly once:
- * {@link #proceed} and {@link #cancel()} share one atomic, and only the first reaches Chromium. It names no Chromium
- * type and keeps no user name or password. Any thread.
+ * page's top address and main-frame navigation as Chromium asked ({@link Page#topAddress()},
+ * {@link Page#navigation()}), and the one answer Chromium waits for, a user name and password or a cancel. Chromium's
+ * request waits until it is answered, so each sign-in is answered exactly once: {@link #proceed} and {@link #cancel()}
+ * share one atomic, and only the first reaches Chromium. It names no Chromium type and keeps no user name or password.
+ * Any thread.
  */
 public final class SignIn {
     private static final System.Logger LOG = System.getLogger(SignIn.class.getName());
     private final String originUrl, host, realm, scheme, topAddress;
     private final boolean proxy;
     private final int port;
+    private final long navigation;
     private final BiConsumer<String, String> proceed;
     private final Runnable cancel;
     private final AtomicBoolean answered = new AtomicBoolean();
@@ -32,11 +34,12 @@ public final class SignIn {
      * @param realm the challenge's realm, as the challenger wrote it; empty for none
      * @param scheme the challenge's scheme, such as {@code basic} or {@code digest}, in any case
      * @param topAddress the page's top address as Chromium asked
+     * @param navigation the page's main-frame navigation as Chromium asked ({@link Page#navigation()})
      * @param proceed gives Chromium a user name and password, once at most
      * @param cancel tells Chromium there are none, once at most
      */
     public SignIn(String originUrl, boolean proxy, String host, int port, String realm, String scheme, String topAddress,
-                  BiConsumer<String, String> proceed, Runnable cancel) {
+                  long navigation, BiConsumer<String, String> proceed, Runnable cancel) {
         this.originUrl = Objects.requireNonNullElse(originUrl, "");
         this.proxy = proxy;
         this.host = Objects.requireNonNullElse(host, "");
@@ -44,6 +47,7 @@ public final class SignIn {
         this.realm = Objects.requireNonNullElse(realm, "");
         this.scheme = Objects.requireNonNullElse(scheme, "").toLowerCase(Locale.ROOT);
         this.topAddress = Objects.requireNonNullElse(topAddress, "");
+        this.navigation = navigation;
         this.proceed = Objects.requireNonNull(proceed, "proceed");
         this.cancel = Objects.requireNonNull(cancel, "cancel");
     }
@@ -111,6 +115,16 @@ public final class SignIn {
      */
     public String topAddress() {
         return topAddress;
+    }
+
+    /**
+     * The page's main-frame navigation as Chromium asked: the number of its navigation requests then
+     * ({@link Page#navigation()}), which a later request raises and a redirect does not.
+     *
+     * @return the number
+     */
+    public long navigation() {
+        return navigation;
     }
 
     /**

@@ -307,10 +307,13 @@ class PageNavigationTest {
         Page page = made.get();
         PageBrowser browser = PageTestAccess.pageBrowser(page);
         var navigation = new Request("http://intranet.example/", ResourceType.RT_MAIN_FRAME);
+        long before = page.navigation();
         var handler = PageNavigation.requests(browser, navigation, true, new OpenerBridge()::responses, null, Optional::empty);
         assertThat(page.topAddress()).isEqualTo("http://intranet.example/");
+        assertThat(page.navigation()).as("L31: a new navigation").isEqualTo(before + 1);
         handler.onResourceRedirect(browser, null, navigation, new Response(301), new StringRef("https://intranet.example/"));
         assertThat(page.topAddress()).as("after the redirect").isEqualTo("https://intranet.example/");
+        assertThat(page.navigation()).as("L31: a redirect is the same navigation").isEqualTo(before + 1);
         assertThat(handler.onResourceResponse(browser, null, new Request("https://intranet.example/", ResourceType.RT_MAIN_FRAME),
             new Response(401))).as("nothing about the load changes").isFalse();
         onUiThread(() -> { }); // the response is posted to the UI thread
@@ -333,6 +336,7 @@ class PageNavigationTest {
             PageNavigation.requests(tools, new Request("devtools://devtools/inspector.html", ResourceType.RT_MAIN_FRAME), true,
                 () -> null, null, Optional::empty);
             assertThat(page.topAddress()).as("still none").isEmpty();
+            assertThat(page.navigation()).as("L31: no navigation of the page's").isZero();
             var redirected = new PageNavigation.PageRequests(new OpenerBridge().responses(), false, null, null);
             redirected.onResourceRedirect(tools, null, new Request("https://a.example/", ResourceType.RT_MAIN_FRAME),
                 new Response(302), new StringRef("https://b.example/"));
@@ -372,6 +376,7 @@ class PageNavigationTest {
         onUiThread(() -> {
             Page page = page();
             page.mainFrameRequested("https://intranet.example/start");
+            long navigation = page.navigation();
             var heard = new ArrayList<SignIn>();
             page.onSignIn(heard::add);
             var handedOff = new ArrayList<Runnable>();
@@ -388,6 +393,7 @@ class PageNavigationTest {
                 assertThat(signIn.scheme()).isEqualTo("basic");
                 assertThat(signIn.proxy()).isFalse();
                 assertThat(signIn.topAddress()).isEqualTo("https://intranet.example/start");
+                assertThat(signIn.navigation()).as("L31: the navigation asked in").isEqualTo(navigation);
             });
             assertThat(callback.told).as("answered later").isEmpty();
             assertThat(heard.getFirst().proceed("u", "pw")).isTrue();

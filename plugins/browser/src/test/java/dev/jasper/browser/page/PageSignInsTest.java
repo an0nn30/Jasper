@@ -213,12 +213,12 @@ class PageSignInsTest {
 
     private SignIn signIn(String topAddress) {
         return new SignIn("https://intranet.example/private", false, "intranet.example", 443, "Corp", "basic", topAddress,
-            (user, password) -> told.add("continue " + user), () -> told.add("cancel"));
+            0, (user, password) -> told.add("continue " + user), () -> told.add("cancel"));
     }
 
     private SignIn signIn() {
-        return new SignIn("https://intranet.example/", false, "intranet.example", 443, "Corp", "basic", "https://intranet.example/",
-            (user, password) -> told.add("continue " + user), () -> told.add("cancel"));
+        return new SignIn("https://intranet.example/", false, "intranet.example", 443, "Corp", "basic",
+            "https://intranet.example/", 0, (user, password) -> told.add("continue " + user), () -> told.add("cancel"));
     }
 
     private static Page page() {

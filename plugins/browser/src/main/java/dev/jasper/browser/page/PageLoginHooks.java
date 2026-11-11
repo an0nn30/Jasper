@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -15,8 +16,9 @@ import java.util.function.Consumer;
  * holds the tools' part: the login script each of its main frames runs as an http or https document starts loading,
  * read on Chromium's thread, and the handler its {@link PageQuery}s go to, with the queries handed to it that are not
  * yet over, which the page's close cancels; and its HTTP sign-ins: who hears each {@link SignIn} Chromium asks for, the
- * page's top address they are judged against, noted on Chromium's threads, and who hears each final response to a
- * main-frame navigation. It reaches no browser. UI thread, but where a method says otherwise.
+ * page's top address they are judged against and the number of its main frame's navigation requests, noted on
+ * Chromium's threads, and who hears each final response to a main-frame navigation. It reaches no browser. UI thread,
+ * but where a method says otherwise.
  */
 final class PageLoginHooks {
     /** What a query is told when the page has no password manager to hand it to. */
@@ -32,6 +34,8 @@ final class PageLoginHooks {
     // came last; and that latest commit. Null before the first. Written on Chromium's threads, read on any.
     private final AtomicReference<String> top = new AtomicReference<>();
     private volatile String committedTop;
+    // The main frame's navigation requests so far, their redirects not counted (L31). Written on Chromium's threads.
+    private final AtomicLong navigations = new AtomicLong();
     private final List<Consumer<SignIn>> signIns = new CopyOnWriteArrayList<>();
     private final List<BiConsumer<String, Integer>> responses = new CopyOnWriteArrayList<>();
 
@@ -85,11 +89,25 @@ final class PageLoginHooks {
     }
 
     /**
-     * The main frame asks for {@code url}, or a request of its is redirected there: the top address from now on. A null
-     * is ignored. Any thread.
+     * The main frame starts a navigation request for {@code url}: a new navigation, and the top address from now on. A
+     * null address is not noted, but the request counts. Any thread.
      */
     void mainFrameRequested(String url) {
+        navigations.incrementAndGet();
         if (url != null) top.set(url);
+    }
+
+    /**
+     * A request of the main frame's navigation is redirected to {@code url}: the same navigation, whose top address it
+     * is from now on (F6). A null is ignored. Any thread.
+     */
+    void mainFrameRedirected(String url) {
+        if (url != null) top.set(url);
+    }
+
+    /** The number of the main frame's navigation requests so far, their redirects not counted (L31). Any thread. */
+    long navigation() {
+        return navigations.get();
     }
 
     /**

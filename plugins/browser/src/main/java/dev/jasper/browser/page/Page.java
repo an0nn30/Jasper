@@ -57,7 +57,8 @@ import org.cef.browser.CefRequestContext;
  * close cancels the queries not answered (plan 8). Each HTTP sign-in Chromium asks for one of the page's requests goes
  * to its item, to answer once ({@link #onSignIn}, {@link SignIn}), judged against the page's top address: its main
  * frame's latest navigation request, after its redirects, or its latest commit, whichever came last
- * ({@link #topAddress()}); and so does each final main-frame response's status ({@link #onMainFrameResponse}).
+ * ({@link #topAddress()}), and stamped with the number of that navigation ({@link #navigation()}); and so does each
+ * final main-frame response's status ({@link #onMainFrameResponse}).
  */
 public final class Page implements AutoCloseable {
     /** The longest {@link #source} waits for Chromium's HTML. */
@@ -964,14 +965,35 @@ public final class Page implements AutoCloseable {
     }
 
     /**
-     * Chromium's IO thread notes that the page's main frame asks for {@code url}, as each of its navigation requests
-     * starts, or is redirected there (F6): the page's top address until the next request or commit
+     * Chromium's IO thread notes that the page's main frame starts a navigation request for {@code url}: a new
+     * navigation ({@link #navigation()}), and the page's top address until the next request, redirect or commit
      * ({@link #topAddress()}). Any thread.
      *
-     * @param url the request's address, as Chromium names it; a null is ignored
+     * @param url the request's address, as Chromium names it; a null address is not noted, but the request counts
      */
     public void mainFrameRequested(String url) {
         loginHooks.mainFrameRequested(url);
+    }
+
+    /**
+     * Chromium's IO thread notes that a request of the page's main-frame navigation is redirected to {@code url} (F6):
+     * the same navigation, and the page's top address until the next request, redirect or commit. Any thread.
+     *
+     * @param url the address it is redirected to, as Chromium names it; a null is ignored
+     */
+    public void mainFrameRedirected(String url) {
+        loginHooks.mainFrameRedirected(url);
+    }
+
+    /**
+     * The number of the page's main-frame navigation requests so far, as Chromium's IO thread noted them: each new one
+     * counts, its redirects do not ({@link #mainFrameRequested}, {@link #mainFrameRedirected}), so an HTTP sign-in and
+     * the responses that follow it can be told to belong to one navigation (plan 8's L31). Any thread.
+     *
+     * @return the number; 0 before the first
+     */
+    public long navigation() {
+        return loginHooks.navigation();
     }
 
     /**

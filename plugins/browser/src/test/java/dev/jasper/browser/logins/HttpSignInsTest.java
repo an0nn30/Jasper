@@ -1096,6 +1096,133 @@ class HttpSignInsTest {
         });
     }
 
+    /**
+     * L31: the site's own open redirect does not re-arm a fill either: once the page is sent to it, its 200 and its
+     * commit answer another navigation than the one the fill answered, so the challenge after it shows the dialog.
+     */
+    @Test void anOpenRedirectOnTheSiteDoesNotReArmTheFill() throws Exception {
+        open(true);
+        fake.login(CORP, "u", "wrong");
+        String bounce = TOP + "redirect?to=https://elsewhere.example/";
+        onUiThread(() -> {
+            page.mainFrameRequested(TOP);
+            challenge("a", TOP, "intranet.example", 443, "Corp", false);
+            page.mainFrameRequested(bounce);
+            page.mainFrameResponded(bounce, 200);
+            PageTestAccess.loadStarted(page, bounce);
+            page.mainFrameRequested(TOP);
+            challenge("again", TOP, "intranet.example", 443, "Corp", false);
+        });
+        onUiThread(() -> {
+            assertThat(host.windowView(ID, TITLE)).as("the dialog, not a second fill").isPresent();
+            press(form().cancelAction());
+            assertThat(told).containsExactly("a proceed u wrong", "again cancel");
+            assertThat(fake.calls).as("one silent fill").containsExactly("credentialIfGranted " + CORP);
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /** L31: a redirect is the fill's own navigation, so its 200 and commit re-arm the fill (F6). */
+    @Test void aRedirectOfTheFillsOwnNavigationReArmsIt() throws Exception {
+        open(true);
+        fake.login(CORP, "u", "pw");
+        onUiThread(() -> {
+            page.mainFrameRequested(TOP);
+            challenge("a", TOP, "intranet.example", 443, "Corp", false);
+            page.mainFrameRedirected(TOP + "y");
+            page.mainFrameResponded(TOP + "y", 200);
+            PageTestAccess.loadStarted(page, TOP + "y");
+            page.mainFrameRequested(TOP);
+            challenge("later", TOP, "intranet.example", 443, "Corp", false);
+            assertThat(told).containsExactly("a proceed u pw", "later proceed u pw");
+            assertThat(host.windows()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * L31: a fill whose navigation a new request replaces before its answer leaves its name tried while the page
+     * lasts: neither the new navigation's answer nor a later sign-in through the dialog that works re-arms it.
+     */
+    @Test void aFillWhoseNavigationIsReplacedNeverReArmsOnThatPage() throws Exception {
+        open(true);
+        fake.login(CORP, "u", "pw");
+        onUiThread(() -> {
+            page.mainFrameRequested(TOP);
+            challenge("a", TOP, "intranet.example", 443, "Corp", false);
+            page.mainFrameRequested(NEXT);
+            page.mainFrameResponded(NEXT, 200);
+            PageTestAccess.loadStarted(page, NEXT);
+            page.mainFrameRequested(TOP);
+            challenge("b", TOP, "intranet.example", 443, "Corp", false);
+        });
+        onUiThread(() -> {
+            assertThat(host.windowView(ID, TITLE)).as("replaced before its answer").isPresent();
+            type("u", "pw");
+            press(ok());
+            page.mainFrameResponded(TOP, 200);
+            PageTestAccess.loadStarted(page, TOP);
+            page.mainFrameRequested(TOP);
+            challenge("c", TOP, "intranet.example", 443, "Corp", false);
+        });
+        onUiThread(() -> {
+            assertThat(host.windowView(ID, TITLE)).as("still, after a sign-in that worked").isPresent();
+            press(form().cancelAction());
+            assertThat(told).containsExactly("a proceed u pw", "b proceed u pw", "c cancel");
+            assertThat(fake.calls).as("one silent fill").containsExactly("credentialIfGranted " + CORP);
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * L31: a main-frame load failure, such as the user's Stop, ends the fill's navigation, its 200 notwithstanding:
+     * the commit after it re-arms nothing.
+     */
+    @Test void aFillWhoseNavigationFailsNeverReArms() throws Exception {
+        open(true);
+        fake.login(CORP, "u", "pw");
+        onUiThread(() -> {
+            page.mainFrameRequested(TOP);
+            challenge("a", TOP, "intranet.example", 443, "Corp", false);
+            page.mainFrameResponded(TOP, 200);
+            PageTestAccess.loadFailed(page, TOP, "ERR_ABORTED");
+            PageTestAccess.loadStarted(page, TOP);
+            challenge("b", TOP, "intranet.example", 443, "Corp", false);
+        });
+        onUiThread(() -> {
+            assertThat(host.windowView(ID, TITLE)).as("the failed navigation's name").isPresent();
+            press(form().cancelAction());
+            assertThat(told).containsExactly("a proceed u pw", "b cancel");
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * L31: a name whose fill found no login it may read sent no password, so it keeps L30's rule: another navigation's
+     * answer from its origin and that page's commit re-arm it.
+     */
+    @Test void aNameWhoseFillSentNothingKeepsTheOriginsRule() throws Exception {
+        open(true);
+        UUID id = fake.login(CORP, "u", "pw");
+        fake.ungranted.add(id);
+        onUiThread(() -> {
+            page.mainFrameRequested(TOP);
+            challenge("a", TOP, "intranet.example", 443, "Corp", false);
+        });
+        onUiThread(() -> {
+            assertThat(host.windowView(ID, TITLE)).as("no login the Browser may read").isPresent();
+            press(form().cancelAction());
+            page.mainFrameRequested(NEXT);
+            page.mainFrameResponded(NEXT, 200);
+            PageTestAccess.loadStarted(page, NEXT);
+            fake.ungranted.remove(id);
+            page.mainFrameRequested(TOP);
+            challenge("b", TOP, "intranet.example", 443, "Corp", false);
+            assertThat(told).containsExactly("a cancel", "b proceed u pw");
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
     /** Minor 1: a main-frame load start before the challenged navigation's response drops the pending save, zeroed. */
     @Test void aLoadStartDropsThePendingSave() throws Exception {
         open(true);
@@ -1229,7 +1356,7 @@ class HttpSignInsTest {
     private SignIn signIn(String name, String origin, String top, String challenger, int port, String realm, boolean proxy,
                           String scheme) {
         if (items == null) open(false);
-        return new SignIn(origin, proxy, challenger, port, realm, scheme, top,
+        return new SignIn(origin, proxy, challenger, port, realm, scheme, top, page.navigation(),
             (user, password) -> told.add(name + " proceed " + user + " " + password), () -> told.add(name + " cancel"));
     }
 

@@ -1078,9 +1078,9 @@ final class OpenerBridge {
 
     /**
      * A main frame's navigation request: its response's opener policy and content security policies go to the bridge;
-     * the address each redirect sends it to is the page's top address until the next request or commit
-     * ({@link Page#mainFrameRequested}, plan 8's F6); and the final response's address and status are posted to the
-     * page ({@link Page#mainFrameResponded}). Nothing about the load changes. Chromium's IO thread.
+     * the address each redirect sends it to is the page's top address until the next request or commit, in the same
+     * navigation ({@link Page#mainFrameRedirected}, plan 8's F6); and the final response's address and status are
+     * posted to the page ({@link Page#mainFrameResponded}). Nothing about the load changes. Chromium's IO thread.
      */
     private static final class Responses extends CefResourceRequestHandlerAdapter {
         private final OpenerBridge bridge;
@@ -1094,7 +1094,7 @@ final class OpenerBridge {
             try {
                 Page page = browser instanceof PageBrowser shown ? shown.owner() : null;
                 if (page != null && newUrl != null && request.getResourceType() == CefRequest.ResourceType.RT_MAIN_FRAME)
-                    page.mainFrameRequested(newUrl.get());
+                    page.mainFrameRedirected(newUrl.get());
             } catch (RuntimeException failure) {
                 LOG.log(System.Logger.Level.WARNING, "The opener bridge could not read a page's redirect", failure);
             }

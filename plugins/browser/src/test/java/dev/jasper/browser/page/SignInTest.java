@@ -41,7 +41,8 @@ class SignInTest {
         for (int round = 0; round < 200; round++) {
             var answers = new AtomicInteger();
             SignIn signIn = new SignIn("https://intranet.example/", false, "intranet.example", 443, "Corp", "Basic",
-                "https://intranet.example/", (user, password) -> answers.incrementAndGet(), answers::incrementAndGet);
+                "https://intranet.example/", 0, (user, password) -> answers.incrementAndGet(),
+                answers::incrementAndGet);
             var start = new CountDownLatch(1);
             var won = new AtomicInteger();
             Thread proceeding = new Thread(() -> {
@@ -67,13 +68,13 @@ class SignInTest {
      */
     @Test void aThrowingCallbackIsContainedAndLoggedWithoutTheSecret() {
         try (var log = new CapturedLog(SignIn.class.getName())) {
-            SignIn proceeding = new SignIn("https://intranet.example/", false, "intranet.example", 443, "Corp", "basic", "",
-                (user, password) -> { throw new IllegalStateException("No native browser"); }, () -> { });
+            SignIn proceeding = new SignIn("https://intranet.example/", false, "intranet.example", 443, "Corp", "basic",
+                "", 0, (user, password) -> { throw new IllegalStateException("No native browser"); }, () -> { });
             assertThat(proceeding.proceed("u", "pw")).isFalse();
             assertThat(proceeding.answered()).isTrue();
             assertThat(proceeding.cancel()).isFalse();
-            SignIn cancelling = new SignIn("https://intranet.example/", false, "intranet.example", 443, "Corp", "basic", "",
-                (user, password) -> { }, () -> { throw new IllegalStateException("No native browser"); });
+            SignIn cancelling = new SignIn("https://intranet.example/", false, "intranet.example", 443, "Corp", "basic",
+                "", 0, (user, password) -> { }, () -> { throw new IllegalStateException("No native browser"); });
             assertThat(cancelling.cancel()).isFalse();
             assertThat(cancelling.answered()).isTrue();
             assertThat(log.records()).hasSize(2).allSatisfy(record -> {
@@ -85,7 +86,7 @@ class SignInTest {
 
     @Test void itKeepsChromiumsValuesTheSchemeInLowerCase() {
         SignIn signIn = new SignIn("https://intranet.example/", true, "proxy.example", 8118, "Corp", "NTLM",
-            "https://intranet.example/start", (user, password) -> { }, () -> { });
+            "https://intranet.example/start", 7, (user, password) -> { }, () -> { });
         assertThat(signIn.originUrl()).isEqualTo("https://intranet.example/");
         assertThat(signIn.proxy()).isTrue();
         assertThat(signIn.host()).isEqualTo("proxy.example");
@@ -93,10 +94,11 @@ class SignInTest {
         assertThat(signIn.realm()).isEqualTo("Corp");
         assertThat(signIn.scheme()).isEqualTo("ntlm");
         assertThat(signIn.topAddress()).isEqualTo("https://intranet.example/start");
+        assertThat(signIn.navigation()).isEqualTo(7);
     }
 
     @Test void aNullTextReadsAsEmpty() {
-        SignIn signIn = new SignIn(null, false, null, 80, null, null, null, (user, password) -> { }, () -> { });
+        SignIn signIn = new SignIn(null, false, null, 80, null, null, null, 0, (user, password) -> { }, () -> { });
         assertThat(List.of(signIn.originUrl(), signIn.host(), signIn.realm(), signIn.scheme(), signIn.topAddress()))
             .containsOnly("");
     }
@@ -112,12 +114,14 @@ class SignInTest {
     }
 
     private SignIn signIn() {
-        return new SignIn("https://intranet.example/", false, "intranet.example", 443, "Corp", "Basic", "https://intranet.example/",
-            (user, password) -> told.add("continue " + user + " " + password), () -> told.add("cancel"));
+        return new SignIn("https://intranet.example/", false, "intranet.example", 443, "Corp", "Basic",
+            "https://intranet.example/", 0, (user, password) -> told.add("continue " + user + " " + password),
+            () -> told.add("cancel"));
     }
 
     private static SignIn signInFrom(String originUrl) {
-        return new SignIn(originUrl, false, "intranet.example", 443, "", "basic", "", (user, password) -> { }, () -> { });
+        return new SignIn(originUrl, false, "intranet.example", 443, "", "basic", "", 0, (user, password) -> { },
+            () -> { });
     }
 
     /** The record's text, its parameters and its exception's message included. */
