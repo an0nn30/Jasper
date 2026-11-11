@@ -33,7 +33,8 @@ bundled plugins, the plugin SDK, and the libraries the application is built from
   [differences from Vim](vim-divergences.md).
 - [Browser](browser.md): web pages in workspace tabs and panes, the Web menu, history and bookmarks, /dev/null mode,
   site permissions, page notifications, audio, clearing data, ad blocking and the HTTP proxy, downloads and page tools,
-  links and popups in a page, where the links you click in a terminal open, and making Jasper your default browser.
+  logins from the Credential Vault, links and popups in a page, where the links you click in a terminal open, and
+  making Jasper your default browser.
 - [File Server](file-server.md): sharing a folder over HTTP, HTTPS, FTP, FTPS, SFTP and TFTP.
 - [Project Index](project-index.md): indexing projects and finding their files from the command palette.
 - [Shell History and Snippets](history-and-snippets.md): searching shell history and saving commands.

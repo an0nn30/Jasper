@@ -147,12 +147,15 @@ data in memory only; site permissions for the camera, the microphone and notific
 Jasper's; audio muting, until you allow a site's sound; Clear Cookies and Clear Website Data; ad blocking from a
 content-blocker list; and an HTTP proxy. Downloads go to the Downloads folder with the system's downloaded-file mark,
 listed in a Downloads menu, and its page tools are reader mode, distraction removal, Remove Element and Save Page As.
+With the Credential Vault it fills a page's login fields from the vault, and its dialog for a site's HTTP sign-in can
+sign in with a login from the vault and remember the one you type.
 It is Jasper's web browser: links you click in a terminal and Jasper's own web links can open here, by default after
 asking "Open in Jasper?", and `jasper URL...` opens here without asking. It also draws the Editor's Markdown preview.
 Chromium starts the first time a browser page or a Markdown preview shows.
 
 - **Start with** File › New Browser Tab.
 - **Capabilities** `browser.provide`, `palette.contribute`.
+- **Uses, when present** Credential Vault (`>=0.9.0`) for logins in pages and sign-ins.
 - **Exports** `dev.jasper.browser.api`, which the Editor uses to draw its Markdown preview.
 
 ### Enterprise
