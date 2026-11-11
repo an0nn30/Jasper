@@ -40,10 +40,10 @@ class HostedAnchorTest {
         var area=new java.awt.Rectangle(10,20,30,8);
         var onScreen=HostedPopover.onScreen(new java.awt.Point(100,100),new java.awt.Dimension(640,480),area);
         assertThat(onScreen).isEqualTo(new java.awt.Rectangle(110,120,30,8));
-        assertThat(HostedPopover.fitBeside(onScreen,new java.awt.Dimension(200,100),screen,screen)).isEqualTo(new java.awt.Rectangle(110,128,200,100));
-        assertThat(HostedPopover.fitBeside(HostedPopover.onScreen(new java.awt.Point(100,700),new java.awt.Dimension(640,480),area),new java.awt.Dimension(200,100),screen,screen))
+        assertThat(HostedPopover.fitBeside(onScreen,new java.awt.Dimension(200,100),0,screen,screen)).isEqualTo(new java.awt.Rectangle(110,128,200,100));
+        assertThat(HostedPopover.fitBeside(HostedPopover.onScreen(new java.awt.Point(100,700),new java.awt.Dimension(640,480),area),new java.awt.Dimension(200,100),0,screen,screen))
             .as("no room below: above the area").isEqualTo(new java.awt.Rectangle(110,620,200,100));
-        assertThat(HostedPopover.fitBeside(onScreen,new java.awt.Dimension(20,100),screen,screen).width).as("as wide as the area").isEqualTo(30);
+        assertThat(HostedPopover.fitBeside(onScreen,new java.awt.Dimension(20,100),0,screen,screen).width).as("as wide as the area").isEqualTo(30);
         assertThat(HostedPopover.onScreen(new java.awt.Point(100,100),new java.awt.Dimension(190,22),null))
             .as("a control's anchor is its bounds").isEqualTo(new java.awt.Rectangle(100,100,190,22));
     }
@@ -59,37 +59,42 @@ class HostedAnchorTest {
         var tall=new java.awt.Rectangle(110,100,580,600);
         var preferred=new java.awt.Dimension(220,300);
         assertThat(HostedPopover.room(tall,screen)).isEqualTo(100);
-        assertThat(HostedPopover.fitBeside(tall,preferred,screen,window)).as("an area filling its window's height: below it, squeezed")
+        assertThat(HostedPopover.fitBeside(tall,preferred,0,screen,window)).as("an area filling its window's height: below it, squeezed")
             .isEqualTo(new java.awt.Rectangle(110,700,580,100));
         assertThat(HostedPopover.fit(tall,preferred,screen,window).intersects(tall)).as("a control's placement clamps over it").isTrue();
 
         var shortScreen=new java.awt.Rectangle(0,0,800,300);
         var middle=new java.awt.Rectangle(50,120,200,60);
-        assertThat(HostedPopover.fitBeside(middle,new java.awt.Dimension(220,200),shortScreen,shortScreen)).as("the middle of a short screen: below, squeezed")
+        assertThat(HostedPopover.fitBeside(middle,new java.awt.Dimension(220,200),0,shortScreen,shortScreen)).as("the middle of a short screen: below, squeezed")
             .isEqualTo(new java.awt.Rectangle(50,180,220,120));
         var lower=new java.awt.Rectangle(50,150,200,60);
-        assertThat(HostedPopover.fitBeside(lower,new java.awt.Dimension(220,200),shortScreen,shortScreen)).as("more room above: above, squeezed")
+        assertThat(HostedPopover.fitBeside(lower,new java.awt.Dimension(220,200),0,shortScreen,shortScreen)).as("more room above: above, squeezed")
             .isEqualTo(new java.awt.Rectangle(50,0,220,150));
 
         var bottom=new java.awt.Rectangle(10,700,300,100);
-        assertThat(HostedPopover.fitBeside(bottom,preferred,screen,screen)).as("an area at the screen's bottom: above it")
+        assertThat(HostedPopover.fitBeside(bottom,preferred,0,screen,screen)).as("an area at the screen's bottom: above it")
             .isEqualTo(new java.awt.Rectangle(10,400,300,300));
 
         for(var area:List.of(tall,middle,lower,bottom,new java.awt.Rectangle(10,20,30,8),new java.awt.Rectangle(0,-50,40,500),new java.awt.Rectangle(0,650,40,500)))
             for(var usable:List.of(screen,shortScreen)){
-                var fitted=HostedPopover.fitBeside(area,new java.awt.Dimension(400,900),usable,usable);
+                var fitted=HostedPopover.fitBeside(area,new java.awt.Dimension(400,900),0,usable,usable);
                 if(fitted!=null)assertThat(fitted.intersects(area)).as("%s on %s: %s",area,usable,fitted).isFalse();
             }
     }
 
-    /** L37: with no room below or above the area, there is nowhere off it to put a popover. */
+    /** L37: with no room below or above the area, there is nowhere off it to put a popover; L40: nor with less than the content's minimum. */
     @Test void anAreaFillingTheScreenLeavesNoRoom() {
         var screen=new java.awt.Rectangle(0,20,1000,780);
         assertThat(HostedPopover.room(new java.awt.Rectangle(0,20,1000,780),screen)).isZero();
-        assertThat(HostedPopover.fitBeside(new java.awt.Rectangle(0,20,1000,780),new java.awt.Dimension(200,100),screen,screen)).isNull();
-        assertThat(HostedPopover.fitBeside(new java.awt.Rectangle(300,0,30,900),new java.awt.Dimension(200,100),screen,screen)).as("past both edges").isNull();
-        assertThat(HostedPopover.fitBeside(new java.awt.Rectangle(300,21,30,778),new java.awt.Dimension(200,100),screen,screen)).as("a pixel either side: below it")
+        assertThat(HostedPopover.fitBeside(new java.awt.Rectangle(0,20,1000,780),new java.awt.Dimension(200,100),0,screen,screen)).isNull();
+        assertThat(HostedPopover.fitBeside(new java.awt.Rectangle(300,0,30,900),new java.awt.Dimension(200,100),0,screen,screen)).as("past both edges").isNull();
+        assertThat(HostedPopover.fitBeside(new java.awt.Rectangle(300,21,30,778),new java.awt.Dimension(200,100),0,screen,screen)).as("a pixel either side: below it")
             .isEqualTo(new java.awt.Rectangle(300,799,200,1));
+        // L40: a room smaller than the content's minimum height is no room.
+        assertThat(HostedPopover.fitBeside(new java.awt.Rectangle(300,21,30,778),new java.awt.Dimension(200,100),31,screen,screen)).as("a pixel, under a minimum of 31").isNull();
+        assertThat(HostedPopover.fitBeside(new java.awt.Rectangle(300,51,30,718),new java.awt.Dimension(200,100),31,screen,screen)).as("31 either side, a minimum of 31")
+            .isEqualTo(new java.awt.Rectangle(300,769,200,31));
+        assertThat(HostedPopover.fitBeside(new java.awt.Rectangle(300,50,30,720),new java.awt.Dimension(200,100),31,screen,screen)).as("30 either side, a minimum of 31").isNull();
     }
 
     /**
@@ -107,6 +112,43 @@ class HostedAnchorTest {
             assertThat(placed).isNotNull();assertThat(placed.intersects(area)).isFalse();
             assertThat(placed.y+placed.height).as("above the area").isEqualTo(700);
             assertThat(popover.get().place(new java.awt.Rectangle(100,0,30,800),screen,screen)).as("no room").isNull();
+            assertThat(closed).as("not while it is being placed").hasValue(0);
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            assertThat(closed).as("closed on the next turn").hasValue(1);
+            assertThat(page.get().anchor().isOpen()).as("the anchor stays open").isTrue();
+            page.get().close();
+        });
+    }
+
+    /**
+     * L40: a room beside the area smaller than the content's minimum height, a picker menu's search box, is no room: the
+     * popover would be a sliver taking the keyboard where the user cannot see it, so it closes on the next turn; a room
+     * of the minimum shows it.
+     */
+    @Test void aRoomBelowTheContentsMinimumHeightIsNoRoom() throws Exception {
+        var page=new AtomicReference<Page>();var closed=new AtomicInteger();var minimum=new AtomicInteger();
+        var screen=new java.awt.Rectangle(0,0,1000,800);
+        // An area leaving `room` both below and above it.
+        java.util.function.IntFunction<java.awt.Rectangle> leaving=room->new java.awt.Rectangle(100,room,30,800-2*room);
+        SwingUtilities.invokeAndWait(() -> {
+            page.set(Page.open("test.area.sliver"));
+            java.util.function.Supplier<HostedPopover> menu=() -> {
+                var popover=(HostedPopover) page.get().ui().windows().popover(page.get().anchor());
+                var view=page.get().kit().create(new ViewSpec(new Nodes.PickerMenu("menu",ControlState.READY,"example","Search credentials",
+                    List.of(new Nodes.PickerItem("login","example.com","alice","user",Nodes.Hue.BLUE)),"","","No matches","New Credential…","create","cancel")),e -> {});
+                popover.setContent(view);popover.show();
+                minimum.set(view.component().getMinimumSize().height);
+                return popover;
+            };
+            var shown=menu.get();
+            assertThat(minimum.get()).as("precondition: the menu has a minimum height, its search box").isGreaterThan(1);
+            var placed=shown.place(leaving.apply(minimum.get()),screen,screen);
+            assertThat(placed).as("a room of the minimum").isNotNull();
+            assertThat(placed.height).isEqualTo(minimum.get());assertThat(placed.intersects(leaving.apply(minimum.get()))).isFalse();
+            shown.close();
+            var sliver=menu.get();sliver.onClosed(closed::incrementAndGet);
+            assertThat(sliver.place(leaving.apply(minimum.get()-1),screen,screen)).as("a pixel less: no room").isNull();
             assertThat(closed).as("not while it is being placed").hasValue(0);
         });
         SwingUtilities.invokeAndWait(() -> {

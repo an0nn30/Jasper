@@ -61,6 +61,42 @@ class PickerMenusTest {
    assertThat(((Nodes.PickerItem)rows.getSelectedValue()).id()).as("Up from no row: the last, the footer").isEqualTo("create");
   }finally{release(context);}
  });}
+ /**
+  * Browser plan 8's L40: a press on a row reports it as Selected before accepting it, although the look's own press
+  * handler, which runs first, holds the selection adjusting until the release; so an owner that accepts only the row
+  * the user moved to takes the click. The look's handler cannot run headless (it reads the menu shortcut key), so its
+  * press and release are replayed as BasicListUI makes them.
+  */
+ @Test void aPressedRowIsReportedBeforeItIsAccepted(){Edt.run(()->{
+  var context=KitFixtures.context();var priorLaf=UIManager.getLookAndFeel();FlatLafInstaller.install(context.theme(),dev.jasper.ui.kit.Kit.DEFAULT);
+  var events=new ArrayList<UiEvent>();
+  var items=List.of(new Nodes.PickerItem("a","Alpha","alice","user",Nodes.Hue.BLUE),new Nodes.PickerItem("b","Beta","bob","user",Nodes.Hue.BLUE));
+  var menu=new Nodes.PickerMenu("menu",ControlState.READY,"example","Search",items,"","","No matches","New Credential\u2026","create","cancel");
+  try(var view=new KitView(context,new ViewSpec(menu),events::add)){
+   view.setSize(view.getPreferredSize());layout(view);
+   var rows=find(view,"menu.rows",JList.class);var field=find(view,"menu.search",JTextField.class);
+   assertThat(rows.getUI()).as("precondition: FlatLaf's list").isInstanceOf(com.formdev.flatlaf.ui.FlatListUI.class);
+   var listeners=List.of(rows.getMouseListeners());java.util.function.Predicate<Object> ours=listener->listener.getClass().getName().startsWith("dev.jasper.ui.swing.PickerMenus$");
+   int look=-1,own=-1;for(int i=0;i<listeners.size();i++){if(listeners.get(i).getClass().getName().startsWith("javax.swing.plaf.basic.BasicListUI$"))look=i;if(ours.test(listeners.get(i)))own=i;}
+   assertThat(look).as("precondition: the look's press handler runs before the kit's").isNotNegative().isLessThan(own);
+   var kit=listeners.get(own);
+   field.getActionMap().get("picker.enter").actionPerformed(null);
+   assertThat(events).as("Enter with no row active").isEmpty();
+   for(var row:List.of(1,0)){
+    events.clear();var cell=rows.getCellBounds(row,row);
+    var press=new java.awt.event.MouseEvent(rows,java.awt.event.MouseEvent.MOUSE_PRESSED,System.currentTimeMillis(),java.awt.event.InputEvent.BUTTON1_DOWN_MASK,cell.x+4,cell.y+4,1,false,java.awt.event.MouseEvent.BUTTON1);
+    // BasicListUI.Handler.mousePressed: the selection adjusting, then the pressed row.
+    rows.setValueIsAdjusting(true);rows.setSelectionInterval(row,row);
+    assertThat(events).as("silent while adjusting").isEmpty();
+    kit.mousePressed(press);
+    String id=items.get(row).id();
+    assertThat(events).as("row %s: the pressed row, then its acceptance",row).containsExactly(new UiEvent.Selected("menu",Set.of(id)),new UiEvent.Action(id));
+    // BasicListUI.Handler.mouseReleased.
+    rows.setValueIsAdjusting(false);
+    assertThat(events).as("nothing more on the release").hasSize(2);
+   }
+  }finally{release(context);try{UIManager.setLookAndFeel(priorLaf);}catch(UnsupportedLookAndFeelException failure){throw new AssertionError(failure);}}
+ });}
  /** Browser plan 8's L36: the search takes the focus with the caret at the end of its text and nothing selected, under FlatLaf's select-all-on-focus too. */
  @Test void theSearchTakesTheFocusWithTheCaretAtItsEndAndNothingSelected(){Edt.run(()->{
   var context=KitFixtures.context();var priorLaf=UIManager.getLookAndFeel();FlatLafInstaller.install(context.theme(),dev.jasper.ui.kit.Kit.DEFAULT);

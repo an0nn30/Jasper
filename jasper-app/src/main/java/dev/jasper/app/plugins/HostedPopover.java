@@ -60,11 +60,13 @@ final class HostedPopover implements PluginPopover {
      * opened it (Browser plan 8's L37). It is no taller than the larger {@link #room} beside the area, so it goes below the
      * area where it fits there and above it otherwise, its rows scrolling.
      *
-     * @return where it goes, or null when the usable screen leaves no room below or above the area
+     * @param minimum the content's minimum height, such as a picker menu's search box: a smaller room is no room, since a
+     *     sliver would take the keyboard where the user cannot see it (L40)
+     * @return where it goes, or null when the larger room is less than {@code minimum}, or than a pixel
      */
-    static Rectangle fitBeside(Rectangle area,Dimension preferred,Rectangle usable,Rectangle window){
+    static Rectangle fitBeside(Rectangle area,Dimension preferred,int minimum,Rectangle usable,Rectangle window){
         int room=room(area,usable);
-        return room<1?null:fit(area,new Dimension(preferred.width,Math.min(preferred.height,room)),usable,window);
+        return room<Math.max(1,minimum)?null:fit(area,new Dimension(preferred.width,Math.min(preferred.height,room)),usable,window);
     }
     /** The larger room the usable screen leaves below or above {@code area}; zero or less when it leaves none. */
     static int room(Rectangle area,Rectangle usable){return Math.max(usable.y+usable.height-(area.y+area.height),area.y-usable.y);}
@@ -84,15 +86,16 @@ final class HostedPopover implements PluginPopover {
     /**
      * Sizes and moves the popover for its anchor at {@code at} on a screen whose usable bounds are {@code usable}, and
      * answers where it goes. Its content may be as tall as the usable screen, or for an area anchor as the larger room
-     * beside the area. Where an area anchor leaves no room below or above its area, the popover closes on the next turn,
-     * as a dismissal does, and the answer is null; its anchor stays open.
+     * beside the area. Where an area anchor leaves less room below and above its area than the content's minimum height
+     * ({@link #fitBeside}), the popover closes on the next turn, as a dismissal does, and the answer is null; its anchor
+     * stays open.
      */
     Rectangle place(Rectangle at,Rectangle usable,Rectangle window){
-        int room=anchor.area==null?usable.height:room(at,usable);
-        if(anchor.area!=null&&room<1){SwingUtilities.invokeLater(this::close);return null;}
-        content.component().setAvailableHeight(Math.max(1,com.formdev.flatlaf.util.UIScale.unscale(room)));
-        var preferred=content.component().getPreferredSize();
-        var bounds=anchor.area==null?fit(at,preferred,usable,window):fitBeside(at,preferred,usable,window);
+        var component=content.component();
+        component.setAvailableHeight(Math.max(1,com.formdev.flatlaf.util.UIScale.unscale(anchor.area==null?usable.height:room(at,usable))));
+        var preferred=component.getPreferredSize();
+        var bounds=anchor.area==null?fit(at,preferred,usable,window):fitBeside(at,preferred,component.getMinimumSize().height,usable,window);
+        if(bounds==null){SwingUtilities.invokeLater(this::close);return null;}
         popup.setPopupSize(bounds.getSize());if(popup.isVisible())popup.setLocation(bounds.x,bounds.y);
         return bounds;
     }

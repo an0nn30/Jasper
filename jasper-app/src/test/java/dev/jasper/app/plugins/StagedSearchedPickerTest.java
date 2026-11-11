@@ -23,8 +23,9 @@ import static org.assertj.core.api.Assertions.*;
 /**
  * Browser plan 8's L36 through the real host, kit and staged Vault: a pick with a starting search, as a page's field
  * asks, has no active row until the user moves to one, so Enter on the starting search, or on what the user types,
- * chooses nothing and the chooser stays open; Down then Enter chooses the first match. The search takes the focus with
- * its text unselected and the caret at its end. A pick without a starting search still chooses its first row on Enter.
+ * chooses nothing and the chooser stays open; Down then Enter chooses the first match, and a press on a match chooses it
+ * (L40). The search takes the focus with its text unselected and the caret at its end. A pick without a starting search
+ * still chooses its first row on Enter.
  */
 class StagedSearchedPickerTest {
     static final PluginInfo CONSUMER = new PluginInfo("test.consumer", "Consumer", "0.1.0", Set.of());
@@ -94,6 +95,24 @@ class StagedSearchedPickerTest {
                 key(menu, "down"); enter(named(menu, "credential.menu.search"));
             });
             assertThat(chosen(picked)).as("Down then Enter: the first match").isEqualTo(ids.get(1));
+
+            // L40: a press on a match the user had not moved to chooses it. The look's press handler cannot run headless,
+            // so its press is replayed as BasicListUI makes it, then the kit's own press listener runs.
+            var pressed = pick.apply("example.com");
+            await(() -> menus(vault).size() == 1, "the chooser again");
+            var target = new AtomicReference<String>();
+            onEdt(() -> {
+                var menu = menu(vault); menu.setSize(menu.getPreferredSize()); layout(menu);
+                var rows = rows(menu); assertThat(rows.getSelectedValue()).as("no row active").isNull();
+                target.set(item(rows, 1).id());
+                var cell = rows.getCellBounds(1, 1);
+                var press = new java.awt.event.MouseEvent(rows, java.awt.event.MouseEvent.MOUSE_PRESSED, System.currentTimeMillis(),
+                    java.awt.event.InputEvent.BUTTON1_DOWN_MASK, cell.x + 4, cell.y + 4, 1, false, java.awt.event.MouseEvent.BUTTON1);
+                rows.setValueIsAdjusting(true); rows.setSelectionInterval(1, 1);
+                for (var listener : rows.getMouseListeners())
+                    if (listener.getClass().getName().startsWith("dev.jasper.ui.swing.PickerMenus$")) listener.mousePressed(press);
+            });
+            assertThat(chosen(pressed)).as("a press on the second match").isEqualTo(UUID.fromString(target.get()));
 
             var first = pick.apply("");
             await(() -> menus(vault).size() == 1, "the chooser without a starting search");

@@ -172,6 +172,24 @@ class AnchoredPickTest extends VaultServiceTest {
    assertThat(result.join()).isInstanceOfSatisfying(CredentialPickResult.Chosen.class,chosen->assertThat(chosen.credential().id()).isEqualTo(site));
   });
  }
+ /** L40: a press on a row the user had not moved to reports it as Selected, then accepts it, and so chooses it. */
+ @Test void aPressOnARowOfASearchedChooserChoosesIt(@TempDir Path dir)throws Exception{
+  var api=service(dir).forConsumer(SSH);populate();UUID site=UUID.randomUUID(),other=UUID.randomUUID();addSite(site);
+  lock.vault().accounts().add(new dev.jasper.vault.model.Account(other,"https://example.com (Home)","v",new dev.jasper.vault.model.Auth.Password("pw".toCharArray()),java.time.Instant.EPOCH,java.time.Instant.EPOCH));lock.save().join();
+  long[] now={0};
+  withChooser(dir,()->now[0],(host,anchor)->{
+   var result=api.pick(window,new CredentialPickRequest(anchor,Optional.empty(),true,"example.com"));
+   assertThat(rows(host)).containsExactlyInAnyOrder(site.toString(),other.toString());
+   var pressed=rows(host).getLast();now[0]+=500*MS;
+   chooser(host).emit(new dev.jasper.sdk.ui.UiEvent.Action(pressed));
+   chooser(host).emit(new dev.jasper.sdk.ui.UiEvent.Selected(dev.jasper.vault.ui.AnchoredPicker.MENU,Set.of(pressed)));
+   assertThat(result).as("accepted before it was reported, as the kit's press did before L40").isNotDone();
+   chooser(host).emit(new dev.jasper.sdk.ui.UiEvent.Edited(dev.jasper.vault.ui.AnchoredPicker.MENU,"example.com"));
+   chooser(host).emit(new dev.jasper.sdk.ui.UiEvent.Selected(dev.jasper.vault.ui.AnchoredPicker.MENU,Set.of(pressed)));
+   chooser(host).emit(new dev.jasper.sdk.ui.UiEvent.Action(pressed));
+   assertThat(result.join()).as("a press: the row reported, then accepted").isInstanceOfSatisfying(CredentialPickResult.Chosen.class,chosen->assertThat(chosen.credential().id().toString()).isEqualTo(pressed));
+  });
+ }
  @Test void aStartingSearchMatchingNothingLeavesNewCredentialInactiveToo(@TempDir Path dir)throws Exception{
   var api=service(dir).forConsumer(SSH);populate();long[] now={0};
   withChooser(dir,()->now[0],(host,anchor)->{

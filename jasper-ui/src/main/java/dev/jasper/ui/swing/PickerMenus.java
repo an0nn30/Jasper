@@ -103,7 +103,9 @@ final class PickerMenus {
             search.addInputMethodListener(ime);own(()->search.removeInputMethodListener(ime));
             ListSelectionListener selection=e->{if(!e.getValueIsAdjusting()&&!applying&&list.getSelectedValue()!=null)emit(new UiEvent.Selected(this.node.id(),Set.of(list.getSelectedValue().id())));};
             list.addListSelectionListener(selection);own(()->list.removeListSelectionListener(selection));
-            MouseAdapter click=new MouseAdapter(){public void mousePressed(MouseEvent e){if(SwingUtilities.isLeftMouseButton(e)){int i=list.locationToIndex(e.getPoint());if(i>=0&&list.getCellBounds(i,i).contains(e.getPoint())){list.setSelectedIndex(i);accept();}}}};
+            // The look's own press handler, which runs first, holds the selection adjusting until the release; ending it
+            // reports the pressed row as Selected before the press accepts it (Browser plan 8's L40).
+            MouseAdapter click=new MouseAdapter(){public void mousePressed(MouseEvent e){if(SwingUtilities.isLeftMouseButton(e)){int i=list.locationToIndex(e.getPoint());if(i>=0&&list.getCellBounds(i,i).contains(e.getPoint())){list.setSelectedIndex(i);list.setValueIsAdjusting(false);accept();}}}};
             list.addMouseListener(click);own(()->list.removeMouseListener(click));
             bind("DOWN","down",()->move(1));bind("UP","up",()->move(-1));bind("ENTER","enter",this::accept);bind("ESCAPE","escape",()->emit(new UiEvent.Action(((Nodes.PickerMenu)this.node).cancelAction())));
             refresh();
