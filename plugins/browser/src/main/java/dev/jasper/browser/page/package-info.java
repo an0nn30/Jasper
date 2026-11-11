@@ -73,8 +73,15 @@
  * ({@link dev.jasper.browser.page.Page#onToolReport}), Save Page As's parts among them, and counts its documents
  * ({@link dev.jasper.browser.page.Page#document}), which tells Save Page As whether the page navigated meanwhile; the
  * right-click menu's Save Page As… is its item's, through the menu place.
+ * For its item's password manager (plan 8), a page runs a login script in each http or https document of its main
+ * frame as it starts loading, there and then on Chromium's thread, but never in a challenge provider's, and hands each
+ * {@code login.pick} of its top frame, which the {@code links} package's opener bridge makes a
+ * {@link dev.jasper.browser.page.PageQuery}, to its item's handler, to answer later, once, and only while the page
+ * shows the origin that asked ({@link dev.jasper.browser.page.Page#handleLogins},
+ * {@link dev.jasper.browser.page.Page#loginQuery}); {@code PageLoginHooks} holds the script and the handler, and the
+ * page's close cancels the queries not answered.
  * {@link dev.jasper.browser.page.LastPress}, {@code Favicons}, {@code DownloadStart}, {@code DownloadTarget},
- * {@code DownloadProgress}, {@code Page}'s methods and {@code PreviewPage}'s name no Chromium type, and none of these
- * classes loads until a browser item opens or a Markdown preview is made.
+ * {@code DownloadProgress}, {@code PageQuery}, {@code Page}'s methods and {@code PreviewPage}'s name no Chromium type,
+ * and none of these classes loads until a browser item opens or a Markdown preview is made.
  */
 package dev.jasper.browser.page;

@@ -5,19 +5,28 @@ import dev.jasper.browser.links.Isolation.OpenerPolicy;
 import dev.jasper.browser.links.Isolation.Sandbox;
 import dev.jasper.browser.links.OpenerBridge.Answer;
 import dev.jasper.browser.links.OpenerBridge.Party;
+import dev.jasper.browser.links.OpenerBridge.QueryId;
 import dev.jasper.browser.page.Activation;
 import dev.jasper.browser.page.Favicons;
+import dev.jasper.browser.page.LastPress;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageContext;
 import dev.jasper.browser.page.PageFind;
+import dev.jasper.browser.page.PageQuery;
 import dev.jasper.browser.page.PageTestAccess;
+import dev.jasper.browser.store.CapturedLog;
+import java.awt.EventQueue;
 import java.io.InputStream;
 import java.lang.ref.WeakReference;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -39,7 +48,11 @@ class OpenerBridgeTest {
     // The pages here fetch no favicon: the bridge's part ends where a page is told its document's icon.
     private static final Favicons NO_FAVICONS = PageTestAccess.noFavicons();
     private static final String APP = "https://app.example/start", LOGIN = "https://login.example/sign-in";
+    /** What {@code login-fields.js} sends as the user clicks a password field's button (plan 8). */
+    private static final String PICK = "{\"op\":\"login.pick\",\"field\":\"password\",\"x\":8,\"y\":16,\"width\":200,\"height\":24}";
     private final OpenerBridge bridge = new OpenerBridge();
+    // The ids Chromium gives the queries the tests answer, each its own.
+    private long queries;
 
     @Test void anOpenWithTheUsersActivationMakesALinkAndOpensANextTabItem() throws Exception {
         onUiThread(() -> {
@@ -335,14 +348,14 @@ class OpenerBridgeTest {
             var answers = new java.util.ArrayList<Answer>();
             var from = bridge.sender(link.popup.page, "main", () -> LOGIN);
             assertThat(bridge.admit(link.popup.page, true, post(link.id, "*", "1"))).isEmpty();
-            bridge.answer(link.popup.party(), true, from, post(link.id, "*", "1"), NOW, answers::add);
+            bridge.answer(link.popup.party(), true, from, asked(), post(link.id, "*", "1"), NOW, answers::add);
             assertThat(answers).singleElement().satisfies(answer -> assertThat(answer.ok()).isTrue());
             assertThat(bridge.waiting()).isZero();
 
             var broken = new Error("the page's browser broke");
             link.opener.breaking = broken;
             assertThat(bridge.admit(link.popup.page, true, post(link.id, "*", "2"))).isEmpty();
-            assertThatThrownBy(() -> bridge.answer(link.popup.party(), true, from, post(link.id, "*", "2"), NOW, answers::add)).isSameAs(broken);
+            assertThatThrownBy(() -> bridge.answer(link.popup.party(), true, from, asked(), post(link.id, "*", "2"), NOW, answers::add)).isSameAs(broken);
             assertThat(answers).hasSize(2).last().satisfies(answer -> assertThat(answer.code()).isEqualTo(OpenerBridge.REFUSED));
             assertThat(bridge.waiting()).isZero();
         });
@@ -798,13 +811,13 @@ class OpenerBridgeTest {
             page.activation.activate(NOW - 100);
             var answers = new java.util.ArrayList<Answer>();
             var child = bridge.sender(page.page, "child", () -> APP);
-            bridge.answer(page.party(), false, child, open(LOGIN), NOW, answers::add);
-            bridge.answer(page.party(), false, child, favicon("https://app.example/icon.png"), NOW, answers::add);
+            bridge.answer(page.party(), false, child, asked(), open(LOGIN), NOW, answers::add);
+            bridge.answer(page.party(), false, child, asked(), favicon("https://app.example/icon.png"), NOW, answers::add);
             assertThat(answers).extracting(Answer::code).containsExactly(OpenerBridge.REFUSED, OpenerBridge.REFUSED);
             assertThat(page.opened).isEmpty();
             assertThat(page.activation.active(NOW)).as("a refused frame consumes nothing").isTrue();
             assertThat(PageTestAccess.declaredFavicon(page.page)).isEmpty();
-            bridge.answer(page.party(), true, bridge.sender(page.page, "main", () -> APP), open(LOGIN), NOW, answers::add);
+            bridge.answer(page.party(), true, bridge.sender(page.page, "main", () -> APP), asked(), open(LOGIN), NOW, answers::add);
             assertThat(answers.getLast().ok()).as("the main frame's").isTrue();
             assertThat(page.opened).containsExactly("NEXT_TAB " + LOGIN);
         });
@@ -902,6 +915,258 @@ class OpenerBridgeTest {
             .as("ASCII only, with no control character but the newline").isEmpty();
     }
 
+    /** Plan 8's F19: the codes a page's late answers fail with are the bridge's own, which the page scripts read. */
+    @Test void aPageQuerysCodesAreTheBridges() {
+        assertThat(List.of(PageQuery.MALFORMED, PageQuery.REFUSED, PageQuery.GONE, PageQuery.BUSY))
+            .containsExactly(OpenerBridge.MALFORMED, OpenerBridge.REFUSED, OpenerBridge.GONE, OpenerBridge.BUSY);
+    }
+
+    /**
+     * Plan 8's F14: a top frame's {@code login.pick} becomes a query its page's password manager answers later, once,
+     * with the document's origin as Chromium's thread saw it and the request as the page sent it; it waits in no place
+     * of the page's, and leaves the bridge once answered.
+     */
+    @Test void aTopFrameLoginPickReachesThePagesPasswordManagerAndIsAnsweredOnceLater() throws Exception {
+        onUiThread(() -> {
+            var page = new Document(APP);
+            var held = new ArrayList<PageQuery>();
+            page.page.handleLogins("login();", held::add);
+            bridge.loadStarted(page.party(), APP);
+            var answers = new ArrayList<Answer>();
+            assertThat(bridge.admit(page.page, true, PICK)).isEmpty();
+            bridge.answer(page.party(), true, bridge.sender(page.page, "main", () -> APP), asked(), PICK, NOW, answers::add);
+            assertThat(answers).as("answered later").isEmpty();
+            assertThat(bridge.waiting()).as("it holds no waiting place").isZero();
+            assertThat(bridge.loginQueries()).isOne();
+            PageQuery query = held.getFirst();
+            assertThat(held).hasSize(1);
+            assertThat(query.page()).isSameAs(page.page);
+            assertThat(query.origin()).hasValue("https://app.example");
+            assertThat(query.request()).containsExactly(Map.entry("op", "login.pick"), Map.entry("field", "password"), Map.entry("x", 8L),
+                Map.entry("y", 16L), Map.entry("width", 200L), Map.entry("height", 24L));
+            assertThat(query.answer("{\"password\":\"pw\"}")).isTrue();
+            assertThat(answers).containsExactly(new Answer(0, "{\"password\":\"pw\"}"));
+            assertThat(query.answer("{}")).isFalse();
+            assertThat(query.fail(PageQuery.BUSY, "Busy.")).isFalse();
+            assertThat(answers).as("once").hasSize(1);
+            assertThat(bridge.loginQueries()).as("an answered query leaves").isZero();
+        });
+    }
+
+    /** Plan 8's F14: the picker may stay open for minutes, so its query keeps none of the page's eight places. */
+    @Test void aLoginPickHoldsNoneOfThePagesWaitingPlaces() throws Exception {
+        onUiThread(() -> {
+            var page = new Document(APP);
+            var held = new ArrayList<PageQuery>();
+            page.page.handleLogins("login();", held::add);
+            bridge.loadStarted(page.party(), APP);
+            var answers = new ArrayList<Answer>();
+            for (int each = 0; each < 2 * OpenerBridge.WAITING_LIMIT; each++) {
+                assertThat(bridge.admit(page.page, true, PICK)).as("pick %d", each).isEmpty();
+                bridge.answer(page.party(), true, bridge.sender(page.page, "main", () -> APP), asked(), PICK, NOW, answers::add);
+            }
+            assertThat(held).hasSize(2 * OpenerBridge.WAITING_LIMIT);
+            assertThat(bridge.waiting()).as("back to none while each picker would still be open").isZero();
+            for (int each = 0; each < OpenerBridge.WAITING_LIMIT; each++) assertThat(bridge.admit(page.page, true, "{}")).isEmpty();
+            for (int each = 0; each < OpenerBridge.WAITING_LIMIT; each++) bridge.settled(page.page, true);
+            assertThat(answers).isEmpty();
+            held.forEach(query -> query.answer("{}"));
+            assertThat(answers).hasSize(2 * OpenerBridge.WAITING_LIMIT);
+            assertThat(bridge.loginQueries()).isZero();
+        });
+    }
+
+    /** The user's call: the field buttons fill the top frame only, so a sub-frame's pick is refused on both threads. */
+    @Test void aSubFramesLoginPickIsRefused() throws Exception {
+        onUiThread(() -> {
+            var page = new Document(APP);
+            var held = new ArrayList<PageQuery>();
+            page.page.handleLogins("login();", held::add);
+            assertThat(bridge.admit(page.page, false, PICK)).as("on Chromium's thread")
+                .hasValue(new Answer(OpenerBridge.REFUSED, "Only a page's top frame can use Jasper's opener bridge."));
+            var answers = new ArrayList<Answer>();
+            bridge.answer(page.party(), false, bridge.sender(page.page, "child", () -> APP), asked(), PICK, NOW, answers::add);
+            assertThat(answers).extracting(Answer::code).containsExactly(OpenerBridge.REFUSED);
+            assertThat(held).isEmpty();
+            assertThat(bridge.loginQueries()).isZero();
+        });
+    }
+
+    @Test void aLoginPickToAPageWithoutAPasswordManagerIsRefused() throws Exception {
+        onUiThread(() -> {
+            var page = new Document(APP);
+            var answers = new ArrayList<Answer>();
+            bridge.answer(page.party(), true, bridge.sender(page.page, "main", () -> APP), asked(), PICK, NOW, answers::add);
+            assertThat(answers).containsExactly(new Answer(OpenerBridge.REFUSED, "This page has no password manager."));
+            assertThat(bridge.waiting()).isZero();
+            assertThat(bridge.loginQueries()).isZero();
+        });
+    }
+
+    /**
+     * Plan 8's F14: a handler that throws leaves its query answered {@code REFUSED}, once, and settled; one that
+     * answered first keeps its answer; an {@link Error} is answered, once, and thrown on.
+     */
+    @Test void aLoginPickWhoseHandlerThrowsIsRefusedOnce() throws Exception {
+        onUiThread(() -> {
+            var answers = new ArrayList<Answer>();
+            var broken = new Document(APP);
+            broken.page.handleLogins("login();", query -> { throw new IllegalStateException("the picker broke"); });
+            try (var log = new CapturedLog(OpenerBridge.class.getName())) {
+                bridge.answer(broken.party(), true, bridge.sender(broken.page, "main", () -> APP), asked(), PICK, NOW, answers::add);
+                assertThat(log.records()).singleElement().satisfies(record -> assertThat(record.getThrown()).hasMessage("the picker broke"));
+            }
+            assertThat(answers).containsExactly(new Answer(OpenerBridge.REFUSED, "Jasper could not answer this request."));
+
+            var answering = new Document(APP);
+            answering.page.handleLogins("login();", query -> {
+                query.fail(PageQuery.BUSY, "Busy.");
+                throw new IllegalStateException("after its answer");
+            });
+            try (var log = new CapturedLog(OpenerBridge.class.getName())) {
+                bridge.answer(answering.party(), true, bridge.sender(answering.page, "main", () -> APP), asked(), PICK, NOW, answers::add);
+                assertThat(log.records()).hasSize(1);
+            }
+            assertThat(answers).hasSize(2).last().isEqualTo(new Answer(OpenerBridge.BUSY, "Busy."));
+
+            var failing = new Error("the page's item broke");
+            var erring = new Document(APP);
+            erring.page.handleLogins("login();", query -> { throw failing; });
+            assertThatThrownBy(() -> bridge.answer(erring.party(), true, bridge.sender(erring.page, "main", () -> APP), asked(), PICK, NOW,
+                answers::add)).isSameAs(failing);
+            assertThat(answers).hasSize(3).last().isEqualTo(new Answer(OpenerBridge.REFUSED, "Jasper could not answer this request."));
+            assertThat(bridge.waiting()).isZero();
+            assertThat(bridge.loginQueries()).isZero();
+        });
+    }
+
+    /**
+     * Plan 8's F3: a pick's activation needs Jasper's record of a recent mouse press as well as the page's activation,
+     * which it then consumes; a key alone activates the page but opens no picker, and spends nothing.
+     */
+    @Test void aLoginPicksActivationNeedsAMousePress() throws Exception {
+        onUiThread(() -> {
+            var page = new Document(APP);
+            var held = new ArrayList<PageQuery>();
+            page.page.handleLogins("login();", held::add);
+            var press = new AtomicReference<LastPress>(LastPress.NONE);
+            Party party = page.pressed(press::get);
+            var answers = new ArrayList<Answer>();
+            page.activation.activate(NOW - 100); // a key the page got
+            bridge.answer(party, true, bridge.sender(page.page, "main", () -> APP), asked(), PICK, NOW, answers::add);
+            assertThat(held.getLast().consumeActivation()).as("a key without a press").isFalse();
+            assertThat(page.activation.active(NOW)).as("nothing spent").isTrue();
+
+            press.set(new LastPress(1, 0, NOW - 6_000));
+            bridge.answer(party, true, bridge.sender(page.page, "main", () -> APP), asked(), PICK, NOW, answers::add);
+            assertThat(held.getLast().consumeActivation()).as("a press 6 s before the pick").isFalse();
+
+            press.set(new LastPress(1, 0, NOW - 100));
+            page.activation.activate(NOW - 100);
+            bridge.answer(party, true, bridge.sender(page.page, "main", () -> APP), asked(), PICK, NOW, answers::add);
+            PageQuery clicked = held.getLast();
+            assertThat(clicked.consumeActivation()).as("a click").isTrue();
+            assertThat(page.activation.active(NOW)).as("consumed").isFalse();
+            assertThat(clicked.consumeActivation()).isFalse();
+            assertThat(answers).isEmpty();
+        });
+    }
+
+    /** Plan 8's F14: the answer reaches the page only while its main frame shows the origin that asked. */
+    @Test void aLoginQueryIsToldGoneOnceThePageShowsAnotherOrigin() throws Exception {
+        onUiThread(() -> {
+            var page = new Document(APP);
+            var held = new ArrayList<PageQuery>();
+            page.page.handleLogins("login();", held::add);
+            bridge.loadStarted(page.party(), APP);
+            var answers = new ArrayList<Answer>();
+            bridge.answer(page.party(), true, bridge.sender(page.page, "main", () -> APP), asked(), PICK, NOW, answers::add);
+            bridge.loadStarted(page.party(), LOGIN);
+            assertThat(held.getFirst().answer("{\"password\":\"pw\"}")).isFalse();
+            assertThat(answers).singleElement().satisfies(answer -> {
+                assertThat(answer.code()).isEqualTo(OpenerBridge.GONE);
+                assertThat(answer.text()).doesNotContain("pw");
+            });
+            assertThat(bridge.loginQueries()).isZero();
+        });
+    }
+
+    /**
+     * Plan 8's F14: Chromium cancels a query as its frame navigates or closes, or as the page cancels it: the bridge
+     * finds the login query by its browser's identifier and its id, which then sends nothing.
+     */
+    @Test void chromiumsCancelReachesTheLoginQuery() throws Exception {
+        onUiThread(() -> {
+            var page = new Document(APP);
+            var cancels = new AtomicInteger();
+            var held = new ArrayList<PageQuery>();
+            page.page.handleLogins("login();", query -> {
+                held.add(query);
+                query.onCancelled(cancels::incrementAndGet);
+            });
+            bridge.loadStarted(page.party(), APP);
+            var answers = new ArrayList<Answer>();
+            bridge.answer(page.party(), true, bridge.sender(page.page, "main", () -> APP), new QueryId(7, 41), PICK, NOW, answers::add);
+            bridge.cancelled(8, 41);
+            bridge.cancelled(7, 40);
+            assertThat(cancels).as("another browser's or another query's cancel").hasValue(0);
+            bridge.cancelled(7, 41);
+            assertThat(cancels).hasValue(1);
+            assertThat(bridge.loginQueries()).isZero();
+            assertThat(held.getFirst().answer("{\"password\":\"pw\"}")).isFalse();
+            assertThat(answers).isEmpty();
+        });
+        onUiThread(() -> { }); // a cancel that found nothing looks again on the UI thread
+    }
+
+    /**
+     * Plan 8's F14: a cancel that comes on Chromium's thread before the UI thread took the query is not lost: the task
+     * that hands the query over was posted first, and the cancel follows it.
+     */
+    @Test void aCancelBeforeTheUiThreadTakesTheQueryCancelsItOnceTaken() throws Exception {
+        var made = new AtomicReference<Document>();
+        var cancels = new AtomicInteger();
+        var held = new CopyOnWriteArrayList<PageQuery>();
+        onUiThread(() -> {
+            var page = new Document(APP);
+            page.page.handleLogins("login();", query -> {
+                held.add(query);
+                query.onCancelled(cancels::incrementAndGet);
+            });
+            bridge.loadStarted(page.party(), APP);
+            made.set(page);
+        });
+        Document page = made.get();
+        var answers = new CopyOnWriteArrayList<Answer>();
+        OpenerBridge.Sender from = bridge.sender(page.page, "main", () -> APP);
+        // As Queries does on Chromium's thread: the query goes to the UI thread, then Chromium cancels it.
+        EventQueue.invokeLater(() -> bridge.answer(page.party(), true, from, new QueryId(3, 9), PICK, NOW, answers::add));
+        bridge.cancelled(3, 9);
+        onUiThread(() -> { });
+        assertThat(held).hasSize(1);
+        assertThat(cancels).hasValue(1);
+        assertThat(held.getFirst().answer("{\"password\":\"pw\"}")).isFalse();
+        assertThat(answers).isEmpty();
+        assertThat(bridge.loginQueries()).isZero();
+    }
+
+    /** Plan 8's F14: no login query outlives its page: the page's close cancels it, and it leaves the bridge. */
+    @Test void aLoginQueryLeavesTheBridgeAsItsPageCloses() throws Exception {
+        onUiThread(() -> {
+            var page = new Document(APP);
+            var held = new ArrayList<PageQuery>();
+            page.page.handleLogins("login();", held::add);
+            bridge.loadStarted(page.party(), APP);
+            var answers = new ArrayList<Answer>();
+            bridge.answer(page.party(), true, bridge.sender(page.page, "main", () -> APP), asked(), PICK, NOW, answers::add);
+            assertThat(bridge.loginQueries()).isOne();
+            page.page.close();
+            assertThat(bridge.loginQueries()).isZero();
+            assertThat(held.getFirst().answer("{\"password\":\"pw\"}")).isFalse();
+            assertThat(answers).isEmpty();
+        });
+    }
+
     /** A page's document as a recording stand-in: the scripts run in it, where it is, and what it asked of its item. */
     private static final class Document {
         final Page page;
@@ -930,11 +1195,18 @@ class OpenerBridgeTest {
         }
 
         Party party() {
-            return new Party(page, activation, () -> showing, script -> {
-                if (breaking != null) throw breaking;
-                if (failing) throw new IllegalStateException("the page's browser has gone");
-                scripts.add(script);
-            }, () -> address);
+            return new Party(page, activation, () -> showing, this::run, () -> address);
+        }
+
+        /** The page as the bridge reaches it, with Jasper's record of its last mouse press. */
+        Party pressed(java.util.function.Supplier<LastPress> press) {
+            return new Party(page, activation, press, () -> showing, this::run, () -> address);
+        }
+
+        private void run(String script) {
+            if (breaking != null) throw breaking;
+            if (failing) throw new IllegalStateException("the page's browser has gone");
+            scripts.add(script);
         }
     }
 
@@ -1026,6 +1298,11 @@ class OpenerBridgeTest {
             }
         }
         assertThat(reference.get()).as(what + " is collected").isNull();
+    }
+
+    /** A query as Chromium names it, its own: browser 1's next. */
+    private QueryId asked() {
+        return new QueryId(1, ++queries);
     }
 
     private Answer ask(Document from, String request) {

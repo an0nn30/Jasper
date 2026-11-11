@@ -50,6 +50,11 @@ import org.cef.browser.CefRequestContext;
  * end; {@link PageDownloadState} holds the ask, the start and the hold. Its item hears when its first navigation
  * becomes a download ({@link #onFirstNavigationDownload}, F28), and its downloads when a save chooser for it is
  * cancelled ({@link #onSaveCancelled}, F1.3).
+ *
+ * <p><b>Logins.</b> Its item's password manager runs a login script in each http or https document of the page's main
+ * frame as it starts loading, and answers the page's login queries later, once each ({@link #handleLogins},
+ * {@link #loginQuery}, {@link PageQuery}); {@link PageLoginHooks} holds the script and the handler, and the page's
+ * close cancels the queries not answered (plan 8).
  */
 public final class Page implements AutoCloseable {
     /** The longest {@link #source} waits for Chromium's HTML. */
@@ -115,6 +120,8 @@ public final class Page implements AutoCloseable {
     private final PageDownloadState downloadState = new PageDownloadState();
     // Plan 7: what the page gives the tools: their scripts, its load ends, their reports and its find's top frame.
     private final PageToolHooks toolHooks = new PageToolHooks(this);
+    // Plan 8: what the page gives its password manager: its login script and the handler of its queries.
+    private final PageLoginHooks loginHooks = new PageLoginHooks();
     // Where the page's dialogs and file choosers show, and where its right-click menu shows; its item gives them.
     private DialogPlace dialogPlace;
     private MenuPlace menuPlace;
@@ -915,6 +922,45 @@ public final class Page implements AutoCloseable {
     }
 
     /**
+     * Has {@code handler} answer the page's login queries, which the {@code links} package's opener bridge hands it
+     * ({@link #loginQuery}), and has each of its main frames run {@code script} as an {@code http} or {@code https}
+     * document starts loading, from now on until the page's close: there and then on Chromium's thread, so it runs
+     * before the document's own scripts, as a rule, and never in a challenge provider's frame or one of Jasper's own
+     * pages. The page's item gives them once, when it has a password manager (plan 8). Nothing after {@link #close()}.
+     *
+     * @param script the login script, which Jasper wrote
+     * @param handler given each of the page's queries, on the UI thread, to answer later, once
+     * @throws IllegalStateException when the page has been given a handler already
+     */
+    public void handleLogins(String script, Consumer<PageQuery> handler) {
+        Objects.requireNonNull(script, "script");
+        Objects.requireNonNull(handler, "handler");
+        loginHooks.handle(script, handler);
+    }
+
+    /**
+     * A login query of the page's, from its top frame: its handler is handed it ({@link #handleLogins}), or it fails
+     * {@link PageQuery#REFUSED}, "This page has no password manager.", when the page has none or has closed. The page's
+     * close cancels each query its handler has not answered.
+     *
+     * @param query the query, the page's
+     * @throws IllegalArgumentException for another page's query
+     */
+    public void loginQuery(PageQuery query) {
+        Objects.requireNonNull(query, "query");
+        if (query.page() != this) throw new IllegalArgumentException("A login query of another page");
+        loginHooks.query(query);
+    }
+
+    /**
+     * The login script a main frame runs as it starts loading the document at {@code address}, as
+     * {@link PageLoginHooks#script} gives it. Chromium's thread.
+     */
+    Optional<String> loginScript(String address) {
+        return loginHooks.script(address);
+    }
+
+    /**
      * Tells {@code listener} each time the page's main frame starts loading a document, as {@link #onLoadStart} does, with
      * how the load reached it: each of the page's visits, for its item's history.
      *
@@ -1284,6 +1330,7 @@ public final class Page implements AutoCloseable {
         CompletableFuture<Void> held = downloadState.held(this);
         loadStarts.clear();
         toolHooks.close();
+        loginHooks.close();
         selectionGestures.clear();
         view.endSelectionGestures();
         visits.clear();

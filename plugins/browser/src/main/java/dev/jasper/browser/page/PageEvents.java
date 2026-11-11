@@ -40,7 +40,8 @@ import org.cef.network.CefRequest;
  * at once and on Chromium's thread, to the hooks the {@code links} package and {@code FrameScripts} gave the client
  * ({@link #onMainFrameLoadStart}), and a sub-frame's to theirs ({@link #onSubFrameLoadStart}), each once the load's
  * transition has been read; the main frame then runs {@code detect-favicon.js}, which names the document's
- * icon through the opener bridge's router for the page to fetch ({@link Page#faviconDeclared}). Each main-frame load
+ * icon through the opener bridge's router for the page to fetch ({@link Page#faviconDeclared}), and, in an http or
+ * https document, the page's login script once its item gave one ({@link Page#handleLogins}). Each main-frame load
  * start shows the page at its own zoom again, there and then, as Chromium keeps one zoom per host. A main frame's failed
  * load goes to its page with Chromium's name for the error ({@link Page#onLoadFailure}), for its item's error page. Each
  * main-frame load start reaches its page with how the load reached it ({@link #reached}), for its item's history
@@ -73,6 +74,8 @@ public final class PageEvents {
     /** What each main frame runs as its document starts loading: it names the document's icon once it is parsed. */
     private static final String DETECT_FAVICON = script("detect-favicon.js");
     private static final String DETECT_FAVICON_URL = "jasper-about:detect-favicon.js";
+    /** The name a page's login script goes by in its console and stack traces (plan 8). */
+    private static final String LOGIN_FIELDS_URL = "jasper-about:login-fields.js";
     private static final System.Logger LOG = System.getLogger(PageEvents.class.getName());
     // The hooks each client was given, which hear its pages' main-frame load starts, and its sub-frames', on Chromium's
     // thread.
@@ -306,6 +309,7 @@ public final class PageEvents {
                 } catch (RuntimeException failure) {
                     LOG.log(System.Logger.Level.WARNING, "A page's favicon script could not run", failure);
                 }
+                runLoginScript(shown.owner(), frame);
             }
             String url = frame.getURL();
             long started = document;
@@ -313,6 +317,19 @@ public final class PageEvents {
                 page.privacy().documentShown(started);
                 page.loadStarted(url, reached);
             });
+        }
+
+        /**
+         * Runs {@code page}'s login script in {@code frame}, its main frame, which starts loading a document: there and
+         * then, on Chromium's thread, so the script runs before the document's own scripts, as a rule, once the page's
+         * item gave one, and only where {@link PageLoginHooks#runsIn} allows it (plan 8's F13). A failure is logged.
+         */
+        private static void runLoginScript(Page page, CefFrame frame) {
+            try {
+                page.loginScript(frame.getURL()).ifPresent(script -> frame.executeJavaScript(script, LOGIN_FIELDS_URL, 0));
+            } catch (RuntimeException failure) {
+                LOG.log(System.Logger.Level.WARNING, "A page's login script could not run", failure);
+            }
         }
 
         /** Tells the hooks {@code browser}'s client gave in {@code given} that {@code frame} starts loading. */

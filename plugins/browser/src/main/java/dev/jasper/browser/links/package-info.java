@@ -13,7 +13,10 @@
  * favicon goes to its {@link dev.jasper.browser.page.Page}, when {@code http} would fetch it, and what a frame's
  * {@code find.js} found to the page's {@link dev.jasper.browser.page.PageFind}, from any frame of the page, and what the
  * {@code tools} package's scripts report, from the page's top frame, to the page's tools
- * ({@link dev.jasper.browser.page.Page#toolReported}).
+ * ({@link dev.jasper.browser.page.Page#toolReported}). A {@code login.pick} from the page's top frame becomes a
+ * {@link dev.jasper.browser.page.PageQuery} the page's password manager answers later, once
+ * ({@link dev.jasper.browser.page.Page#loginQuery}), which holds none of the page's waiting places and which Chromium's
+ * cancel of the query cancels.
  * {@code PrivacyQueries} is the client's privacy router, apart from the bridge's as its permission requests can wait
  * minutes, which the same installer adds: the {@code page} package's {@code notifications.js} asks through it, from a
  * page's top frame, and its {@code audio.js} tells of a document's first sound, from any frame but a challenge frame,

@@ -6,10 +6,12 @@ import dev.jasper.browser.json.StrictJson;
 import dev.jasper.browser.links.Isolation.OpenerPolicy;
 import dev.jasper.browser.links.Isolation.Sandbox;
 import dev.jasper.browser.page.Activation;
+import dev.jasper.browser.page.LastPress;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageBrowser;
 import dev.jasper.browser.page.PageEvents;
 import dev.jasper.browser.page.PageFind;
+import dev.jasper.browser.page.PageQuery;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.ui.TabPlacement;
 import java.awt.EventQueue;
@@ -32,6 +34,7 @@ import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -61,7 +64,9 @@ import org.cef.network.CefResponse;
  * {@code reader}, {@code distractions} and {@code savePage} go to the page's tools as the page sent them: from the
  * {@code tools} package's {@code reader.js}, what a check found and that the reader closed, from its
  * {@code distractions.js}, that distraction removal ended, and from its {@code save-page.js}, the parts of Save Page
- * As's snapshot, each within a message's limit (plan 7).
+ * As's snapshot, each within a message's limit (plan 7). {@code login.pick}, from the {@code logins} package's
+ * {@code login-fields.js} as the user clicks the button it shows in a login field, opens the password manager's picker
+ * at the field and is answered later, with the login the user chose (plan 8).
  *
  * <p>Every frame and every script of a page can call the page function, so each request is untrusted, and the bridge
  * keeps the limits Chromium would:
@@ -87,6 +92,13 @@ import org.cef.network.CefResponse;
  *   <li>A {@code find} answer is only shown: a search's id and a count of at most {@link PageFind#MAX_MATCHES}, or a
  *   selection of at most {@link PageFind#MAX_QUERY} characters, which the page's find takes only for what it asked
  *   under way, from a frame it asked, as Chromium names the frame.</li>
+ *   <li>A {@code login.pick} is taken from the page's top frame alone, as the field buttons show there and nowhere
+ *   else. It becomes a {@link PageQuery} the page's password manager answers later, once ({@link Page#loginQuery}), so
+ *   it holds none of the page's waiting places, and Chromium's cancel, as the asking frame navigates or closes or the
+ *   page cancels it, cancels it. The manager opens one picker per page at a time, only for an http or https document,
+ *   and only after a click in the page: Jasper's record of a mouse press within the activation as well as the page's
+ *   own activation, which the pick consumes, so a key alone opens nothing. Its answer reaches the page only while the
+ *   page's main frame shows the origin that asked.</li>
  * </ul>
  *
  * <p>A link ends as Chromium's window groups do: when the popup closes, when the user sends either page elsewhere
@@ -94,7 +106,8 @@ import org.cef.network.CefResponse;
  * a window group of its own ({@link Isolation#severs}). Both stand-ins then report closed. When the opener closes, the
  * link keeps only what the popup's later documents need: its id, and that the opener has closed.
  *
- * <p>Chromium asks on its own thread; each request is answered on the UI thread, where items open. A main frame's
+ * <p>Chromium asks on its own thread; each request is answered on the UI thread, where items open, but a
+ * {@code login.pick}, which is answered as the user chooses. A main frame's
  * response is noted on Chromium's IO thread, and its load start is answered at once on Chromium's UI thread, so the
  * script runs before Swing would hear of the load.
  */
@@ -131,7 +144,10 @@ final class OpenerBridge {
         TOO_MANY = new Answer(BUSY, "Too many of this page's requests are waiting."),
         NOT_WEB_ICON = new Answer(REFUSED, "Jasper shows only icons at http and https addresses."),
         NOT_PARTY = new Answer(REFUSED, "This page is not part of that link."),
-        OTHER_CLOSED = new Answer(GONE, "The other page is closed.");
+        OTHER_CLOSED = new Answer(GONE, "The other page is closed."),
+        UNANSWERED = new Answer(REFUSED, AboutScheme.UNANSWERED);
+    // What a request the page answers later is answered at once: nothing. Compared by identity, and never sent.
+    private static final Answer LATER = new Answer(0, "later");
     private static final System.Logger LOG = System.getLogger(OpenerBridge.class.getName());
 
     private final SecureRandom random = new SecureRandom();
@@ -144,6 +160,9 @@ final class OpenerBridge {
     // How many requests of each page's main frame, and of its sub-frames together, wait for the UI thread; a queue
     // leaves once none does.
     private final Map<Waiters, Integer> waiting = new ConcurrentHashMap<>();
+    // Plan 8: the login queries handed to their pages and not yet over, for Chromium's cancel; each leaves as it is
+    // answered, failed or cancelled, and its page's close cancels it.
+    private final Map<QueryId, PageQuery> logins = new ConcurrentHashMap<>();
 
     /** A bridge with no links, which no page reaches until {@link #install} wires it to a client. */
     OpenerBridge() { }
@@ -164,30 +183,48 @@ final class OpenerBridge {
     }
 
     /**
-     * A page as the bridge reaches it: the page, its activation, whether it shows, how a script reaches the document
-     * its main frame shows now, and where that document is. A page's browser gives one; a test gives a recording one.
+     * A page as the bridge reaches it: the page, its activation, the last mouse press it got, whether it shows, how a
+     * script reaches the document its main frame shows now, and where that document is. A page's browser gives one; a
+     * test gives a recording one.
      *
      * @param page the page, which is one end of a link or asks to be
      * @param activation the page's user activation, as Jasper forwarded the user's presses and keys to it
+     * @param lastPress the last mouse press Jasper forwarded to the page; any thread
      * @param showing whether the page shows; UI thread
      * @param scripts runs a script in the main frame's current document
      * @param address the main frame's current address
      */
-    record Party(Page page, Activation activation, BooleanSupplier showing, Consumer<String> scripts, Supplier<String> address) {
+    record Party(Page page, Activation activation, Supplier<LastPress> lastPress, BooleanSupplier showing, Consumer<String> scripts,
+                 Supplier<String> address) {
         Party {
             Objects.requireNonNull(page, "page");
             Objects.requireNonNull(activation, "activation");
+            Objects.requireNonNull(lastPress, "lastPress");
             Objects.requireNonNull(showing, "showing");
             Objects.requireNonNull(scripts, "scripts");
             Objects.requireNonNull(address, "address");
         }
 
+        /** A page that has had no mouse press, as a test's recording party is. */
+        Party(Page page, Activation activation, BooleanSupplier showing, Consumer<String> scripts, Supplier<String> address) {
+            this(page, activation, () -> LastPress.NONE, showing, scripts, address);
+        }
+
         /** The page {@code browser} shows, {@code page}. Any thread. */
         static Party of(PageBrowser browser, Page page) {
-            return new Party(page, browser.view().activation(), browser.view()::isShowing,
+            return new Party(page, browser.view().activation(), browser.view()::lastPress, browser.view()::isShowing,
                 script -> browser.executeJavaScript(script, SCRIPT_URL, 0), browser::getURL);
         }
     }
+
+    /**
+     * A query as Chromium names it, which its cancel names too: the identifier of the browser that asked, and the
+     * query's id there.
+     *
+     * @param browser the browser's identifier
+     * @param query the query's id
+     */
+    record QueryId(int browser, long query) { }
 
     /**
      * What a request is answered: {@code code} 0 and the text the script is given, or a failure's code and why.
@@ -224,7 +261,9 @@ final class OpenerBridge {
         /** Distraction removal's report: that it ended in the page (plan 7). */
         DISTRACTIONS("distractions", false),
         /** A part of Save Page As's snapshot (plan 7's Task 7). */
-        SAVE_PAGE("savePage", false);
+        SAVE_PAGE("savePage", false),
+        /** The password manager's picker at a login field, answered later with the login chosen (plan 8). */
+        LOGIN_PICK("login.pick", false);
 
         private final String name;
         private final boolean subFrames;
@@ -393,7 +432,8 @@ final class OpenerBridge {
     }
 
     /**
-     * Answers a page's request. UI thread; it never throws for what a page sent.
+     * Answers a page's request at once. UI thread; it never throws for what a page sent. A {@code login.pick}, which
+     * its page answers later, is answered only through {@link #answer}: here it is refused.
      *
      * @param sender the page that asked
      * @param mainFrame whether its main frame asked, rather than a sub-frame
@@ -403,6 +443,15 @@ final class OpenerBridge {
      * @return the answer
      */
     Answer request(Party sender, boolean mainFrame, Sender from, String text, long nowMillis) {
+        return request(sender, mainFrame, from, text, nowMillis, request -> UNANSWERED);
+    }
+
+    /**
+     * Answers a page's request, as {@link #request(Party, boolean, Sender, String, long)} does, but a
+     * {@code login.pick} of the top frame, which {@code loginPick} is given, and answers. UI thread.
+     */
+    private Answer request(Party sender, boolean mainFrame, Sender from, String text, long nowMillis,
+                           Function<Map<String, Object>, Answer> loginPick) {
         if (!mainFrame && !Op.fromSubFrame(text)) return SUB_FRAME;
         if (text != null && text.length() > REQUEST_LIMIT) return TOO_LONG;
         Map<String, Object> request = BridgeJson.object(text).orElse(null);
@@ -416,6 +465,7 @@ final class OpenerBridge {
             case FAVICON -> favicon(sender, from, request);
             case FIND -> find(sender, from, request);
             case READER, DISTRACTIONS, SAVE_PAGE -> toolReport(sender, op, text);
+            case LOGIN_PICK -> loginPick.apply(request);
             case null -> MALFORMED_REQUEST;
         };
     }
@@ -499,6 +549,37 @@ final class OpenerBridge {
     }
 
     /**
+     * The login queries handed to their pages that are not yet over.
+     *
+     * @return how many
+     */
+    int loginQueries() {
+        return logins.size();
+    }
+
+    /**
+     * Chromium cancelled the query {@code query} of the browser {@code browser}, as its frame navigated or closed or
+     * its page cancelled it: a login query handed to its page is cancelled, and sends nothing. One the UI thread has
+     * yet to hand over is cancelled once it has: the task that hands it over was posted first, so the look again posted
+     * now comes after it. Any thread; Chromium's, from its router.
+     *
+     * @param browser the identifier of the browser that asked
+     * @param query the query's id there
+     */
+    void cancelled(int browser, long query) {
+        var asked = new QueryId(browser, query);
+        if (!cancel(asked)) EventQueue.invokeLater(() -> cancel(asked));
+    }
+
+    /** Cancels the login query {@code asked}, if one is handed to its page and not yet over: whether there was one. */
+    private boolean cancel(QueryId asked) {
+        PageQuery query = logins.remove(asked);
+        if (query == null) return false;
+        query.cancelled();
+        return true;
+    }
+
+    /**
      * Chromium's handler for a main frame's resources, which hands the bridge each response's opener policy and content
      * security policies. Chromium's IO thread.
      *
@@ -510,24 +591,30 @@ final class OpenerBridge {
 
     /**
      * Answers an admitted query and settles it: {@code reply} is told the answer once, whatever happens. A failure inside
-     * is answered as one; an {@link Error} is answered and then thrown on. UI thread.
+     * is answered as one; an {@link Error} is answered and then thrown on. A {@code login.pick} of the top frame is
+     * handed to its page as a {@link PageQuery}, settled as the page's handler returns, and answered later, once, by
+     * that query; a hand-off that throws fails it, once, and an {@code Error} is thrown on. UI thread.
      *
      * @param sender the page that asked
      * @param mainFrame whether its main frame asked, as Chromium's thread read it
      * @param from the document that asked, as Chromium's thread saw it
+     * @param asked the query, as Chromium names it
      * @param text the request
      * @param nowMillis when it asked
      * @param reply told the answer
      */
-    void answer(Party sender, boolean mainFrame, Sender from, String text, long nowMillis, Consumer<Answer> reply) {
-        Answer answer = new Answer(REFUSED, AboutScheme.UNANSWERED);
+    void answer(Party sender, boolean mainFrame, Sender from, QueryId asked, String text, long nowMillis, Consumer<Answer> reply) {
+        Answer answer = UNANSWERED;
+        var handed = new PageQuery[1];
         try {
-            answer = request(sender, mainFrame, from, text, nowMillis);
+            answer = request(sender, mainFrame, from, text, nowMillis,
+                request -> loginPick(sender, from, asked, request, nowMillis, reply, handed));
         } catch (RuntimeException failure) {
             LOG.log(System.Logger.Level.WARNING, "The opener bridge could not answer a page", failure);
         } finally {
             settled(sender.page(), mainFrame);
-            reply.accept(answer);
+            if (handed[0] == null) reply.accept(answer);
+            else if (answer != LATER) handed[0].fail(REFUSED, AboutScheme.UNANSWERED);
         }
     }
 
@@ -691,6 +778,32 @@ final class OpenerBridge {
         return DONE;
     }
 
+    /**
+     * {@code login.pick}: the page's password manager answers it as the user chooses, so it becomes a
+     * {@link PageQuery}, put in {@code handed}, which the page is handed ({@link Page#loginQuery}) and which replies
+     * through {@code reply} once. Its origin is the asking document's, as Chromium's thread saw it; its answer reaches
+     * the page only while the page's main frame shows that origin, as the bridge has heard. Its activation needs a
+     * mouse press within the activation as well as the page's activation, which it consumes, both as at
+     * {@code nowMillis}, when Chromium took the request (plan 8's F3). It waits for Chromium's cancel until it is over.
+     * UI thread.
+     *
+     * @return {@code LATER}
+     */
+    private Answer loginPick(Party sender, Sender asker, QueryId asked, Map<String, Object> request, long nowMillis,
+                             Consumer<Answer> reply, PageQuery[] handed) {
+        Page page = sender.page();
+        BooleanSupplier activation = () -> sender.lastPress().get().withinActivation(nowMillis) && sender.activation().consume(nowMillis);
+        var query = new PageQuery(page, asker.document().origin(), request, activation, () -> document(page).origin(), (code, text) -> {
+            logins.remove(asked);
+            reply.accept(new Answer(code, text));
+        });
+        handed[0] = query;
+        logins.put(asked, query);
+        query.onCancelled(() -> logins.remove(asked, query));
+        page.loginQuery(query);
+        return LATER;
+    }
+
     /** The document {@code page}'s main frame shows, as far as the bridge has heard. The bridge's lock is held, or not needed. */
     private Document document(Page page) {
         synchronized (lock) {
@@ -831,7 +944,7 @@ final class OpenerBridge {
     /**
      * The client's one handler for the page function. On Chromium's thread it answers at once what it refuses (a request
      * from anything but a page, one that stays open for more answers, and what {@link #admit} refuses), and hands the
-     * rest to the UI thread. Every query is answered, once.
+     * rest to the UI thread. Every query is answered, once, unless Chromium cancels it first, which the bridge hears.
      */
     private static final class Queries extends CefMessageRouterHandlerAdapter {
         private final OpenerBridge bridge;
@@ -860,15 +973,25 @@ final class OpenerBridge {
                 admitted = true;
                 Party sender = Party.of(shown, page);
                 Sender from = bridge.sender(page, frame.getIdentifier(), frame::getURL);
+                var asked = new QueryId(browser.getIdentifier(), queryId);
                 long now = System.currentTimeMillis();
                 boolean mainFrame = main;
-                EventQueue.invokeLater(() -> bridge.answer(sender, mainFrame, from, request, now, answer -> reply(callback, answer)));
+                EventQueue.invokeLater(() -> bridge.answer(sender, mainFrame, from, asked, request, now, answer -> reply(callback, answer)));
                 return true;
             } catch (RuntimeException failure) {
                 LOG.log(System.Logger.Level.WARNING, "The opener bridge could not take a page's request", failure);
                 if (admitted) bridge.settled(page, main);
                 reply(callback, new Answer(REFUSED, AboutScheme.UNANSWERED));
                 return true;
+            }
+        }
+
+        /** Chromium cancelled a query, as its frame navigated or closed or its page cancelled it: the bridge hears. */
+        @Override public void onQueryCanceled(CefBrowser browser, CefFrame frame, long queryId) {
+            try {
+                if (browser != null) bridge.cancelled(browser.getIdentifier(), queryId);
+            } catch (RuntimeException failure) {
+                LOG.log(System.Logger.Level.WARNING, "The opener bridge could not cancel a page's request", failure);
             }
         }
 
