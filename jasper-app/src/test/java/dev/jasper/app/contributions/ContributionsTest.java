@@ -17,6 +17,21 @@ class ContributionsTest {
     private final Contributions model = new Contributions();
     private final List<Contributions.Kind> changes = new ArrayList<>();
 
+    /**
+     * Browser plan 7 Task 1b, review round 1 (Minor 6): a plugin's menu entry and a submenu of entries have a key a window
+     * keeps them by; only a submenu of actions has the empty one.
+     */
+    @Test void keyedMenuEntriesRefuseBlankKeys() {
+        for (String blank : List.of("", " ", "\t"))
+            assertThatIllegalArgumentException().as("a command keyed %s", blank)
+                .isThrownBy(() -> new MenuEntry.Command(blank, "Stop", true, () -> { }));
+        for (String blank : List.of(" ", "\t"))
+            assertThatIllegalArgumentException().as("a submenu keyed %s", blank)
+                .isThrownBy(() -> new MenuEntry.Submenu(blank, "a.zip", true, List.of()));
+        assertThat(new MenuEntry.Submenu("", "More", true, List.of()).key()).as("a submenu of actions").isEmpty();
+        assertThat(new MenuEntry.Command("dev.x/1/stop", "Stop", true, () -> { }).key()).isEqualTo("dev.x/1/stop");
+    }
+
     /** Workspace plan 8b Rulings 5 and 17: split items are unique, the bundled plugins' first, and a change of the menus. */
     @Test void splitItemsAreUniqueTheBundledFirstAndChangeTheMenus() {
         model.onChanged(changes::add);
@@ -69,7 +84,7 @@ class ContributionsTest {
         MenuSection top = model.addMenuSection(MenuTarget.topLevel("dev.x.menu", "Tool"));
         assertThatIllegalArgumentException().isThrownBy(() -> model.addMenuSection(MenuTarget.topLevel("dev.x.menu", "Again")));
         view.set(List.of(new MenuEntry.Item("dev.x.a"), new MenuEntry.Separator(),
-            new MenuEntry.Submenu("More", List.of(new MenuEntry.Item("dev.x.a")))));
+            new MenuEntry.Submenu("", "More", true, List.of(new MenuEntry.Item("dev.x.a")))));
         assertThat(model.menus()).containsExactly(view, top);
         assertThat(view.entries()).hasSize(3);
         top.close();

@@ -392,6 +392,20 @@ class UiValuesTest {
         assertThatExceptionOfType(UnsupportedOperationException.class).isThrownBy(() -> older(Platform.class).copyOnSelect());
     }
 
+    /**
+     * Browser plan 7 Task 1b (SDK 0.31.0): menu entries that are not actions are a default that an older host refuses,
+     * and the entries they return are a subscription.
+     */
+    @Test void menuEntriesAreADefaultThatAnOlderHostRefuses() throws Exception {
+        assertThat(PluginMenu.class.getMethod("addEntries", List.class, java.util.function.Consumer.class).isDefault()).isTrue();
+        assertThat(PluginMenu.class.getMethod("addEntries", List.class, java.util.function.Consumer.class).getReturnType())
+            .isEqualTo(MenuEntries.class);
+        assertThat(MenuEntries.class.getInterfaces()).containsExactly(dev.jasper.sdk.Subscription.class);
+        assertThat(MenuEntries.class.getMethod("set", List.class).isDefault()).isFalse();
+        assertThatExceptionOfType(UnsupportedOperationException.class)
+            .isThrownBy(() -> older(PluginMenu.class).addEntries(List.of(new MenuItem("a", "A", "", "a", true, false)), id -> { }));
+    }
+
     /** Browser plan 5 Task 10 (SDK 0.29.0): inserted text is any text, empty included, and whether Return follows it. */
     @Test void insertedTextIsAnyTextAndWhetherReturnFollowsIt() {
         assertThat(new InsertedText("ls -la", true)).isEqualTo(new InsertedText("ls -la", true))

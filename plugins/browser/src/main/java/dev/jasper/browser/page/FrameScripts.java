@@ -175,9 +175,10 @@ final class FrameScripts {
     }
 
     /**
-     * {@code frame} of a page's {@code browser} starts loading a document: a main frame's document starts in its site's
-     * audio mode, which becomes the page's current one, and the frame runs the scripts {@link #scripts} gives it. A
-     * browser that is no page's runs none. Chromium's thread; it never throws.
+     * {@code frame} of a page's {@code browser} starts loading a document: a main frame's document renews the page's
+     * download allowance when it starts with the page's user activation ({@link Page#documentStarting}, plan 7's D46) and
+     * starts in its site's audio mode, which becomes the page's current one, and the frame runs the scripts
+     * {@link #scripts} gives it. A browser that is no page's runs none. Chromium's thread; it never throws.
      *
      * @param browser the page's browser
      * @param frame the frame, which is not disposed here
@@ -189,7 +190,10 @@ final class FrameScripts {
         try {
             boolean main = frame.isMain();
             String address = frame.getURL();
-            if (main) page.privacy().documentStarted(audioMode(address, page));
+            if (main) {
+                page.documentStarting(System.currentTimeMillis());
+                page.privacy().documentStarted(audioMode(address, page));
+            }
             for (Script script : scripts(main, address, page, hiding)) frame.executeJavaScript(script.text(), script.url(), 0);
         } catch (RuntimeException failure) {
             LOG.log(System.Logger.Level.WARNING, "A page's privacy scripts could not run", failure);

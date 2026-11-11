@@ -36,6 +36,11 @@ def localNetworkUsage = 'Jasper connects to SSH hosts on your local network.'
 // that opens either, which a web page the user allowed does.
 def cameraUsage = "Web pages in Jasper's browser use your camera only when you allow it."
 def microphoneUsage = "Web pages in Jasper's browser use your microphone only when you allow it."
+// Browser plan 7 (spec 10, rulings F8 and D4): shown by macOS's prompts for the Downloads, Desktop and Documents folders,
+// which the Browser saves downloads in, the last two when the Downloads folder setting or Save Page As names them.
+def downloadsFolderUsage = 'Jasper saves the files you download in the Browser here.'
+def desktopFolderUsage = 'Jasper saves files from the Browser here when you choose this folder.'
+def documentsFolderUsage = 'Jasper saves files from the Browser here when you choose this folder.'
 // Workspace-tabs spec 5.4: Jasper appears in Open With and takes drops on its Dock icon for text, source code and
 // folders, without claiming any of them as their default application.
 ext.macDocumentTypes = groovy.json.JsonOutput.toJson([
@@ -300,6 +305,9 @@ def packageApp = tasks.register('packageApp') {
     inputs.property('localNetworkUsage', localNetworkUsage)
     inputs.property('cameraUsage', cameraUsage)
     inputs.property('microphoneUsage', microphoneUsage)
+    inputs.property('downloadsFolderUsage', downloadsFolderUsage)
+    inputs.property('desktopFolderUsage', desktopFolderUsage)
+    inputs.property('documentsFolderUsage', documentsFolderUsage)
     inputs.property('documentTypes', macDocumentTypes)
     inputs.property('importedTypes', macImportedTypes)
     inputs.property('urlTypes', macUrlTypes)
@@ -347,6 +355,12 @@ def packageApp = tasks.register('packageApp') {
                     new File(image, 'Contents/Info.plist').absolutePath], 'plutil camera usage')
                 executeNative(['/usr/bin/plutil', '-replace', 'NSMicrophoneUsageDescription', '-string', microphoneUsage,
                     new File(image, 'Contents/Info.plist').absolutePath], 'plutil microphone usage')
+                executeNative(['/usr/bin/plutil', '-replace', 'NSDownloadsFolderUsageDescription', '-string', downloadsFolderUsage,
+                    new File(image, 'Contents/Info.plist').absolutePath], 'plutil Downloads folder usage')
+                executeNative(['/usr/bin/plutil', '-replace', 'NSDesktopFolderUsageDescription', '-string', desktopFolderUsage,
+                    new File(image, 'Contents/Info.plist').absolutePath], 'plutil Desktop folder usage')
+                executeNative(['/usr/bin/plutil', '-replace', 'NSDocumentsFolderUsageDescription', '-string', documentsFolderUsage,
+                    new File(image, 'Contents/Info.plist').absolutePath], 'plutil Documents folder usage')
                 executeNative(['/usr/bin/plutil', '-replace', 'CFBundleDocumentTypes', '-json', macDocumentTypes,
                     new File(image, 'Contents/Info.plist').absolutePath], 'plutil document types')
                 executeNative(['/usr/bin/plutil', '-replace', 'UTImportedTypeDeclarations', '-json', macImportedTypes,
@@ -713,6 +727,12 @@ def verifyPackage = tasks.register('verifyPackage') {
             if (camera != cameraUsage) throw new GradleException("Package verification failed: plist camera usage description is '${camera}'")
             def microphone = executeNative(['/usr/bin/plutil', '-extract', 'NSMicrophoneUsageDescription', 'raw', '-o', '-', plist.absolutePath], 'plutil microphone').stdout.trim()
             if (microphone != microphoneUsage) throw new GradleException("Package verification failed: plist microphone usage description is '${microphone}'")
+            def downloadsFolder = executeNative(['/usr/bin/plutil', '-extract', 'NSDownloadsFolderUsageDescription', 'raw', '-o', '-', plist.absolutePath], 'plutil Downloads folder').stdout.trim()
+            if (downloadsFolder != downloadsFolderUsage) throw new GradleException("Package verification failed: plist Downloads folder usage description is '${downloadsFolder}'")
+            def desktopFolder = executeNative(['/usr/bin/plutil', '-extract', 'NSDesktopFolderUsageDescription', 'raw', '-o', '-', plist.absolutePath], 'plutil Desktop folder').stdout.trim()
+            if (desktopFolder != desktopFolderUsage) throw new GradleException("Package verification failed: plist Desktop folder usage description is '${desktopFolder}'")
+            def documentsFolder = executeNative(['/usr/bin/plutil', '-extract', 'NSDocumentsFolderUsageDescription', 'raw', '-o', '-', plist.absolutePath], 'plutil Documents folder').stdout.trim()
+            if (documentsFolder != documentsFolderUsage) throw new GradleException("Package verification failed: plist Documents folder usage description is '${documentsFolder}'")
             def documentTypes = new groovy.json.JsonSlurper().parseText(executeNative(['/usr/bin/plutil', '-extract', 'CFBundleDocumentTypes', 'json', '-o', '-', plist.absolutePath], 'plutil document types').stdout)
             if (documentTypes != new groovy.json.JsonSlurper().parseText(macDocumentTypes)) throw new GradleException("Package verification failed: plist document types are ${documentTypes}")
             def importedTypes = new groovy.json.JsonSlurper().parseText(executeNative(['/usr/bin/plutil', '-extract', 'UTImportedTypeDeclarations', 'json', '-o', '-', plist.absolutePath], 'plutil imported types').stdout)

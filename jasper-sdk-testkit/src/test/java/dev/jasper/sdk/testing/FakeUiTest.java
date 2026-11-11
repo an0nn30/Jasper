@@ -109,6 +109,18 @@ class FakeUiTest {
         }
     }
 
+    /** SDK 0.31.0: a menu entry whose choice throws is recorded in failures, as a throwing action is. */
+    @Test void aMenuEntryThatThrowsIsRecordedInFailures() {
+        try (var host = new FakePluginHost()) {
+            var context = host.start(INFO, Set.of(), Set.of(), plugin -> { });
+            context.menus().create("dev.x.tool.menu", "Tool").addEntries(
+                List.of(new dev.jasper.sdk.ui.MenuItem("fails", "Fails", "", "fails", true, false)),
+                id -> { throw new IllegalStateException("failed " + id); });
+            assertThat(host.chooseMenuEntry("fails")).isTrue();
+            assertThat(host.failures()).singleElement().asString().startsWith("dev.x.tool menu entry fails: ").contains("failed fails");
+        }
+    }
+
     @Test void editorSchemesArePublishedOnFlushAsAWorkspaceChange() {
         try (var host = new FakePluginHost()) {
             var context = host.start(INFO, Set.of(), Set.of(), plugin -> {});

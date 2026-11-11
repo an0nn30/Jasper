@@ -278,7 +278,7 @@ class HostedUiTest {
         more.add("dev.x.tool.run");
         assertThat(model.menus()).singleElement().satisfies(section -> assertThat(section.entries()).containsExactly(
             new MenuEntry.Item("dev.x.tool.run"), new MenuEntry.Separator(),
-            new MenuEntry.Submenu("More", List.of(new MenuEntry.Item("dev.x.tool.run")))));
+            new MenuEntry.Submenu("", "More", true, List.of(new MenuEntry.Item("dev.x.tool.run")))));
         first.close();
         more.close();
         assertThat(model.menus().get(0).entries()).containsExactly(new MenuEntry.Separator());
@@ -295,6 +295,45 @@ class HostedUiTest {
         assertThat(model.menus()).hasSize(3);
         view.close();
         assertThat(model.menus()).hasSize(2);
+    }
+
+    /**
+     * Browser plan 7 Task 1b: menu entries are snapshotted as commands, separators and keyed submenus, keyed by the plugin,
+     * their group and their id, so another group's same id has a key of its own; a choice runs contained, and nothing
+     * once the context has closed.
+     */
+    @Test void menuEntriesAreKeyedCommandsAndSubmenusWhoseChoicesAreContained() {
+        List<String> heard = new ArrayList<>();
+        PluginMenu tools = ui.menus().standard(StandardMenu.TOOLS);
+        tools.addEntries(List.of(new dev.jasper.sdk.ui.MenuItem("a", "A", "", "a", true, false),
+            new dev.jasper.sdk.ui.MenuItem("rule", "", "", "", true, true),
+            new dev.jasper.sdk.ui.MenuItem("sub", "Sub", "", "", false, false, dev.jasper.sdk.ui.Nodes.Hue.NEUTRAL, "",
+                List.of(new dev.jasper.sdk.ui.MenuItem("b", "B", "", "b", false, false)))),
+            id -> { heard.add(id); if (id.equals("b")) throw new IllegalStateException("b failed"); });
+        tools.addEntries(List.of(new dev.jasper.sdk.ui.MenuItem("a", "Again", "", "a", true, false)), heard::add);
+        var entries = model.menus().getFirst().entries();
+        assertThat(entries).hasSize(4);
+        var a = (MenuEntry.Command) entries.get(0);
+        assertThat(entries.get(1)).isEqualTo(new MenuEntry.Separator());
+        var sub = (MenuEntry.Submenu) entries.get(2);
+        var again = (MenuEntry.Command) entries.get(3);
+        assertThat(a.key()).startsWith("dev.x.tool/").endsWith("/a");
+        assertThat(again.key()).startsWith("dev.x.tool/").endsWith("/a").isNotEqualTo(a.key());
+        assertThat(List.of(a.label(), again.label())).containsExactly("A", "Again");
+        assertThat(a.enabled()).isTrue();
+        assertThat(sub.key()).startsWith("dev.x.tool/").endsWith("/sub");
+        assertThat(sub.title()).isEqualTo("Sub");
+        assertThat(sub.enabled()).isFalse();
+        var b = (MenuEntry.Command) sub.entries().getFirst();
+        assertThat(b.enabled()).isFalse();
+        assertThat(List.of(HostedMenu.entryId(a.key()), HostedMenu.entryId(sub.key()), HostedMenu.entryId(b.key()))).containsExactly("a", "sub", "b");
+        a.chosen().run();
+        b.chosen().run();
+        assertThat(heard).containsExactly("a", "b");
+        assertThat(containment.failures("dev.x.tool")).as("the throw is the plugin's incident").isEqualTo(1);
+        open.set(false);
+        a.chosen().run();
+        assertThat(heard).as("nothing once the context closed").hasSize(2);
     }
 
     @Test void progressUsesOwnedActionsAndIgnoresClosedUpdates() {

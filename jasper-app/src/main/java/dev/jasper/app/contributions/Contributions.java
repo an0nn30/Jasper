@@ -316,7 +316,7 @@ public final class Contributions {
         if (panelsMenu == null) panelsMenu = addMenuSection(MenuTarget.standard(MenuTarget.Slot.VIEW));
         List<MenuEntry> toggles = new ArrayList<>();
         for (PanelEntry panel : panels.values()) toggles.add(new MenuEntry.Item(panel.toggleActionId()));
-        panelsMenu.set(List.of(new MenuEntry.Submenu("Tool Windows", toggles)));
+        panelsMenu.set(List.of(new MenuEntry.Submenu("", "Tool Windows", true, toggles)));
     }
 
     void remove(ActionEntry entry) { if (actions.remove(entry.id(), entry)) changed(Kind.ACTIONS); }

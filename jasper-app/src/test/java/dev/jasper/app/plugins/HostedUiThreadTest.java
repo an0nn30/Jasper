@@ -12,9 +12,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 /**
- * Browser plans 4a, 4c, 5 and 6: the application host refuses openFile, hasModal, createForContent, isDefaultBrowser,
- * onDefaultBrowserChanged, setTextInsertion, setSavedTitle and a text target's calls off the UI thread; the testkit
- * models no UI thread.
+ * Browser plans 4a, 4c, 5, 6 and 7: the application host refuses openFile, hasModal, createForContent, isDefaultBrowser,
+ * onDefaultBrowserChanged, setTextInsertion, setSavedTitle, a text target's calls, addEntries and a menu entries' set off
+ * the UI thread; the testkit models no UI thread.
  */
 class HostedUiThreadTest {
     @Test void theBrowserCoreCallsOffTheUiThreadThrow() {
@@ -87,6 +87,25 @@ class HostedUiThreadTest {
                 .withMessageContaining("UI thread");
             UUID item = harness.windowTabs(window).getLast().getLast();
             assertThat(harness.savedTitle(item)).isEqualTo("Page");
+        }
+    }
+
+    /** SDK 0.31.0: adding and setting menu entries refuse other threads, and closing them is safe from any thread. */
+    @Test void menuEntriesRefuseOtherThreads() {
+        try (var harness = new AppContractTest().newHarness()) {
+            var menu = new AtomicReference<dev.jasper.sdk.ui.PluginMenu>();
+            var entries = new AtomicReference<dev.jasper.sdk.ui.MenuEntries>();
+            var items = java.util.List.of(new dev.jasper.sdk.ui.MenuItem("a", "A", "", "a", true, false));
+            harness.start(new PluginInfo("test.off", "Off", "1.0.0", Set.of()), Set.of(), Set.of(), context -> {
+                menu.set(context.menus().standard(dev.jasper.sdk.ui.StandardMenu.TOOLS));
+                entries.set(menu.get().addEntries(items, id -> { }));
+            });
+            assertThatIllegalStateException().isThrownBy(() -> menu.get().addEntries(items, id -> { })).withMessageContaining("UI thread");
+            assertThatIllegalStateException().isThrownBy(() -> entries.get().set(java.util.List.of())).withMessageContaining("UI thread");
+            assertThat(harness.menu("TOOLS")).containsExactly("entry:a:A");
+            entries.get().close();
+            harness.ui(() -> { });
+            assertThat(harness.menu("TOOLS")).isEmpty();
         }
     }
 

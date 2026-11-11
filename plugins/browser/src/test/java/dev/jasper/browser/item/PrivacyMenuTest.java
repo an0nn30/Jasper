@@ -350,7 +350,7 @@ class PrivacyMenuTest {
     }
 
     private static List<MenuItem> menu(Optional<Boolean> bookmarked, List<Grant> site, boolean muted) {
-        Nodes.Stack bar = new BrowserToolbar(typed -> List.of()).node("https://a.test/page", false, false, false, Optional.empty(), History.EMPTY,
+        Nodes.Stack bar = new BrowserToolbar(typed -> List.of()).node(List.of(), "https://a.test/page", false, false, false, Optional.empty(), History.EMPTY,
             GOOGLE, false, bookmarked.isEmpty(), bookmarked, PrivacyMenu.items(site, muted));
         return ((Nodes.MenuButton) Views.node(bar, BrowserToolbar.MENU)).items();
     }

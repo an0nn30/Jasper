@@ -1,18 +1,24 @@
 package dev.jasper.browser.item;
 
+import dev.jasper.browser.downloads.DownloadNames;
+import dev.jasper.browser.downloads.FileManager;
 import dev.jasper.browser.engine.AboutScheme;
 import dev.jasper.browser.page.Favicons;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.restore.BrowserRestore;
 import dev.jasper.browser.settings.BrowserSettings;
+import dev.jasper.browser.tools.SavePage;
 import dev.jasper.sdk.RestoreState;
 import dev.jasper.sdk.WindowOwner;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.terminal.WindowHandle;
+import dev.jasper.sdk.ui.ContentTab;
 import dev.jasper.sdk.ui.IconAsset;
 import dev.jasper.sdk.ui.TabPlacement;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
@@ -33,7 +39,9 @@ import javax.swing.Timer;
  * store's items that show a site whose permissions changed, hands each error page's Try Again and
  * Continue to the item whose page it is, finds the item's capture a source page shows, holds the notifications their
  * pages show ({@link PageNotifications}), and holds the fetchers of their pages' favicons and their address fields'
- * search suggestions until {@link #close()}. A page is made, and Chromium so asked for, only when its item first shows.
+ * search suggestions until {@link #close()}. Its items' Save Page As saves start here ({@link #savePage}), with the
+ * Downloads folder and file manager the plugin gives ({@link #useSaving}) and the HTTP proxy as it is then, whose change
+ * retires each save's client (plan 7's D6). A page is made, and Chromium so asked for, only when its item first shows.
  * UI thread.
  */
 public final class BrowserItems implements AutoCloseable {
@@ -55,9 +63,18 @@ public final class BrowserItems implements AutoCloseable {
     private SuggestionFetcher suggestions;
     // The HTTP proxy both fetchers go through, those made later too (plan 6's F3).
     private Optional<InetSocketAddress> proxy = Optional.empty();
+    // How many times the proxy changed, which a save's client is current for until it changes (plan 7's D6); read on any thread.
+    private volatile long proxyChanges;
+    // Save Page As's folder, file manager and client maker, which the plugin gives; null before.
+    private Saving saving;
     // Made with the first item.
     private PageNotifications notifications;
-    private boolean closed;
+    // Read on any thread, as a save's client asks whether it may go on.
+    private volatile boolean closed;
+
+    /** What Save Page As needs of the plugin: where the chooser starts, what shows the saved folder, and the save's client. */
+    private record Saving(Supplier<Path> folder, DownloadNames names, FileManager files,
+                          Function<Optional<InetSocketAddress>, HttpClient> clients) { }
 
     /**
      * The items of a plugin run, whose pages {@code start} makes: the plugin's has Chromium make them, and a test's
@@ -250,14 +267,43 @@ public final class BrowserItems implements AutoCloseable {
 
     /**
      * Has the items' favicon and suggestion fetches from now on go through {@code proxy} (plan 6's F3), as
-     * {@code http}'s {@code WebFetch} says, the fetchers made later too.
+     * {@code http}'s {@code WebFetch} says, the fetchers made later too; a save under way asks nothing more (plan 7's D6).
      *
      * @param proxy the HTTP proxy's address; empty for the JDK's default proxy selector
      */
     public void useProxy(Optional<InetSocketAddress> proxy) {
         this.proxy = Objects.requireNonNull(proxy, "proxy");
+        proxyChanges++;
         if (favicons != null) favicons.useProxy(proxy);
         if (suggestions != null) suggestions.useProxy(proxy);
+    }
+
+    /**
+     * Gives the items' Save Page As what it needs of the plugin (plan 7's Task 7); before this, Save Page As does nothing.
+     *
+     * @param folder the Downloads folder as it is now, where the save chooser starts
+     * @param names the downloads' names, in which a save holds its suggested folder's name (ruling D43)
+     * @param files shows a saved folder in the file manager
+     * @param clients makes a save's HTTP client through the proxy given, on the background executor
+     */
+    public void useSaving(Supplier<Path> folder, DownloadNames names, FileManager files,
+                          Function<Optional<InetSocketAddress>, HttpClient> clients) {
+        saving = new Saving(Objects.requireNonNull(folder, "folder"), Objects.requireNonNull(names, "names"),
+            Objects.requireNonNull(files, "files"), Objects.requireNonNull(clients, "clients"));
+    }
+
+    /**
+     * Starts a Save Page As of {@code page} over {@code tab}, its item's: with the HTTP proxy as it is now, its client
+     * retired once the proxy changes or the plugin stops.
+     *
+     * @return the save; empty once the plugin has stopped and before {@link #useSaving}
+     */
+    Optional<SavePage> savePage(Page page, ContentTab tab) {
+        Saving given = saving;
+        if (closed || given == null) return Optional.empty();
+        long changes = proxyChanges;
+        var network = new SavePage.Network(proxy, () -> !closed && proxyChanges == changes, () -> !closed, given.clients());
+        return Optional.of(SavePage.start(page, tab, context, given.folder().get(), given.names(), given.files(), network, this::later));
     }
 
     /** The fetcher of the items' pages' favicons; one that fetches nothing once the plugin has stopped. */

@@ -9,7 +9,7 @@ namespaced: they start with the plugin's id and a dot. Registration needs the UI
 <thead><tr><th>Contribution</th><th>Entry point</th><th>Capability</th><th>Where it appears</th></tr></thead>
 <tbody>
 <tr><td>Actions</td><td>{@link Actions#register(ActionSpec,Consumer)}</td><td></td><td>The command palette of every window, Settings › Keymap and its default shortcut; then wherever the plugin places it</td></tr>
-<tr><td>Menu entries</td><td>{@link Menus#standard(StandardMenu)}, {@link Menus#create(String,String)}, {@link Menus#createForContent(String,String)}, {@link Menus#terminalContext()}</td><td></td><td>A section at the end of a built-in menu, a top-level menu of its own, one shown only for its content tabs, the pane right-click menu</td></tr>
+<tr><td>Menu entries</td><td>{@link Menus#standard(StandardMenu)}, {@link Menus#create(String,String)}, {@link Menus#createForContent(String,String)}, {@link Menus#terminalContext()}, then {@link PluginMenu#addEntries(List,Consumer)} for entries that are not actions</td><td></td><td>A section at the end of a built-in menu, a top-level menu of its own, one shown only for its content tabs, the pane right-click menu</td></tr>
 <tr><td>Toolbar items</td><td>{@link Toolbar#add(ToolbarItem)}</td><td></td><td>In every window's toolbar, after Jasper's Split and Maximize buttons and before Find and Settings</td></tr>
 <tr><td>Status items and progress</td><td>{@link StatusBar#add(StatusItemSpec)}, {@link StatusBar#addProgress(StatusItemSpec)}</td><td></td><td>Either end of every window's status bar</td></tr>
 <tr><td>Rail buttons</td><td>{@link Rail#add(String)}</td><td></td><td>The left tool window stripe, after the tool window buttons</td></tr>
@@ -87,7 +87,14 @@ an action run from it receives that pane. A section is a {@link PluginMenu}: add
 rebuild it at any time with {@link PluginMenu#clear()}. In the terminal section and its submenus,
 {@link PluginMenu#addForWebAddress(String)} adds an action that shows only while the pane's selection is one {@code http}
 or {@code https} address with a host; the action chosen from it receives the address as
-{@link ActionContext#webAddress()}, with no capability, since the user chose the item with that selection.</p>
+{@link ActionContext#webAddress()}, with no capability, since the user chose the item with that selection.
+{@link PluginMenu#addEntries(List,Consumer)} adds entries that are not actions, such as a list of downloads, outside
+the terminal section: {@link MenuItem}s showing their labels as plain text and their enabled states, separators, and an
+item's children as a submenu titled by its label. Choosing a leaf calls the plugin back with its id. Entries are never in
+the palette or the keymap and show no key; their ids are unique across the whole tree, and a leaf's {@code action},
+which is not shown, is best its id. {@link MenuEntries#set(List)} replaces them where they stand: a change of labels and
+enabled states alone shows at once, in an open menu too, and any other change waits while the window has a menu
+open.</p>
 
 <h3>Toolbar</h3>
 <p>{@link ToolbarItem#action(String)} is a button for one action, {@link ToolbarItem#menu(String,String,List)} a button

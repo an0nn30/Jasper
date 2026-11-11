@@ -1123,6 +1123,172 @@ public abstract class PluginContractTest {
         assertThat(h.menu("context")).containsExactly("submenu:Open URL", "  web-address:test.alpha.split");
     }
 
+    /** A separator menu item. */
+    private static dev.jasper.sdk.ui.MenuItem separatorItem(String id) {
+        return new dev.jasper.sdk.ui.MenuItem(id, "", "", "", true, true);
+    }
+
+    /** A menu item that opens a submenu of {@code children}. */
+    private static dev.jasper.sdk.ui.MenuItem submenuItem(String id, String label, boolean enabled, dev.jasper.sdk.ui.MenuItem... children) {
+        return new dev.jasper.sdk.ui.MenuItem(id, label, "", "", enabled, false, Nodes.Hue.NEUTRAL, "", List.of(children));
+    }
+
+    /**
+     * Browser plan 7 Task 1b (SDK 0.31.0): menu entries show their labels, enabled states, separators and submenus, a
+     * menu of nothing else is in the window's menu bar, and choosing a leaf reaches {@code chosen} with its id on the UI
+     * thread; a disabled leaf, a leaf of a disabled submenu and a submenu report nothing.
+     */
+    @Test void menuEntriesShowTheirLabelsAndReportTheirIds() {
+        UUID window = h.addTerminalWindow();
+        List<String> heard = Collections.synchronizedList(new ArrayList<>());
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> context.menus().create("test.alpha.downloads", "Downloads")
+            .addEntries(List.of(menuItem("downloads.clear-all", "Clear All", true), separatorItem("downloads.rule"),
+                submenuItem("downloads.1", "a.zip \u2014 40%", true, menuItem("downloads.1.stop", "Stop", true),
+                    menuItem("downloads.1.open", "Open", false)),
+                submenuItem("downloads.2", "b.zip \u2014 Stopped", false, menuItem("downloads.2.remove", "Remove from List", true))),
+                id -> heard.add(id + "|" + javax.swing.SwingUtilities.isEventDispatchThread())));
+        assertThat(h.menu("top:test.alpha.downloads")).containsExactly("entry:downloads.clear-all:Clear All", "---",
+            "entries:a.zip \u2014 40%", "  entry:downloads.1.stop:Stop", "  entry:downloads.1.open:Open:disabled",
+            "entries:b.zip \u2014 Stopped:disabled", "  entry:downloads.2.remove:Remove from List");
+        assertThat(h.menuBar(window)).as("a menu of entries alone shows").containsExactly("top:test.alpha.downloads");
+
+        assertThat(h.chooseMenuEntry("downloads.1.stop")).isTrue();
+        assertThat(heard).containsExactly("downloads.1.stop|true");
+        assertThat(h.chooseMenuEntry("downloads.1.open")).as("disabled").isFalse();
+        assertThat(h.chooseMenuEntry("downloads.2.remove")).as("in a disabled submenu, which does not open").isFalse();
+        assertThat(h.chooseMenuEntry("downloads.1")).as("a submenu reports nothing").isFalse();
+        assertThat(h.chooseMenuEntry("downloads.rule")).as("nor does a separator").isFalse();
+        assertThat(h.chooseMenuEntry("downloads.absent")).isFalse();
+        assertThat(heard).hasSize(1);
+    }
+
+    /**
+     * Browser plan 7 Task 1b: menu entries are not actions. The registered actions, which the command palette and the
+     * keymap list, hold none of them, and none runs as an action.
+     */
+    @Test void menuEntriesAreNotActions() {
+        UUID window = h.addTerminalWindow();
+        List<String> heard = Collections.synchronizedList(new ArrayList<>());
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            context.actions().register(ActionSpec.of("test.alpha.run", "Run"), invoked -> heard.add("run"));
+            PluginMenu tools = context.menus().standard(StandardMenu.TOOLS);
+            tools.add("test.alpha.run");
+            tools.addEntries(List.of(menuItem("test.alpha.entry", "Entry", true)), heard::add);
+        });
+        assertThat(h.menu("TOOLS")).containsExactly("item:test.alpha.run", "entry:test.alpha.entry:Entry");
+        assertThat(h.actions()).containsExactly("test.alpha.run|Run|true");
+        assertThat(h.invoke("test.alpha.entry", window, null)).isFalse();
+        assertThat(heard).isEmpty();
+        assertThat(h.chooseMenuEntry("test.alpha.entry")).isTrue();
+        assertThat(heard).containsExactly("test.alpha.entry");
+    }
+
+    /** Browser plan 7 Task 1b: setting the entries replaces them where they stand, between the menu's other items. */
+    @Test void settingEntriesKeepsTheirPlace() {
+        var entries = new AtomicReference<dev.jasper.sdk.ui.MenuEntries>();
+        List<String> heard = Collections.synchronizedList(new ArrayList<>());
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            context.actions().register(ActionSpec.of("test.alpha.a", "A"), invoked -> { });
+            context.actions().register(ActionSpec.of("test.alpha.b", "B"), invoked -> { });
+            PluginMenu menu = context.menus().create("test.alpha.menu", "Alpha");
+            menu.add("test.alpha.a");
+            entries.set(menu.addEntries(List.of(menuItem("one", "One", true)), heard::add));
+            menu.add("test.alpha.b");
+        });
+        assertThat(h.menu("top:test.alpha.menu")).containsExactly("item:test.alpha.a", "entry:one:One", "item:test.alpha.b");
+        h.ui(() -> entries.get().set(List.of(menuItem("two", "Two", false), separatorItem("rule"),
+            submenuItem("more", "More", true, menuItem("three", "Three", true)))));
+        assertThat(h.menu("top:test.alpha.menu")).containsExactly("item:test.alpha.a", "entry:two:Two:disabled", "---",
+            "entries:More", "  entry:three:Three", "item:test.alpha.b");
+        assertThat(h.chooseMenuEntry("one")).as("gone with the set").isFalse();
+        assertThat(h.chooseMenuEntry("three")).isTrue();
+        h.ui(() -> entries.get().set(List.of()));
+        assertThat(h.menu("top:test.alpha.menu")).containsExactly("item:test.alpha.a", "item:test.alpha.b");
+        h.ui(() -> entries.get().set(List.of(menuItem("four", "Four", true))));
+        assertThat(h.menu("top:test.alpha.menu")).as("still between them").containsExactly("item:test.alpha.a", "entry:four:Four",
+            "item:test.alpha.b");
+        assertThat(heard).containsExactly("three");
+    }
+
+    /**
+     * Browser plan 7 Task 1b: a repeated id anywhere in the tree and a shortcut anywhere are refused, by
+     * {@code addEntries} and by {@code set}, and a refused set keeps the entries as they were.
+     */
+    @Test void aRepeatedIdOrAShortcutIsRefused() {
+        var entries = new AtomicReference<dev.jasper.sdk.ui.MenuEntries>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            context.actions().register(ActionSpec.of("test.alpha.run", "Run"), invoked -> { });
+            PluginMenu menu = context.menus().standard(StandardMenu.TOOLS);
+            List<List<dev.jasper.sdk.ui.MenuItem>> refused = List.of(
+                List.of(menuItem("same", "A", true), menuItem("same", "B", true)),
+                List.of(menuItem("same", "A", true), submenuItem("outer", "Outer", true, menuItem("same", "B", true))),
+                List.of(submenuItem("outer", "Outer", true, menuItem("outer", "B", true))),
+                List.of(submenuItem("x", "X", true, menuItem("leaf", "A", true)), submenuItem("y", "Y", true, menuItem("leaf", "B", true))),
+                List.of(separatorItem("same"), menuItem("same", "A", true)),
+                List.of(menuItem("a", "A", true).withShortcut("test.alpha.run")),
+                List.of(submenuItem("outer", "Outer", true, menuItem("a", "A", true).withShortcut("new_tab"))));
+            for (var items : refused)
+                assertThatIllegalArgumentException().as("%s", items).isThrownBy(() -> menu.addEntries(items, id -> { }));
+            entries.set(menu.addEntries(List.of(menuItem("a", "A", true)), id -> { }));
+            for (var items : refused)
+                assertThatIllegalArgumentException().as("set %s", items).isThrownBy(() -> entries.get().set(items));
+            assertThatNullPointerException().isThrownBy(() -> menu.addEntries(List.of(menuItem("b", "B", true)), null));
+        });
+        assertThat(h.active("test.alpha")).isTrue();
+        assertThat(h.menu("TOOLS")).as("only the accepted entries").containsExactly("entry:a:A");
+    }
+
+    /** Browser plan 7 Task 1b: the terminal's right-click menu, and its submenus, take no menu entries. */
+    @Test void aTerminalContextSectionRefusesEntries() {
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            PluginMenu section = context.menus().terminalContext();
+            for (PluginMenu menu : List.of(section, section.submenu("More")))
+                assertThatIllegalStateException().isThrownBy(() -> menu.addEntries(List.of(menuItem("a", "A", true)), id -> { }));
+            context.menus().standard(StandardMenu.VIEW).submenu("Elsewhere").addEntries(List.of(menuItem("b", "B", true)), id -> { });
+        });
+        assertThat(h.active("test.alpha")).isTrue();
+        assertThat(h.menu("context")).containsExactly("submenu:More");
+        assertThat(h.menu("VIEW")).as("any other menu takes them").containsExactly("submenu:Elsewhere", "  entry:b:B");
+    }
+
+    /**
+     * Browser plan 7 Task 1b: closing entries removes them, twice is harmless, and a closed one's set shows nothing; clearing
+     * the menu removes them too, and the plugin's stop takes the rest.
+     */
+    @Test void closingEntriesRemovesThem() {
+        var entries = new AtomicReference<dev.jasper.sdk.ui.MenuEntries>();
+        var cleared = new AtomicReference<dev.jasper.sdk.ui.MenuEntries>();
+        var other = new AtomicReference<PluginMenu>();
+        List<String> heard = Collections.synchronizedList(new ArrayList<>());
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            context.actions().register(ActionSpec.of("test.alpha.run", "Run"), invoked -> { });
+            PluginMenu menu = context.menus().standard(StandardMenu.TOOLS);
+            menu.add("test.alpha.run");
+            entries.set(menu.submenu("Recent").addEntries(List.of(menuItem("a", "A", true)), heard::add));
+            other.set(context.menus().create("test.alpha.other", "Other"));
+            cleared.set(other.get().addEntries(List.of(menuItem("b", "B", true)), heard::add));
+            context.menus().create("test.alpha.kept", "Kept").addEntries(List.of(menuItem("c", "C", true)), heard::add);
+        });
+        assertThat(h.menu("TOOLS")).containsExactly("item:test.alpha.run", "submenu:Recent", "  entry:a:A");
+        h.ui(() -> { entries.get().close(); entries.get().close(); });
+        assertThat(h.menu("TOOLS")).containsExactly("item:test.alpha.run", "submenu:Recent");
+        assertThat(h.chooseMenuEntry("a")).isFalse();
+        h.ui(() -> entries.get().set(List.of(menuItem("d", "D", true))));
+        assertThat(h.menu("TOOLS")).as("a closed one's set shows nothing").containsExactly("item:test.alpha.run", "submenu:Recent");
+
+        h.ui(() -> other.get().clear());
+        assertThat(h.menu("top:test.alpha.other")).isEmpty();
+        h.ui(() -> cleared.get().set(List.of(menuItem("e", "E", true))));
+        assertThat(h.menu("top:test.alpha.other")).as("cleared with its menu").isEmpty();
+        assertThat(h.chooseMenuEntry("e")).isFalse();
+
+        assertThat(h.menu("top:test.alpha.kept")).containsExactly("entry:c:C");
+        h.stopAll();
+        assertThat(h.menu("top:test.alpha.kept")).isEmpty();
+        assertThat(h.chooseMenuEntry("c")).isFalse();
+        assertThat(heard).isEmpty();
+    }
+
     @Test void statusItemsAreOrderedGlobalAndInertAfterClose() {
         var late = new AtomicReference<StatusItem>();
         h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
@@ -5028,6 +5194,53 @@ public abstract class PluginContractTest {
         h.ui(() -> assertThat(a.platform().copyOnSelect()).as("and on it").isTrue());
         h.copyOnSelect(false);
         assertThat(a.platform().copyOnSelect()).as("the user turned it off").isFalse();
+    }
+
+    /**
+     * Browser plan 7 (SDK 0.31.0): the Downloads folder is an absolute path, the same on any thread. The case only reads
+     * it, so it never creates the folder or writes in it (the application's is the user's own).
+     */
+    @Test void theDownloadsFolderIsAbsolute() {
+        PluginContext a = started("test.a", Set.of());
+        Path folder = a.platform().downloadsFolder();
+        assertThat(folder).isAbsolute();
+        assertThat(a.platform().downloadsFolder()).as("the same folder again").isEqualTo(folder);
+        h.ui(() -> assertThat(a.platform().downloadsFolder()).as("on the UI thread too").isEqualTo(folder));
+    }
+
+    /** SDK 0.31.0: marking a file that does not exist throws {@code NoSuchFileException} and creates nothing. */
+    @Test void markingAMissingFileThrowsNoSuchFile(@org.junit.jupiter.api.io.TempDir Path folder) {
+        PluginContext a = started("test.a", Set.of());
+        Path missing = folder.resolve("missing.zip");
+        assertThatThrownBy(() -> a.platform().markDownloaded(missing, java.net.URI.create("https://example.com/missing.zip"), Optional.empty()))
+            .isInstanceOf(java.nio.file.NoSuchFileException.class);
+        assertThat(missing).doesNotExist();
+    }
+
+    /** SDK 0.31.0 (F33): marking does file work, so the UI thread is refused, and so are missing arguments. */
+    @Test void markingADownloadRefusesTheUiThread(@org.junit.jupiter.api.io.TempDir Path folder) throws Exception {
+        PluginContext a = started("test.a", Set.of());
+        Path file = java.nio.file.Files.writeString(folder.resolve("report.pdf"), "%PDF-1.7");
+        java.net.URI source = java.net.URI.create("https://example.com/report.pdf");
+        h.ui(() -> assertThatIllegalStateException().isThrownBy(() -> a.platform().markDownloaded(file, source, Optional.empty()))
+            .withMessageContaining("UI thread"));
+        assertThatNullPointerException().isThrownBy(() -> a.platform().markDownloaded(null, source, Optional.empty()));
+        assertThatNullPointerException().isThrownBy(() -> a.platform().markDownloaded(file, null, Optional.empty()));
+        assertThatNullPointerException().isThrownBy(() -> a.platform().markDownloaded(file, source, null));
+        assertThat(file).hasContent("%PDF-1.7");
+    }
+
+    /**
+     * SDK 0.31.0 (F7): a download whose addresses must not be kept, such as one from a /dev/null page, is marked with
+     * {@code about:internet} and no referrer, and marked again with addresses; the file's content is untouched.
+     */
+    @Test void aDownloadWithNoAddressToKeepIsMarked(@org.junit.jupiter.api.io.TempDir Path folder) throws Exception {
+        PluginContext a = started("test.a", Set.of());
+        Path file = java.nio.file.Files.writeString(folder.resolve("notes.txt"), "notes");
+        a.platform().markDownloaded(file, java.net.URI.create("about:internet"), Optional.empty());
+        a.platform().markDownloaded(file, java.net.URI.create("https://user:secret@example.com/notes.txt"),
+            Optional.of(java.net.URI.create("https://example.com/")));
+        assertThat(file).hasContent("notes");
     }
 
     @Test void theCommandLineNamesTheClientOnceTheHostKnowsIt() {

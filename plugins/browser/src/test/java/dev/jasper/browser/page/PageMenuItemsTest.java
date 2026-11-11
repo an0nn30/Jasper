@@ -12,14 +12,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * The page's right-click menu for what is under the pointer (spec section 11), as the SDK's menu items: above Jasper's
  * pane items, Back, Forward and Reload over a bare page only, as in Chrome (P38), the link's items, the image's, then the
- * editing or selection items with Select All last; below them, Print… and Copy Page Title, then View Source and Inspect
- * Element, a separator between groups. Pure: no Chromium, no host.
+ * editing or selection items with Select All last; below them, Save Page As… (plan 7's Task 7), Print… and Copy Page Title,
+ * then View Source, Remove Element (plan 7's Task 6) and Inspect Element, a separator between groups. The link's and image's items include Save
+ * Link As… and Save Image As… (plan 7's F10). Pure: no Chromium, no host.
  */
 class PageMenuItemsTest {
     private static final Optional<String> NONE = Optional.empty();
     private static final String PAGE = "https://example.com/";
-    private static final List<String> TRAILING = List.of("page-menu.print Print…", "page-menu.copy-title Copy Page Title", "---",
-        "page-menu.view-source View Source", "page-menu.inspect-element Inspect Element");
+    private static final List<String> TRAILING = List.of("page-menu.save-page Save Page As…", "page-menu.print Print…",
+        "page-menu.copy-title Copy Page Title", "---",
+        "page-menu.view-source View Source", "page-menu.remove-element Remove Element", "page-menu.inspect-element Inspect Element");
 
     @Test void aBarePageGivesBackForwardAndReloadThenSelectAllAboveAndThePageItemsBelow() {
         var menu = PageMenuItems.of(context(true, false, NONE, NONE, NONE, false));
@@ -31,10 +33,11 @@ class PageMenuItemsTest {
     /** P38: over a link, an image or a selection Back, Forward and Reload are left out, and each adds its group in order. */
     @Test void aLinkAnImageAndASelectionEachAddTheirGroupInOrderWithoutBackForwardAndReload() {
         var menu = PageMenuItems.of(new Context(false, true, Optional.of("https://example.com/next"),
-            Optional.of("https://example.com/cat.png"), Optional.of("two words"), false, "DuckDuckGo", PAGE, true));
+            Optional.of("https://example.com/cat.png"), Optional.of("two words"), false, "DuckDuckGo", PAGE, true, PAGE));
         assertThat(lines(menu.leading())).containsExactly(
-            "page-menu.open-link Open Link in New Tab", "page-menu.copy-link Copy Link", "---",
-            "page-menu.open-image Open Image in New Tab", "page-menu.copy-image-address Copy Image Address", "---",
+            "page-menu.open-link Open Link in New Tab", "page-menu.copy-link Copy Link", "page-menu.save-link Save Link As…", "---",
+            "page-menu.open-image Open Image in New Tab", "page-menu.save-image Save Image As…",
+            "page-menu.copy-image-address Copy Image Address", "---",
             "page-menu.copy Copy", "page-menu.search Search with DuckDuckGo", "page-menu.select-all Select All");
         assertThat(lines(menu.trailing())).isEqualTo(TRAILING);
     }
@@ -51,7 +54,7 @@ class PageMenuItemsTest {
 
     @Test void searchWithNamesTheEngineItIsGiven() {
         for (String engine : List.of("Google", "Bing", "Kagi", "search.example.com", "Custom"))
-            assertThat(lines(PageMenuItems.of(new Context(true, true, NONE, NONE, Optional.of("jcef"), false, engine, PAGE, true)).leading()))
+            assertThat(lines(PageMenuItems.of(new Context(true, true, NONE, NONE, Optional.of("jcef"), false, engine, PAGE, true, PAGE)).leading()))
                 .contains("page-menu.search Search with " + engine);
     }
 
@@ -80,6 +83,22 @@ class PageMenuItemsTest {
         assertThat(opens("jasper-about:welcome", "https://example.com")).isTrue();
     }
 
+    /**
+     * Plan 7's F10 and D9: Save Link As… and Save Image As… download, with Jasper's rights, only an http or https address
+     * the frame could open itself, or a data: address; never a local file, Jasper's own pages, a blob or anything else,
+     * whichever page the frame shows. Copying works for any address.
+     */
+    @Test void saveLinkAndSaveImageSaveOnlyWebAndDataAddresses() {
+        for (String frame : List.of(PAGE, "file:///Users/ada/index.html", "jasper-about:welcome")) {
+            for (String address : List.of("https://example.com/report.pdf", "HTTP://example.com/a.zip", "data:image/png;base64,AAAA",
+                "DATA:text/plain,hello"))
+                assertThat(saves(frame, address)).as("from %s: %s", frame, address).isTrue();
+            for (String address : List.of("file:///etc/hosts", "jasper-about:welcome", "blob:https://example.com/1", "javascript:alert(1)",
+                "about:blank", "mailto:ada@example.com", "ftp://example.com/a.zip", "chrome://settings", "relative/path"))
+                assertThat(saves(frame, address)).as("from %s: %s", frame, address).isFalse();
+        }
+    }
+
     @Test void searchTermsAreTheSelectionWithItsWhiteSpaceCollapsedAndCutToAThousandCharacters() {
         assertThat(PageMenuItems.searchTerms("  two\n\twords\u00A0 here ")).isEqualTo("two words here");
         assertThat(PageMenuItems.searchTerms(" \n ")).isEmpty();
@@ -93,9 +112,24 @@ class PageMenuItemsTest {
 
     /** P39: Copy Page Title is disabled while the page has no title. */
     @Test void copyPageTitleIsDisabledOnAnUntitledPage() {
-        var menu = PageMenuItems.of(new Context(true, true, NONE, NONE, NONE, false, "Google", PAGE, false));
-        assertThat(lines(menu.trailing())).containsExactly("page-menu.print Print…", "page-menu.copy-title Copy Page Title (disabled)",
-            "---", "page-menu.view-source View Source", "page-menu.inspect-element Inspect Element");
+        var menu = PageMenuItems.of(new Context(true, true, NONE, NONE, NONE, false, "Google", PAGE, false, PAGE));
+        assertThat(lines(menu.trailing())).containsExactly("page-menu.save-page Save Page As…", "page-menu.print Print…",
+            "page-menu.copy-title Copy Page Title (disabled)", "---", "page-menu.view-source View Source", "page-menu.remove-element Remove Element",
+            "page-menu.inspect-element Inspect Element");
+    }
+
+    /**
+     * Spec section 11 and plan 7's Task 6: the last group is View Source, Remove Element and Inspect Element, whatever is
+     * under the pointer, Remove Element always enabled.
+     */
+    @Test void theLastGroupIsViewSourceRemoveElementAndInspectElement() {
+        for (var context : List.of(context(true, true, NONE, NONE, NONE, false), context(false, false, Optional.of("https://example.com/a"),
+            Optional.of("https://example.com/a.png"), Optional.of("text"), true))) {
+            var groups = groups(PageMenuItems.of(context).trailing());
+            assertThat(groups.getLast()).containsExactly("page-menu.view-source View Source", "page-menu.remove-element Remove Element",
+                "page-menu.inspect-element Inspect Element");
+        }
+        assertThat(PageMenuItems.REMOVE_ELEMENT).isEqualTo("page-menu.remove-element");
     }
 
     /**
@@ -118,9 +152,10 @@ class PageMenuItemsTest {
             if (link.isEmpty() && image.isEmpty() && selection.isEmpty() && !editable)
                 expected.add(List.of("page-menu.back Back" + (back ? "" : " (disabled)"),
                     "page-menu.forward Forward" + (forward ? "" : " (disabled)"), "page-menu.reload Reload"));
-            if (link.isPresent()) expected.add(List.of("page-menu.open-link Open Link in New Tab", "page-menu.copy-link Copy Link"));
-            if (image.isPresent())
-                expected.add(List.of("page-menu.open-image Open Image in New Tab", "page-menu.copy-image-address Copy Image Address"));
+            if (link.isPresent()) expected.add(List.of("page-menu.open-link Open Link in New Tab", "page-menu.copy-link Copy Link",
+                "page-menu.save-link Save Link As…"));
+            if (image.isPresent()) expected.add(List.of("page-menu.open-image Open Image in New Tab", "page-menu.save-image Save Image As…",
+                "page-menu.copy-image-address Copy Image Address"));
             String cutAndCopy = selection.isPresent() ? "" : " (disabled)";
             if (editable) expected.add(List.of("page-menu.cut Cut" + cutAndCopy, "page-menu.copy Copy" + cutAndCopy, "page-menu.paste Paste",
                 "page-menu.select-all Select All"));
@@ -167,17 +202,65 @@ class PageMenuItemsTest {
             "page-menu.reload Reload", "---", "page-menu.select-all Select All");
     }
 
+    /**
+     * Task 6's review, minor 5: Remove Element is disabled where Jasper's page scripts never run, as {@link Page#run}
+     * decides: while the page's main frame shows one of Jasper's own pages, in any case, or a challenge provider's
+     * address. The frame the pointer is in does not decide, as Remove Element runs in the main frame.
+     */
+    @Test void removeElementIsDisabledWhereJaspersPageScriptsDoNotRun() {
+        for (String page : List.of("jasper-about:welcome", "JASPER-ABOUT:history", "jasper-about:source?url=x",
+            "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/b/turnstile"))
+            assertThat(removeElement(page, page)).as(page).isFalse();
+        assertThat(removeElement("jasper-about:welcome", PAGE)).as("a web frame in Jasper's page").isFalse();
+        assertThat(removeElement(PAGE, "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/b/turnstile"))
+            .as("a challenge frame in a web page").isTrue();
+        for (String page : List.of(PAGE, "http://localhost:8080/", "file:///Users/ada/index.html", "about:blank", "data:text/html,hi"))
+            assertThat(removeElement(page, page)).as(page).isTrue();
+        assertThat(lines(PageMenuItems.of(new Context(true, true, NONE, NONE, NONE, false, "Google", "jasper-about:welcome", true,
+            "jasper-about:welcome")).trailing())).as("the rest of the group stays").contains("page-menu.view-source View Source",
+            "page-menu.remove-element Remove Element (disabled)", "page-menu.inspect-element Inspect Element");
+    }
+
+    /**
+     * Plan 7's Task 7 and F26: Save Page As… comes first in the group before View Source, before Print…, and is disabled
+     * where Jasper's page scripts never run, on Jasper's own pages and a challenge provider's, as its script could not.
+     */
+    @Test void savePageAsLeadsThePagesGroupAndIsDisabledWhereJaspersScriptsDoNotRun() {
+        assertThat(PageMenuItems.SAVE_PAGE).isEqualTo("page-menu.save-page");
+        for (var context : List.of(context(true, true, NONE, NONE, NONE, false), context(false, false, Optional.of("https://example.com/a"),
+            Optional.of("https://example.com/a.png"), Optional.of("text"), true)))
+            assertThat(groups(PageMenuItems.of(context).trailing()).getFirst()).containsExactly("page-menu.save-page Save Page As…",
+                "page-menu.print Print…", "page-menu.copy-title Copy Page Title");
+        for (String page : List.of("jasper-about:welcome", "JASPER-ABOUT:history",
+            "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/b/turnstile"))
+            assertThat(savePage(page)).as(page).isFalse();
+        for (String page : List.of(PAGE, "http://localhost:8080/", "file:///Users/ada/index.html", "about:blank"))
+            assertThat(savePage(page)).as(page).isTrue();
+    }
+
+    /** Whether Save Page As… is enabled in a page whose main frame shows {@code page}. */
+    private static boolean savePage(String page) {
+        return PageMenuItems.of(new Context(true, true, NONE, NONE, NONE, false, "Google", page, true, page)).trailing().stream()
+            .filter(item -> item.id().equals(PageMenuItems.SAVE_PAGE)).findFirst().orElseThrow().enabled();
+    }
+
+    /** Whether Remove Element is enabled over a frame at {@code frame} in a page whose main frame shows {@code page}. */
+    private static boolean removeElement(String page, String frame) {
+        return PageMenuItems.of(new Context(true, true, NONE, NONE, NONE, false, "Google", frame, true, page)).trailing().stream()
+            .filter(item -> item.id().equals(PageMenuItems.REMOVE_ELEMENT)).findFirst().orElseThrow().enabled();
+    }
+
     /** A titled page's context over {@link #PAGE}, searching with Google. */
     private static Context context(boolean canBack, boolean canForward, Optional<String> link, Optional<String> image,
                                    Optional<String> selection, boolean editable) {
-        return new Context(canBack, canForward, link, image, selection, editable, "Google", PAGE, true);
+        return new Context(canBack, canForward, link, image, selection, editable, "Google", PAGE, true, PAGE);
     }
 
     /** Whether Open Link in New Tab is enabled for a link to {@code address} in a frame at {@code frame}. */
     private static boolean opens(String frame, String address) {
-        var link = PageMenuItems.of(new Context(true, true, Optional.of(address), NONE, NONE, false, "Google", frame, true))
+        var link = PageMenuItems.of(new Context(true, true, Optional.of(address), NONE, NONE, false, "Google", frame, true, frame))
             .leading().stream().filter(item -> item.id().equals(PageMenuItems.OPEN_LINK)).findFirst();
-        var image = PageMenuItems.of(new Context(true, true, NONE, Optional.of(address), NONE, false, "Google", frame, true))
+        var image = PageMenuItems.of(new Context(true, true, NONE, Optional.of(address), NONE, false, "Google", frame, true, frame))
             .leading().stream().filter(item -> item.id().equals(PageMenuItems.OPEN_IMAGE)).findFirst();
         if (address.isEmpty()) {
             assertThat(link).as("an empty address is none").isEmpty();
@@ -186,6 +269,17 @@ class PageMenuItemsTest {
         assertThat(image.orElseThrow().enabled()).as("Open Image follows the same rule").isEqualTo(link.orElseThrow().enabled());
         assertThat(LinkSchemes.opensFrom(frame, address)).as("the shared rule").isEqualTo(link.orElseThrow().enabled());
         return link.orElseThrow().enabled();
+    }
+
+    /** Whether Save Link As… is enabled for a link to {@code address} in a frame at {@code frame}, as Save Image As… is. */
+    private static boolean saves(String frame, String address) {
+        var link = PageMenuItems.of(new Context(true, true, Optional.of(address), NONE, NONE, false, "Google", frame, true, frame))
+            .leading().stream().filter(item -> item.id().equals(PageMenuItems.SAVE_LINK)).findFirst().orElseThrow();
+        var image = PageMenuItems.of(new Context(true, true, NONE, Optional.of(address), NONE, false, "Google", frame, true, frame))
+            .leading().stream().filter(item -> item.id().equals(PageMenuItems.SAVE_IMAGE)).findFirst().orElseThrow();
+        assertThat(image.enabled()).as("Save Image As… follows the same rule").isEqualTo(link.enabled());
+        assertThat(LinkSchemes.saves(frame, address)).as("the shared rule").isEqualTo(link.enabled());
+        return link.enabled();
     }
 
     /** Each item as {@code id label}, {@code " (disabled)"} after a disabled one, and {@code ---} for a separator. */

@@ -20,11 +20,12 @@ import java.util.function.Function;
  * each disabled when the page cannot go there and each holding the page's twelve nearest history entries that way in
  * its hold menu, then, as Chrome's do, a separator and Show Full History, which opens Jasper's history page (plan 5's
  * H2); Reload, which is Stop while the page loads; the address field, with the site icon at its left; and the
- * /dev/null indicator of an item in /dev/null mode, which opens {@link DevNullPopover}; the menu button, which holds Add
- * Bookmark, or Remove Bookmark while the page is bookmarked, a separator, Manage Bookmarks and History, outside
- * /dev/null mode, then the item's {@link PrivacyMenu} group, the Reset items of the permissions stored for the page's
- * site, then Settings, its groups parted by one separator each (spec section 6). The site icon is the page's icon, else
- * the globe, and dragging it drags the page's address; while the page is one Jasper goes on to past a certificate
+ * /dev/null indicator of an item in /dev/null mode, which opens {@link DevNullPopover}; the menu button, which holds the
+ * page's tools first (plan 7: Reader Mode and Remove Distractions, while the page offers them), then Add Bookmark, or
+ * Remove Bookmark while the page is bookmarked, a separator, Manage Bookmarks and History, outside /dev/null mode, then
+ * the item's {@link PrivacyMenu} group, the Reset items of the permissions stored for the page's site, then Settings,
+ * its groups parted by one separator each (spec section 6). The site icon is the page's icon, else the globe, and
+ * dragging it drags the page's address; while the page is one Jasper goes on to past a certificate
  * error, "Not secure", in the warning colour, stands in its place (spec section 14). The click that brings the focus
  * into the field selects all its text. The toolbar keeps what is typed into the field and the engine's suggestions for
  * it: the field shows the page's address, or a results page's search terms, until something is typed, then that text
@@ -76,6 +77,7 @@ final class BrowserToolbar {
     /**
      * The toolbar for a page at {@code address}.
      *
+     * @param tools the menu's first group, the page's tools, as the item's {@link PageToolsHost} gives it
      * @param address the page's address, which the field shows unless something was typed, and which dragging the site
      *     icon drags
      * @param loading whether the page loads
@@ -92,7 +94,7 @@ final class BrowserToolbar {
      * @param privacy the menu's privacy group, as the item's {@link PrivacyMenu} gives it
      * @return the toolbar's row
      */
-    Nodes.Stack node(String address, boolean loading, boolean canGoBack, boolean canGoForward, Optional<PixelImage> icon,
+    Nodes.Stack node(List<MenuItem> tools, String address, boolean loading, boolean canGoBack, boolean canGoForward, Optional<PixelImage> icon,
                      NavigationHistory.History history, BrowserSettings settings, boolean notSecure, boolean devNull, Optional<Boolean> bookmarked,
                      List<MenuItem> privacy) {
         var reload = loading
@@ -107,7 +109,8 @@ final class BrowserToolbar {
         Optional<String> drag = notSecure || address.isBlank() ? Optional.empty() : Optional.of(address);
         var field = new Nodes.Field(ADDRESS, ControlState.READY, Nodes.FieldKind.TEXT, value, PLACEHOLDER, "Address", ENTER, Optional.empty(),
             Nodes.FieldPresentation.EMBEDDED, "", ESCAPE, "", false, image, glyph, name, drag, true, rows, typed != null && suggesting);
-        var menu = new Nodes.MenuButton(MENU, ControlState.READY, "", "menu", Nodes.ButtonKind.GHOST, "", menu(address, bookmarked, privacy), "Menu");
+        var menu = new Nodes.MenuButton(MENU, ControlState.READY, "", "menu", Nodes.ButtonKind.GHOST, "", menu(tools, address, bookmarked, privacy),
+            "Menu");
         var children = new ArrayList<Nodes.Node>(List.of(
             historyButton(BACK, canGoBack, "back", "Back", NavigationHistory.backMenu(history)),
             historyButton(FORWARD, canGoForward, "forward", "Forward", NavigationHistory.forwardMenu(history)), reload));
@@ -167,12 +170,13 @@ final class BrowserToolbar {
     }
 
     /**
-     * The menu button's items, its groups in order: with a bookmark state, Add Bookmark (disabled for an address bookmarks
-     * never keep) or Remove Bookmark, a separator, Manage Bookmarks and History; the privacy group; then a separator and
-     * Settings. Plan 7's reader group goes first. A separator that would lead, end the menu or follow another is left out.
+     * The menu button's items, its groups in order: the page's tools (plan 7); with a bookmark state, Add Bookmark
+     * (disabled for an address bookmarks never keep) or Remove Bookmark, a separator, Manage Bookmarks and History; the
+     * privacy group; then a separator and Settings. A separator that would lead, end the menu or follow another is left
+     * out.
      */
-    private static List<MenuItem> menu(String address, Optional<Boolean> bookmarked, List<MenuItem> privacy) {
-        var items = new ArrayList<MenuItem>();
+    private static List<MenuItem> menu(List<MenuItem> tools, String address, Optional<Boolean> bookmarked, List<MenuItem> privacy) {
+        var items = new ArrayList<MenuItem>(tools);
         if (bookmarked.isPresent()) {
             items.add(bookmarked.get() ? new MenuItem(BOOKMARK_REMOVE, "Remove Bookmark", "", BOOKMARK_REMOVE, true, false)
                 : new MenuItem(BOOKMARK_ADD, "Add Bookmark", "", BOOKMARK_ADD, Addresses.storable(address).isPresent(), false));

@@ -214,7 +214,7 @@ has its own, so every registration is attributed to it.
 | `fileSources()` | [Places in Jasper's file chooser](#file-sources). |
 | `notifications()` | [Notification groups](#notifications). |
 | `commandLine()` | [`jasper` subcommands](#command-line-subcommands). |
-| `platform()` | [Opening files and web addresses](#opening-files-and-web-addresses), [the clipboard](#the-clipboard), [the file editor role](#the-file-editor-role) and [the web browser role](#the-web-browser-role). |
+| `platform()` | [Opening files and web addresses](#opening-files-and-web-addresses), [downloaded files](#downloaded-files), [the clipboard](#the-clipboard), [the file editor role](#the-file-editor-role) and [the web browser role](#the-web-browser-role). |
 
 ## Capabilities and consent
 
@@ -340,6 +340,16 @@ private static void installUi(PluginContext context, long stepMillis) {
   [`webAddress()`](sdk-reference.html#dev.jasper.sdk.ui.ActionContext.webAddress()); chosen any other way, it gets
   none. It needs no capability, since the user chose the item with that selection. Any other menu throws
   `IllegalStateException`.
+- [`addEntries(items, chosen)`](sdk-reference.html#dev.jasper.sdk.ui.PluginMenu.addEntries(List,Consumer)) adds menu
+  entries that are not actions, such as a list of downloads: each
+  [`MenuItem`](sdk-reference.html#dev.jasper.sdk.ui.MenuItem) shows its label and enabled state, a separator shows as
+  one, and an item with children is a submenu titled by its label. Choosing a leaf calls `chosen` with its id on the UI thread. Entries are never in the palette or the keymap,
+  show no key and no icon, and their labels are plain text. A leaf's `action`, which `MenuItem` requires, is not shown:
+  make it the item's id. An id repeated anywhere in the tree, or a shortcut, throws `IllegalArgumentException`, and the
+  `terminalContext()` section or a submenu of it throws `IllegalStateException`.
+  [`MenuEntries.set(items)`](sdk-reference.html#dev.jasper.sdk.ui.MenuEntries.set(List)) replaces them where they
+  stand. A change of labels and enabled states alone shows at once, in an open menu too; any other change waits while
+  the window has a menu open.
 
 | `StandardMenu` | For |
 | --- | --- |
@@ -1141,6 +1151,22 @@ one.
   `IllegalArgumentException` (from `openInBrowser` too), and a failure is posted as "Could not open a web address".
 - `openInEditor`, `openInBrowser` and `browse` work from any thread; `openFile` only on the UI thread.
 
+## Downloaded files
+
+- `context.platform().downloadsFolder()` (SDK 0.31.0), on any thread, returns the system's Downloads folder as an
+  absolute path: `~/Downloads` on macOS, the Downloads known folder on Windows (else `%USERPROFILE%\Downloads`), and
+  `XDG_DOWNLOAD_DIR` from `user-dirs.dirs` on Linux (else `~/Downloads`). Jasper finds it once, at the first call,
+  which may block while it reads the system's settings, so make that call off the UI thread. It may not exist yet:
+  create it before saving there.
+- `context.platform().markDownloaded(file, source, referrer)` (SDK 0.31.0) gives a file the plugin downloaded the
+  system's downloaded-file mark, so the system checks it before it is opened or run: the quarantine attribute on
+  macOS, the `Zone.Identifier` stream on Windows naming the referrer and the source, and nothing on Linux, which has
+  no such mark. A mark already there is kept. The addresses lose their user name and password, and one that is not
+  `http` or `https` is written as `about:internet`; pass `about:internet` and no referrer to keep no address. It does
+  file work, so call it from `background()`: on the UI thread it throws `IllegalStateException`. A missing file throws
+  `NoSuchFileException`, and a mark that cannot be written an `IOException` with the system's reason, such as "This
+  volume cannot keep a downloaded-file mark" on a Windows FAT32 or exFAT drive.
+
 ## The clipboard
 
 `context.platform()` puts text on the clipboard and reads it, on the UI thread; elsewhere the calls throw
@@ -1499,7 +1525,7 @@ try (var host = new FakePluginHost()) {
 | Restoring | `restoreState(tab)` (the restore state a tab gives), `savedTitle(tab)` (the title Jasper saves it with), `restoreTab(pluginId, windowId, title, state)` (runs the plugin's restorer as Jasper does: the tab is placed in that window, not shown, and a session's tab waits, `NOT_STARTED`, until it is shown), `declinedRestores()` (the reasons restorers gave when no tab came back) |
 | Provided sessions | `sessionState(paneId)`, `typeIntoSession`, `sessionOutput`, `cancelSession`, `reconnectSession`, `pumpSessions` |
 | Palette scopes | `scopes()`, `scopePresentation(id)`, `scopesInAll()`, `scopesInRecents()`, `searchScope`, `availableInScope`, `stepInScope`, `completeStep`, `executeInScope`, `paletteOpens()`; `addTextTarget(windowId)` (a content tab that takes text, its window's current item, which a query with no pane names as its text target) and `insertedText(tabId)`; `insertText(tab, text)` (runs a plugin tab's insertion) |
-| Everything else | `notifications()`, `clipboard()`, `activityLog()`, `connectionLog()`, `openedInEditor()`, `openedFiles()`, `browsed()`, `contentTabs()` with `contentStatus(tab)` and `contentCommands(tab)`, `contentMenu(tab)` (the right-click menu `showContextMenu` shows), `chooseFromContentMenu(tab, path...)`, `dismissContentMenu(tab)`, `contentTab(pluginId, title)` and `contentView(pluginId, title)`, `fileSources()`, `connectFileSource`, `declareSubcommand(pluginId, name, summary)` before `start` (the fake reads no `plugin.toml`), then `call(name, arguments, folder)`, `setCommandClient(path)` (what `CommandLine.client()` returns), `setDefaultBrowser(jasper)` (what `Platform.isDefaultBrowser()` returns; a change runs the `onDefaultBrowserChanged` handlers), `setCopyOnSelect(on)` (what `Platform.copyOnSelect()` returns), `declareBundled(pluginId)` (a bundled plugin's file editor and web browser registrations win), `shellEnvironment(map)`, `edit(file, line, windowId, origin)` (without `origin`, a Jasper open), `openLink(address, origin, placement, target, windowId)`, `browserPlugin()`, `publishApp(topic, payload)`, `setVariant`, `setWorkspace` |
+| Everything else | `notifications()`, `clipboard()`, `activityLog()`, `connectionLog()`, `openedInEditor()`, `openedFiles()`, `browsed()`, `contentTabs()` with `contentStatus(tab)` and `contentCommands(tab)`, `contentMenu(tab)` (the right-click menu `showContextMenu` shows), `chooseFromContentMenu(tab, path...)`, `dismissContentMenu(tab)`, `contentTab(pluginId, title)` and `contentView(pluginId, title)`, `fileSources()`, `connectFileSource`, `declareSubcommand(pluginId, name, summary)` before `start` (the fake reads no `plugin.toml`), then `call(name, arguments, folder)`, `setCommandClient(path)` (what `CommandLine.client()` returns), `setDefaultBrowser(jasper)` (what `Platform.isDefaultBrowser()` returns; a change runs the `onDefaultBrowserChanged` handlers), `setCopyOnSelect(on)` (what `Platform.copyOnSelect()` returns), `setDownloadsFolder(folder)` (what `Platform.downloadsFolder()` returns; by default `home/Downloads` under the host's data root), `markedDownloads()` and `failMarks(failure)` (the marks `Platform.markDownloaded` made, and a failure every later one throws), `declareBundled(pluginId)` (a bundled plugin's file editor and web browser registrations win), `shellEnvironment(map)`, `edit(file, line, windowId, origin)` (without `origin`, a Jasper open), `openLink(address, origin, placement, target, windowId)`, `browserPlugin()`, `publishApp(topic, payload)`, `setVariant`, `setWorkspace` |
 
 Where the fake differs from Jasper:
 

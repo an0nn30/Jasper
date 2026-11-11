@@ -6,6 +6,7 @@ import dev.jasper.browser.item.DataStores;
 import dev.jasper.browser.item.ItemTestAccess;
 import dev.jasper.browser.settings.BrowserSettings;
 import dev.jasper.browser.store.MemoryStores;
+import dev.jasper.browser.tools.ToolScripts;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.testing.FakePluginHost;
 import dev.jasper.sdk.ui.ContentTab;
@@ -63,11 +64,12 @@ class PageMenuTest {
             PageTestAccess.loadingChanged(page, false, true, false);
             show(pointed(Optional.of("https://example.com/next"), NONE, Optional.of("selected"), false));
             List<String> lines = host.contentMenu(item.tab());
-            assertThat(lines).startsWith("item:page-menu.open-link", "item:page-menu.copy-link", "---", "item:page-menu.copy",
-                "item:page-menu.search", "item:page-menu.select-all", "---", "host:Split");
+            assertThat(lines).startsWith("item:page-menu.open-link", "item:page-menu.copy-link", "item:page-menu.save-link", "---",
+                "item:page-menu.copy", "item:page-menu.search", "item:page-menu.select-all", "---", "host:Split");
             assertThat(lines).contains("host:Move Pane to Tab (disabled)", "host:Close Pane");
-            assertThat(lines).endsWith("host:Close Pane", "---", "item:page-menu.print", "item:page-menu.copy-title (disabled)", "---",
-                "item:page-menu.view-source", "item:page-menu.inspect-element");
+            assertThat(lines).endsWith("host:Close Pane", "---", "item:page-menu.save-page", "item:page-menu.print",
+                "item:page-menu.copy-title (disabled)", "---",
+                "item:page-menu.view-source", "item:page-menu.remove-element", "item:page-menu.inspect-element");
             assertThat(ended).as("Chromium's menu ends once the menu closes").hasValue(0);
             assertThat(host.dismissContentMenu(item.tab())).isTrue();
             show(plain());
@@ -189,6 +191,64 @@ class PageMenuTest {
         });
     }
 
+    /**
+     * Spec sections 10 and 11, plan 7's F10: Save Link As… and Save Image As… arm the page's ask with the address Chromium
+     * checked, not the one the page wrote, then start its download, which asks where it goes; a data: image saves too.
+     */
+    @Test void saveLinkAsAndSaveImageAsAskWhereTheDownloadGoesThenStartIt() throws Exception {
+        onUiThread(() -> {
+            open();
+            var started = new ArrayList<String>();
+            page.useDownloader((downloading, url) -> {
+                assertThat(downloading).isSameAs(page);
+                started.add(url);
+            });
+            String link = "https://example.org/report.pdf", image = "data:image/png;base64,AAAA";
+            var pointed = new PageMenu.Pointed(new Point(), Optional.of(link), Optional.of("https://ada:pw@example.org/report.pdf"),
+                Optional.of(image), NONE, false, NONE);
+            show(pointed);
+            assertThat(host.contentMenu(item.tab())).contains("item:page-menu.save-link", "item:page-menu.save-image");
+            assertThat(host.chooseFromContentMenu(item.tab(), "item:page-menu.save-link")).isTrue();
+            assertThat(started).containsExactly(link);
+            assertThat(page.downloadAsk().take(link, System.currentTimeMillis() + 2_000)).as("armed for the link").isTrue();
+            show(pointed);
+            assertThat(host.chooseFromContentMenu(item.tab(), "item:page-menu.save-image")).isTrue();
+            assertThat(started).containsExactly(link, image);
+            assertThat(page.downloadAsk().take(image, System.currentTimeMillis() + 2_000)).as("armed for the image").isTrue();
+            assertThat(ended).hasValue(2);
+            assertThat(items.items()).as("nothing opened").hasSize(1);
+            assertThat(host.clipboard().copies()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * Plan 7's D9: Save Link As… and Save Image As… are disabled for a local, Jasper, blob or script address, and save
+     * nothing even when run, as they download with Jasper's rights; a page without a browser starts nothing.
+     */
+    @Test void saveLinkAsAndSaveImageAsSaveNoOtherAddressEvenWhenRun() throws Exception {
+        onUiThread(() -> {
+            open();
+            var started = new ArrayList<String>();
+            page.useDownloader((downloading, url) -> started.add(url));
+            for (String other : List.of("file:///etc/hosts", "jasper-about:welcome", "blob:https://example.com/1", "javascript:alert(1)")) {
+                var pointed = pointed(Optional.of(other), Optional.of(other), NONE, false);
+                show(pointed);
+                assertThat(host.contentMenu(item.tab())).as(other)
+                    .contains("item:page-menu.save-link (disabled)", "item:page-menu.save-image (disabled)");
+                assertThat(host.dismissContentMenu(item.tab())).isTrue();
+                PageMenu.run(page, page.menuPlace().orElseThrow(), pointed, PAGE + "/", PageMenuItems.SAVE_LINK);
+                PageMenu.run(page, page.menuPlace().orElseThrow(), pointed, PAGE + "/", PageMenuItems.SAVE_IMAGE);
+                assertThat(page.downloadAsk().take(other, System.currentTimeMillis() + 2_000)).as(other + ": nothing armed").isFalse();
+            }
+            assertThat(started).isEmpty();
+            var unready = new Page(URI.create(PAGE), () -> { }, PageTestAccess.noFavicons(), Runnable::run, PageContext.persistent());
+            unready.startDownload("https://example.org/report.pdf");
+            unready.close();
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
     /** Spec section 11: Search with ⟨engine⟩ names the chosen engine and opens its search in the next tab. */
     @Test void searchWithTheEngineOpensASearchForTheSelectionInTheNextTab() throws Exception {
         onUiThread(() -> {
@@ -243,7 +303,7 @@ class PageMenuTest {
             for (var choice : List.of(Map.entry("page-menu.back", bare), Map.entry("page-menu.forward", bare), Map.entry("page-menu.reload", bare),
                 Map.entry("page-menu.cut", field), Map.entry("page-menu.copy", field), Map.entry("page-menu.paste", field),
                 Map.entry("page-menu.select-all", field), Map.entry("page-menu.print", field), Map.entry("page-menu.view-source", field),
-                Map.entry("page-menu.inspect-element", field))) {
+                Map.entry("page-menu.remove-element", field), Map.entry("page-menu.inspect-element", field))) {
                 show(choice.getValue());
                 assertThat(host.chooseFromContentMenu(item.tab(), "item:" + choice.getKey())).as(choice.getKey()).isTrue();
                 assertThat(ended).as(choice.getKey()).hasValue(++count);
@@ -280,10 +340,84 @@ class PageMenuTest {
             var inspected = new ArrayList<Point>();
             var page = new Page(URI.create(PAGE), () -> { }, PageTestAccess.noFavicons(), Runnable::run, PageContext.persistent());
             var place = new MenuPlace(tab((proxy, method, args) -> null), copied -> { }, () -> "Google", terms -> URI.create(PAGE),
-                () -> false, () -> { }, () -> { }, () -> { }, inspected::add);
+                () -> false, () -> { }, () -> { }, () -> { }, () -> { }, at -> { }, inspected::add);
             var pointed = new PageMenu.Pointed(new Point(40, 70), NONE, NONE, NONE, NONE, false, NONE);
             PageMenu.run(page, place, pointed, PAGE, PageMenuItems.INSPECT_ELEMENT);
             assertThat(inspected).containsExactly(new Point(40, 70));
+        });
+    }
+
+    /**
+     * Spec section 10 and plan 7's Task 6: Remove Element is its item's, at the point on the page's canvas where the menu
+     * was asked for, as Inspect Element's.
+     */
+    @Test void removeElementIsTheItemsAtThePointOnThePagesCanvas() throws Exception {
+        onUiThread(() -> {
+            var removed = new ArrayList<Point>();
+            var inspected = new ArrayList<Point>();
+            var page = new Page(URI.create(PAGE), () -> { }, PageTestAccess.noFavicons(), Runnable::run, PageContext.persistent());
+            var place = new MenuPlace(tab((proxy, method, args) -> null), copied -> { }, () -> "Google", terms -> URI.create(PAGE),
+                () -> false, () -> { }, () -> { }, () -> { }, () -> { }, removed::add, inspected::add);
+            var pointed = new PageMenu.Pointed(new Point(40, 70), NONE, NONE, NONE, NONE, false, NONE);
+            PageMenu.run(page, place, pointed, PAGE, PageMenuItems.REMOVE_ELEMENT);
+            assertThat(removed).containsExactly(new Point(40, 70));
+            assertThat(inspected).isEmpty();
+        });
+    }
+
+    /**
+     * Plan 7's Task 7: Save Page As… is its item's, which asks where and saves the page; over one of Jasper's own pages,
+     * which the main frame may have committed since the menu showed, it does nothing.
+     */
+    @Test void savePageAsIsTheItemsButNotOverJaspersOwnPages() throws Exception {
+        onUiThread(() -> {
+            var saved = new java.util.concurrent.atomic.AtomicInteger();
+            var page = new Page(URI.create(PAGE), () -> { }, PageTestAccess.noFavicons(), Runnable::run, PageContext.persistent());
+            var place = new MenuPlace(tab((proxy, method, args) -> null), copied -> { }, () -> "Google", terms -> URI.create(PAGE),
+                () -> false, () -> { }, () -> { }, saved::incrementAndGet, () -> { }, at -> { }, at -> { });
+            PageTestAccess.addressChanged(page, PAGE);
+            PageMenu.run(page, place, plain(), PAGE, PageMenuItems.SAVE_PAGE);
+            assertThat(saved).hasValue(1);
+            PageTestAccess.addressChanged(page, "jasper-about:welcome");
+            PageMenu.run(page, place, plain(), PAGE, PageMenuItems.SAVE_PAGE);
+            assertThat(saved).as("not on Jasper's own page").hasValue(1);
+            page.close();
+        });
+    }
+
+    /**
+     * Task 6's review, minor 5: over one of Jasper's own pages, which the page's main frame committed, Remove Element is
+     * disabled, and over a web page enabled again.
+     */
+    @Test void removeElementIsDisabledOverJaspersOwnPages() throws Exception {
+        onUiThread(() -> {
+            open();
+            PageTestAccess.addressChanged(page, "jasper-about:welcome");
+            show(plain());
+            assertThat(host.contentMenu(item.tab())).contains("item:page-menu.remove-element (disabled)", "item:page-menu.view-source");
+            assertThat(host.chooseFromContentMenu(item.tab(), "item:page-menu.remove-element")).isFalse();
+            assertThat(host.dismissContentMenu(item.tab())).isTrue();
+            PageTestAccess.addressChanged(page, PAGE + "/");
+            show(plain());
+            assertThat(host.contentMenu(item.tab())).contains("item:page-menu.remove-element");
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * Plan 7's Task 6: chosen from the menu over an item's page, Remove Element ends Chromium's menu and runs
+     * {@code distractions.js}'s removeAt in the page at the menu's point, in CSS pixels at the item's zoom.
+     */
+    @Test void removeElementFromTheMenuRunsRemoveAtInThePage() throws Exception {
+        onUiThread(() -> {
+            open();
+            var ran = new ArrayList<String>();
+            PageTestAccess.useScriptRunner(page, (script, url) -> ran.add(url + " " + script));
+            show(new PageMenu.Pointed(new Point(300, 150), NONE, NONE, NONE, NONE, false, NONE));
+            assertThat(host.chooseFromContentMenu(item.tab(), "item:page-menu.remove-element")).isTrue();
+            assertThat(ended).hasValue(1);
+            assertThat(ran).containsExactly(ToolScripts.DISTRACTIONS_URL + " " + ToolScripts.distractionsRemoveAt(300.0, 150.0));
+            assertThat(host.failures()).isEmpty();
         });
     }
 
@@ -461,7 +595,7 @@ class PageMenuTest {
     private static Page placed(ContentTab tab, List<String> copies) {
         var page = new Page(URI.create(PAGE), () -> { }, PageTestAccess.noFavicons(), Runnable::run, PageContext.persistent());
         page.setMenuPlace(new MenuPlace(tab, copies::add, () -> "Google", terms -> URI.create("https://google.com/search?q=" + terms),
-            page::canGoBack, page::back, page::reload, () -> { }, at -> { }));
+            page::canGoBack, page::back, page::reload, () -> { }, () -> { }, at -> { }, at -> { }));
         return page;
     }
 

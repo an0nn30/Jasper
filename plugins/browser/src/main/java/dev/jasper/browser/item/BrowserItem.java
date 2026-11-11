@@ -102,7 +102,15 @@ import javax.swing.JComponent;
  * in a {@link DataStore} (spec section 12), which it holds while it is open: its page is made in the store's request
  * context, once the store is {@link DataStore#ready ready}; its history, bookmarks, address suggestions and Edit Bookmark
  * panel are the store's, and so are the certificates it goes on past; and the links and popups its page opens in items
- * of their own open in the same store, so a /dev/null item's stay in its group. UI thread.
+ * of their own open in the same store, so a /dev/null item's stay in its group. An item its page opened that way closes
+ * when its first navigation becomes a download, before it shows any document, as Chrome closes such a tab, while the
+ * download keeps its browser (plan 7's F28); one the user opened never does. Its menu button's first group is its page's
+ * tools ({@link PageToolsHost}): Reader Mode and Remove Distractions, offered once a check of the page's document finds
+ * more than 10 characters of reader text, and Reader Mode lays the article over the page in the theme's colours until
+ * Exit Reader Mode, Escape in the page or the page's next load (spec section 10); Remove Distractions hides the overlays
+ * the user clicks until Exit Distraction Removal, Escape or the next load, and either mode ends the other. Remove
+ * Element, from the page's right-click menu, hides the overlay under the pointer, its point divided by the zoom the page
+ * shows at, and Save Page As… saves the page with its resources in a folder the user chooses. UI thread.
  */
 public final class BrowserItem implements AutoCloseable {
     static final String ROOT = "browser", PAGE = "browser.page", CONTENT = "browser.page.content";
@@ -133,6 +141,8 @@ public final class BrowserItem implements AutoCloseable {
     private final Subscription bookmarksChanged, visitsChanged;
     // The menu's privacy group, which follows the store's permissions until the item closes.
     private final PrivacyMenu privacy;
+    // The page's tools, reader mode first, whose group leads the menu (plan 7's F38).
+    private final PageToolsHost pageTools;
     // Answers the page's camera, microphone and notification requests until the item closes or the plugin stops.
     private final SitePermissions sitePermissions;
     // The plugin's pages' notifications, which the page's go to.
@@ -154,6 +164,8 @@ public final class BrowserItem implements AutoCloseable {
     private OptionalInt ownZoom;
     private String title;
     private boolean waiting, asked, closed;
+    // Whether a page opened the item, as its link or popup (plan 7's F28).
+    private boolean openedByPage;
     // How many main-frame loads the page has started: a bookmark's panel opens only if none has since Add Bookmark.
     private long loadStarts;
     // Copy on select: whether a read of the page's selection is under way, and whether a gesture came meanwhile (H34);
@@ -183,12 +195,15 @@ public final class BrowserItem implements AutoCloseable {
         page.onMagnify(this::magnify);
         page.onOpenItem(this::openItem);
         page.onCloseItem(this::close);
+        // Plan 7's F28: a tab a page opened, whose first navigation became a download, is empty: it closes, as Chrome's.
+        page.onFirstNavigationDownload(() -> { if (openedByPage) close(); });
         page.onShowItem(this::show);
         page.onAddressChange(this::committed);
         page.onLoadStart(address -> loadStarts++);
         page.onSelectionGesture(this::selectionFinished);
         errors = new ErrorPages(page, store.allowance(), this::load);
         privacy = new PrivacyMenu(store, items, errors::address, this::reloadForPermissions, page);
+        pageTools = new PageToolsHost(page, items.context().appearance(), () -> this.zoom, items::later, this::render);
         sitePermissions = new SitePermissions(page, store, items::closed);
         // The page's notifications are Jasper's, in the item's window, until it closes; a new document's names are its own.
         // A /dev/null item shows none, as Chrome's Incognito (ruling V20).
@@ -205,7 +220,9 @@ public final class BrowserItem implements AutoCloseable {
         view = items.context().kit().create(spec(), this::event);
         view.registerContent(new CustomContent(CONTENT, Nodes.CustomKind.PREVIEW, page.view(), page));
         page.view().addHierarchyListener(event -> {
-            if ((event.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0 && page.view().isShowing()) shown();
+            if ((event.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) == 0 || !page.view().isShowing()) return;
+            shown();
+            pageTools.shown();
         });
         // The item draws again as the bookmarks change, and as the visits do while something is typed, for the field's list.
         bookmarksChanged = stores.bookmarkIndex().onChanged(this::render);
@@ -266,6 +283,7 @@ public final class BrowserItem implements AutoCloseable {
             bookmarksChanged.close();
             visitsChanged.close();
             privacy.close();
+            pageTools.close();
             view.close();
             throw failure;
         }
@@ -288,7 +306,7 @@ public final class BrowserItem implements AutoCloseable {
         // right-click menu, which copies with the plugin's clipboard and searches with the engine chosen as it opens.
         page.setDialogPlace(new DialogPlace(items.context().kit(), items.context().windows(), tab));
         page.setMenuPlace(new MenuPlace(tab, items.context().platform()::copy, this::engineName, this::search, errors::canGoBack,
-            this::goBack, this::reload, this::viewSource, this::inspect));
+            this::goBack, this::reload, this::savePage, this::viewSource, this::removeElement, this::inspect));
         items.opened(this);
         present();
     }
@@ -513,10 +531,27 @@ public final class BrowserItem implements AutoCloseable {
     }
 
     /**
+     * Save Page As…, from the page's right-click menu (plan 7's Task 7): the save chooser asks where, starting in the
+     * Downloads folder, then the page is saved there with its resources ({@link BrowserItems#savePage}). Nothing once the
+     * item has closed.
+     */
+    void savePage() {
+        if (!closed && tab != null) items.savePage(page, tab).ifPresent(pageTools::saving);
+    }
+
+    /**
      * View Source: the page's HTML is captured, and the item loads the page's source page ({@link SourcePages#show}).
      */
     void viewSource() {
         if (!closed) sources.show();
+    }
+
+    /**
+     * Remove Element at {@code at} on the page's canvas: the overlay of the element there is hidden, the point divided
+     * by the zoom the page shows at ({@link PageToolsHost#removeElementAt}).
+     */
+    void removeElement(Point at) {
+        if (!closed) pageTools.removeElementAt(at.x, at.y);
     }
 
     /**
@@ -689,6 +724,7 @@ public final class BrowserItem implements AutoCloseable {
         bookmarksChanged.close();
         visitsChanged.close();
         privacy.close();
+        pageTools.close();
         sitePermissions.close();
         endSuggestions();
         sources.close();
@@ -717,7 +753,7 @@ public final class BrowserItem implements AutoCloseable {
      * A link or popup of the page opens an item of its own beside this one, for no OSC 8 target, in this item's store: in
      * a new tab right after this item's tab, or split from this item's pane. A split opens beside the focused pane of the
      * window's shown tab, so this item is selected first when it is not that. An address that is no URI opens nothing.
-     * Answers the new item's page, which the opener bridge links to this one.
+     * Answers the new item's page, which the opener bridge links to this one. The new item knows a page opened it.
      */
     private Optional<Page> openItem(String address, TabPlacement placement) {
         if (closed || tab == null) return Optional.empty();
@@ -725,7 +761,9 @@ public final class BrowserItem implements AutoCloseable {
         if (link.isEmpty()) return Optional.empty();
         if (placement != TabPlacement.NEXT_TAB && !tab.isActive()) tab.select();
         try {
-            return Optional.of(items.open(link.get(), placement, Optional.empty(), Optional.of(tab), store).page);
+            BrowserItem opened = items.open(link.get(), placement, Optional.empty(), Optional.of(tab), store);
+            opened.openedByPage = true;
+            return Optional.of(opened.page);
         } catch (IllegalStateException closing) { // the windows close, or Jasper quits
             items.context().log().log(System.Logger.Level.WARNING, "A link could not open: " + closing.getMessage(), closing);
             return Optional.empty();
@@ -848,10 +886,11 @@ public final class BrowserItem implements AutoCloseable {
                 endWait();
                 page.focus();
             }
-            // A Reset item or Unmute Current Page of the menu, an answer of the audio bar, or an entry of Back's or
-            // Forward's hold menu.
+            // A Reset item or Unmute Current Page of the menu, an answer of the audio bar, a page tool of the menu, or an
+            // entry of Back's or Forward's hold menu.
             default -> {
-                if (!privacy.choose(action)) NavigationHistory.entryId(action).ifPresent(page::goToHistoryEntry);
+                if (!privacy.choose(action) && !pageTools.choose(action))
+                    NavigationHistory.entryId(action).ifPresent(page::goToHistoryEntry);
             }
         }
     }
@@ -983,8 +1022,8 @@ public final class BrowserItem implements AutoCloseable {
     }
 
     private ViewSpec spec() {
-        Nodes.Node bar = toolbar.node(shown(errors.address()), page.loading(), errors.canGoBack(), page.canGoForward(), icon(),
-            page.history(), items.settings(), errors.notSecure(), store.devNull(),
+        Nodes.Node bar = toolbar.node(pageTools.group(), shown(errors.address()), page.loading(), errors.canGoBack(), page.canGoForward(),
+            icon(), page.history(), items.settings(), errors.notSecure(), store.devNull(),
             store.devNull() ? Optional.empty() : Optional.of(stores.bookmarkIndex().has(errors.address())), privacy.group());
         // A waiting item keeps the canvas's slot, hidden: a slot that leaves the view closes its content, the page.
         Nodes.Node canvas = new Nodes.Custom(PAGE, waiting ? HIDDEN : ControlState.READY, CONTENT, Nodes.CustomKind.PREVIEW, "Web page");

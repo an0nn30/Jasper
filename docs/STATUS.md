@@ -1,6 +1,248 @@
 # Jasper — Status and Handoff
 
-**Editor file associations — 2026-11-10** (`claude/editor-file-associations`, worktree `.claude/worktrees/editor-file-associations`, from `417e2270f`; [spec](superpowers/specs/2026-11-10-editor-file-associations-design.md), [plan 1](superpowers/plans/2026-11-10-editor-file-associations-1-handed-in-files.md); not merged or pushed): plan 1 of 3 is done. A file another program hands to Jasper (a launch, `jasper <file>`, Finder's Open With, a `file:` URL, a second launch) reaches the editor as `FileOrigin.OUTSIDE` (SDK 0.31.0), and the Editor's `DefaultEditor` opens those files itself whatever Default editor says, while `JASPER` opens still follow the choice; `docs/editor.md`, `docs/command-line.md`, `docs/packaging.md` and `docs/workspace.md` say so, and a `JasperApplication` test drives each route. Deviations from the plan: Task 2 added `FileEditors.edit(..., FileOrigin)` early (`ContractHarness` needed it); `HostedContext` needed no edit; the plan's lines 322 and 329 lost their link syntax (`AppDocumentationTest` checks links in plans); the loop anti-goal is tested in halves (plugin half in `DefaultEditorTest`, application half through the OUTSIDE funnel), and plan 2 owns the end-to-end check with a fake desktop. Plans 2 and 3 are not written. Known flake: `FaviconsTest` once missed its timing threshold (0.3999 s against 0.4 s).
+**Browser plan 7: downloads and page tools — 2026-11-10** (`claude/browser-downloads-page-tools`, worktree
+`.claude/worktrees/browser-4b-4c-e6deab`, from local `main` `417e2270f`, which has plans 4a, 4b, 4c, 9, 5 and 6 merged;
+the plan `a52181595`, brought in from `5c42e4a82`, commits `371a94680` to `87e4fb7c3`, and the docs, `2a8b0a782` and
+`5949bdfba`, and their counts, local `main` `44c11698e` (the Editor file associations' plan 1) merged in as
+`6a5042193`, and the final fix wave, `291a42772`, and its docs and their counts; not merged or pushed;
+[plan](superpowers/plans/2026-10-30-browser-7-downloads-page-tools.md), whose banner lists every deviation by task,
+[spec](superpowers/specs/2026-10-26-jasper-browser-plugin-design.md) sections 6, 10, 11, 17, 20 and 23,
+[guide](browser.md#downloads); executed with per-task subagents and reviews, Task 1 as 1a, 1b and 1c, each task's fix
+rounds until its re-review found every finding addressed; the final reviews passed Tasks 1-4 and Tasks 5-7 "With
+fixes" and the docs "Approved with fixes", and the fix wave that followed is done). The Browser gains iTerm2's
+downloads and page tools:
+- **Downloads** go, without asking, into the Downloads folder (`downloads_folder`, empty for the system's: macOS
+  `~/Downloads`, Windows' known folder, Linux's `XDG_DOWNLOAD_DIR`), read and made on the background executor at the
+  first page start (D-F3, D4), under safe, numbered names reserved per download (D-F4, D-F5, D18). Each finished file
+  gets the system's downloaded-file mark: macOS's `com.apple.quarantine` through `setxattr`, Windows' `Zone.Identifier`
+  written by Jasper, nothing on Linux; a /dev/null download's names no address (D-F7), and a failed mark withholds Open
+  on macOS and Windows (D-F6).
+- **The Downloads menu** (`MenuEntries`, SDK 0.31.0) joins the menu bar with the first download: the 20 newest and every
+  running one (D-F19), with Stop, Open, Show in Finder, Explorer or Folder (D-F31, D21), Remove from List and Clear
+  All; titles change in place while a menu is open and structural changes wait for it to close (D-F9, D13, D14).
+  Notifications in the new Downloads group: finished, failed or refused, and a file without its mark.
+- **Limits and lifetimes:** as Chrome, a page's second download without a click is refused, with "This site tried to
+  download multiple files" and the host, until a document that starts within 5 seconds of a click, or a page opened
+  from Jasper, allows one again (D1, the user's "Match Chrome"; D11, D20, D22, D46); Save Link As… and Save Image As…
+  ask in Jasper's chooser (D-F10, D9, D-F32); Alt-click loads in place; a closed tab's downloads finish
+  with its page blank (D-F1, D19, D24, D25), and a page-opened tab whose first page is a download closes (D-F28); a quit
+  stops downloads and deletes their partial files (D-F29, D-F30). In the packaged `Jasper.app`, `Info.plist` names the
+  Downloads, Desktop and Documents folder usage strings (D-F8, D4).
+- **Reader mode** in ☰, with Readability.js 0.6.0 bundled unmodified (D2): checked at each load end and settled route
+  change, never on Jasper's pages, challenge providers' pages or pages over 50,000 elements (D-F24); the article over
+  the page in the theme's colours, on a constructed sheet (D-F11), with the page inert, its keys and clicks stopped and
+  Find searching the article (D26-D32).
+- **Remove Distractions** in ☰ (crosshair, red outline, a single click hides the overlay and its backdrops, D34, D35)
+  and **Remove Element** in the right-click menu, at the page's zoom (D-F25, D33).
+- **Save Page As…** in the right-click menu: a folder named after the host (D7, D43) with `index.html` and
+  `resources/`, fetched again by Jasper within bounds (D-F14, D43), through the HTTP proxy (D5, D6), never from private
+  hosts for a public page (D-F12, D39, D40, D44), every file marked (D-F13), Jasper's own tools' state left out of the
+  copy (D36, D42), and cancelled by a quit (D41).
+
+SDK 0.31.0 (every bundled range `>=0.31.0, <0.32`): `PluginMenu.addEntries` and `MenuEntries`,
+`Platform.downloadsFolder` and `Platform.markDownloaded`, with the testkit's `FakePluginHost.chooseMenuEntry`,
+`setDownloadsFolder`, `markedDownloads`, `failMarks` and `MarkedDownload`; the Editor file associations, merged in,
+add `FileOrigin` and `FileEditor`'s four-argument `edit` to the same 0.31.0, which no release carries (D45). The Browser
+stays 0.2.0; Readability.js has its `notices.toml` component. Docs: the Browser guide (Downloads, Page tools, ☰, Find,
+the right-click menu, Links in a page, error pages, /dev/null mode, Jasper's own requests, Settings),
+`docs/packaging.md`'s folder usage strings (Task 3) and the timing of macOS's prompts, the configuration guide's Browser
+row, the notifications guide's Downloads group, the README's, Plugins' and the docs index's Browser descriptions, the
+SDK README, AGENTS.md's Verified JCEF behaviour (the download handler, and `CefBrowser_N`'s calls before the native
+browser exists), the plan's banner and this entry (D8); the SDK guides, the testkit README and plugin authoring came
+with Tasks 1b and 1c. The final reviews, dispatched 2026-11-10 over `44c11698e..6a5042193`, led to the fix wave: W1's
+code, `291a42772` (D46, D47: a page's own documents keep the download allowance; a download the 20-newest trim drops
+still has its outcome told; Save Page As's name lookups within its deadlines and a stop, an `Error` failing the save,
+the reader's host restored last in the copy; every Escape keydown stopped while reader mode or distraction removal
+closes, until its keyup; the reader's shadow root stopping six more event types; a busy bridge retried; one
+`DownloadAddresses` rule; `Page`'s tools hooks moved into `PageToolHooks`; `COM0` and `LPT0`), and W2's docs (review C's
+fixes, D46-D48 and W1's changes: the Browser guide, the packaging guide, plugin authoring, the checklist, the banner and
+this entry). Verification: after the fix wave's code and docs, at `fa3137a03`, `./gradlew check --continue` (JBR
+25.0.4.1 b635.75 jcef, 10m 21s) gave **15,911 tests, 0 failures, 0 errors, 105 skipped** (1,413 classes in the 16 build
+folders, without the example plugin's: jasper-app 5,357 with 92 skipped, Editor 5,391 with 4 skipped, Browser 1,630 with
+1 skipped, jasper-ui 1,020, Remote 659, jasper-terminal 512 with 7 skipped, jasper-sdk 136, jasper-sdk-testkit 326):
+plan 6's 15,546, plan 7's 345 by its docs, the Editor file associations' 11 at the merge and the fix wave's 9; the
+example external plugin's `check pluginZip` against `build/sdk-release` passed after each SDK task and passes (1 test,
+up to date: no SDK change since the merge); `sdkReference` changed nothing; source hygiene is clean, and no file the
+docs touched holds a raw U+00A0, U+2028 or U+2029. No GUI was launched.
+
+Each task's commits (the banner has each one's deviations):
+- Task 1a: `371a94680` "SDK: 0.31.0".
+- Task 1b: `7b8258f8c` "SDK 0.31.0: menu entries that are not actions" and `ce4a8dd13` "SDK 0.31.0: menu entries'
+  review fixes".
+- Task 1c: `f28fc63fd` "SDK 0.31.0: the Downloads folder and the downloaded-file mark", `e4d709ac1` "SDK 0.31.0: the
+  Downloads folder's review fixes" and `e3deff65c` "Test: set the earlier quarantine mark through setxattr".
+- Task 2: `5143079dd` "Browser: download names, the Downloads folder setting and the list" and `fa4c45586` "Browser:
+  the downloads core's review fixes".
+- Task 3: `39f098db6` "Browser: downloads, the Downloads menu and the downloaded-file mark" and `98a11775c` "Browser:
+  downloads' review fixes".
+- Task 4: `6a895753f` "Browser: Alt-click loads in place, Save Link As asks, and closing a tab keeps its downloads"
+  and `f98750727` "Browser: a download and its page, review fixes".
+- Task 5: `ef2483295` "Browser: reader mode with Readability.js", `54c6aeac1` "Browser: reader mode's review fixes" and
+  `dda17f9e7` "Browser: reader mode's find and input".
+- Task 6: `37abec264` "Browser: distraction removal and Remove Element" and `ca8b60016` "Browser: distraction
+  removal's review fixes".
+- Task 7: `8b3d5375a` "Browser: Save Page As saves a folder with the page and its resources", `de91e3216` "Browser:
+  Save Page As's review fixes" and `87e4fb7c3` "Browser: Save Page As's last fixes".
+- Task 8: `2a8b0a782` "Docs: downloads and page tools"; Task 9: `5949bdfba` "Docs: plan 7's GUI check, pending"; then
+  "Docs: plan 7's counts after the docs".
+- The merge: `6a5042193` "Merge local main (Editor file associations) into the downloads branch".
+- The final fix wave: `291a42772` "Browser: plan 7's final fixes" (W1) and "Docs: plan 7's final wave" (W2); then
+  "Docs: plan 7's counts after the final wave".
+
+The controller's rulings, one line each (the pre-flight scan's F1-F38 adopted as D0; the banner gives each D-F*n* where
+it applied):
+- D0: every ruling the pre-flight scan proposed (F1-F38) is adopted and cited as D-F*n*, except where D1-D3 decide
+  otherwise; its provisional items are re-checked against the merged plan 6 before the task that uses them.
+- D1: F16, the user's choice ("Match Chrome (Recommended)", 2026-11-09): after a page's first download without a user
+  activation in the current document, later ones without one are refused, with one "This site tried to download
+  multiple files" notice per document; gestures and Save Link As always download.
+- D2: the user's choice ("Yes, download it", 2026-11-09): Task 5 bundles the staged Readability.js 0.6.0 unmodified
+  (sha512 verified; SHA-256 `34dcab3d…f174`, 89,980 bytes; Apache-2.0, no NOTICE), and no implementer downloads it.
+- D3: the user's choice ("No (Recommended)", 2026-11-09): no jsdom; `reader.js`, `distractions.js` and `save-page.js`
+  get `node --check`, stub harnesses (D-F36) and pending GUI lines.
+- D4: R1 (F3, F8): the early folder resolution only creates and checks the folder itself, never reads or writes inside
+  it; the Desktop and Documents usage strings read "Jasper saves files from the Browser here when you choose this
+  folder."
+- D5: R2 (F12): with the HTTP proxy on, Save Page As checks the literal host only, and resolves names only while the
+  proxy is off.
+- D6: R3 (F14): a proxy change during a save retires that save's client, and unfetched resources stay absolute.
+- D7: R4 (F26): a suggested save folder is numbered at its end, "example.com (1)".
+- D8: R5: Task 8 also updates the Browser lines of `README.md`, `docs/plugins.md` and `docs/README.md`, the
+  notifications guide's Groups table, the configuration guide's Browser row and AGENTS.md's Verified JCEF behaviour.
+- D9: R6 (F10): Save Link As and Save Image As are enabled for the `http` and `https` addresses that
+  `LinkSchemes.opensFrom` allows, and for `data:` addresses on their own.
+- D10: R7 (F24): a site's own challenge page (Cloudflare's "Just a moment…" on the site's host) is a known gap, with a
+  Task 9 line.
+- D11: R8: D1's notice carries the page's host as its content, and a running "Unconfirmed *n*.crdownload" keeps the
+  shown name.
+- D12: `MenuEntry.Submenu` carries `enabled` beside its key (`""` and `true` for action submenus).
+- D13: placed actions' text and enabled changes also update in place, instead of rebuilding the menu bar.
+- D14: a change held while a menu is open also applies at the next model change or menu-bar render when no
+  menu-closed event came, so a window is never left with a held change after its menus close; Task 9 checks JBR's
+  signals however a menu opens.
+- D15: Task 1c's calls are accepted: `strerror_r`; `XDG_DOWNLOAD_DIR="$HOME"` alone means the home folder; a referrer
+  that is not `http` or `https` is written as `about:internet`; the short `docs/sdk-architecture.md` paragraph stays.
+- D16: `$HOME` in `user-dirs.dirs` expands to an absolute `HOME` from the environment, else `user.home`.
+- D17: no test, probe or script on this Mac runs `/usr/bin/xattr -w`, or any tool that adds a quarantine or Mark of
+  the Web attribute; marks are set only through the code under test and read with `xattr -p`, as the endpoint agent
+  kills the whole process tree when it sees one.
+- D18: Task 2's extras are accepted: U+2028, U+2029 and unpaired surrogates replaced, the device check ignoring spaces
+  before the first dot, `MAX_PATH` counted with " (1000)", downloads listed oldest first, the dispatch's device list.
+- D19: the close hold (F1) is wired in Task 4 through `Downloads.drained(Page)`, and Task 4's review checks F1 end to
+  end; a DevTools download from a /dev/null page staying listed, and a download Chromium never updates after
+  `before()`, are known gaps, the second with a GUI line.
+- D20: a load Jasper starts for the user (`Page.load`: the address bar, a bookmark, the palette, history, a terminal
+  link) gives the page a fresh download allowance, as a new document does.
+- D21: Windows' Show runs `explorer.exe` with two arguments, `/select,` and the path in quotes; Task 9's Windows line
+  uses a name with a comma and a space under a user folder with a space.
+- D22: D1 keeps the user's wording, "clicks always download": an activation is not consumed by a download, and a
+  click whose answer comes after Chromium's 5 s window counts as automatic; both are known gaps with Task 9 lines.
+- D23: Task 4's deviations and choices are accepted (F32's address-taking signatures, the new hook names,
+  fragment-blind matching, F1.3's oldest ask start, the mouse hook), and the hover lag is a known gap with a Task 9
+  line.
+- D24: F1.3 ends only the page's count and keeps the download's start, so a late update still lists and marks the
+  file.
+- D25: a page that downloads and calls `window.close()` in the same task ends with a marked file in the list, or with
+  no file and no entry; Task 9's line expects either.
+- D26: while the reader shows, key events stop at the overlay, and Escape closes the reader (as D29 amends it).
+- D27: Task 5's deviations are accepted (`PageTools`' signature, the token-carrying ops, `PageHtml.colours` for the
+  shadow root); Remove Distractions stays visible and inert until Task 6.
+- D28: a reader check's answer counts only while `answerable > 0` and its token equals `answerable`, which is then 0,
+  so one check gets one answer; reading turns true only after the show's script is built.
+- D29: D26 as the review amended it: the capture acts only while the reader shows, on the window in the capture phase,
+  stops propagation only (Escape alone is prevented), is removed at `end()` and `pagehide` and swallows Escape's
+  keyup; the page's body is inert while the reader shows, the page takes the focus after a show and the earlier focus
+  comes back (`preventScroll`) at close.
+- D30: Task 5's minors in the fix round: custom elements in the article unwrapped and `animate` and `set` dropped; the
+  Trusted Types comment and Task 9 line corrected; address changes that differ only in the fragment re-check nothing,
+  and a `#` link in the overlay scrolls the overlay; `Page.run` refuses `jasper-about:` main frames; the forward
+  references to Task 6 removed; the full parse at each load end stays, for the benchmark sitting.
+- D31: while the reader shows, Jasper's Find searches the article inside the overlay's shadow root and nothing behind
+  it, and after close the page again.
+- D32: pointer, mouse, click and touch events inside the overlay stop at the reader's host, and the wheel goes on;
+  Escape's keyup swallower is removed at that keyup or at `end()`; a hash-routed app not re-checked on a route change
+  is a known gap (D30).
+- D33: Remove Element hides the element at the menu's point at once, as the brief, F25 and the spec say; Task 6's two
+  additions (frames take no pointer while removal runs, a page that replaced `innerWidth` still gets removal) are
+  accepted.
+- D34: distraction removal hides only on a click whose `detail` is 1; every click still stops and is prevented, and
+  keys pass, Escape alone handled.
+- D35: when a click or Remove Element hides a fixed element covering at least 90% of the viewport, each of `html` and
+  `body` whose computed `overflow-y` is `hidden` or `clip` gets `overflow-y: visible !important`, kept after stop; a
+  body locked with `position: fixed` and a modal `<dialog>` hidden with `display: none` are known gaps.
+- D36: the snapshot strips Jasper's own state from the clone in `save-page.js` (the reader's host, body's `inert`,
+  distraction removal's outline) and never ends the page's mode.
+- D37: Jasper's own fetches (favicons, suggestions, View Source, the filter list, Save Page As) keep the JDK's
+  default User-Agent; a resource a CDN refuses stays absolute, a known gap.
+- D38: Task 7's deviations are accepted as recorded.
+- D39: a save counts as a private page's only when the page's literal host is private; a page reached by name is
+  judged public, its private resources left absolute.
+- D40: the per-save memo keeps literals and refusals only, and a resolved name is judged right before each of its
+  requests; DNS rebinding remains a documented gap.
+- D41: a plugin stop or quit cancels running saves: `PageSaver` takes the plugin's running flag, apart from D6's
+  current one, shuts each running save's client down at once, skips the write and deletes its temporary files.
+- D42: D36 is built with the reader's overflow hold added: `reader.js` and `distractions.js` give what they hold
+  through read-only accessors on their kept objects (`held()`, `outlined()`), and `save-page.js` restores it in the
+  clone.
+- D43: Task 7's minors in the fix round: `198.18.0.0/15` and `64:ff9b:1::/48` refused; saved files made as ordinary
+  new files (the umask's mode); `index.html`'s mark source through `DownloadAddresses.source`; buffered style sheets
+  capped at 32 MiB in all; kind `script` over a `text/css` type; the save folder reserved through a `Reservation`;
+  user info stripped from registry authorities by the last `@`; a 5-minute deadline for a save's fetches; the docs say
+  kept scripts run from `file://` and can reach the network, as in Chrome.
+- D44: Save Page As's round 2: `index.html` written through an encoder that replaces malformed input, as
+  `String.getBytes` did; a scheme-relative reference keeps its form without user info, redirects included; `live()`
+  checked again before each move, the temporary file marked before it moves and deleted when its mark is refused
+  after a stop; `255.255.255.255` and 6to4 addresses (`2002::/16`) embedding a private IPv4 refused.
+- D45: this plan's SDK additions and the Editor file associations' (`FileOrigin`, `FileEditor`'s four-argument
+  `edit`), merged in from local `main` `44c11698e`, share 0.31.0, which no release carries; no 0.32.0 bump.
+- D46: a main-frame document renews D1's allowance only when it starts while the page's `Activation` is active, or
+  through Jasper's own load (D20); a page's own refresh, reload or `location` change keeps the count, as Chrome keeps
+  its limiter's state across navigations without a gesture, so a site that reloads itself to deliver files needs a
+  click; `DownloadsTest`'s Javadoc and the Task 9 line corrected.
+- D47: the final wave's code: I2 (`finish` and `update` return what they made, so a trimmed download's outcome is still
+  told); D46; final review B's minors 1-7 (`unhold()` finds every counterpart first and removes the host last; the
+  name lookup polled every 100 ms against both deadlines and `live()`, a timeout counting as refused; every trusted
+  Escape keydown stopped and prevented while closing until Escape's keyup, `repeat` never read; six more event types
+  stopped at the reader's shadow root; `report()` retrying a busy bridge; `SavePage` failing for an `Error`;
+  `reader.js`'s header on capture listeners); A's minors 5-7 (one `DownloadAddresses` rule, `PageToolHooks`, `COM0`
+  and `LPT0`); a valid supplementary character row.
+- D48: recorded, not coded: a download that completes as Jasper quits (F30); whether macOS's folder prompt freezes the
+  window (a Task 9 line); a DevTools download whose page closes (D19's gap); `reserveFolder` sharing the names' lock
+  (its Javadoc); D20 renewing only through `Page.load`; final review B's kept list and the old route after a proxy
+  change; Task 9 lines for a held Escape on a page with its own handler, a modal `<dialog>` over the reader and a
+  back-forward cache restore; Task 1b's deferred (b) dropped, as `MenuItem` refuses a blank id.
+- D49: W1's calls are accepted and recorded: the app's `DownloadMark` keeps its own `about:internet`, as the app uses
+  no plugin class; D46 misses a document that starts more than 5 s after its click; a timed-out lookup refuses its
+  name for the rest of the save; a lost Escape keyup keeps Escape from the page until a stop, the next start or the
+  page going; `FilterListTest`'s hourly-check failure is a deferred flake for plan 8's first full checks.
+- D50: an abandoned name lookup's thread holds only the name, the resolver and its future, never the save
+  (`72d581607`, after the W1 re-review).
+
+Known gaps and follow-ups (the banner has them all, with the recorded minors and the deferred minors the final reviews
+kept): a download Chromium never updates after `before()` holds its name and its page's browser until quit, a
+/dev/null page's DevTools download stays listed, and a DevTools download whose page closes lands unmarked and stays
+listed as running (D19, D48); a click allows any number of downloads within 5 seconds, a click answered after 5
+seconds counts as none, and a document that starts more than 5 seconds after its click, or from Jasper's Reload, Back
+or Forward, gives no fresh allowance (D22, D48, D49); a download that completes as Jasper quits lands unmarked and
+unwarned (F30, D48); an Alt-click made as the pointer reaches a link may still download (D23); a page that downloads
+and closes itself in one task may land no file (D25); Windows' mark is Jasper's own, so an antivirus hooked to the
+attachment service may not scan on arrival (D-F33); a site's own challenge page is checked for reader mode (D10), and
+Trusted Types pages may lose some articles (D-F24); the full Readability parse at each load end waits for the
+benchmark sitting, and hash routing is not re-checked (D30); a page's earlier window capture listeners hear keys and
+clicks first, and in reader mode its capture listeners on the window, document or root hear the overlay's pointer
+events first (D29, D47); a lost Escape keyup keeps Escape from the page until a stop, the next start or the page going
+(D49); D35's `position: fixed` body and modal `<dialog>`; DNS rebinding (D40), the proxy-on literal check (D5), a LAN
+page reached by name (D39), a timed-out name lookup refused for the rest of its save (D49), and fetches under way
+finishing over the old route for up to 15 seconds after a proxy change (D6); the JDK's User-Agent (D37); Save Page As
+does not save shadow DOM, `<template>` references, SVG `image` and `use` references or CSS `image-set()`; a maximal
+save completes in a 320 MiB heap for ASCII HTML and 512 MiB for UTF-16 (D43); `FilterListTest`'s hourly check failed
+once on a temporary folder's deletion and waits for plan 8's first full checks (D49). Task 9 (the user's check on macOS,
+with their OK): pending, F1, F2, F9 and F29 first, then the plan's twelve lines with the task reviews' lines, and the
+fix wave's ([checklist](browser-verification.md#plan-7-downloads-and-page-tools)). Windows and Linux are not run; the
+start-up and memory batch, with the reader's parse cost and the save heap, waits for the benchmark sitting (D-F35); no
+JavaScript runs in a test (D3).
+
+**Editor file associations — 2026-11-10** (`claude/editor-file-associations`, worktree `.claude/worktrees/editor-file-associations`, from `417e2270f`; [spec](superpowers/specs/2026-11-10-editor-file-associations-design.md), [plan 1](superpowers/plans/2026-11-10-editor-file-associations-1-handed-in-files.md); merged into local `main` at `44c11698e`, not pushed): plan 1 of 3 is done. A file another program hands to Jasper (a launch, `jasper <file>`, Finder's Open With, a `file:` URL, a second launch) reaches the editor as `FileOrigin.OUTSIDE` (SDK 0.31.0), and the Editor's `DefaultEditor` opens those files itself whatever Default editor says, while `JASPER` opens still follow the choice; `docs/editor.md`, `docs/command-line.md`, `docs/packaging.md` and `docs/workspace.md` say so, and a `JasperApplication` test drives each route. Deviations from the plan: Task 2 added `FileEditors.edit(..., FileOrigin)` early (`ContractHarness` needed it); `HostedContext` needed no edit; the plan's lines 322 and 329 lost their link syntax (`AppDocumentationTest` checks links in plans); the loop anti-goal is tested in halves (plugin half in `DefaultEditorTest`, application half through the OUTSIDE funnel), and plan 2 owns the end-to-end check with a fake desktop. Plans 2 and 3 are not written. Known flake: `FaviconsTest` once missed its timing threshold (0.3999 s against 0.4 s).
 
 **Editor file associations, plan 2: the platform layer — 2026-11-10** (`claude/editor-file-associations-2`, worktree `.claude/worktrees/editor-file-associations-2`; [plan 2](superpowers/plans/2026-11-10-editor-file-associations-2-platform-layer.md); not merged or pushed): plan 2 of 3 is done. `dev.jasper.app.platform.FileAssociations` answers, claims and restores file-type handlers through `MacFileAssociations`, `WindowsFileAssociations` (Windows Settings; never `UserChoice`) and `LinuxFileAssociations` (`xdg-mime`, `mimeapps.list`), keeps the previous handlers in `file-associations.toml`, and is wired through `ApplicationBootstrap` and `JasperApplication` (refreshed on window activation). `file-types.tsv` is the catalogue; `docs/app-architecture.md` and `docs/app-maintenance.md` say so. A `JasperApplication` test ends the plan 1 loop: a declined `JASPER` open, the desktop's edit hand-back, and one `OUTSIDE` open. Changes from the plan: (a) the Windows installer registers the `JasperFile` ProgId, and a status check that sees Jasper re-writes `Capabilities\FileAssociations\<ext>` after an upgrade deletes `Software\Jasper\Capabilities`; (b) `file-types.tsv` is shared by the code and the packaging build; (c) Unavailable and Refusal are enums, plus `Outcome.Refused(Refusal)` made only by the facade; (d) the previous handler is saved before the claim, and an unreadable `file-associations.toml` is moved to `file-associations.toml.bad`; (e) the macOS harness fails only for an extension that resolves to a declared non-text type; (f) on Linux, restoring "no previous app" is Done once Jasper's own lines leave `mimeapps.list`; (g) restoring an app that is gone gives `PreviousGone` on macOS and Linux. Catalogue: `.ts` emptied on macOS and Linux (`video/mp2t`) with the TypeScript import removed; `.zsh` is `public.zsh-script`, `.bash` `public.bash-script`, `.txt` `public.plain-text`, `.log` `com.apple.log`. Pending: the Linux real-database check in `jasper-ci-linux` (Docker was not running); the Windows-only tests (`WindowsRegistryTest`, `Verify-Installer.ps1`, `InstallerAcceptanceTest`); `packageApp` plus `verifyPackage` on macOS; the plan's GUI checks. Plan 3 (SDK surface, testkit, the Editor's File associations section) is not written. Final-review fixes: a failed claim keeps its saved entry while the type is still Jasper's; claim and restore ask nothing when unavailable (`Failed("unavailable: <reason>")`); restore hands back only types Jasper still opens and drops the others' entries; `unavailable()` has its own lock and is primed on the worker; Windows names an app without a `UserChoice`, reads `Applications\jasper.exe` as Jasper and refuses `PATHEXT` and shell-handled extensions outside the catalogue; Linux counts types that inherit from `text/plain` (`mime/subclasses`) as text; `Handler.Unknown` replaces `Other("", "")`; a status pass asks each shared type once.
 
