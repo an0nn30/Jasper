@@ -14,9 +14,10 @@
  * browser items hand their pages' sign-ins to, with or without the Vault, shows the {@code dialogs} package's
  * {@link dev.jasper.browser.dialogs.SignInDialog} for each, one per page at a time, and gives Chromium what it answers;
  * with the Vault it signs a top-level challenge in with a remembered login without the dialog, but only in a navigation
- * the user began, with the page's user activation or through Jasper itself, never one a page's script starts on its
- * own, and once until the answer to that very navigation, from the login's own origin, commits a page; and it saves
- * one answered with "Remember this password" once the response to the same navigation succeeds.
+ * the user began, with the page's user activation in the document it leaves or as Jasper's own request, never one a
+ * page's script starts on its own, and once until the answer to that very navigation, from the login's own origin,
+ * commits a page; and it saves one answered with "Remember this password" once the response to the same navigation
+ * succeeds.
  * Names no Chromium type. May depend on the {@code page}, {@code permissions}, {@code dialogs} and {@code json}
  * packages, the SDK, the JDK and {@code dev.jasper.vault.api}; the {@code settings} package names none of its types.
  */

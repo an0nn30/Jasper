@@ -49,6 +49,18 @@ class ActivationTest {
         assertThat(activation.lastActivatedAt(Long.MIN_VALUE)).as("still never").isFalse();
     }
 
+    /** Plan 8's L42: an activation counts since a moment only when its press or key came after that moment. */
+    @Test void anActivationCountsSinceAMomentOnlyWhenItCameAfterIt() {
+        var activation = new Activation();
+        assertThat(activation.activeSince(Long.MIN_VALUE, 100_000)).as("nothing yet").isFalse();
+        activation.activate(100_000);
+        assertThat(activation.activeSince(Long.MIN_VALUE, 100_000)).as("since any moment").isTrue();
+        assertThat(activation.activeSince(99_999, 105_000)).as("after the moment, within 5 s").isTrue();
+        assertThat(activation.activeSince(100_000, 100_500)).as("at the moment itself").isFalse();
+        assertThat(activation.activeSince(99_999, 105_001)).as("past 5 s").isFalse();
+        assertThat(activation.active(100_500)).as("the activation itself, unchanged").isTrue();
+    }
+
     @Test void anExpiredActivationConsumesNothing() {
         var activation = new Activation();
         assertThat(activation.consume(0)).isFalse();

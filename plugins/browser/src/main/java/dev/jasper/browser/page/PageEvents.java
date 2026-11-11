@@ -314,6 +314,7 @@ public final class PageEvents {
             }
             long document = 0;
             if (browser instanceof PageBrowser shown && shown.owner() != null) {
+                shown.owner().mainFrameStarting();
                 tell(LOAD_STARTS, shown, frame);
                 // The document the hooks just started, which the page's muting acts on once the UI thread hears of it.
                 document = shown.owner().privacy().documents();

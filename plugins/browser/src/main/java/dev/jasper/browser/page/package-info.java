@@ -86,10 +86,11 @@
  * main frame's latest navigation request after its redirects, which that handler and the opener bridge note on
  * Chromium's IO thread, or of its latest commit, which the display handler notes there and then, whichever came last;
  * a request that fails or becomes a download falls back to the commit before it
- * ({@link dev.jasper.browser.page.Page#topAddress}); and it carries the number of the main frame's navigation
- * requests then, which a redirect does not raise, and whether the page had a user activation as that navigation's
- * request started ({@link dev.jasper.browser.page.Page#latestNavigation}). The page tells its item each final
- * main-frame response's status ({@link dev.jasper.browser.page.Page#onMainFrameResponse}).
+ * ({@link dev.jasper.browser.page.Page#topAddress}); and it carries the number of the main frame's navigation requests
+ * then, which a redirect does not raise, whether the page had a user activation as that navigation's request started,
+ * and whether that request was Jasper's own navigation's ({@link dev.jasper.browser.page.Page#latestNavigation}). The
+ * page tells its item each final main-frame response's status
+ * ({@link dev.jasper.browser.page.Page#onMainFrameResponse}).
  * {@link dev.jasper.browser.page.LastPress}, {@code Favicons}, {@code DownloadStart}, {@code DownloadTarget},
  * {@code DownloadProgress}, {@code PageQuery}, {@code SignIn}, {@code Page}'s methods and {@code PreviewPage}'s name no
  * Chromium type, and none of these classes loads until a browser item opens or a Markdown preview is made.

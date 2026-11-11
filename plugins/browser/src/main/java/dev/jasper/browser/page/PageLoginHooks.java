@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -16,12 +17,16 @@ import java.util.function.Consumer;
  * read on Chromium's thread, and the handler its {@link PageQuery}s go to, with the queries handed to it that are not
  * yet over, which the page's close cancels; and its HTTP sign-ins: who hears each {@link SignIn} Chromium asks for, the
  * page's top address they are judged against and its main frame's latest navigation, the number of its requests and
- * whether the page's user activation began the latest, noted on Chromium's threads, and who hears each final response
- * to a main-frame navigation. It reaches no browser. UI thread, but where a method says otherwise.
+ * whether the page's user activation or Jasper began the latest, noted on Chromium's threads, and who hears each final
+ * response to a main-frame navigation. It reaches no browser. UI thread, but where a method says otherwise.
  */
 final class PageLoginHooks {
     /** What a query is told when the page has no password manager to hand it to. */
     static final String NO_MANAGER = "This page has no password manager.";
+    /** How long Jasper's mark of a navigation it starts waits for that navigation's request (plan 8's L42). */
+    static final long MARK_MILLIS = 10_000;
+    // No mark, and no load start yet.
+    private static final long NONE = Long.MIN_VALUE;
     private static final System.Logger LOG = System.getLogger(PageLoginHooks.class.getName());
     // The login script, from the handler's arrival until the page closes; read on Chromium's thread.
     private volatile String script;
@@ -36,6 +41,10 @@ final class PageLoginHooks {
     // The main frame's latest navigation: the number of its requests so far, their redirects not counted (L31), and
     // whether the latest began with the page's user activation (L35). Written on Chromium's threads.
     private final AtomicReference<Page.Navigation> navigation = new AtomicReference<>(Page.Navigation.NONE);
+    // When Jasper last sent the page elsewhere, until the next main-frame request takes it or a main frame's address
+    // change, load start or load failure drops it (L42); and when the main frame last started loading a document.
+    // Written on the UI thread and Chromium's, read on Chromium's.
+    private final AtomicLong mark = new AtomicLong(NONE), loadStarted = new AtomicLong(NONE);
     private final List<Consumer<SignIn>> signIns = new CopyOnWriteArrayList<>();
     private final List<BiConsumer<String, Integer>> responses = new CopyOnWriteArrayList<>();
 
@@ -89,14 +98,37 @@ final class PageLoginHooks {
     }
 
     /**
-     * The main frame starts a navigation request for {@code url}, {@code activated} telling whether the page had a user
-     * activation then: the top address from now on, and then a new navigation, so a read of the navigation and then of
-     * the top address never pairs the new navigation with the old address (L32). A null address is not noted, but the
-     * request counts. Any thread.
+     * Jasper sends the page elsewhere for the user at {@code nowMillis} ({@link Page#onNavigate}): the main frame's
+     * next navigation request is Jasper's, if it comes within {@value #MARK_MILLIS} ms and nothing drops the mark first
+     * (L42). UI thread.
      */
-    void mainFrameRequested(String url, boolean activated) {
+    void jaspersNavigation(long nowMillis) {
+        mark.set(nowMillis);
+    }
+
+    /**
+     * The main frame starts a navigation request for {@code url} at {@code nowMillis}: the top address from now on, and
+     * then a new navigation, so a read of the navigation and then of the top address never pairs the new navigation
+     * with the old address (L32). It takes Jasper's mark: the navigation is Jasper's when the mark was set at most
+     * {@value #MARK_MILLIS} ms before (L42). It began with the page's user activation when {@code activation} is
+     * active then from a press or key since the main frame last started loading a document (L35, L42). A null address
+     * is not noted, but the request counts. Any thread; Chromium's IO thread.
+     */
+    void mainFrameRequested(String url, Activation activation, long nowMillis) {
+        long marked = mark.getAndSet(NONE);
+        boolean byJasper = marked != NONE && nowMillis >= marked && nowMillis - marked <= MARK_MILLIS;
+        boolean activated = activation.activeSince(loadStarted.get(), nowMillis);
         if (url != null) top.set(url);
-        navigation.updateAndGet(last -> new Page.Navigation(last.number() + 1, activated));
+        navigation.updateAndGet(last -> new Page.Navigation(last.number() + 1, activated, byJasper));
+    }
+
+    /**
+     * The main frame starts loading a document at {@code nowMillis}: no activation from before it begins a later
+     * navigation, and Jasper's mark, if a request has not taken it, is dropped (L42). Chromium's thread.
+     */
+    void mainFrameStarting(long nowMillis) {
+        loadStarted.set(nowMillis);
+        mark.set(NONE);
     }
 
     /**
@@ -109,7 +141,7 @@ final class PageLoginHooks {
 
     /**
      * The main frame's latest navigation: the number of its requests so far, their redirects not counted (L31), and
-     * whether the latest began with the page's user activation, which its redirects keep (L35). Any thread.
+     * whether the page's user activation or Jasper began the latest, which its redirects keep (L35, L42). Any thread.
      */
     Page.Navigation navigation() {
         return navigation.get();
@@ -117,9 +149,11 @@ final class PageLoginHooks {
 
     /**
      * The main frame committed {@code url}, a document of its own or a change within one: the top address from now on,
-     * whatever was requested before it (L23). A null is ignored. Any thread.
+     * whatever was requested before it (L23). Jasper's mark, if no request took it, is dropped, as for a history entry
+     * within the document (L42). A null address is ignored. Any thread.
      */
     void mainFrameCommitted(String url) {
+        mark.set(NONE);
         if (url == null) return;
         committedTop = url;
         top.set(url);
@@ -128,9 +162,11 @@ final class PageLoginHooks {
     /**
      * The main frame's request for {@code url} ended without a commit: it failed, or became a download. When it is the
      * top address still, the commit before it is from now on; another address's end, such as that of a request the
-     * next one replaced, changes nothing. A null is ignored. Any thread.
+     * next one replaced, changes nothing. Jasper's mark, if no request took it, is dropped (L42). A null address is
+     * ignored. Any thread.
      */
     void mainFrameRequestEnded(String url) {
+        mark.set(NONE);
         String current = top.get();
         if (url != null && url.equals(current)) top.compareAndSet(current, committedTop);
     }

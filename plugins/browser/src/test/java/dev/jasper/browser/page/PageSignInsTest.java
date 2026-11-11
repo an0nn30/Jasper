@@ -120,15 +120,80 @@ class PageSignInsTest {
             assertThat(page.latestNavigation()).as("before any").isEqualTo(Page.Navigation.NONE);
             PageTestAccess.activate(page, 1_000);
             PageTestAccess.mainFrameRequested(page, "https://intranet.example/", 6_000);
-            assertThat(page.latestNavigation()).as("within the activation").isEqualTo(new Page.Navigation(1, true));
+            assertThat(page.latestNavigation()).as("within the activation")
+                .isEqualTo(new Page.Navigation(1, true, false));
             assertThat(page.activation().active(6_000)).as("not consumed").isTrue();
             page.mainFrameRedirected("https://intranet.example/home");
-            assertThat(page.latestNavigation()).as("its redirect").isEqualTo(new Page.Navigation(1, true));
+            assertThat(page.latestNavigation()).as("its redirect").isEqualTo(new Page.Navigation(1, true, false));
             PageTestAccess.mainFrameRequested(page, "https://intranet.example/next", 6_001);
-            assertThat(page.latestNavigation()).as("after it").isEqualTo(new Page.Navigation(2, false));
+            assertThat(page.latestNavigation()).as("after it").isEqualTo(new Page.Navigation(2, false, false));
             page.mainFrameRedirected("https://intranet.example/last");
-            assertThat(page.latestNavigation()).as("its redirect").isEqualTo(new Page.Navigation(2, false));
+            assertThat(page.latestNavigation()).as("its redirect").isEqualTo(new Page.Navigation(2, false, false));
             assertThat(page.navigation()).isEqualTo(2);
+        });
+    }
+
+    /**
+     * L42: Jasper's navigation marks the page's next main-frame request, if it comes within 10 s: that navigation is
+     * Jasper's, and its redirect keeps it, but the request after it, as the page's own, is not. A mark no request takes
+     * within 10 s lapses, and a main frame's address change, load start or load failure before a request drops it.
+     */
+    @Test void jaspersNavigationMarksItsOwnRequestAlone() throws Exception {
+        onUiThread(() -> {
+            Page page = page();
+            var millis = new java.util.concurrent.atomic.AtomicLong(1_000_000);
+            PageTestAccess.useClock(page, millis::get);
+            page.load(URI.create("https://intranet.example/"));
+            millis.addAndGet(10_000);
+            page.mainFrameRequested("https://intranet.example/");
+            assertThat(page.latestNavigation()).as("within 10 s").isEqualTo(new Page.Navigation(1, false, true));
+            page.mainFrameRedirected("https://intranet.example/home");
+            assertThat(page.latestNavigation()).as("its redirect").isEqualTo(new Page.Navigation(1, false, true));
+            page.mainFrameRequested("https://intranet.example/other");
+            assertThat(page.latestNavigation()).as("the page's own request after it")
+                .isEqualTo(new Page.Navigation(2, false, false));
+            page.load(URI.create("https://intranet.example/"));
+            millis.addAndGet(10_001);
+            page.mainFrameRequested("https://intranet.example/");
+            assertThat(page.latestNavigation().byJasper()).as("lapsed").isFalse();
+            var drops = new java.util.LinkedHashMap<String, Runnable>();
+            drops.put("an address change", () -> committed(page, "https://intranet.example/#top"));
+            drops.put("a load start", page::mainFrameStarting);
+            drops.put("a load failure",
+                () -> PageEvents.loadError(page, frame(true), null, "https://intranet.example/x", task -> { }));
+            for (var drop : drops.entrySet()) {
+                page.load(URI.create("https://intranet.example/#top"));
+                drop.getValue().run();
+                page.mainFrameRequested("https://intranet.example/");
+                assertThat(page.latestNavigation().byJasper()).as(drop.getKey()).isFalse();
+            }
+        });
+    }
+
+    /**
+     * L42: an activation begins a navigation only when it came after the main frame last started loading a document,
+     * so the click that brought a document begins none of that document's own navigations; the page's activation is
+     * left as it was, for its popups and downloads.
+     */
+    @Test void anActivationFromBeforeTheLastLoadStartBeginsNoNavigation() throws Exception {
+        onUiThread(() -> {
+            Page page = page();
+            var millis = new java.util.concurrent.atomic.AtomicLong(1_000_000);
+            PageTestAccess.useClock(page, millis::get);
+            PageTestAccess.activate(page, 1_000_000); // the click on a link
+            millis.set(1_000_100);
+            page.mainFrameRequested("https://intranet.example/");
+            assertThat(page.latestNavigation().activated()).as("the link's navigation").isTrue();
+            millis.set(1_000_300);
+            page.mainFrameStarting();
+            millis.set(1_001_000);
+            page.mainFrameRequested("https://intranet.example/refresh");
+            assertThat(page.latestNavigation().activated()).as("the new document's own, within 5 s").isFalse();
+            assertThat(page.activation().active(1_001_000)).as("the activation itself").isTrue();
+            PageTestAccess.activate(page, 1_002_000); // a click in the new document
+            millis.set(1_002_100);
+            page.mainFrameRequested("https://intranet.example/next");
+            assertThat(page.latestNavigation().activated()).isTrue();
         });
     }
 
@@ -236,12 +301,12 @@ class PageSignInsTest {
 
     private SignIn signIn(String topAddress) {
         return new SignIn("https://intranet.example/private", false, "intranet.example", 443, "Corp", "basic", topAddress,
-            0, false, (user, password) -> told.add("continue " + user), () -> told.add("cancel"));
+            0, false, false, (user, password) -> told.add("continue " + user), () -> told.add("cancel"));
     }
 
     private SignIn signIn() {
         return new SignIn("https://intranet.example/", false, "intranet.example", 443, "Corp", "basic",
-            "https://intranet.example/", 0, false, (user, password) -> told.add("continue " + user),
+            "https://intranet.example/", 0, false, false, (user, password) -> told.add("continue " + user),
             () -> told.add("cancel"));
     }
 

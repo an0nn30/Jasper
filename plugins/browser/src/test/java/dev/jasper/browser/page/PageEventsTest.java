@@ -94,6 +94,31 @@ class PageEventsTest {
     }
 
     /**
+     * Plan 8's L42: a main frame's load start is noted there and then, on Chromium's thread: the click before it begins
+     * none of the new document's navigations, and Jasper's mark no request took is dropped. A page's DevTools note
+     * nothing for it.
+     */
+    @Test void aMainFramesLoadStartEndsTheActivationAndTheMarkBeforeIt() throws Exception {
+        onUiThread(() -> {
+            Page page = page();
+            var millis = new java.util.concurrent.atomic.AtomicLong(1_000_000);
+            PageTestAccess.useClock(page, millis::get);
+            PageTestAccess.activate(page, 1_000_000);
+            millis.set(1_000_200);
+            PageBrowser devTools = PageTestAccess.devToolsBrowser(PageTestAccess.devTools(page, new Point()));
+            new PageEvents.Load().onLoadStart(devTools, recording(new ArrayList<>()), null);
+            page.mainFrameRequested("https://example.com/next");
+            assertThat(page.latestNavigation().activated()).as("its DevTools' load start").isTrue();
+            page.load(java.net.URI.create("https://example.com/typed"));
+            new PageEvents.Load().onLoadStart(PageTestAccess.pageBrowser(page), recording(new ArrayList<>()), null);
+            millis.set(1_000_400);
+            page.mainFrameRequested("https://example.com/typed");
+            assertThat(page.latestNavigation()).as("after the page's load start")
+                .isEqualTo(new Page.Navigation(2, false, false));
+        });
+    }
+
+    /**
      * Plan 8's F13: the login script goes only into an http or https document, never a challenge provider's, as no
      * Jasper page script does, nor a file's, Jasper's own pages', a blank, data or blob document's, or any other.
      */

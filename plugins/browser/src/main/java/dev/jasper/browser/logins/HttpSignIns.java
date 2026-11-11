@@ -38,23 +38,24 @@ import java.util.function.Function;
  *
  * <p>A challenge that can be remembered is, as its turn comes and while the vault is unlocked, signed in without the
  * dialog with the Browser's remembered login of its name ({@link VaultLogins#useGranted}) when the user began its
- * navigation (L35): it started while the page had a user activation, as a link the user clicks or a form the user
- * submits with a key starts one, its redirects included ({@link SignIn#activated()}), or it is a navigation Jasper
- * started for the user ({@link #navigating}) none of whose dialogs the user cancelled. Any other, such as one a page's
- * script starts on its own, shows the dialog, Password Manager included. A name is so signed in once until the
- * navigation the fill answered, after its redirects, gets an answer from that name's own origin that is neither a 401
- * nor a 407 and the page that answer brings commits (L30, L31). Chromium's challenge again for a wrong password so
- * shows the dialog rather than looping (review focus 1), and no other navigation, origin or page, nor the origin's own
- * answer that commits nothing, such as a 204 or a download, lets the password be sent again: a fill whose navigation is
- * replaced, or whose challenge's own address fails to load first, leaves its name tried while the page lasts (L29). A
- * name whose fill found no login, so sent nothing, is tried again once any answer of its origin commits a page. OK
- * with Remember ticked keeps a pending save for the page, with the answer's password array, until the page's next
- * main-frame response: a 2xx from the challenge's origin, after any redirect, in the navigation the sign-in answered,
- * saves it in the Vault ({@link VaultLogins#save}); any other response, one of a later navigation, a main-frame load
- * start or load failure before it, a new challenge of the page and the page's close drop it, zeroed (L34). A save the
- * Vault cannot make posts "Could not save the password for HOST", with the Vault's reason; one it makes or declines,
- * such as when unlocking is cancelled, posts nothing. Neither a silent fill nor the other challenges one answer serves
- * (F30) is remembered.
+ * navigation (L35, L42): its request started while the page had a user activation from a press or key since the page's
+ * last main-frame load start, as a link the user clicks or a form the user submits with a key starts one, its redirects
+ * included ({@link SignIn#activated()}); or its request is the one a navigation Jasper started for the user made
+ * ({@link SignIn#byJasper()}), none of whose dialogs the user cancelled. Any other, such as one a page's script starts
+ * on its own, or one after a navigation of Jasper's that committed nothing, shows the dialog, Password Manager
+ * included. A name is so signed in once until the navigation the fill answered, after its redirects, gets an answer
+ * from that name's own origin that is neither a 401 nor a 407 and the page that answer brings commits (L30, L31).
+ * Chromium's challenge again for a wrong password so shows the dialog rather than looping (review focus 1), and no
+ * other navigation, origin or page, nor the origin's own answer that commits nothing, such as a 204 or a download, lets
+ * the password be sent again: a fill whose navigation is replaced, or whose challenge's own address fails to load
+ * first, leaves its name tried while the page lasts (L29). A name whose fill found no login, so sent nothing, is tried
+ * again once any answer of its origin commits a page. OK with Remember ticked keeps a pending save for the page, with
+ * the answer's password array, until the page's next main-frame response: a 2xx from the challenge's origin, after any
+ * redirect, in the navigation the sign-in answered, saves it in the Vault ({@link VaultLogins#save}); any other
+ * response, one of a later navigation, a main-frame load start or load failure before it, a new challenge of the page
+ * and the page's close drop it, zeroed (L34). A save the Vault cannot make posts "Could not save the password for
+ * HOST", with the Vault's reason; one it makes or declines, such as when unlocking is cancelled, posts nothing. Neither
+ * a silent fill nor the other challenges one answer serves (F30) is remembered.
  *
  * <p>Each challenge is stamped with the page's document as it arrives; the page's next main-frame load start cancels
  * every challenge stamped earlier, shown or waiting, and closes its dialog (F8), as Chromium never says the request
@@ -120,12 +121,13 @@ public final class HttpSignIns {
     /**
      * Jasper sends {@code page} elsewhere for the user ({@link Page#onNavigate}), which a page's script cannot do:
      * until the page's next main-frame load start, a top-level challenge that arrives shows its dialog even once the
-     * page's flood guard has tripped (L27), so the page's own dialogs before it do not refuse the user's navigation;
-     * and a remembered login may fill it without the page's activation (L35). A Cancel of one of those dialogs ends
-     * that, refusing those still waiting too (L28), so a navigation that never commits gives the page no more dialogs
-     * past the trip once the user cancels one; and so does a main-frame load failure of the address the latest of
-     * those challenges was asked from, but not one before any of them, nor one of another address, such as the late
-     * end of a navigation this one replaced (L29). Nothing for a page that has closed, or once the plugin stopped.
+     * page's flood guard has tripped (L27), so the page's own dialogs before it do not refuse the user's navigation. A
+     * remembered login may fill a challenge of that navigation's own request without the page's activation, as the page
+     * marks that request ({@link SignIn#byJasper()}, L35, L42). A Cancel of one of those dialogs ends both, refusing
+     * those still waiting too (L28), so a navigation that never commits gives the page no more dialogs past the trip
+     * once the user cancels one; and so does a main-frame load failure of the address the latest of those challenges
+     * was asked from, but not one before any of them, nor one of another address, such as the late end of a navigation
+     * this one replaced (L29). Nothing for a page that has closed, or once the plugin stopped.
      *
      * @param page the page
      */
@@ -377,13 +379,14 @@ public final class HttpSignIns {
         }
 
         /**
-         * Whether the user began {@code asked}'s navigation (L35): it started while the page had a user activation, as
-         * a link the user clicks starts one, its redirects included; or it is a navigation Jasper started for the user
-         * that is still pending, none of whose dialogs the user cancelled (L27, L28). A page's script alone begins
-         * neither.
+         * Whether the user began {@code asked}'s navigation (L35, L42): its request started while the page had a user
+         * activation from a press or key in the document it left, as a link the user clicks starts one, its redirects
+         * included; or its request is the one a navigation Jasper started for the user made, still pending, none of
+         * whose dialogs the user cancelled (L28). A page's script alone begins neither, nor does a later request after
+         * Jasper's navigation that committed nothing.
          */
         private boolean byTheUser(Asked asked) {
-            return asked.signIn.activated() || asked.usersNavigation && navigating;
+            return asked.signIn.activated() || asked.signIn.byJasper() && navigating;
         }
 
         /** Shows {@code asked}'s dialog. */

@@ -25,6 +25,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntConsumer;
+import java.util.function.LongSupplier;
 import java.util.function.ObjIntConsumer;
 import java.util.function.Predicate;
 import javax.swing.JComponent;
@@ -57,8 +58,9 @@ import org.cef.browser.CefRequestContext;
  * close cancels the queries not answered (plan 8). Each HTTP sign-in Chromium asks for one of the page's requests goes
  * to its item, to answer once ({@link #onSignIn}, {@link SignIn}), judged against the page's top address: its main
  * frame's latest navigation request, after its redirects, or its latest commit, whichever came last
- * ({@link #topAddress()}), and stamped with that navigation's number and whether the page's user activation began it
- * ({@link #latestNavigation()}); and so does each final main-frame response's status ({@link #onMainFrameResponse}).
+ * ({@link #topAddress()}), and stamped with that navigation's number and whether the page's user activation or Jasper
+ * began it ({@link #latestNavigation()}); and so does each final main-frame response's status
+ * ({@link #onMainFrameResponse}).
  */
 public final class Page implements AutoCloseable {
     /** The longest {@link #source} waits for Chromium's HTML. */
@@ -126,6 +128,9 @@ public final class Page implements AutoCloseable {
     private final PageToolHooks toolHooks = new PageToolHooks(this);
     // Plan 8: what the page gives its password manager: its login script and the handler of its queries.
     private final PageLoginHooks loginHooks = new PageLoginHooks();
+    // The time its navigations' marks and activations are read at: the system's, or a test's. Read on Chromium's
+    // thread.
+    private volatile LongSupplier clock = System::currentTimeMillis;
     // Where the page's dialogs and file choosers show, and where its right-click menu shows; its item gives them.
     private DialogPlace dialogPlace;
     private MenuPlace menuPlace;
@@ -965,33 +970,51 @@ public final class Page implements AutoCloseable {
     }
 
     /**
-     * A main-frame navigation of a page, as Chromium's IO thread noted its request (plan 8's L31, L35).
+     * A main-frame navigation of a page, as Chromium's IO thread noted its request (plan 8's L31, L35, L42). Its
+     * redirects keep what its request noted.
      *
      * @param number the number of the page's main-frame navigation requests up to it: each new request raises it, a
      *     redirect does not; 0 before the first
      * @param activated whether the page had a user activation as its request started, as a link the user clicks or a
-     *     key the user presses gives one; its redirects keep it
+     *     key the user presses gives one, from a press or key since the main frame last started loading a document
+     * @param byJasper whether its request is the one Jasper's own navigation for the user made: the first main-frame
+     *     request within 10 s after it ({@link #onNavigate}), with no address change, load start or load failure of the
+     *     main frame between
      */
-    public record Navigation(long number, boolean activated) {
+    public record Navigation(long number, boolean activated, boolean byJasper) {
         /** No navigation yet. */
-        public static final Navigation NONE = new Navigation(0, false);
+        public static final Navigation NONE = new Navigation(0, false, false);
     }
 
     /**
      * Chromium's IO thread notes that the page's main frame starts a navigation request for {@code url}: a new
      * navigation ({@link #latestNavigation()}), begun with the page's user activation or not, as the activation reads
-     * now, unconsumed, and the page's top address until the next request, redirect or commit ({@link #topAddress()}).
-     * Any thread.
+     * now, unconsumed, and Jasper's or not, as it takes Jasper's mark; and the page's top address until the next
+     * request, redirect or commit ({@link #topAddress()}). Any thread.
      *
      * @param url the request's address, as Chromium names it; a null address is not noted, but the request counts
      */
     public void mainFrameRequested(String url) {
-        mainFrameRequested(url, System.currentTimeMillis());
+        mainFrameRequested(url, clock.getAsLong());
     }
 
-    /** As {@link #mainFrameRequested(String)}, the page's activation read at {@code nowMillis}. Any thread. */
+    /** As {@link #mainFrameRequested(String)}, at {@code nowMillis}. Any thread. */
     void mainFrameRequested(String url, long nowMillis) {
-        loginHooks.mainFrameRequested(url, activation().active(nowMillis));
+        loginHooks.mainFrameRequested(url, activation(), nowMillis);
+    }
+
+    /**
+     * Chromium's thread notes that the page's main frame starts loading a document: a user activation from before it
+     * begins no later navigation, and a mark of Jasper's navigation that no request took is dropped (plan 8's L42).
+     * Chromium's thread.
+     */
+    void mainFrameStarting() {
+        loginHooks.mainFrameStarting(clock.getAsLong());
+    }
+
+    /** Has the page read the time for its navigations' marks and activations from {@code clock}: a test's. */
+    void useClock(LongSupplier clock) {
+        this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     /**
@@ -1527,8 +1550,12 @@ public final class Page implements AutoCloseable {
         return PageToolHooks.runsScriptsIn(address);
     }
 
-    /** Jasper sends the page elsewhere. */
+    /**
+     * Jasper sends the page elsewhere: its next main-frame request is marked Jasper's (plan 8's L42), and those who
+     * asked {@link #onNavigate} are told.
+     */
     private void navigated() {
+        loginHooks.jaspersNavigation(clock.getAsLong());
         for (Runnable listener : navigations) listener.run();
     }
 

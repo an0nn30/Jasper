@@ -41,7 +41,7 @@ class SignInTest {
         for (int round = 0; round < 200; round++) {
             var answers = new AtomicInteger();
             SignIn signIn = new SignIn("https://intranet.example/", false, "intranet.example", 443, "Corp", "Basic",
-                "https://intranet.example/", 0, false, (user, password) -> answers.incrementAndGet(),
+                "https://intranet.example/", 0, false, false, (user, password) -> answers.incrementAndGet(),
                 answers::incrementAndGet);
             var start = new CountDownLatch(1);
             var won = new AtomicInteger();
@@ -69,12 +69,14 @@ class SignInTest {
     @Test void aThrowingCallbackIsContainedAndLoggedWithoutTheSecret() {
         try (var log = new CapturedLog(SignIn.class.getName())) {
             SignIn proceeding = new SignIn("https://intranet.example/", false, "intranet.example", 443, "Corp", "basic",
-                "", 0, false, (user, password) -> { throw new IllegalStateException("No native browser"); }, () -> { });
+                "", 0, false, false, (user, password) -> { throw new IllegalStateException("No native browser"); },
+                () -> { });
             assertThat(proceeding.proceed("u", "pw")).isFalse();
             assertThat(proceeding.answered()).isTrue();
             assertThat(proceeding.cancel()).isFalse();
             SignIn cancelling = new SignIn("https://intranet.example/", false, "intranet.example", 443, "Corp", "basic",
-                "", 0, false, (user, password) -> { }, () -> { throw new IllegalStateException("No native browser"); });
+                "", 0, false, false, (user, password) -> { },
+                () -> { throw new IllegalStateException("No native browser"); });
             assertThat(cancelling.cancel()).isFalse();
             assertThat(cancelling.answered()).isTrue();
             assertThat(log.records()).hasSize(2).allSatisfy(record -> {
@@ -86,7 +88,7 @@ class SignInTest {
 
     @Test void itKeepsChromiumsValuesTheSchemeInLowerCase() {
         SignIn signIn = new SignIn("https://intranet.example/", true, "proxy.example", 8118, "Corp", "NTLM",
-            "https://intranet.example/start", 7, true, (user, password) -> { }, () -> { });
+            "https://intranet.example/start", 7, true, true, (user, password) -> { }, () -> { });
         assertThat(signIn.originUrl()).isEqualTo("https://intranet.example/");
         assertThat(signIn.proxy()).isTrue();
         assertThat(signIn.host()).isEqualTo("proxy.example");
@@ -96,10 +98,11 @@ class SignInTest {
         assertThat(signIn.topAddress()).isEqualTo("https://intranet.example/start");
         assertThat(signIn.navigation()).isEqualTo(7);
         assertThat(signIn.activated()).as("L35").isTrue();
+        assertThat(signIn.byJasper()).as("L42").isTrue();
     }
 
     @Test void aNullTextReadsAsEmpty() {
-        SignIn signIn = new SignIn(null, false, null, 80, null, null, null, 0, false, (user, password) -> { },
+        SignIn signIn = new SignIn(null, false, null, 80, null, null, null, 0, false, false, (user, password) -> { },
             () -> { });
         assertThat(List.of(signIn.originUrl(), signIn.host(), signIn.realm(), signIn.scheme(), signIn.topAddress()))
             .containsOnly("");
@@ -117,13 +120,13 @@ class SignInTest {
 
     private SignIn signIn() {
         return new SignIn("https://intranet.example/", false, "intranet.example", 443, "Corp", "Basic",
-            "https://intranet.example/", 0, false, (user, password) -> told.add("continue " + user + " " + password),
-            () -> told.add("cancel"));
+            "https://intranet.example/", 0, false, false,
+            (user, password) -> told.add("continue " + user + " " + password), () -> told.add("cancel"));
     }
 
     private static SignIn signInFrom(String originUrl) {
-        return new SignIn(originUrl, false, "intranet.example", 443, "", "basic", "", 0, false, (user, password) -> { },
-            () -> { });
+        return new SignIn(originUrl, false, "intranet.example", 443, "", "basic", "", 0, false, false,
+            (user, password) -> { }, () -> { });
     }
 
     /** The record's text, its parameters and its exception's message included. */

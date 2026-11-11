@@ -63,13 +63,13 @@ class HttpSignInsTest {
     private static final String TOP = "https://intranet.example/", NEXT = "https://intranet.example/next";
     // The login name of TOP's sign-ins for the realm Corp.
     private static final String CORP = "https://intranet.example (Corp)";
-    // When the user's press or key activates the page, and when a script's navigation starts long after it (L35).
-    private static final long CLICK = 1_000, SCRIPTED = CLICK + 60_000;
     private final MemoryStores memory = new MemoryStores();
     private final FakeVault fake = new FakeVault();
     // What Chromium was told, in order: "NAME proceed USER PASSWORD" or "NAME cancel".
     private final List<String> told = new CopyOnWriteArrayList<>();
     private final AtomicLong now = new AtomicLong();
+    // The page's clock, for its navigations' activations and Jasper's marks (L35, L42).
+    private final AtomicLong millis = new AtomicLong(1_000_000);
     private AutoCloseable clock;
     private FakePluginHost host;
     private BrowserItems items;
@@ -320,7 +320,11 @@ class HttpSignInsTest {
         });
     }
 
-    /** L28: a main-frame load failure, such as a download or a stopped load, ends the navigation's bypass. */
+    /**
+     * L28, L29: a main-frame load failure of the address the navigation's sign-in was asked from, such as a stopped
+     * load, ends its bypass; one before any sign-in ends nothing
+     * ({@link #onlyTheChallengesOwnLoadFailureEndsTheUsersNavigationsBypass}).
+     */
     @Test void aLoadFailureEndsTheUsersNavigationsBypass() throws Exception {
         trip();
         onUiThread(() -> {
@@ -1488,19 +1492,22 @@ class HttpSignInsTest {
 
     /**
      * L35: a navigation that began within the page's user activation fills, as a link the user clicks or a key the
-     * user presses begins one, and so do its redirects, however long they take; a script's redirects do not.
+     * user presses begins one, and so do its redirects; a script's redirects do not.
      */
     @Test void theRedirectsOfANavigationTheUserBeganFillAndAScriptsDoNot() throws Exception {
         open(true);
         fake.login(CORP, "u", "pw");
         fake.login("https://intranet.example (Other)", "u", "pw");
         onUiThread(() -> {
-            PageTestAccess.activate(page, CLICK);
-            PageTestAccess.mainFrameRequested(page, "http://intranet.example/", CLICK + 5_000);
+            long press = millis.addAndGet(60_000);
+            PageTestAccess.activate(page, press);
+            millis.set(press + 5_000);
+            page.mainFrameRequested("http://intranet.example/");
             page.mainFrameRedirected(TOP);
             challenge("redirected", TOP, "intranet.example", 443, "Corp", false);
             assertThat(told).as("within 5 s of the press").containsExactly("redirected proceed u pw");
-            PageTestAccess.mainFrameRequested(page, "http://intranet.example/", CLICK + 5_001);
+            millis.set(press + 5_001);
+            page.mainFrameRequested("http://intranet.example/");
             page.mainFrameRedirected(TOP);
             challenge("late", TOP, "intranet.example", 443, "Other", false);
         });
@@ -1524,12 +1531,10 @@ class HttpSignInsTest {
         fake.ungranted.add(fake.login("https://intranet.example (Other)", "u", "pw"));
         fake.login("https://intranet.example (Third)", "u", "pw");
         onUiThread(() -> {
-            page.load(URI.create(NEXT));
-            scripted(NEXT);
+            typed(NEXT);
             challenge("typed", NEXT, "intranet.example", 443, "Corp", false);
             assertThat(told).as("Jasper's own navigation").containsExactly("typed proceed u pw");
-            page.load(URI.create(NEXT));
-            scripted(NEXT);
+            typed(NEXT);
             challenge("other", NEXT, "intranet.example", 443, "Other", false);
             challenge("third", NEXT, "intranet.example", 443, "Third", false);
         });
@@ -1541,6 +1546,136 @@ class HttpSignInsTest {
             assertThat(heading()).as("after the user's Cancel").contains("“Third”");
             press(form().cancelAction());
             assertThat(told).containsExactly("typed proceed u pw", "other cancel", "third cancel");
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * L42: the silent fill's Jasper half answers to Jasper's own request alone. After a navigation Jasper started that
+     * commits no page (Back to an entry within the document, a 204, the user's Stop before any sign-in, a download), a
+     * page's script that sends the tab to a remembered site, a second or three minutes later, gets the dialog, and
+     * nothing is sent.
+     */
+    @Test void aJasperNavigationThatCommitsNothingLendsALaterScriptsNavigationNothing() throws Exception {
+        open(true);
+        fake.login(CORP, "u", "pw");
+        var rows = new java.util.LinkedHashMap<String, Runnable>();
+        rows.put("within the document", () -> {
+            millis.addAndGet(60_000);
+            page.load(URI.create(NEXT + "#part"));
+            PageTestAccess.mainFrameCommitted(page, NEXT + "#part");
+        });
+        rows.put("a 204", () -> {
+            typed(NEXT);
+            page.mainFrameResponded(NEXT, 204);
+        });
+        rows.put("a Stop", () -> {
+            typed(NEXT);
+            PageTestAccess.mainFrameFailed(page, NEXT, "ERR_ABORTED");
+        });
+        rows.put("a download", () -> {
+            typed(NEXT + "report.pdf");
+            PageTestAccess.downloadStart(page, 1, 7, NEXT + "report.pdf", "report.pdf", TOP, millis.get());
+        });
+        for (var row : rows.entrySet())
+            for (long later : List.of(1_000L, 180_000L)) {
+                String name = row.getKey() + ", " + later + " ms later";
+                onUiThread(() -> {
+                    row.getValue().run();
+                    millis.addAndGet(later);
+                    page.mainFrameRequested(TOP); // the old page's script, as a form's submit
+                    challenge(name, TOP, "intranet.example", 443, "Corp", false);
+                });
+                onUiThread(() -> {
+                    assertThat(host.windowView(ID, TITLE)).as(name).isPresent();
+                    press(form().cancelAction());
+                });
+            }
+        onUiThread(() -> {
+            assertThat(told).hasSize(8).allSatisfy(line -> assertThat(line).endsWith(" cancel"));
+            assertThat(fake.calls).as("the Vault never asked").isEmpty();
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * L42: Jasper's mark waits 10 s for its navigation's request: one that comes later is not Jasper's, so it shows the
+     * dialog; one within 10 s fills, and so does its redirect.
+     */
+    @Test void jaspersMarkLapsesUntakenAfter10Seconds() throws Exception {
+        open(true);
+        fake.login(CORP, "u", "pw");
+        onUiThread(() -> {
+            millis.addAndGet(60_000);
+            page.load(URI.create(TOP));
+            millis.addAndGet(10_001);
+            page.mainFrameRequested(TOP);
+            challenge("lapsed", TOP, "intranet.example", 443, "Corp", false);
+        });
+        onUiThread(() -> {
+            assertThat(host.windowView(ID, TITLE)).as("10,001 ms later").isPresent();
+            press(form().cancelAction());
+            millis.addAndGet(60_000);
+            page.load(URI.create("http://intranet.example/"));
+            millis.addAndGet(10_000);
+            page.mainFrameRequested("http://intranet.example/");
+            page.mainFrameRedirected(TOP);
+            challenge("taken", TOP, "intranet.example", 443, "Corp", false);
+            assertThat(told).containsExactly("lapsed cancel", "taken proceed u pw");
+            assertThat(host.windows()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * L42: once Jasper's request has taken the mark, a request of the page's that replaces it, as the old document's
+     * script sending the tab elsewhere before Jasper's navigation commits, is not Jasper's: the dialog shows.
+     */
+    @Test void aPageRequestAfterJaspersOwnIsNotJaspers() throws Exception {
+        open(true);
+        fake.login(CORP, "u", "pw");
+        onUiThread(() -> {
+            typed(NEXT + "elsewhere");
+            millis.addAndGet(500);
+            page.mainFrameRequested(TOP);
+            challenge("replacing", TOP, "intranet.example", 443, "Corp", false);
+        });
+        onUiThread(() -> {
+            assertThat(host.windowView(ID, TITLE)).as("the page's own request").isPresent();
+            press(form().cancelAction());
+            assertThat(told).containsExactly("replacing cancel");
+            assertThat(fake.calls).isEmpty();
+        });
+    }
+
+    /**
+     * L42: an activation carries into no new document. The click on a link fills that link's navigation, but once the
+     * document it brings starts loading, that click begins none of the document's own navigations, such as its meta
+     * refresh within 5 s, which shows the dialog; a click in the new document does.
+     */
+    @Test void theClickThatBroughtADocumentBeginsNoneOfItsOwnNavigations() throws Exception {
+        open(true);
+        fake.login(CORP, "u", "pw");
+        fake.login("https://intranet.example (Other)", "u", "pw");
+        onUiThread(() -> {
+            millis.addAndGet(60_000);
+            clicked(NEXT);
+            challenge("link", NEXT, "intranet.example", 443, "Corp", false);
+            assertThat(told).containsExactly("link proceed u pw");
+            millis.addAndGet(300);
+            PageTestAccess.mainFrameStarting(page);
+            PageTestAccess.loadStarted(page, NEXT);
+            millis.addAndGet(1_000);
+            page.mainFrameRequested(TOP); // the new document's meta refresh
+            challenge("refresh", TOP, "intranet.example", 443, "Other", false);
+        });
+        onUiThread(() -> {
+            assertThat(host.windowView(ID, TITLE)).as("within 5 s of the click, but in the document it brought")
+                .isPresent();
+            press(form().cancelAction());
+            clicked(TOP);
+            challenge("clicked", TOP, "intranet.example", 443, "Other", false);
+            assertThat(told).containsExactly("link proceed u pw", "refresh cancel", "clicked proceed u pw");
             assertThat(host.failures()).isEmpty();
         });
     }
@@ -1563,19 +1698,30 @@ class HttpSignInsTest {
         if (items == null) open(false);
         Page.Navigation navigation = page.latestNavigation();
         return new SignIn(origin, proxy, challenger, port, realm, scheme, top, navigation.number(),
-            navigation.activated(), (user, password) -> told.add(name + " proceed " + user + " " + password),
-            () -> told.add(name + " cancel"));
+            navigation.activated(), navigation.byJasper(), (user, password) -> told.add(name + " proceed " + user + " "
+                + password), () -> told.add(name + " cancel"));
     }
 
     /** The page's main frame requests {@code url} as a link the user clicks does: within its activation (L35). */
     private void clicked(String url) {
-        PageTestAccess.activate(page, CLICK);
-        PageTestAccess.mainFrameRequested(page, url, CLICK);
+        PageTestAccess.activate(page, millis.get());
+        page.mainFrameRequested(url);
     }
 
-    /** The page's main frame requests {@code url} as a page's script does: with no user activation, nor Jasper's. */
+    /**
+     * The page's main frame requests {@code url} as a page's script does, a minute later: with no user activation, and
+     * not Jasper's (L35, L42).
+     */
     private void scripted(String url) {
-        PageTestAccess.mainFrameRequested(page, url, SCRIPTED);
+        millis.addAndGet(60_000);
+        page.mainFrameRequested(url);
+    }
+
+    /** Jasper sends the page to {@code url} for the user, a minute after any press or key, and its request goes out. */
+    private void typed(String url) {
+        millis.addAndGet(60_000);
+        page.load(URI.create(url));
+        page.mainFrameRequested(url);
     }
 
     /** The sign-in dialogs from now on read one moment, so each opens straight after the one before closed. */
@@ -1617,6 +1763,7 @@ class HttpSignInsTest {
             item = items.open(URI.create(TOP), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
             page = ItemTestAccess.page(item);
             place = page.dialogPlace().orElseThrow();
+            PageTestAccess.useClock(page, millis::get);
             // The user's click begins the page's navigation, so its remembered logins may fill (L35).
             clicked(TOP);
         };

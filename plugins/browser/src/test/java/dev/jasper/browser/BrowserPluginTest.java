@@ -496,7 +496,7 @@ class BrowserPluginTest {
     /** A Basic challenge of the top-level navigation to intranet.example, for realm {@code name}, told to {@code told}. */
     private static SignIn signIn(String name, List<String> told) {
         String top = "https://intranet.example/";
-        return new SignIn(top, false, "intranet.example", 443, name, "basic", top, 0, false,
+        return new SignIn(top, false, "intranet.example", 443, name, "basic", top, 0, false, false,
             (user, password) -> told.add(name + " proceed"), () -> told.add(name + " cancel"));
     }
 

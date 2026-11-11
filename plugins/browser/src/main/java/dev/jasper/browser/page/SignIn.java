@@ -7,8 +7,8 @@ import java.util.function.BiConsumer;
 
 /**
  * An HTTP authentication challenge to one of a page's requests, a server's or a proxy's, as Chromium asks Jasper for a
- * sign-in (plan 8), in plain values: the address that asked, who challenged and for which realm and scheme, the
- * page's top address and main-frame navigation as Chromium asked, with whether the page's user activation began that
+ * sign-in (plan 8), in plain values: the address that asked, who challenged and for which realm and scheme, the page's
+ * top address and main-frame navigation as Chromium asked, with whether the page's user activation or Jasper began that
  * navigation ({@link Page#topAddress()}, {@link Page#latestNavigation()}), and the one answer Chromium waits for, a
  * user name and password or a cancel. Chromium's request waits until it is answered, so each sign-in is answered
  * exactly once: {@link #proceed} and {@link #cancel()} share one atomic, and only the first reaches Chromium. It names
@@ -17,7 +17,7 @@ import java.util.function.BiConsumer;
 public final class SignIn {
     private static final System.Logger LOG = System.getLogger(SignIn.class.getName());
     private final String originUrl, host, realm, scheme, topAddress;
-    private final boolean proxy, activated;
+    private final boolean proxy, activated, byJasper;
     private final int port;
     private final long navigation;
     private final BiConsumer<String, String> proceed;
@@ -37,11 +37,13 @@ public final class SignIn {
      * @param navigation the page's main-frame navigation as Chromium asked ({@link Page#navigation()})
      * @param activated whether that navigation began with the page's user activation
      *     ({@link Page.Navigation#activated()})
+     * @param byJasper whether that navigation is Jasper's own for the user ({@link Page.Navigation#byJasper()})
      * @param proceed gives Chromium a user name and password, once at most
      * @param cancel tells Chromium there are none, once at most
      */
     public SignIn(String originUrl, boolean proxy, String host, int port, String realm, String scheme, String topAddress,
-                  long navigation, boolean activated, BiConsumer<String, String> proceed, Runnable cancel) {
+                  long navigation, boolean activated, boolean byJasper, BiConsumer<String, String> proceed,
+                  Runnable cancel) {
         this.originUrl = Objects.requireNonNullElse(originUrl, "");
         this.proxy = proxy;
         this.host = Objects.requireNonNullElse(host, "");
@@ -51,6 +53,7 @@ public final class SignIn {
         this.topAddress = Objects.requireNonNullElse(topAddress, "");
         this.navigation = navigation;
         this.activated = activated;
+        this.byJasper = byJasper;
         this.proceed = Objects.requireNonNull(proceed, "proceed");
         this.cancel = Objects.requireNonNull(cancel, "cancel");
     }
@@ -138,6 +141,16 @@ public final class SignIn {
      */
     public boolean activated() {
         return activated;
+    }
+
+    /**
+     * Whether the page's main-frame navigation as Chromium asked is Jasper's own for the user, from its address field,
+     * a bookmark, history, Back or Forward, its redirects included ({@link Page.Navigation#byJasper()}, plan 8's L42).
+     *
+     * @return whether it is
+     */
+    public boolean byJasper() {
+        return byJasper;
     }
 
     /**

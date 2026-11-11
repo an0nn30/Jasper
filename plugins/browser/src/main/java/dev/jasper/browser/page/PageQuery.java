@@ -103,8 +103,8 @@ public final class PageQuery {
     /**
      * Consumes the user's activation for this request: whether it allows the request, asked once. Its answerer asks it
      * once the request is otherwise allowed, and also to spend the activation of a request it refuses for where the
-     * press was, so each press answers a page one such question (plan 8's L21, L22, L37); a request refused before
-     * either spends nothing.
+     * press was, for a field too tall to be a login field, or for an anchor refused, so each press answers a page one
+     * such question (plan 8's L21, L22, L37); a request refused before either spends nothing.
      *
      * @return whether the activation allowed it the first time; false each time after
      */
