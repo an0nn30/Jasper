@@ -25,7 +25,7 @@ import java.util.function.IntSupplier;
  * elsewhere) and as the item's zoom changes ({@link #zoomChanged}); the page's script closes it as the page scrolls,
  * and its anchor closes it as the canvas is resized (L6). A /dev/null item has the buttons too, as Chrome's Incognito
  * fills saved passwords, and nothing here writes to the Vault (F24); its sign-in dialog offers no Vault. It closes with
- * the item, which cancels the page's sign-ins, shown or waiting. UI thread.
+ * the item, which cancels the page's sign-ins, shown or waiting, and ends their saves. UI thread.
  */
 final class PageLoginsHost implements AutoCloseable {
     private final Page page;
@@ -73,7 +73,7 @@ final class PageLoginsHost implements AutoCloseable {
         if (buttons != null) buttons.closePicker();
     }
 
-    /** The item closes: the page is heard no more, an open picker closes, and the page's sign-ins are cancelled. */
+    /** The item closes: the page is heard no more, an open picker closes, and the page's sign-ins and saves end. */
     @Override public void close() {
         heard.forEach(Subscription::close);
         if (buttons != null) buttons.closePicker();

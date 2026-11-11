@@ -385,7 +385,7 @@ public class BrowserPlugin implements Plugin {
     /**
      * Jasper quits, or the plugin is turned off. The running downloads are cancelled and the pages' holds complete, then
      * the filter list's checks, its download under way and its client end, and the pages' HTTP sign-ins are cancelled,
-     * their dialogs closed.
+     * their dialogs closed, and their passwords' saves withdrawn or dropped.
      * The items close their open Edit Bookmark panels, whose bookmarks keep the tags they show, and give history their
      * pages' last titles, then the data stores close: the persistent history and
      * bookmarks' database takes no more work and closes once the work given before has run, and each /dev/null store
@@ -402,7 +402,8 @@ public class BrowserPlugin implements Plugin {
         if (downloads != null) downloads.stopAll();
         // The filter list's checks, its download under way and its client end.
         if (filters != null) filters.close();
-        // Plan 8's L27: every page's sign-ins, shown or waiting, are cancelled while Chromium still runs.
+        // Plan 8's L27: every page's sign-ins, shown or waiting, are cancelled while Chromium still runs, and (F10)
+        // their saves end.
         if (signIns != null) signIns.close();
         if (items != null) items.close();
         if (dataStores != null) dataStores.close();

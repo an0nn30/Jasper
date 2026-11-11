@@ -12,6 +12,7 @@ import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageTestAccess;
 import dev.jasper.browser.page.SignIn;
 import dev.jasper.browser.settings.BrowserSettings;
+import dev.jasper.browser.store.CapturedLog;
 import dev.jasper.browser.store.MemoryStores;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.testing.FakeKitView;
@@ -20,8 +21,12 @@ import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.TabPlacement;
 import dev.jasper.sdk.ui.UiEvent;
 import dev.jasper.vault.api.Credential;
+import dev.jasper.vault.api.CredentialDescriptor;
 import dev.jasper.vault.api.CredentialPickResult;
+import dev.jasper.vault.api.Kind;
+import dev.jasper.vault.api.LockState;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -31,6 +36,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,14 +49,19 @@ import static org.assertj.core.api.Assertions.assertThat;
  * item, one at a time, the rest waiting in order, and past eight waiting the next is cancelled at once; OK and a login
  * chosen in the Vault's picker sign in, anything else cancels; the dialog offers the Vault's controls only as the
  * challenge allows, and none without the Vault or in /dev/null; a main-frame load start cancels the earlier document's
- * challenges (F8); one answer serves the page's waiting challenges of the same protection space (F30); and the item's
- * close cancels every challenge exactly once (review focus 5). The pages are stand-in items' own on the testkit's fake
- * host, the Vault is {@link FakeVault}, and Chromium's side is a recording {@link SignIn}.
+ * challenges (F8); one answer serves the page's waiting challenges of the same protection space (F30); a sign-in
+ * answered with "Remember this password" is saved at the page's next main-frame 2xx from its origin, and a remembered
+ * login fills the top-level challenge in without the dialog, once until the page's main frame gets a response (review
+ * focus 1); and the item's close and the plugin's stop cancel every challenge exactly once and drop every save, its
+ * password zeroed (review focus 5). The pages are stand-in items' own on the testkit's fake host, the Vault is
+ * {@link FakeVault}, and Chromium's side is a recording {@link SignIn}.
  */
 class HttpSignInsTest {
     private static final String ID = "dev.jasper.browser";
     private static final String TITLE = SignInDialog.TITLE;
     private static final String TOP = "https://intranet.example/", NEXT = "https://intranet.example/next";
+    // The login name of TOP's sign-ins for the realm Corp.
+    private static final String CORP = "https://intranet.example (Corp)";
     private final MemoryStores memory = new MemoryStores();
     private final FakeVault fake = new FakeVault();
     // What Chromium was told, in order: "NAME proceed USER PASSWORD" or "NAME cancel".
@@ -137,6 +149,7 @@ class HttpSignInsTest {
     @Test void closingTheItemCancelsEveryChallengeOnce() throws Exception {
         open(true);
         UUID id = fake.login("https://intranet.example (Corp)", "u", "pw");
+        fake.ungranted.add(id); // a login the Browser has no saved grant for, so the dialog shows
         var withdrawn = new AtomicBoolean();
         var late = new CompletableFuture<Optional<Credential>>() {
             @Override public boolean cancel(boolean interrupt) {
@@ -152,8 +165,8 @@ class HttpSignInsTest {
         });
         onUiThread(() -> {
             press(managerAction());
-            assertThat(fake.calls).as("the login chosen, its fetch under way")
-                .containsExactly("credential https://intranet.example (Corp)");
+            assertThat(fake.calls).as("no silent fill, then the login chosen, its fetch under way")
+                .containsExactly("credentialIfGranted https://intranet.example (Corp)", "credential https://intranet.example (Corp)");
             item.close();
             assertThat(told).containsExactlyInAnyOrder("a cancel", "b cancel", "c cancel");
             assertThat(withdrawn).as("the close withdrew the Vault's fetch, whose login then goes to no one").isTrue();
@@ -472,7 +485,7 @@ class HttpSignInsTest {
     /** F30 for a login chosen in the Vault's picker, which is searched for the host without its leading www. (F26). */
     @Test void aLoginChosenInThePickerSignsInTheSameRealmsChallenges() throws Exception {
         open(true);
-        fake.login("https://www.intranet.example (Corp)", "u", "pw");
+        fake.ungranted.add(fake.login("https://www.intranet.example (Corp)", "u", "pw"));
         String www = "https://www.intranet.example/";
         onUiThread(() -> {
             items.signIns().challenged(page, place, false, signIn("a", www, www, "www.intranet.example", 443, "Corp", false, "basic"));
@@ -491,7 +504,7 @@ class HttpSignInsTest {
 
     @Test void aCancelledPickerKeepsTheDialog() throws Exception {
         open(true);
-        fake.login("https://intranet.example (Corp)", "u", "pw");
+        fake.ungranted.add(fake.login("https://intranet.example (Corp)", "u", "pw"));
         fake.pickAnswer = CompletableFuture.completedFuture(new CredentialPickResult.Cancelled());
         onUiThread(() -> challenge("a", TOP, "intranet.example", 443, "Corp", false));
         onUiThread(() -> {
@@ -567,6 +580,438 @@ class HttpSignInsTest {
     }
 
     /**
+     * Remember ticked: the page's next main-frame 2xx from the challenge's origin saves the login under its name, over
+     * the item's window, once; the pending save's array is kept while the Vault saves and zeroed once it has.
+     */
+    @Test void rememberedThenTwoHundredSavesTheLogin() throws Exception {
+        open(true);
+        onUiThread(() -> challenge("a", TOP, "intranet.example", 443, "Corp", false));
+        onUiThread(() -> {
+            assertThat(remember()).isTrue();
+            type("u", "pw");
+            tickRemember();
+            press(ok());
+            assertThat(told).containsExactly("a proceed u pw");
+            assertThat(fake.calls).as("nothing saved before the response").isEmpty();
+            page.mainFrameResponded(TOP, 200);
+            assertThat(fake.calls).containsExactly("saveLogin " + CORP + " u");
+            assertThat(fake.savedPasswords).containsExactly("pw");
+            assertThat(fake.saveOwners).containsExactly(item.tab().window());
+            page.mainFrameResponded(TOP, 200);
+            assertThat(fake.calls).as("once").hasSize(1);
+        });
+        var saving = new CompletableFuture<Optional<CredentialDescriptor>>();
+        fake.saveAnswer = saving;
+        char[] given = "pw".toCharArray();
+        onUiThread(() -> challenge("b", TOP, "intranet.example", 443, "Corp", false));
+        onUiThread(() -> {
+            okShown("u", given, true);
+            assertThat(given).as("kept for the save").containsExactly('p', 'w');
+            page.mainFrameResponded(TOP, 200);
+            assertThat(fake.calls).hasSize(2);
+            assertThat(given).as("while the Vault saves").containsExactly('p', 'w');
+            saving.complete(Optional.of(new CredentialDescriptor(UUID.randomUUID(), CORP, "u", Kind.ACCOUNT_PASSWORD)));
+            assertThat(given).as("zeroed once saved").containsOnly((char) 0);
+            assertThat(host.notifications().lines()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /** A 401, or a 2xx from another origin, drops the pending save unsaved and zeroed; a later 200 saves nothing. */
+    @Test void aFourOhOneOrAnotherOriginSavesNothing() throws Exception {
+        open(true);
+        char[] wrong = "pw".toCharArray(), elsewhere = "pw".toCharArray();
+        onUiThread(() -> challenge("a", TOP, "intranet.example", 443, "Corp", false));
+        onUiThread(() -> {
+            okShown("u", wrong, true);
+            page.mainFrameResponded(TOP, 401);
+            assertThat(wrong).as("dropped").containsOnly((char) 0);
+            page.mainFrameResponded(TOP, 200);
+            assertThat(fake.calls).as("the 401 dropped it").isEmpty();
+            challenge("b", TOP, "intranet.example", 443, "Corp", false);
+        });
+        onUiThread(() -> {
+            okShown("u", elsewhere, true);
+            page.mainFrameResponded("https://files.example/", 200);
+            assertThat(elsewhere).as("dropped").containsOnly((char) 0);
+            page.mainFrameResponded(TOP, 200);
+            assertThat(fake.calls).as("another origin's response dropped it").isEmpty();
+            assertThat(told).containsExactly("a proceed u pw", "b proceed u pw");
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /** F10: the item's close drops the pending save, its array zeroed, and nothing is saved after it. */
+    @Test void aPendingSaveIsZeroedWhenTheItemCloses() throws Exception {
+        open(true);
+        char[] given = "pw".toCharArray();
+        onUiThread(() -> challenge("a", TOP, "intranet.example", 443, "Corp", false));
+        onUiThread(() -> {
+            okShown("u", given, true);
+            assertThat(given).as("pending").containsExactly('p', 'w');
+            item.close();
+            assertThat(given).as("zeroed unsaved").containsOnly((char) 0);
+            page.mainFrameResponded(TOP, 200);
+            items.signIns().responded(page, TOP, 200);
+            assertThat(fake.calls).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * A new challenge on the page, such as Chromium's again for a wrong password, drops the pending save, its array
+     * zeroed; only a later answer with Remember is saved.
+     */
+    @Test void aNewChallengeReplacesThePendingSave() throws Exception {
+        open(true);
+        char[] wrong = "wrong".toCharArray(), right = "pw".toCharArray();
+        onUiThread(() -> challenge("a", TOP, "intranet.example", 443, "Corp", false));
+        onUiThread(() -> {
+            okShown("u", wrong, true);
+            challenge("again", TOP, "intranet.example", 443, "Corp", false);
+            assertThat(wrong).as("replaced, zeroed").containsOnly((char) 0);
+        });
+        onUiThread(() -> {
+            press(form().cancelAction());
+            page.mainFrameResponded(TOP, 200);
+            assertThat(fake.calls).as("nothing pending").isEmpty();
+            challenge("b", TOP, "intranet.example", 443, "Corp", false);
+        });
+        onUiThread(() -> {
+            okShown("u", right, true);
+            page.mainFrameResponded(TOP, 200);
+            assertThat(fake.calls).containsExactly("saveLogin " + CORP + " u");
+            assertThat(fake.savedPasswords).containsExactly("pw");
+            assertThat(right).containsOnly((char) 0);
+            assertThat(told).containsExactly("a proceed u wrong", "again cancel", "b proceed u pw");
+        });
+    }
+
+    /** A failed save posts "Could not save the password for HOST", with the failure's message, and zeroes the array. */
+    @Test void aFailedSavePostsCouldNotSave() throws Exception {
+        open(true);
+        fake.saveAnswer = CompletableFuture.failedFuture(new IllegalStateException("Could not save the login"));
+        char[] given = "pw".toCharArray();
+        try (var log = new CapturedLog(HttpSignIns.class.getName())) {
+            onUiThread(() -> challenge("a", TOP, "intranet.example", 443, "Corp", false));
+            onUiThread(() -> {
+                okShown("u", given, true);
+                page.mainFrameResponded(TOP, 200);
+                assertThat(host.notifications().lines())
+                    .containsExactly(ID + "|ERROR|Could not save the password for intranet.example|Could not save the login");
+                assertThat(given).containsOnly((char) 0);
+            });
+            assertThat(log.records()).singleElement().satisfies(record -> {
+                assertThat(record.getLevel()).isEqualTo(Level.WARNING);
+                assertThat(record.getThrown()).isInstanceOf(IllegalStateException.class);
+            });
+        }
+    }
+
+    /** An empty answer, as when unlocking is cancelled or there is no vault, posts nothing, and the array is zeroed. */
+    @Test void aCancelledUnlockPostsNothing() throws Exception {
+        open(true);
+        fake.saveAnswer = CompletableFuture.completedFuture(Optional.empty());
+        char[] given = "pw".toCharArray();
+        onUiThread(() -> challenge("a", TOP, "intranet.example", 443, "Corp", false));
+        onUiThread(() -> {
+            okShown("u", given, true);
+            page.mainFrameResponded(TOP, 200);
+            assertThat(fake.calls).containsExactly("saveLogin " + CORP + " u");
+            assertThat(given).containsOnly((char) 0);
+            assertThat(host.notifications().lines()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * A remembered login the Browser may read signs the top-level challenge in with no dialog, its credential closed;
+     * the page's flood guard never counts such a fill.
+     */
+    @Test void aGrantedLoginFillsWithoutTheDialog() throws Exception {
+        open(true);
+        fake.login(CORP, "u", "pw");
+        onUiThread(() -> challenge("a", TOP, "intranet.example", 443, "Corp", false));
+        onUiThread(() -> {
+            assertThat(told).containsExactly("a proceed u pw");
+            assertThat(host.windows()).as("no dialog").isEmpty();
+            assertThat(fake.calls).containsExactly("credentialIfGranted " + CORP);
+            assertThat(fake.issued).singleElement().satisfies(credential -> assertThat(FakeVault.closed(credential)).isTrue());
+        });
+        tripsQuickly();
+        onUiThread(() -> {
+            for (String name : List.of("b", "c", "d")) {
+                page.mainFrameResponded(TOP, 200);
+                challenge(name, TOP, "intranet.example", 443, "Corp", false);
+            }
+            assertThat(told).endsWith("b proceed u pw", "c proceed u pw", "d proceed u pw");
+            challenge("other", TOP, "intranet.example", 443, "Other", false);
+        });
+        onUiThread(() -> {
+            assertThat(host.windowView(ID, TITLE)).as("the page's first dialog, after three fills").isPresent();
+            press(form().cancelAction());
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * Review focus 1: a remembered password that is wrong is filled once; Chromium's challenge again, with no response
+     * between, shows the dialog instead of looping; once the main frame gets a response, the next challenge fills
+     * silently again.
+     */
+    @Test void aSecondChallengeAfterASilentFillShowsTheDialog() throws Exception {
+        open(true);
+        fake.login(CORP, "u", "wrong");
+        onUiThread(() -> {
+            challenge("a", TOP, "intranet.example", 443, "Corp", false);
+            assertThat(told).containsExactly("a proceed u wrong");
+            challenge("again", TOP, "intranet.example", 443, "Corp", false);
+        });
+        onUiThread(() -> {
+            assertThat(host.windowView(ID, TITLE)).as("the dialog, not a loop").isPresent();
+            assertThat(fake.calls).as("one silent fill").containsExactly("credentialIfGranted " + CORP);
+            type("u", "pw");
+            press(ok());
+            assertThat(told).containsExactly("a proceed u wrong", "again proceed u pw");
+            page.mainFrameResponded(TOP, 200);
+            challenge("later", TOP, "intranet.example", 443, "Corp", false);
+            assertThat(told).as("filled silently again after the response").endsWith("later proceed u wrong");
+            assertThat(host.windows()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * L24: should Chromium report the 401 (or a proxy's 407) before it challenges again, that response does not let a
+     * wrong remembered password be filled again: the second challenge shows the dialog.
+     */
+    @Test void aFourOhOneBetweenTheChallengesStillShowsTheDialog() throws Exception {
+        open(true);
+        fake.login(CORP, "u", "wrong");
+        onUiThread(() -> {
+            challenge("a", TOP, "intranet.example", 443, "Corp", false);
+            page.mainFrameResponded(TOP, 401);
+            challenge("again", TOP, "intranet.example", 443, "Corp", false);
+        });
+        onUiThread(() -> {
+            assertThat(host.windowView(ID, TITLE)).as("after a 401").isPresent();
+            press(form().cancelAction());
+            page.mainFrameResponded(TOP, 407);
+            challenge("proxied", TOP, "intranet.example", 443, "Corp", false);
+        });
+        onUiThread(() -> {
+            assertThat(host.windowView(ID, TITLE)).as("after a 407").isPresent();
+            press(form().cancelAction());
+            assertThat(told).containsExactly("a proceed u wrong", "again cancel", "proxied cancel");
+            assertThat(fake.calls).as("one silent fill").containsExactly("credentialIfGranted " + CORP);
+        });
+    }
+
+    /** Review focus 4: a locked vault shows the dialog, and asks nothing of the Vault, nor marks the name tried. */
+    @Test void aLockedVaultShowsTheDialog() throws Exception {
+        open(true);
+        fake.login(CORP, "u", "pw");
+        fake.state = LockState.LOCKED;
+        onUiThread(() -> challenge("a", TOP, "intranet.example", 443, "Corp", false));
+        onUiThread(() -> {
+            assertThat(labels()).containsExactly("Password Manager", "Cancel", "OK");
+            assertThat(remember()).isTrue();
+            assertThat(fake.calls).as("the Vault is not asked while locked").isEmpty();
+            press(form().cancelAction());
+            fake.state = LockState.UNLOCKED;
+            challenge("unlocked", TOP, "intranet.example", 443, "Corp", false);
+            assertThat(told).as("a locked vault marked nothing tried").containsExactly("a cancel", "unlocked proceed u pw");
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * F5, F24: a /dev/null item's challenge, a framed one, Digest, NTLM and a proxy's are never filled silently nor
+     * remembered, even should an answer say Remember, which their dialogs do not offer.
+     */
+    @Test void devNullFramedDigestAndProxyNeverFillSilentlyOrRemember() throws Exception {
+        open(true);
+        fake.login(CORP, "u", "pw");
+        fake.login("https://files.example (Corp)", "u", "pw");
+        record Row(boolean devNull, SignIn signIn) { }
+        var arrays = new ArrayList<char[]>();
+        List<Row> rows = List.of(
+            new Row(true, signIn("devnull", TOP, TOP, "intranet.example", 443, "Corp", false, "basic")),
+            new Row(false, signIn("framed", "https://files.example/", TOP, "files.example", 443, "Corp", false, "basic")),
+            new Row(false, signIn("digest", TOP, TOP, "intranet.example", 443, "Corp", false, "digest")),
+            new Row(false, signIn("ntlm", TOP, TOP, "intranet.example", 443, "Corp", false, "ntlm")),
+            new Row(false, signIn("proxy", TOP, TOP, "proxy.example", 8118, "Corp", true, "basic")));
+        for (Row row : rows) {
+            SignIn signIn = row.signIn();
+            onUiThread(() -> items.signIns().challenged(page, place, row.devNull(), signIn));
+            onUiThread(() -> {
+                assertThat(host.windowView(ID, TITLE)).as("a dialog for " + signIn.originUrl()).isPresent();
+                assertThat(remember()).isFalse();
+                char[] given = "pw".toCharArray();
+                arrays.add(given);
+                okShown("u", given, true);
+                page.mainFrameResponded(signIn.originUrl(), 200);
+                page.mainFrameResponded(TOP, 200);
+            });
+        }
+        onUiThread(() -> {
+            assertThat(told).containsExactly("devnull proceed u pw", "framed proceed u pw", "digest proceed u pw",
+                "ntlm proceed u pw", "proxy proceed u pw");
+            assertThat(fake.calls).as("never filled silently, never saved").isEmpty();
+            assertThat(arrays).allSatisfy(array -> assertThat(array).containsOnly((char) 0));
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /** F5: a same-origin sub-resource's challenge offers Password Manager, but is never remembered nor filled silently. */
+    @Test void aSameOriginSubresourceChallengeNeverRemembersOrFillsSilently() throws Exception {
+        open(true);
+        fake.login(CORP, "u", "pw");
+        char[] given = "pw".toCharArray();
+        onUiThread(() -> items.signIns().challenged(page, place, false,
+            signIn("fetch", TOP + "api", TOP, "intranet.example", 443, "Corp", false, "basic")));
+        onUiThread(() -> {
+            assertThat(labels()).containsExactly("Password Manager", "Cancel", "OK");
+            assertThat(remember()).isFalse();
+            assertThat(fake.calls).as("no silent fill").isEmpty();
+            okShown("u", given, true);
+            assertThat(given).containsOnly((char) 0);
+            page.mainFrameResponded(TOP, 200);
+            assertThat(told).containsExactly("fetch proceed u pw");
+            assertThat(fake.calls).as("nothing saved").isEmpty();
+        });
+    }
+
+    /** F5: a site that redirects after the sign-in answers on another address of the same origin, which still saves. */
+    @Test void aRedirectAfterTheSignInStillSaves() throws Exception {
+        open(true);
+        onUiThread(() -> challenge("a", TOP + "login", "intranet.example", 443, "Corp", false));
+        onUiThread(() -> {
+            type("u", "pw");
+            tickRemember();
+            press(ok());
+            page.mainFrameResponded("https://intranet.example/home", 200);
+            assertThat(fake.calls).containsExactly("saveLogin " + CORP + " u");
+            assertThat(fake.savedPasswords).containsExactly("pw");
+        });
+    }
+
+    /** A silent fill is the Vault's login already: it makes no pending save. */
+    @Test void aSilentFillMakesNoPendingSave() throws Exception {
+        open(true);
+        fake.login(CORP, "u", "pw");
+        onUiThread(() -> {
+            challenge("a", TOP, "intranet.example", 443, "Corp", false);
+            page.mainFrameResponded(TOP, 200);
+            assertThat(told).containsExactly("a proceed u pw");
+            assertThat(fake.calls).containsExactly("credentialIfGranted " + CORP);
+        });
+    }
+
+    /** F8: a challenge cancelled as stale before its turn never marks its name tried. */
+    @Test void aStaleChallengeIsNotMarkedTried() throws Exception {
+        open(true);
+        fake.login(CORP, "u", "pw");
+        onUiThread(() -> {
+            challenge("other", TOP, "intranet.example", 443, "Other", false);
+            challenge("a", TOP, "intranet.example", 443, "Corp", false);
+        });
+        onUiThread(() -> {
+            assertThat(heading()).as("waiting behind another realm's dialog").contains("“Other”");
+            PageTestAccess.loadStarted(page, NEXT);
+            assertThat(told).containsExactlyInAnyOrder("other cancel", "a cancel");
+            challenge("next", NEXT, "intranet.example", 443, "Corp", false);
+            assertThat(told).as("the name was never tried").endsWith("next proceed u pw");
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /** F10, review focus 5: the item's close withdraws a save under way, which the Vault sees cancelled, and zeroes it. */
+    @Test void closingTheItemWithdrawsTheSave() throws Exception {
+        open(true);
+        var saving = new CompletableFuture<Optional<CredentialDescriptor>>();
+        fake.saveAnswer = saving;
+        char[] given = "pw".toCharArray();
+        onUiThread(() -> challenge("a", TOP, "intranet.example", 443, "Corp", false));
+        onUiThread(() -> {
+            okShown("u", given, true);
+            page.mainFrameResponded(TOP, 200);
+            assertThat(fake.calls).as("the save under way, its unlock prompt showing").containsExactly("saveLogin " + CORP + " u");
+            item.close();
+            assertThat(saving).as("withdrawn").isCancelled();
+            assertThat(given).as("zeroed").containsOnly((char) 0);
+            assertThat(host.notifications().lines()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /** Review focus 5: the plugin's stop cancels the challenges, withdraws the save under way and drops the pending one. */
+    @Test void stopCancelsChallengesAndSaves() throws Exception {
+        open(true);
+        var saving = new CompletableFuture<Optional<CredentialDescriptor>>();
+        fake.saveAnswer = saving;
+        char[] inFlight = "pw".toCharArray(), pending = "pw2".toCharArray();
+        onUiThread(() -> challenge("a", TOP, "intranet.example", 443, "Corp", false));
+        onUiThread(() -> {
+            okShown("u", inFlight, true);
+            page.mainFrameResponded(TOP, 200);
+            challenge("b", TOP, "intranet.example", 443, "Corp", false);
+            challenge("c", TOP, "intranet.example", 443, "Other", false);
+        });
+        onUiThread(() -> okShown("u", pending, true));
+        onUiThread(() -> {
+            assertThat(heading()).as("the next one shows").contains("“Other”");
+            items.signIns().close();
+            assertThat(saving).as("withdrawn").isCancelled();
+            assertThat(inFlight).as("the save's array, zeroed").containsOnly((char) 0);
+            assertThat(pending).as("the pending save's, zeroed").containsOnly((char) 0);
+            assertThat(told).containsExactly("a proceed u pw", "b proceed u pw2", "c cancel");
+            assertThat(host.windows()).isEmpty();
+            page.mainFrameResponded(TOP, 200);
+            assertThat(fake.calls).as("one save, withdrawn").containsExactly("saveLogin " + CORP + " u");
+            assertThat(host.notifications().lines()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /** F29: neither the failure notice nor any log line of the sign-in, the pick and the save holds a secret. */
+    @Test void theFailureNoticeHoldsNoPassword() throws Exception {
+        open(true);
+        fake.ungranted.add(fake.login("https://intranet.example (Realm-7d1)", "user-7d1", "secret-7d1"));
+        fake.saveAnswer = CompletableFuture.failedFuture(new IllegalStateException("Could not save the login"));
+        var logs = List.of(new CapturedLog(HttpSignIns.class.getName()), new CapturedLog(VaultLogins.class.getName()),
+            new CapturedLog(SignInDialog.class.getName()), new CapturedLog(SignIn.class.getName()));
+        try {
+            onUiThread(() -> challenge("a", TOP, "intranet.example", 443, "Realm-7d1", false));
+            onUiThread(() -> press(managerAction()));
+            onUiThread(() -> {
+                assertThat(told).as("picked").containsExactly("a proceed user-7d1 secret-7d1");
+                challenge("b", TOP, "intranet.example", 443, "Realm-7d1", false);
+            });
+            onUiThread(() -> {
+                type("user-7d1", "pw-7d1");
+                tickRemember();
+                press(ok());
+                page.mainFrameResponded(TOP, 200);
+            });
+            assertThat(host.notifications().posts()).singleElement().satisfies(post -> {
+                assertThat(post.spec().title()).isEqualTo("Could not save the password for intranet.example");
+                assertThat(post.spec().content()).isEqualTo("Could not save the login");
+            });
+            List<LogRecord> records = logs.stream().flatMap(log -> log.records().stream()).toList();
+            assertThat(records).as("the save's failure").isNotEmpty();
+            for (String secret : List.of("pw-7d1", "secret-7d1", "user-7d1", "Realm-7d1"))
+                assertThat(host.notifications().lines()).noneMatch(line -> line.contains(secret));
+            assertThat(records).allSatisfy(record -> {
+                for (String secret : List.of("pw-7d1", "secret-7d1", "user-7d1", "Realm-7d1"))
+                    assertThat(logged(record)).doesNotContain(secret);
+            });
+        } finally {
+            logs.forEach(CapturedLog::close);
+        }
+    }
+
+    /**
      * A Basic challenge of the page's top-level navigation to {@link #TOP}, as Chromium's thread hands it over, to the
      * item's sign-ins, outside /dev/null. UI thread.
      */
@@ -631,6 +1076,32 @@ class HttpSignInsTest {
                 throw new AssertionError(failed);
             }
         }
+    }
+
+    /** Ticks the dialog's "Remember this password". */
+    private void tickRemember() {
+        String toggle = form().sections().stream().filter(Nodes.SettingRow.class::isInstance).map(Nodes.SettingRow.class::cast)
+            .findFirst().orElseThrow(() -> new AssertionError("no Remember this password")).control().id();
+        view().emit(new UiEvent.Toggled(toggle, true));
+    }
+
+    /**
+     * Answers the page's shown challenge with OK, as its dialog would, with {@code password}, an array of the test's;
+     * then closes that dialog, which answers nothing more.
+     */
+    private void okShown(String user, char[] password, boolean remember) {
+        FakeKitView dialog = view();
+        LoginsTestAccess.answerShown(items.signIns(), page).accept(new Outcome.Ok(user, password, remember));
+        dialog.emit(new UiEvent.Action(((Nodes.Form) dialog.spec().root()).cancelAction()));
+    }
+
+    /** A log record's message, parameters and each exception it carries, as text. */
+    private static String logged(LogRecord record) {
+        var text = new StringBuilder(String.valueOf(record.getMessage()));
+        if (record.getParameters() != null)
+            for (Object parameter : record.getParameters()) text.append(' ').append(parameter);
+        for (Throwable thrown = record.getThrown(); thrown != null; thrown = thrown.getCause()) text.append(' ').append(thrown);
+        return text.toString();
     }
 
     /** Types {@code user} in the dialog's User name field and {@code password} in its Password field. */
