@@ -1,13 +1,14 @@
 # Jasper — Status and Handoff
 
 **Browser plan 7: downloads and page tools — 2026-11-10** (`claude/browser-downloads-page-tools`, worktree
-`.claude/worktrees/browser-4b-4c-e6deab`, from local `main` `417e2270f`, which has plans 4a, 4b, 4c, 9, 5 and 6
-merged; the plan `a52181595`, brought in from `5c42e4a82`, commits `371a94680` to `87e4fb7c3`, and the docs; not
-merged or pushed; [plan](superpowers/plans/2026-10-30-browser-7-downloads-page-tools.md), whose banner lists every
-deviation by task, [spec](superpowers/specs/2026-10-26-jasper-browser-plugin-design.md) sections 6, 10, 11, 17, 20 and
-23, [guide](browser.md#downloads); executed with per-task subagents and reviews, Task 1 as 1a, 1b and 1c, each task's
-fix rounds until its re-review found every finding addressed; the final reviews are to come). The Browser gains
-iTerm2's downloads and page tools:
+`.claude/worktrees/browser-4b-4c-e6deab`, from local `main` `417e2270f`, which has plans 4a, 4b, 4c, 9, 5 and 6 merged;
+the plan `a52181595`, brought in from `5c42e4a82`, commits `371a94680` to `87e4fb7c3`, and the docs, `2a8b0a782` and
+`5949bdfba`, and their counts; not merged or pushed;
+[plan](superpowers/plans/2026-10-30-browser-7-downloads-page-tools.md), whose banner lists every deviation by task,
+[spec](superpowers/specs/2026-10-26-jasper-browser-plugin-design.md) sections 6, 10, 11, 17, 20 and 23,
+[guide](browser.md#downloads); executed with per-task subagents and reviews, Task 1 as 1a, 1b and 1c, each task's fix
+rounds until its re-review found every finding addressed; the final reviews are to come). The Browser gains iTerm2's
+downloads and page tools:
 - **Downloads** go, without asking, into the Downloads folder (`downloads_folder`, empty for the system's: macOS
   `~/Downloads`, Windows' known folder, Linux's `XDG_DOWNLOAD_DIR`), read and made on the background executor at the
   first page start (D-F3, D4), under safe, numbered names reserved per download (D-F4, D-F5, D18). Each finished file
@@ -43,12 +44,14 @@ page, error pages, /dev/null mode, Jasper's own requests, Settings), `docs/packa
 and the timing of macOS's prompts, the configuration guide's Browser row, the notifications guide's Downloads group, the
 README's, Plugins' and the docs index's Browser descriptions, the SDK README, AGENTS.md's Verified JCEF behaviour (the
 download handler, and `CefBrowser_N`'s calls before the native browser exists), the plan's banner and this entry (D8);
-the SDK guides, the testkit README and plugin authoring came with Tasks 1b and 1c. Verification: before the docs, at
-`87e4fb7c3`, the controller's `./gradlew check` (JBR 25.0.4.1 b635.75 jcef, 9m 57s) gave **15,891 tests, 0 failures, 0
-errors, 105 skipped** (1,413 classes in the 16 build folders, without the example plugin's: jasper-app 5,352 with 92
-skipped, Editor 5,387 with 4 skipped, Browser 1,621 with 1 skipped, jasper-ui 1,020, Remote 659, jasper-terminal 512
-with 7 skipped, jasper-sdk 136, jasper-sdk-testkit 324), plan 6's 15,546 and plan 7's 345; the example external plugin's
-`check pluginZip` against `build/sdk-release` passed after each SDK task. No GUI was launched.
+the SDK guides, the testkit README and plugin authoring came with Tasks 1b and 1c. Verification: after both docs
+commits, at `5949bdfba`, `./gradlew check --continue` (JBR 25.0.4.1 b635.75 jcef, 10m 1s) gave **15,891 tests, 0
+failures, 0 errors, 105 skipped** (1,413 classes in the 16 build folders, without the example plugin's: jasper-app 5,352
+with 92 skipped, Editor 5,387 with 4 skipped, Browser 1,621 with 1 skipped, jasper-ui 1,020, Remote 659, jasper-terminal
+512 with 7 skipped, jasper-sdk 136, jasper-sdk-testkit 324), as at `87e4fb7c3` before the docs: plan 6's 15,546 and plan
+7's 345; the example external plugin's `check pluginZip` against `build/sdk-release` passed after each SDK task and
+passes (1 test, up to date: no SDK change since Task 1c); `sdkReference` changed nothing; source hygiene is clean, and
+no file the docs touched holds a raw U+00A0, U+2028 or U+2029. No GUI was launched.
 
 Each task's commits (the banner has each one's deviations):
 - Task 1a: `371a94680` "SDK: 0.31.0".
@@ -68,7 +71,8 @@ Each task's commits (the banner has each one's deviations):
   removal's review fixes".
 - Task 7: `8b3d5375a` "Browser: Save Page As saves a folder with the page and its resources", `de91e3216` "Browser:
   Save Page As's review fixes" and `87e4fb7c3` "Browser: Save Page As's last fixes".
-- Task 8: "Docs: downloads and page tools"; Task 9: "Docs: plan 7's GUI check, pending".
+- Task 8: `2a8b0a782` "Docs: downloads and page tools"; Task 9: `5949bdfba` "Docs: plan 7's GUI check, pending"; then
+  "Docs: plan 7's counts after the docs".
 
 The controller's rulings, one line each (the pre-flight scan's F1-F38 adopted as D0; the banner gives each D-F*n* where
 it applied):

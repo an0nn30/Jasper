@@ -7,13 +7,13 @@
 the docs; Task 9, the user's GUI check on macOS, is pending, and so are the final reviews** (branch
 `claude/browser-downloads-page-tools`, worktree `.claude/worktrees/browser-4b-4c-e6deab`, cut from local `main`
 `417e2270f`, which has plans 4a, 4b, 4c, 9, 5 and 6 merged; the plan `a52181595`, brought in from `5c42e4a82`, then
-commits `371a94680` to `87e4fb7c3`, and the docs; not merged or pushed; see `docs/STATUS.md`). Executed with per-task
-subagents and reviews, each task's fix rounds until a re-review found every finding addressed. The pre-flight scan's
-findings F1-F38 were adopted as rulings (D0, cited D-F*n*) except where D1-D3 decide otherwise, and the controller's
-further rulings are D4-D44; plan 4a's R0-R48 and the banners of 4b, 4c, 9, 5 and 6 bind. On 2026-11-09 the user chose
-D1 ("Match Chrome"), D2 ("Yes, download it") and D3 ("No"), and asked for no change to the plan's own calls. 4b's P6,
-no Save Link As… or Save Image As… until this plan, is closed by Task 4's items (D-F10). The task reviews recorded these
-deviations from the plan's text, each with its ruling:
+commits `371a94680` to `87e4fb7c3`, and the docs, `2a8b0a782` and `5949bdfba`, and their counts; not merged or pushed;
+see `docs/STATUS.md`). Executed with per-task subagents and reviews, each task's fix rounds until a re-review found
+every finding addressed. The pre-flight scan's findings F1-F38 were adopted as rulings (D0, cited D-F*n*) except where
+D1-D3 decide otherwise, and the controller's further rulings are D4-D44; plan 4a's R0-R48 and the banners of 4b, 4c, 9,
+5 and 6 bind. On 2026-11-09 the user chose D1 ("Match Chrome"), D2 ("Yes, download it") and D3 ("No"), and asked for no
+change to the plan's own calls. 4b's P6, no Save Link As… or Save Image As… until this plan, is closed by Task 4's items
+(D-F10). The task reviews recorded these deviations from the plan's text, each with its ruling:
 - **Versions:** `JasperSdk.VERSION` 0.30.0 to 0.31.0, every bundled range `>=0.31.0, <0.32` (Task 1a, D-F17), not the
   plan's 0.30.0. New SDK members, each `@since 0.31.0`: `PluginMenu.addEntries(List<MenuItem>, Consumer<String>)` and
   `MenuEntries` (`set(List<MenuItem>)`), and `Platform.downloadsFolder()` and `Platform.markDownloaded(Path, URI,
@@ -107,24 +107,27 @@ deviations from the plan's text, each with its ruling:
   Downloads group; `BrowserPlugin`'s seam constructor gains `saveClients`, re-pinned in `OfflinePluginsTest`; D36 as
   D42 built it, `<html style>` tokenized too; D39-D41, D43 (`DownloadNames.reserveFolder`) and D44 (each file through
   one `place`: written, checked, marked, moved).
-- **Task 8** ("Docs: downloads and page tools"), the docs: the Browser guide (Downloads, Page tools, the toolbar's ☰,
-  Find in reader mode, the right-click menu, Links in a page, error pages, /dev/null mode, Jasper's own requests and the
-  `downloads_folder` row), `docs/packaging.md`'s timing of macOS's folder prompts, the configuration guide's Browser
-  row, the notifications guide's Downloads group, the README's, Plugins' and the docs index's Browser descriptions, the
-  SDK README's `MenuEntries`, AGENTS.md's Verified JCEF behaviour (the download handler, and `CefBrowser_N`'s calls
-  before the native browser exists), this banner and STATUS (D8). The SDK guides, the testkit README and
-  `docs/plugin-authoring.md` came with Tasks 1b and 1c. Before the docs, at `87e4fb7c3`, the controller's `./gradlew
-  check` (JBR 25.0.4.1 b635.75 jcef, 9m 57s) gave **15,891 tests, 0 failures, 0 errors, 105 skipped** (1,413 classes in
-  the 16 build folders, without the example plugin's: jasper-app 5,352 with 92 skipped, Editor 5,387 with 4 skipped,
-  Browser 1,621 with 1 skipped, jasper-ui 1,020, Remote 659, jasper-terminal 512 with 7 skipped, jasper-sdk 136,
-  jasper-sdk-testkit 324), plan 6's 15,546 and plan 7's 345, the 2 more skipped `DownloadMarkTest`'s Windows and Linux
-  rows. The full checks after each task: 15,546 (Task 1a), 15,567 and 15,573 (1b), 15,615 (1c, whose run lost its Gradle
-  daemon in a packaging step) and 15,620 (1c's round), 15,669 (2), 15,709 and 15,723 (3), 15,748 (4), 15,786 and 15,797
-  (5), 15,813 (6), 15,872, 15,886 and 15,891 (7), each with 0 failures and 0 errors, 103 skipped through Task 1b and 105
-  from Task 1c on; the example external plugin's `check pluginZip` against `build/sdk-release` passed after each SDK
-  task. No GUI was launched.
-
-- **Task 9** ("Docs: plan 7's GUI check, pending"), the checklist:
+- **Task 8** (`2a8b0a782` "Docs: downloads and page tools", and "Docs: plan 7's counts after the docs"), the docs: the
+  Browser guide (Downloads, Page tools, the toolbar's ☰, Find in reader mode, the right-click menu, Links in a page,
+  error pages, /dev/null mode, Jasper's own requests and the `downloads_folder` row), `docs/packaging.md`'s timing of
+  macOS's folder prompts, the configuration guide's Browser row, the notifications guide's Downloads group, the
+  README's, Plugins' and the docs index's Browser descriptions, the SDK README's `MenuEntries`, AGENTS.md's Verified
+  JCEF behaviour (the download handler, and `CefBrowser_N`'s calls before the native browser exists), this banner and
+  STATUS (D8). The SDK guides, the testkit README and `docs/plugin-authoring.md` came with Tasks 1b and 1c. After both
+  docs commits, at `5949bdfba`, `./gradlew check --continue` (JBR 25.0.4.1 b635.75 jcef, 10m 1s, 31 of 172 tasks run)
+  gave **15,891 tests, 0 failures, 0 errors, 105 skipped** (1,413 classes in the 16 build folders, without the example
+  plugin's: jasper-app 5,352 with 92 skipped, Editor 5,387 with 4 skipped, Browser 1,621 with 1 skipped, jasper-ui
+  1,020, Remote 659, jasper-terminal 512 with 7 skipped, jasper-sdk 136, jasper-sdk-testkit 324), as at `87e4fb7c3`
+  before the docs (the controller's check, 9m 57s): plan 6's 15,546 and plan 7's 345, the 2 more skipped
+  `DownloadMarkTest`'s Windows and Linux rows. The example external plugin's `check pluginZip` against
+  `build/sdk-release` passes (1 test, up to date: no SDK change since Task 1c); `sdkReference` changed nothing; source
+  hygiene is clean over 3,512 Java files, and no file the docs touched holds a raw U+00A0, U+2028 or U+2029. The full
+  checks after each task: 15,546 (Task 1a), 15,567 and 15,573 (1b), 15,615 (1c, whose run lost its Gradle daemon in a
+  packaging step) and 15,620 (1c's round), 15,669 (2), 15,709 and 15,723 (3), 15,748 (4), 15,786 and 15,797 (5), 15,813
+  (6), 15,872, 15,886 and 15,891 (7), each with 0 failures and 0 errors, 103 skipped through Task 1b and 105 from Task
+  1c on; the example external plugin's `check pluginZip` against `build/sdk-release` passed after each SDK task. No GUI
+  was launched.
+- **Task 9** (`5949bdfba` "Docs: plan 7's GUI check, pending"), the checklist:
   [Plan 7: downloads and page tools](../../browser-verification.md#plan-7-downloads-and-page-tools), every line
   pending, as nothing was run: no GUI, no packaging with AOT, no benchmark.
 
