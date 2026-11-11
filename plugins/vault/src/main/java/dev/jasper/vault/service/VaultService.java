@@ -60,6 +60,10 @@ public final class VaultService {
     private final Map<String, WindowHandle> lastOwner = new HashMap<>();
     /** For tests: sees each copy {@code saveLogin} takes of a password, so a test can check that it is zeroed. */
     Consumer<char[]> saveCopies = copy -> { };
+    /** For tests: sees the old password of each login {@code saveLogin} replaces, so a test can check that it is zeroed. */
+    Consumer<char[]> replacedPasswords = password -> { };
+    /** Whether the caller is on the UI thread, Swing's; tests whose inline executors make their own thread the UI thread replace it. */
+    java.util.function.BooleanSupplier uiThread = java.awt.EventQueue::isDispatchThread;
 
     public VaultService(LockManager lock, Supplier<Optional<WindowHandle>> fallbackOwner, Consumer<UnlockPrompt> showUnlock,
                         Consumer<GrantPrompt> showGrant, Consumer<PickPrompt> showPick, NotificationGroup notifications) {
@@ -296,6 +300,7 @@ public final class VaultService {
 
         @Override public CompletableFuture<Optional<CredentialDescriptor>> saveLogin(WindowHandle owner, String name,
                 String username, char[] password) {
+            requireUiThread();
             if (name == null || name.isBlank()) throw new IllegalArgumentException("A login needs a name");
             if (username == null || password == null) throw new IllegalArgumentException("A login's username and password must not be null");
             if (owner == null || !owner.isOpen()) return CompletableFuture.completedFuture(Optional.empty());
@@ -305,7 +310,10 @@ public final class VaultService {
             var result = new CompletableFuture<Optional<CredentialDescriptor>>();
             // However the save ends, this copy goes; a saved login holds its own (Browser plan 8 F10).
             result.whenComplete((saved, failure) -> SecureBytes.zero(copy));
-            CompletableFuture<Boolean> unlocked = requestUnlock(owner);
+            CompletableFuture<Boolean> unlocked;
+            // A prompt that cannot be shown throws to the caller, as for the other requests; the copy goes first.
+            try { unlocked = requestUnlock(owner); }
+            catch (Throwable failure) { result.completeExceptionally(failure); throw failure; }
             result.whenComplete((saved, failure) -> { if (result.isCancelled()) unlocked.cancel(false); });
             unlocked.whenComplete((ok, failure) -> {
                 if (result.isDone()) return;
@@ -315,7 +323,11 @@ public final class VaultService {
                 long session = lock.generation();
                 try {
                     lock.transact(draft -> save(draft, name, username, copy), result::isCancelled).whenComplete((saved, failed) -> {
-                        if (failed == null) result.complete(Optional.of(saved));
+                        if (failed == null) {
+                            // The manager, its grants and the palette show the login before the caller hears of it.
+                            try { if (changed != null) changed.run(); }
+                            finally { result.complete(Optional.of(saved)); }
+                        }
                         // Locked between the unlock and the commit: as a cancelled unlock, no failure to report.
                         else if (lock.generation() != session) result.complete(Optional.empty());
                         else result.completeExceptionally(new IllegalStateException("Could not save the login", unwrapped(failed)));
@@ -342,6 +354,7 @@ public final class VaultService {
                 Account old = accounts.get(replaced);
                 Account saved = new Account(old.id(), name, username, new Auth.Password(password.clone()), old.created(), now);
                 accounts.set(replaced, saved);
+                replacedPasswords.accept(((Auth.Password) old.auth()).password());
                 old.auth().zero();
                 return describe(saved);
             }
@@ -362,15 +375,22 @@ public final class VaultService {
         }
 
         @Override public Optional<Credential> credentialIfGranted(UUID id) {
+            requireUiThread();
             if (id == null || lock.state() != LockState.UNLOCKED || !lock.vault().grants().contains(new Grant(consumer.id(), id))) return Optional.empty();
             return copyOf(id);
         }
 
         @Override public void openManager(WindowHandle owner) {
-            if (openManager == null) return;
+            requireUiThread();
+            if (openManager == null || owner == null || !owner.isOpen()) return;
             lastOwner.put(consumer.id(), owner);
             openManager.accept(owner);
         }
+    }
+
+    /** The login members a Chromium callback could reach check their thread (Browser plan 8 L9); the older ones do not. */
+    private void requireUiThread() {
+        if (!uiThread.getAsBoolean()) throw new IllegalStateException("Call Credential Vault on the UI thread");
     }
 
     private static Throwable unwrapped(Throwable failure) {

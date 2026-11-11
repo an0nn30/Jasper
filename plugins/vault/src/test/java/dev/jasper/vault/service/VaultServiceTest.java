@@ -50,6 +50,19 @@ class VaultServiceTest {
         };
     }
 
+    /** An owner that is open while {@code open[0]} is true. */
+    static WindowHandle window(boolean[] open) {
+        return new WindowHandle() {
+            final UUID id = UUID.randomUUID();
+            @Override public UUID id() { return id; }
+            @Override public List<TabHandle> tabs() { return List.of(); }
+            @Override public Optional<TabHandle> activeTab() { return Optional.empty(); }
+            @Override public boolean isActive() { return open[0]; }
+            @Override public boolean isOpen() { return open[0]; }
+            @Override public void toFront() { }
+        };
+    }
+
     final List<KeyImportPrompt> imports = new ArrayList<>();
     final List<UnlockPrompt> unlocks = new ArrayList<>();
     final List<GrantPrompt> grants = new ArrayList<>();
@@ -62,13 +75,16 @@ class VaultServiceTest {
     java.util.concurrent.Executor lockUi = Runnable::run;
     LockManager lock;
     VaultService service;
+    /** How often the service reported a change to the vault's views. */
+    int changes;
 
-    /** Inline executors: every future completes before the call returns. */
+    /** Inline executors: every future completes before the call returns, and the test thread is the UI thread. */
     VaultService service(Path dir) {
         var keychain = new KeychainStore("Linux", command -> { throw new UncheckedIOException(new IOException("none")); }, dir.resolve("x"));
         var secrets = new DeviceSecrets(keychain, new FileStore(dir.resolve("device.secret")));
         lock = new LockManager(new VaultFile(dir.resolve("vault.jv")), secrets, lockBackground, lockUi, state -> { states.add(state); if (service != null) service.lockStateChanged(state); });
-        service = new VaultService(lock, () -> Optional.of(window), unlocks::add, grants::add, picks::add, notifications.group("dev.jasper.vault"), importBackground, Runnable::run, owner -> CompletableFuture.completedFuture(lock.state() == LockState.UNLOCKED), imports::add, () -> {});
+        service = new VaultService(lock, () -> Optional.of(window), unlocks::add, grants::add, picks::add, notifications.group("dev.jasper.vault"), importBackground, Runnable::run, owner -> CompletableFuture.completedFuture(lock.state() == LockState.UNLOCKED), imports::add, () -> changes++);
+        service.uiThread = () -> true;
         return service;
     }
 
@@ -332,15 +348,20 @@ class VaultServiceTest {
     static final String SITE = "https://intranet.example (Corp)";
     /** Every copy saveLogin took of a password, through the service's seam. */
     final List<char[]> copies = new ArrayList<>();
+    /** Every old password a save replaced, through the service's seam. */
+    final List<char[]> replaced = new ArrayList<>();
 
-    VaultApi saver(Path dir) { var api = service(dir).forConsumer(SSH); service.saveCopies = copies::add; return api; }
+    VaultApi saver(Path dir) { var api = service(dir).forConsumer(SSH); service.saveCopies = copies::add; service.replacedPasswords = replaced::add; return api; }
 
     List<Account> logins(String name) { return lock.vault().accounts().stream().filter(a -> a.name().equals(name)).toList(); }
 
     void assertCopiesZeroed() {
         assertThat(copies).as("the Vault took its own copy").isNotEmpty();
-        assertThat(copies).allSatisfy(copy -> assertThat(copy).as("zeroed").isEqualTo(new char[copy.length]));
+        assertThat(copies.stream().filter(copy -> !zeroed(copy)).count()).as("copies left unzeroed").isZero();
     }
+
+    /** Whether every char is zero; asserted as a count, so a failure never prints a password. */
+    static boolean zeroed(char[] secret) { return java.util.Arrays.equals(secret, new char[secret.length]); }
 
     /** Locks and unlocks again, so the vault reads what the file holds. */
     void reopen() { lock.lock(); lock.unlock("pw".toCharArray()).join(); }
@@ -397,6 +418,9 @@ class VaultServiceTest {
             .as("its grant kept").containsExactly(new Grant(SSH.id(), first.id()));
         try (Credential credential = api.credentialIfGranted(first.id()).orElseThrow()) { assertThat(credential.password()).isEqualTo("new".toCharArray()); }
         assertCopiesZeroed();
+        assertThat(replaced).as("the draft's old password").hasSize(1);
+        assertThat(replaced.getFirst().length).isEqualTo("old".length());
+        assertThat(zeroed(replaced.getFirst())).as("zeroed").isTrue();
         reopen();
         assertThat(logins(SITE)).singleElement().satisfies(a -> assertThat(((Auth.Password) a.auth()).password()).isEqualTo("new".toCharArray()));
     }
@@ -410,6 +434,8 @@ class VaultServiceTest {
         }
         lock.save().join();
         assertThat(api.saveLogin(window, SITE, "u", "new".toCharArray()).join()).map(CredentialDescriptor::id).contains(newer);
+        assertThat(replaced).hasSize(1);
+        assertThat(zeroed(replaced.getFirst())).as("its old password zeroed").isTrue();
         assertThat(((Auth.Password) lock.vault().account(older).orElseThrow().auth()).password()).isEqualTo("old".toCharArray());
         assertThat(((Auth.Password) lock.vault().account(newer).orElseThrow().auth()).password()).isEqualTo("new".toCharArray());
     }
@@ -432,6 +458,7 @@ class VaultServiceTest {
         assertThat(((Auth.Password) lock.vault().account(others).orElseThrow().auth()).password()).isEqualTo("theirs".toCharArray());
         assertThat(((Auth.Password) lock.vault().account(otherCase).orElseThrow().auth()).password()).isEqualTo("case".toCharArray());
         assertThat(lock.vault().grants()).contains(new Grant(SSH.id(), saved.id())).doesNotContain(new Grant(SSH.id(), ungranted));
+        assertThat(replaced).as("nothing replaced").isEmpty();
     }
 
     @Test void saveLoginLeavesASharedLoginOfTheSameNameAlone(@TempDir Path dir) {
@@ -446,6 +473,7 @@ class VaultServiceTest {
         assertThat(((Auth.Password) lock.vault().account(shared).orElseThrow().auth()).password()).as("another plugin reads it too").isEqualTo("shared".toCharArray());
         assertThat(lock.vault().grants()).contains(new Grant(SSH.id(), shared), new Grant(OTHER.id(), shared), new Grant(SSH.id(), saved.id()));
         assertThat(logins(SITE)).hasSize(2);
+        assertThat(replaced).as("nothing replaced").isEmpty();
     }
 
     @Test void saveLoginUnlocksFirstAndAnswersEmptyWhenCancelled(@TempDir Path dir) {
@@ -519,6 +547,13 @@ class VaultServiceTest {
         assertThat(notifications.posts()).as("no failure").isEmpty();
         assertThat(copies).hasSize(2);
         assertCopiesZeroed();
+        assertThat(changes).as("no refresh for an empty answer").isZero();
+        queued[0] = false;
+        reopen();
+        assertThat(logins(SITE)).as("sealed before the lock zeroed the draft, the write still landed").singleElement().satisfies(login -> {
+            assertThat(((Auth.Password) login.auth()).password()).isEqualTo("pw".toCharArray());
+            assertThat(lock.vault().grants()).contains(new Grant(SSH.id(), login.id()));
+        });
     }
 
     @Test void saveLoginWithNoVaultPostsNoVaultYet(@TempDir Path dir) {
@@ -583,5 +618,108 @@ class VaultServiceTest {
         assertThat(grants).as("never a grant prompt").isEmpty();
         assertThat(picks).as("never a pick").hasSize(1);
         assertThat(notifications.posts()).isEmpty();
+    }
+
+    // Browser plan 8 Task 2, review round 1 (L9).
+
+    /** A service over the same lock whose unlock prompt cannot be shown, as with no window to show it in. */
+    VaultApi unshowable() {
+        service = new VaultService(lock, () -> Optional.of(window), prompt -> { throw new IllegalStateException("No window to show the vault dialog in"); },
+            grants::add, picks::add, notifications.group("dev.jasper.vault"), importBackground, Runnable::run,
+            owner -> CompletableFuture.completedFuture(lock.state() == LockState.UNLOCKED), imports::add, () -> changes++);
+        service.uiThread = () -> true; service.saveCopies = copies::add;
+        return service.forConsumer(SSH);
+    }
+
+    @Test void saveLoginRefreshesTheVaultsViewsBeforeItAnswers(@TempDir Path dir) throws IOException {
+        VaultApi api = saver(dir); populate(); lock.lock();
+        var seen = api.saveLogin(window, SITE, "u", "pw".toCharArray()).thenApply(saved -> changes);
+        assertThat(changes).isZero();
+        unlocks.getFirst().submit("pw".toCharArray());
+        assertThat(seen.join()).as("the views were told before the answer").isEqualTo(1);
+        assertThat(changes).isEqualTo(1);
+        lock.lock();
+        var cancelled = api.saveLogin(window, "other", "u", "pw".toCharArray());
+        cancelled.cancel(false);
+        assertThat(service.forConsumer(OTHER).ensureUnlocked(window)).isNotDone();
+        unlocks.getLast().submit("pw".toCharArray());
+        assertThat(lock.state()).isEqualTo(LockState.UNLOCKED);
+        java.nio.file.Files.createDirectories(dir.resolve("vault.jv.tmp"));
+        assertThat(api.saveLogin(window, "third", "u", "pw".toCharArray())).isCompletedExceptionally();
+        assertThat(changes).as("only a commit refreshes").isEqualTo(1);
+    }
+
+    @Test void aThrowFromTheUnlockPromptZeroesTheCopy(@TempDir Path dir) {
+        service(dir); populate(); lock.lock();
+        VaultApi api = unshowable();
+        assertThatThrownBy(() -> api.saveLogin(window, SITE, "u", "pw".toCharArray()))
+            .isInstanceOf(IllegalStateException.class).hasMessage("No window to show the vault dialog in");
+        assertCopiesZeroed();
+    }
+
+    @Test void saveLoginAnswersEmptyForAnOwnerClosedAtTheCallOrAfterTheUnlock(@TempDir Path dir) {
+        VaultApi api = saver(dir); populate(); lock.lock();
+        boolean[] open = {false};
+        var owner = window(open);
+        assertThat(api.saveLogin(owner, SITE, "u", "pw".toCharArray())).as("closed at the call").isCompletedWithValue(Optional.empty());
+        assertThat(unlocks).as("no prompt").isEmpty();
+        assertThat(copies).as("no copy taken").isEmpty();
+        open[0] = true;
+        var saving = api.saveLogin(owner, SITE, "u", "pw".toCharArray());
+        open[0] = false;
+        unlocks.getFirst().submit("pw".toCharArray());
+        assertThat(lock.state()).isEqualTo(LockState.UNLOCKED);
+        assertThat(saving).as("closed after the unlock").isCompletedWithValue(Optional.empty());
+        assertThat(logins(SITE)).as("nothing written").isEmpty();
+        assertCopiesZeroed();
+        assertThat(notifications.posts()).isEmpty();
+        assertThat(changes).isZero();
+    }
+
+    @Test void openManagerNeedsAnOpenOwnerAndRecordsOnlyThat(@TempDir Path dir) {
+        VaultApi api = service(dir).forConsumer(SSH); populate();
+        var opened = new ArrayList<WindowHandle>();
+        api.openManager(window);
+        assertThat(opened).as("no opener installed: nothing").isEmpty();
+        service.managerOpener(opened::add);
+        var last = window();
+        assertThat(api.ensureUnlocked(last)).isCompletedWithValue(true);
+        api.openManager(null);
+        api.openManager(window(new boolean[] {false}));
+        assertThat(opened).as("a null or closed owner opens nothing").isEmpty();
+        var fetch = api.credential(PROD);
+        assertThat(grants).singleElement().satisfies(prompt -> assertThat(prompt.owner()).as("and is not recorded").isSameAs(last));
+        fetch.cancel(false);
+        var owner = window();
+        api.openManager(owner);
+        assertThat(opened).containsExactly(owner);
+    }
+
+    @Test void theLoginMembersRefuseCallsOffTheUiThread(@TempDir Path dir) throws Exception {
+        service(dir); populate();
+        var strict = new VaultService(lock, () -> Optional.of(window), unlocks::add, grants::add, picks::add, notifications.group("dev.jasper.vault"),
+            importBackground, Runnable::run, owner -> CompletableFuture.completedFuture(lock.state() == LockState.UNLOCKED), imports::add, () -> changes++);
+        var opened = new ArrayList<WindowHandle>();
+        strict.managerOpener(opened::add); strict.saveCopies = copies::add;
+        VaultApi api = strict.forConsumer(SSH);
+        lock.vault().grants().add(new Grant(SSH.id(), PROD));
+        assertThat(javax.swing.SwingUtilities.isEventDispatchThread()).isFalse();
+        assertThatThrownBy(() -> api.saveLogin(window, SITE, "u", "pw".toCharArray())).isInstanceOf(IllegalStateException.class).hasMessageContaining("UI thread");
+        assertThatThrownBy(() -> api.credentialIfGranted(PROD)).isInstanceOf(IllegalStateException.class).hasMessageContaining("UI thread");
+        assertThatThrownBy(() -> api.openManager(window)).isInstanceOf(IllegalStateException.class).hasMessageContaining("UI thread");
+        assertThat(copies).as("no copy taken").isEmpty();
+        assertThat(opened).isEmpty();
+        assertThat(logins(SITE)).isEmpty();
+        assertThat(api.credentials()).as("the older members keep their contract").isNotEmpty();
+        var onUi = new java.util.concurrent.atomic.AtomicReference<Optional<CredentialDescriptor>>();
+        boolean[] read = {false};
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            onUi.set(api.saveLogin(window, SITE, "u", "pw".toCharArray()).join());
+            try (Credential credential = api.credentialIfGranted(PROD).orElseThrow()) { read[0] = credential.password().length > 0; }
+            api.openManager(window);
+        });
+        assertThat(onUi.get()).isPresent();
+        assertThat(read[0]).isTrue();
+        assertThat(opened).containsExactly(window);
     }
 }

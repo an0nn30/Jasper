@@ -14763,7 +14763,7 @@ interface default fails with <a class="ext" href="https://docs.oracle.com/en/jav
     before the save finishes (a save the lock interrupts while it writes may still be in the vault when it next
     unlocks) or there is no vault (Vault then posts a notification saying to create one). Fails with
     <a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalStateException.html"><code>IllegalStateException</code></a> ("Could not save the login") when the vault cannot be written</dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalArgumentException.html">IllegalArgumentException</a> when <code>name</code> is null or blank, or <code>username</code> or <code>password</code> is
-    null</dd></dl>
+    null</dd><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalStateException.html">IllegalStateException</a> when Credential Vault is called off the UI thread</dd></dl>
 </div>
 <div class="member" id="dev.jasper.vault.api.VaultApi.credentialIfGranted(UUID)">
 <pre class="sig"><a class="self" href="#dev.jasper.vault.api.VaultApi.credentialIfGranted(UUID)" aria-label="Link to this member">#</a><code><span class="kw">default</span> <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl" href="#dev.jasper.vault.api.Credential">Credential</a>&gt; <b>credentialIfGranted</b>(<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/UUID.html" title="java.util.UUID">UUID</a> id)</code></pre>
@@ -14771,15 +14771,15 @@ interface default fails with <a class="ext" href="https://docs.oracle.com/en/jav
 for <code>id</code>. A one-time grant from a pick is neither used nor spent. Close the result. The interface default
 answers empty.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>id</code> a credential's <a href="#dev.jasper.vault.api.CredentialDescriptor.id()">id</a></dd><dt>Returns</dt><dd>the secret; empty when the vault is locked or there is none, the id is unknown, or this plugin has no
-    saved grant for it</dd></dl>
+    saved grant for it</dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalStateException.html">IllegalStateException</a> when Credential Vault is called off the UI thread</dd></dl>
 </div>
 <div class="member" id="dev.jasper.vault.api.VaultApi.openManager(WindowHandle)">
 <pre class="sig"><a class="self" href="#dev.jasper.vault.api.VaultApi.openManager(WindowHandle)" aria-label="Link to this member">#</a><code><span class="kw">default</span> <span class="kw">void</span> <b>openManager</b>(<a class="tl" href="#dev.jasper.sdk.terminal.WindowHandle">WindowHandle</a> owner)</code></pre>
 <div class="doc"><p>Opens the Credential Vault manager over <code>owner</code>, creating a vault or unlocking first as Open Vault... does;
-Vault reports its failures in its own notifications. A modal dialog over <code>owner</code>, such as Settings, keeps
-the manager and its prompts from taking input until it closes, so close such a dialog first. The interface default
-does nothing.</p></div>
-<dl class="tags"><dt>Parameters</dt><dd><code>owner</code> the window the manager opens over</dd></dl>
+Vault reports its failures in its own notifications, and does nothing when <code>owner</code> is null or closed. A
+modal dialog over <code>owner</code>, such as Settings, keeps the manager and its prompts from taking input until it
+closes, so close such a dialog first. The interface default does nothing.</p></div>
+<dl class="tags"><dt>Parameters</dt><dd><code>owner</code> the window the manager opens over</dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalStateException.html">IllegalStateException</a> when Credential Vault is called off the UI thread</dd></dl>
 </div>
 </article>
 </section>

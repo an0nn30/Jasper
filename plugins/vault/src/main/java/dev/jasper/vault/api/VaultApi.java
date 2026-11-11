@@ -146,6 +146,7 @@ public interface VaultApi {
      *     {@link IllegalStateException} ("Could not save the login") when the vault cannot be written
      * @throws IllegalArgumentException when {@code name} is null or blank, or {@code username} or {@code password} is
      *     null
+     * @throws IllegalStateException when Credential Vault is called off the UI thread
      */
     default CompletableFuture<Optional<CredentialDescriptor>> saveLogin(WindowHandle owner, String name, String username,
             char[] password) {
@@ -160,16 +161,18 @@ public interface VaultApi {
      * @param id a credential's {@link CredentialDescriptor#id() id}
      * @return the secret; empty when the vault is locked or there is none, the id is unknown, or this plugin has no
      *     saved grant for it
+     * @throws IllegalStateException when Credential Vault is called off the UI thread
      */
     default Optional<Credential> credentialIfGranted(UUID id) { return Optional.empty(); }
 
     /**
      * Opens the Credential Vault manager over {@code owner}, creating a vault or unlocking first as Open Vault... does;
-     * Vault reports its failures in its own notifications. A modal dialog over {@code owner}, such as Settings, keeps
-     * the manager and its prompts from taking input until it closes, so close such a dialog first. The interface default
-     * does nothing.
+     * Vault reports its failures in its own notifications, and does nothing when {@code owner} is null or closed. A
+     * modal dialog over {@code owner}, such as Settings, keeps the manager and its prompts from taking input until it
+     * closes, so close such a dialog first. The interface default does nothing.
      *
      * @param owner the window the manager opens over
+     * @throws IllegalStateException when Credential Vault is called off the UI thread
      */
     default void openManager(WindowHandle owner) { }
 }

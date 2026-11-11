@@ -515,6 +515,26 @@ class VaultPluginTest {
         }
     }); }
 
+    /** Browser plan 8 Task 2, review round 1: a login another plugin saves shows at once in the open manager. */
+    @Test void aSavedLoginShowsInTheOpenManager(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
+        VaultPlugin plugin = plugin();
+        try (var host = new FakePluginHost(dir)) {
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            AtomicReference<VaultApi> api = new AtomicReference<>();
+            var consumer = host.start(SSH, Set.of("dev.jasper.vault"), Set.of(), context -> api.set(context.services().require(VaultApi.class)));
+            UUID window = host.addTerminalWindow();
+            plugin.lockManager().create("test-password".toCharArray(), false);
+            host.runBackground(); host.flush();
+            assertThat(host.invoke(VaultPlugin.OPEN, window, null)).isTrue();
+            var saving = api.get().saveLogin(consumer.terminals().window(window).orElseThrow(), "https://intranet.example (Corp)", "u", "pw".toCharArray());
+            host.runBackground(); host.flush();
+            UUID id = saving.join().orElseThrow().id();
+            var manager = host.windowView(INFO.id(), "Credential Vault").orElseThrow();
+            assertThat(dev.jasper.vault.testsupport.KitViews.find(manager, "row." + id + ".name")).as("the manager lists it").isPresent();
+            assertThat(host.failures()).isEmpty();
+        }
+    }); }
+
     @Test void grantAndPickerDialogsAnswerThroughTheirViewsAndEscapeDenies() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
         VaultPlugin plugin = plugin();
         try (var host = new FakePluginHost()) {
