@@ -30,6 +30,8 @@ class PageQueryTest {
     private static final Optional<String> ASKER = Optional.of("https://login.example");
     private static final Map<String, Object> PICK = Map.of("op", "login.pick", "field", "password");
     private final List<String> replies = new CopyOnWriteArrayList<>();
+    // The press that would activate a query, as the bridge would read it: none unless a test sets one.
+    private Optional<LastPress> press = Optional.empty();
     // The origin the page's main frame shows now, as the bridge would read it.
     private final AtomicReference<Optional<String>> shown = new AtomicReference<>(ASKER);
 
@@ -100,9 +102,9 @@ class PageQueryTest {
     @Test void aReplyThatSentNothingMakesTheAnswerFalse() throws Exception {
         onUiThread(() -> {
             var refused = new ArrayList<String>();
-            PageQuery query = new PageQuery(page(), ASKER, PICK, () -> true, shown::get, (code, text) -> !refused.add(code + " " + text));
+            PageQuery query = new PageQuery(page(), ASKER, PICK, () -> true, Optional::empty, shown::get, (code, text) -> !refused.add(code + " " + text));
             assertThat(query.answer("{}")).isFalse();
-            PageQuery failed = new PageQuery(page(), ASKER, PICK, () -> true, shown::get, (code, text) -> !refused.add(code + " " + text));
+            PageQuery failed = new PageQuery(page(), ASKER, PICK, () -> true, Optional::empty, shown::get, (code, text) -> !refused.add(code + " " + text));
             assertThat(failed.fail(PageQuery.BUSY, "Busy.")).isFalse();
             assertThat(refused).containsExactly("0 {}", "5 Busy.");
         });
@@ -168,6 +170,21 @@ class PageQueryTest {
         }
     }
 
+    /** L20: the query gives the activating press as its bridge reads it, and asking spends nothing. */
+    @Test void itGivesTheActivatingPressAndAskingSpendsNothing() throws Exception {
+        onUiThread(() -> {
+            var asked = new AtomicInteger();
+            PageQuery none = query(page(), ASKER, () -> asked.incrementAndGet() > 0);
+            assertThat(none.press()).isEmpty();
+            press = Optional.of(new LastPress(1, 0, 100, 40, 30));
+            PageQuery pressed = query(page(), ASKER, () -> asked.incrementAndGet() > 0);
+            assertThat(pressed.press()).contains(new LastPress(1, 0, 100, 40, 30));
+            assertThat(pressed.press()).as("asked again").contains(new LastPress(1, 0, 100, 40, 30));
+            assertThat(asked).as("no activation spent").hasValue(0);
+            assertThat(pressed.consumeActivation()).isTrue();
+        });
+    }
+
     @Test void itsActivationIsAskedOnce() throws Exception {
         onUiThread(() -> {
             var asked = new AtomicInteger();
@@ -215,7 +232,7 @@ class PageQueryTest {
     /** Review round 1: a page origin that cannot be read is no origin that asked: the page is told it has gone. */
     @Test void anOriginThatCannotBeReadIsToldGone() throws Exception {
         onUiThread(() -> {
-            var query = new PageQuery(page(), ASKER, PICK, () -> true, () -> { throw new IllegalStateException("no document"); },
+            var query = new PageQuery(page(), ASKER, PICK, () -> true, Optional::empty, () -> { throw new IllegalStateException("no document"); },
                 (code, text) -> replies.add(code + " " + text));
             try (var log = new CapturedLog(PageQuery.class.getName())) {
                 assertThat(query.answer("{\"password\":\"pw\"}")).isFalse();
@@ -332,7 +349,7 @@ class PageQueryTest {
 
     /** A query of {@code page}, from {@code origin}, whose activation {@code activation} answers. */
     private PageQuery query(Page page, Optional<String> origin, BooleanSupplier activation) {
-        return new PageQuery(page, origin, PICK, activation, shown::get, (code, text) -> replies.add(code + " " + text));
+        return new PageQuery(page, origin, PICK, activation, () -> press, shown::get, (code, text) -> replies.add(code + " " + text));
     }
 
     private static Page page() {

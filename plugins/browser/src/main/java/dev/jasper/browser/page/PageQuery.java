@@ -40,6 +40,7 @@ public final class PageQuery {
     private final Optional<String> origin;
     private final Map<String, Object> request;
     private final BooleanSupplier activation;
+    private final Supplier<Optional<LastPress>> press;
     private final Supplier<Optional<String>> currentOrigin;
     private final BiPredicate<Integer, String> reply;
     // Whether the query was answered, failed or cancelled; and whether its activation was asked for.
@@ -56,16 +57,18 @@ public final class PageQuery {
      *     when opaque
      * @param request the request's members, as the page sent them
      * @param activation whether the user's activation allows the request, which it consumes; asked once at most
+     * @param press the mouse press within the activation as it was when the request came, or empty for none
      * @param currentOrigin the origin of the document the page's main frame shows now; empty when opaque
      * @param reply told 0 and the answer, or a failure's code and why, once; answers whether the page was sent it, which
      *     it is not once Chromium has stopped
      */
     public PageQuery(Page page, Optional<String> origin, Map<String, Object> request, BooleanSupplier activation,
-                     Supplier<Optional<String>> currentOrigin, BiPredicate<Integer, String> reply) {
+                     Supplier<Optional<LastPress>> press, Supplier<Optional<String>> currentOrigin, BiPredicate<Integer, String> reply) {
         this.page = Objects.requireNonNull(page, "page");
         this.origin = Objects.requireNonNull(origin, "origin");
         this.request = Collections.unmodifiableMap(new LinkedHashMap<>(Objects.requireNonNull(request, "request")));
         this.activation = Objects.requireNonNull(activation, "activation");
+        this.press = Objects.requireNonNull(press, "press");
         this.currentOrigin = Objects.requireNonNull(currentOrigin, "currentOrigin");
         this.reply = Objects.requireNonNull(reply, "reply");
     }
@@ -105,6 +108,17 @@ public final class PageQuery {
      */
     public boolean consumeActivation() {
         return activationAsked.compareAndSet(false, true) && activation.getAsBoolean();
+    }
+
+    /**
+     * The mouse press that would activate the request, as it was when the request came: its point, on the page's
+     * canvas, says where the user clicked, which a password manager's pick must lie in (plan 8's L20). Asking spends
+     * nothing.
+     *
+     * @return the press; empty when no press within the activation came before the request
+     */
+    public Optional<LastPress> press() {
+        return press.get();
     }
 
     /**

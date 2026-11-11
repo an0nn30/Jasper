@@ -468,7 +468,7 @@ public final class PageView extends JComponent {
         boolean press = event.getID() == MouseEvent.MOUSE_PRESSED;
         boolean left = event.getButton() == MouseEvent.BUTTON1;
         if (press) {
-            lastPress = new LastPress(event.getButton(), event.getModifiersEx(), event.getWhen());
+            lastPress = new LastPress(event.getButton(), event.getModifiersEx(), event.getWhen(), event.getX(), event.getY());
             activation.activate(event.getWhen());
             if (left) altCleared = loadsInPlace(event.getModifiersEx(), hoverUrl, osName);
         }

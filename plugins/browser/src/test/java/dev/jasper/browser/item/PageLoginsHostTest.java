@@ -3,6 +3,7 @@ package dev.jasper.browser.item;
 import dev.jasper.browser.logins.FakeVault;
 import dev.jasper.browser.logins.FieldButtons;
 import dev.jasper.browser.logins.LoginsTestAccess;
+import dev.jasper.browser.page.LastPress;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageQuery;
 import dev.jasper.browser.page.PageTestAccess;
@@ -51,6 +52,8 @@ class PageLoginsHostTest {
     private final MemoryStores memory = new MemoryStores();
     private final FakeVault fake = new FakeVault();
     private final List<String> replies = new CopyOnWriteArrayList<>();
+    // The click that asked, on the page's canvas: inside the field (8, 16, 200, 24) at 100% and at 125%.
+    private Optional<LastPress> press = Optional.of(new LastPress(1, 0, 0, 12, 22));
     private FakePluginHost host;
     private PluginContext context;
     private BrowserItems items;
@@ -78,6 +81,25 @@ class PageLoginsHostTest {
             assertThat(replies).isEmpty();
             fake.pickAnswer.complete(new CredentialPickResult.Cancelled());
             assertThat(replies).containsExactly("0 {}");
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * L20: the click that asked must lie in the field's area of the canvas, at the item's zoom; one just below it, where
+     * a double-click's second press would land, opens nothing.
+     */
+    @Test void aClickOutsideTheFieldOpensNoPicker() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            BrowserItem item = shown(open(true));
+            press = Optional.of(new LastPress(1, 0, 0, 100, 40));
+            ask(item, "password", 8, 16, 200, 24);
+            assertThat(fake.picks).isEmpty();
+            assertThat(replies).containsExactly(PageQuery.REFUSED + " The password manager opens only after a click in the page.");
+            for (int step = 0; step < 5; step++) command(item, "font-bigger");
+            fake.pickAnswer = new CompletableFuture<>();
+            ask(item, "password", 8, 16, 200, 24);
+            assertThat(fake.picks).as("at 125%, the field's area reaches it").hasSize(1);
             assertThat(host.failures()).isEmpty();
         });
     }
@@ -201,7 +223,7 @@ class PageLoginsHostTest {
         request.put("y", y);
         request.put("width", width);
         request.put("height", height);
-        item.page().loginQuery(new PageQuery(item.page(), Optional.of(ORIGIN), request, () -> true, () -> Optional.of(ORIGIN),
+        item.page().loginQuery(new PageQuery(item.page(), Optional.of(ORIGIN), request, () -> true, () -> press, () -> Optional.of(ORIGIN),
             (code, text) -> replies.add(code + " " + text)));
     }
 

@@ -25,7 +25,7 @@
  *   still one, and while the document's origin is the one it was asked from. Each value goes through the input's own
  *   value setter, then bubbling input and change events. From a username field, the username fills it, then the first
  *   enabled, editable password input after it in the document, in its form when it has one, takes the focus and the
- *   password. An empty value fills nothing.
+ *   password; a username field the page has removed fills nothing. An empty value fills nothing.
  * - As the page scrolls the field, or the visual viewport scrolls or is resized, while a pick waits, the pick is
  *   cancelled (jasperBridgeCancel), which closes Jasper's picker, as the field it opened under has moved.
  *
@@ -126,8 +126,6 @@ button:hover { background: rgba(127, 127, 127, 0.25); }
     // The visual viewport maps a field only with all three of its getters.
     const mapped = viewport !== null && typeof viewport === 'object' && typeof offsetLeftOf === 'function'
       && typeof offsetTopOf === 'function' && typeof scaleOf === 'function';
-    // The white space autocomplete's tokens are split on.
-    const WHITE = ' \t\n\f\r';
 
     // The button's element, its shadow root's one button and the sheet it adopts, made the first time one shows.
     let host = null, button = null;
@@ -158,12 +156,12 @@ button:hover { background: rgba(127, 127, 127, 0.25); }
       return hasToken(apply(toLowerCase, apply(autocompleteOf, field, []), []), 'username') ? 'username' : null;
     }
 
-    /** Whether {@code text}, split on white space, holds {@code wanted}. */
+    /** Whether {@code text}, split on HTML's white space, holds {@code wanted}. */
     function hasToken(text, wanted) {
       let token = '';
       for (let at = 0; at <= text.length; at++) {
         const c = at < text.length ? text[at] : ' ';
-        if (WHITE.indexOf(c) < 0) {
+        if (c !== ' ' && c !== '\t' && c !== '\n' && c !== '\f' && c !== '\r') {
           token += c;
           continue;
         }
@@ -455,7 +453,8 @@ button:hover { background: rgba(127, 127, 127, 0.25); }
         if (login.password !== '' && fillable(now.field) && apply(typeOf, now.field, []) === 'password') set(now.field, login.password);
         return;
       }
-      if (login.username !== '' && fillable(now.field)) set(now.field, login.username);
+      if (!connected(now.field)) return;
+      if (login.username !== '' && editable(now.field)) set(now.field, login.username);
       if (login.password === '') return;
       const next = passwordAfter(now.field);
       if (next === null) return;

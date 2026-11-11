@@ -14,7 +14,7 @@ import java.util.function.IntSupplier;
  * One browser item's password manager (plan 8, F18), made only with the Credential Vault, as {@link PageToolsHost} holds
  * the item's tools: its page's login fields show the Vault's buttons, whose picks the item's {@link FieldButtons}
  * answer, the picker anchored on the field's area of the page's canvas, at the zoom the item shows its page at, over
- * the window the item's tab is in. The host sees where the canvas is, not what Chromium draws on it, so the picker
+ * the window the item's tab is in, once the click that asked lies in that area (L20). The host sees where the canvas is, not what Chromium draws on it, so the picker
  * closes as the page goes elsewhere (a main frame's load start, a committed address, Jasper sending it elsewhere) and
  * as the item's zoom changes ({@link #zoomChanged}); the page's script closes it as the page scrolls, and its anchor
  * closes it as the canvas is resized (L6). A /dev/null item has the buttons too, as Chrome's Incognito fills saved
@@ -41,7 +41,7 @@ final class PageLoginsHost implements AutoCloseable {
         Objects.requireNonNull(zoom, "zoom");
         buttons = new FieldButtons(vault);
         page.handleLogins(FieldButtons.SCRIPT, query -> buttons.query(query, tab.window(),
-            css -> FieldButtons.area(css, zoom.getAsInt() / 100.0, page.view().getSize()).map(area -> view.anchorAt(BrowserItem.PAGE, area))));
+            css -> FieldButtons.area(css, zoom.getAsInt() / 100.0, page.view().getSize()), area -> view.anchorAt(BrowserItem.PAGE, area)));
         heard = List.of(page.onLoadStart(address -> buttons.closePicker()), page.onAddressChange(address -> buttons.closePicker()),
             page.onNavigate(buttons::closePicker));
     }

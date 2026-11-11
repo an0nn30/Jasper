@@ -244,7 +244,8 @@ The credential fields of Remote's host editor and File Server's server editor op
 **Search credentials**, **None** where the field may be cleared, every login and SSH key captioned "Password · *user*",
 "Account key · *user*", "Key and password · *user*", "Stored key · *fingerprint*" or "Path key · *fingerprint*", and
 **New Credential…** at the bottom, which offers **Login** or **SSH path key** and opens that sheet; the new entry is
-then in the list to choose. Choosing a credential lets that plugin read it once without asking.
+then in the list to choose. Choosing a credential lets that plugin read it once without asking. A choice in the
+first half second after the picker opens is ignored, so a click meant for what was under it chooses nothing.
 
 Remote's **Import from ~/.ssh/config...** hands the selected private keys to the vault, which creates or unlocks the
 vault first and shows **Import SSH keys**. It reads each key (at most 1 MiB; a `.pub` file beside it must match), asks

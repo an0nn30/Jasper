@@ -1044,7 +1044,8 @@ class OpenerBridgeTest {
 
     /**
      * Plan 8's F3: a pick's activation needs Jasper's record of a recent mouse press as well as the page's activation,
-     * which it then consumes; a key alone activates the page but opens no picker, and spends nothing.
+     * which it then consumes; a key alone activates the page but opens no picker, and spends nothing. The query gives
+     * that press, with its point, for the password manager to check (L20).
      */
     @Test void aLoginPicksActivationNeedsAMousePress() throws Exception {
         onUiThread(() -> {
@@ -1056,17 +1057,23 @@ class OpenerBridgeTest {
             var answers = new ArrayList<Answer>();
             page.activation.activate(NOW - 100); // a key the page got
             bridge.answer(party, true, bridge.sender(page.page, "main", () -> APP), asked(), PICK, NOW, answers::add);
+            assertThat(held.getLast().press()).as("a key without a press: no press").isEmpty();
             assertThat(held.getLast().consumeActivation()).as("a key without a press").isFalse();
             assertThat(page.activation.active(NOW)).as("nothing spent").isTrue();
 
-            press.set(new LastPress(1, 0, NOW - 6_000));
+            press.set(new LastPress(1, 0, NOW - 6_000, 40, 30));
             bridge.answer(party, true, bridge.sender(page.page, "main", () -> APP), asked(), PICK, NOW, answers::add);
+            assertThat(held.getLast().press()).as("a press 6 s before the pick: no press").isEmpty();
             assertThat(held.getLast().consumeActivation()).as("a press 6 s before the pick").isFalse();
 
-            press.set(new LastPress(1, 0, NOW - 100));
+            press.set(new LastPress(1, 0, NOW - 100, 40, 30));
             page.activation.activate(NOW - 100);
             bridge.answer(party, true, bridge.sender(page.page, "main", () -> APP), asked(), PICK, NOW, answers::add);
             PageQuery clicked = held.getLast();
+            assertThat(clicked.press()).as("L20: the press, with its point, which asking spends not").contains(new LastPress(1, 0, NOW - 100, 40, 30));
+            press.set(new LastPress(1, 0, NOW + 50, 90, 90));
+            assertThat(clicked.press()).as("a press after the request is not its").isEmpty();
+            press.set(new LastPress(1, 0, NOW - 100, 40, 30));
             assertThat(clicked.consumeActivation()).as("a click").isTrue();
             assertThat(page.activation.active(NOW)).as("consumed").isFalse();
             assertThat(clicked.consumeActivation()).isFalse();
@@ -1134,7 +1141,7 @@ class OpenerBridgeTest {
             made.set(page);
         });
         Document page = made.get();
-        var press = new LastPress(1, 0, NOW - 100);
+        var press = new LastPress(1, 0, NOW - 100, 0, 0);
         page.activation.activate(NOW - 100);
         // As Queries does on Chromium's thread: the query is registered, then Chromium cancels it before the UI thread
         // takes it.

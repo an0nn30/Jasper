@@ -98,8 +98,8 @@ import org.cef.network.CefResponse;
  *   it holds none of the page's waiting places, and Chromium's cancel, as the asking frame navigates or closes or the
  *   page cancels it, cancels it. The manager opens one picker per page at a time, only for an http or https document,
  *   and only after a click in the page: Jasper's record of a mouse press within the activation as well as the page's
- *   own activation, which the pick consumes, so a key alone opens nothing. Its answer reaches the page only while the
- *   page's main frame shows the origin that asked.</li>
+ *   own activation, which the pick consumes, so a key alone opens nothing; and that press must lie in the field the
+ *   pick names. Its answer reaches the page only while the page's main frame shows the origin that asked.</li>
  * </ul>
  *
  * <p>A link ends as Chromium's window groups do: when the popup closes, when the user sends either page elsewhere
@@ -847,17 +847,18 @@ final class OpenerBridge {
      * through {@code reply} once, told whether the reply was sent. Its origin is the asking document's, as Chromium's
      * thread saw it; its answer reaches the page only while the page's main frame shows that origin, as the bridge has
      * heard. Its activation needs a mouse press within the activation as well as the page's activation, which it
-     * consumes, both as at {@code nowMillis}, when Chromium took the request (plan 8's F3). It waits for Chromium's cancel until it is over;
-     * one Chromium cancelled before the UI thread took it is never handed over, and spends nothing (plan 8's L16). UI
-     * thread.
+     * consumes, both as at {@code nowMillis}, when Chromium took the request (plan 8's F3), and it gives that press,
+     * whose point the password manager checks (L20). It waits for Chromium's cancel until it is over; one Chromium
+     * cancelled before the UI thread took it is never handed over, and spends nothing (plan 8's L16). UI thread.
      *
      * @return {@code LATER}
      */
     private Answer loginPick(Party sender, Sender asker, Pending asked, Map<String, Object> request, long nowMillis,
                              Predicate<Answer> reply, PageQuery[] handed) {
         Page page = sender.page();
-        BooleanSupplier activation = () -> sender.lastPress().get().withinActivation(nowMillis) && sender.activation().consume(nowMillis);
-        var query = new PageQuery(page, asker.document().origin(), request, activation, () -> document(page).origin(), (code, text) -> {
+        Supplier<Optional<LastPress>> press = () -> Optional.of(sender.lastPress().get()).filter(last -> last.withinActivation(nowMillis));
+        BooleanSupplier activation = () -> press.get().isPresent() && sender.activation().consume(nowMillis);
+        var query = new PageQuery(page, asker.document().origin(), request, activation, press, () -> document(page).origin(), (code, text) -> {
             pending.remove(asked.id, asked);
             return reply.test(new Answer(code, text));
         });

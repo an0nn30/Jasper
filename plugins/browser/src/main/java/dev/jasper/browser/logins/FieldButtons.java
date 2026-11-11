@@ -1,6 +1,7 @@
 package dev.jasper.browser.logins;
 
 import dev.jasper.browser.json.StrictJson;
+import dev.jasper.browser.page.LastPress;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageQuery;
 import dev.jasper.sdk.Subscription;
@@ -22,6 +23,7 @@ import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 /**
@@ -29,9 +31,10 @@ import java.util.function.Function;
  * each http or https document of the page's main frame and shows a button inside the field the user focuses: a
  * password field's opens the Vault's picker for a password, a username field's for a username and a password. Its click
  * sends a {@value #PICK} query, which this class answers. Any script of the page can send one, so each is untrusted
- * (R38): the picker opens, one at a time, only for an http or https document, only after a click in the page, and only
- * at a field on the page's canvas, searched for the asking origin's host, never a text the page gives. The page is sent
- * only what the user chose, and only while it shows the origin that asked.
+ * (R38): the picker opens, one at a time, only for an http or https document, only at a field on the page's canvas, and
+ * only after a click in the page inside that field (L20), so a page cannot move a field under a click meant for
+ * something else; it is searched for the asking origin's host, never a text the page gives. The page is sent only what
+ * the user chose, and only while it shows the origin that asked.
  *
  * <p>The picker closes, with its anchor, as the query is cancelled (the page scrolled, which the script reports by
  * cancelling it, or its frame navigated), as the anchor closes (the page's canvas was resized, hidden or moved), as the
@@ -54,7 +57,7 @@ public final class FieldButtons {
     private static final long LIMIT = 1_000_000;
     private static final System.Logger LOG = System.getLogger(FieldButtons.class.getName());
     private final VaultLogins vault;
-    private final Function<Map<String, Object>, String> writer;
+    private final BiFunction<String, char[], String> writer;
     // The page whose queries the buttons answer, from its first; and the pick under way, or null.
     private Page page;
     private Pick open;
@@ -95,11 +98,14 @@ public final class FieldButtons {
      * @param vault the Credential Vault's logins
      */
     public FieldButtons(VaultLogins vault) {
-        this(vault, StrictJson::write);
+        this(vault, FieldButtons::reply);
     }
 
-    /** As {@link #FieldButtons(VaultLogins)}, the answer written by {@code writer}: a test's records it. */
-    FieldButtons(VaultLogins vault, Function<Map<String, Object>, String> writer) {
+    /**
+     * As {@link #FieldButtons(VaultLogins)}, the answer written by {@code writer} from the username to fill, {@code ""}
+     * for none, and the password array, as {@link #reply} writes it: a test's records it.
+     */
+    FieldButtons(VaultLogins vault, BiFunction<String, char[], String> writer) {
         this.vault = Objects.requireNonNull(vault, "vault");
         this.writer = Objects.requireNonNull(writer, "writer");
     }
@@ -146,26 +152,31 @@ public final class FieldButtons {
     }
 
     /**
-     * Answers {@code query}, a {@value #PICK} of the page's, in this order (F3): {@link PageQuery#MALFORMED} for another
-     * op, an unknown field or a place {@link #rect} refuses; {@link PageQuery#REFUSED} for an origin that is opaque or
-     * not http or https; {@link PageQuery#BUSY} while this page's picker is open; nothing more for a query that is over,
-     * and {@link PageQuery#GONE} for one whose page shows another origin (L18); {@link PageQuery#REFUSED} without the
-     * click its activation needs, which is spent only here; and {@link PageQuery#REFUSED} when {@code anchor} gives
-     * nothing, or refuses with an {@link IllegalArgumentException}, as for a field off the canvas. Otherwise the Vault's
-     * picker opens on the anchor, searched for the origin's host without one leading {@code www.} (F26), and the query
-     * is answered later, once: a password field {@code {"password": …}}, a username field
-     * {@code {"username": …, "password": …}}, each without an empty member, and {@code {}} when nothing was chosen. The
-     * answer's text is made only while the query is live, so no password's text is made for a page that would not be
-     * sent it; that text, a Java string, cannot be zeroed.
+     * Answers {@code query}, a {@value #PICK} of the page's, in this order (F3, L20): {@link PageQuery#MALFORMED} for
+     * another op, an unknown field or a place {@link #rect} refuses; {@link PageQuery#REFUSED} for an origin that is
+     * opaque or not http or https; {@link PageQuery#BUSY} while this page's picker is open; nothing more for a query that
+     * is over, and {@link PageQuery#GONE} for one whose page shows another origin (L18); {@link PageQuery#REFUSED} when
+     * {@code area} gives nothing, as for a field off the canvas; {@link PageQuery#REFUSED} without a press within the
+     * activation that lies inside that area; {@link PageQuery#REFUSED} when {@code anchor} refuses the area with an
+     * {@link IllegalArgumentException} or gives a closed anchor; and {@link PageQuery#REFUSED} when the activation does
+     * not allow it, which is spent then, and only then, as the picker is about to open. The Vault's picker then opens
+     * on the anchor, searched for the origin's host without one leading {@code www.} (F26), and the query is answered
+     * later, once: a password field {@code {"password": …}}, a username field {@code {"username": …, "password": …}},
+     * each without an empty member, and {@code {}} when nothing was chosen. The answer's text is made only while the
+     * query is live, so no password's text is made for a page that would not be sent it; that text, a Java string,
+     * cannot be zeroed.
      *
      * @param query the page's query
      * @param window the window the item shows in, which the Vault's prompts open over
-     * @param anchor gives an anchor on the field's area of the page's canvas, or nothing
+     * @param area the area of the page's canvas a field's place covers, in the canvas's coordinates, or nothing
+     * @param anchor an anchor on such an area; throws {@link IllegalArgumentException} for one it refuses
      * @throws IllegalArgumentException for a query of another page than the buttons' first query's
      */
-    public void query(PageQuery query, WindowHandle window, Function<FieldRect, Optional<UiAnchor>> anchor) {
+    public void query(PageQuery query, WindowHandle window, Function<FieldRect, Optional<ContentArea>> area,
+                      Function<ContentArea, UiAnchor> anchor) {
         Objects.requireNonNull(query, "query");
         Objects.requireNonNull(window, "window");
+        Objects.requireNonNull(area, "area");
         Objects.requireNonNull(anchor, "anchor");
         watch(query.page());
         Map<String, Object> request = query.request();
@@ -188,21 +199,31 @@ public final class FieldButtons {
             query.answer(NOTHING); // sends nothing once it is over, and GONE once its document has gone
             return;
         }
-        if (!query.consumeActivation()) {
-            query.fail(PageQuery.REFUSED, NO_CLICK);
-            return;
-        }
-        Optional<UiAnchor> at;
-        try {
-            at = anchor.apply(rect.get());
-        } catch (IllegalArgumentException refused) {
-            at = Optional.empty();
-        }
-        if (at.isEmpty() || !at.get().isOpen()) {
+        Optional<ContentArea> covered = area.apply(rect.get());
+        if (covered.isEmpty()) {
             query.fail(PageQuery.REFUSED, OFF_PAGE);
             return;
         }
-        var pick = new Pick(query, at.get(), field.get());
+        if (query.press().filter(press -> inside(press, covered.get())).isEmpty()) {
+            query.fail(PageQuery.REFUSED, NO_CLICK);
+            return;
+        }
+        UiAnchor at;
+        try {
+            at = anchor.apply(covered.get());
+        } catch (IllegalArgumentException refused) {
+            at = null;
+        }
+        if (at == null || !at.isOpen()) {
+            query.fail(PageQuery.REFUSED, OFF_PAGE);
+            return;
+        }
+        if (!query.consumeActivation()) {
+            at.close();
+            query.fail(PageQuery.REFUSED, NO_CLICK);
+            return;
+        }
+        var pick = new Pick(query, at, field.get());
         open = pick;
         pick.start(window, search.get());
     }
@@ -221,6 +242,27 @@ public final class FieldButtons {
         if (page != null) throw new IllegalArgumentException("A login query of another page");
         page = asking;
         page.onClose(this::closePicker);
+    }
+
+    /** Whether {@code press} lies inside {@code area}, its right and bottom edges outside it. */
+    private static boolean inside(LastPress press, ContentArea area) {
+        return press.x() >= area.x() && press.y() >= area.y() && (long) press.x() < (long) area.x() + area.width()
+            && (long) press.y() < (long) area.y() + area.height();
+    }
+
+    /**
+     * The answer for a login: {@code {"username": …, "password": …}}, each member only when it is not empty, written
+     * with {@link StrictJson#write}. The password's text it makes, a Java string, cannot be zeroed.
+     *
+     * @param username the username to fill, or {@code ""} for none, as from a password field
+     * @param password the password array, which it does not keep
+     * @return the JSON
+     */
+    static String reply(String username, char[] password) {
+        var members = new LinkedHashMap<String, Object>();
+        if (!username.isEmpty()) members.put("username", username);
+        if (password.length > 0) members.put("password", new String(password));
+        return StrictJson.write(members);
     }
 
     /**
@@ -282,10 +324,7 @@ public final class FieldButtons {
          */
         private void fill(String username, char[] password) {
             if (closed || !query.live()) return;
-            var members = new LinkedHashMap<String, Object>();
-            if (field == Field.USERNAME && !username.isEmpty()) members.put("username", username);
-            if (password.length > 0) members.put("password", new String(password));
-            reply = writer.apply(members);
+            reply = writer.apply(field == Field.USERNAME ? username : "", password);
         }
 
         /** The pick is withdrawn, which closes the picker, and so is its anchor. Once. */

@@ -95,6 +95,8 @@ public class VaultPlugin implements Plugin {
     private boolean stopped;
     /** Milliseconds for the inactivity clock; tests set it, production reads the wall clock. */
     long clock = -1;
+    /** Nanoseconds the anchored picker times a choice by (Browser plan 8's L20); tests step it past the wait. */
+    java.util.function.LongSupplier pickerClock = System::nanoTime;
 
     /** Created by the runtime: the platform keychain with the file fallback, completing on the EDT. */
     public VaultPlugin() {
@@ -123,7 +125,7 @@ public class VaultPlugin implements Plugin {
                 case LOCKED -> service.requestUnlock(owner);
                 case UNLOCKED -> CompletableFuture.completedFuture(true);
             }, this::showImport, this::vaultChanged);
-        service.anchoredPicker(prompt -> new dev.jasper.vault.ui.AnchoredPicker(context,manager,prompt).show(), anchor -> context.windows().popover(anchor).close());
+        service.anchoredPicker(prompt -> new dev.jasper.vault.ui.AnchoredPicker(context,manager,prompt,pickerClock).show(), anchor -> context.windows().popover(anchor).close());
         service.managerOpener(window -> open(window, Optional.empty()));
         context.services().publishPerConsumer(VaultApi.class, service::forConsumer);
         locked = "lock";

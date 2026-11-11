@@ -1,6 +1,7 @@
 package dev.jasper.browser.logins;
 
 import dev.jasper.browser.json.StrictJson;
+import dev.jasper.browser.page.LastPress;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageContext;
 import dev.jasper.browser.page.PageQuery;
@@ -45,11 +46,12 @@ class FieldButtonsTest {
     private static final String NAME = "https://example.com (Example)";
     private final FakeVault fake = new FakeVault();
     private final List<String> replies = new CopyOnWriteArrayList<>();
-    // What the writer was asked to write: how often, so a test can see no reply text was made.
+    // How often the writer was asked to write a reply, which is where a password's text is made (Minor 6): a test can so
+    // see that no reply text, and no password text, was made.
     private final AtomicInteger written = new AtomicInteger();
-    private final FieldButtons buttons = new FieldButtons(new VaultLogins(fake.api()), members -> {
+    private final FieldButtons buttons = new FieldButtons(new VaultLogins(fake.api()), (username, password) -> {
         written.incrementAndGet();
-        return StrictJson.write(members);
+        return FieldButtons.reply(username, password);
     });
     private final WindowHandle window = new Window();
     // The areas the anchor function was asked for, and the anchors it made for them, one each.
@@ -59,18 +61,22 @@ class FieldButtonsTest {
     private final AtomicInteger activations = new AtomicInteger();
     // The origin the page's main frame shows now, as the bridge would read it.
     private final AtomicReference<Optional<String>> shown = new AtomicReference<>(Optional.of(ORIGIN));
-    private final Function<FieldButtons.FieldRect, Optional<UiAnchor>> anchors = css -> FieldButtons.area(css, 1.25, new Dimension(800, 600))
-        .map(area -> {
-            areas.add(area);
-            var anchor = new Anchor();
-            made.add(anchor);
-            return anchor;
-        });
+    // The click that activates the next query, on the page's canvas: inside the field (8, 16, 200, 24) at 125%, whose
+    // area is (10, 20, 250, 30).
+    private final AtomicReference<Optional<LastPress>> press = new AtomicReference<>(Optional.of(click(12, 22)));
+    // The page's canvas at 125%, as the item gives it, and the host's anchors on it.
+    private final Function<FieldButtons.FieldRect, Optional<ContentArea>> canvas = css -> FieldButtons.area(css, 1.25, new Dimension(800, 600));
+    private final Function<ContentArea, UiAnchor> anchors = area -> {
+        areas.add(area);
+        var anchor = new Anchor();
+        made.add(anchor);
+        return anchor;
+    };
 
     @Test void aClickOpensThePickerAtTheFieldWithTheHost() throws Exception {
         onUi(() -> {
             fake.pickAnswer = new CompletableFuture<>();
-            buttons.query(query(page(), ORIGIN, pick("password", 8, 16, 200, 24), true), window, anchors);
+            buttons.query(query(page(), ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
             assertThat(areas).as("(8, 16, 200, 24) at 125%").containsExactly(new ContentArea(10, 20, 250, 30));
             assertThat(fake.picks).singleElement().satisfies(request -> {
                 assertThat(request.anchor()).isSameAs(made.getFirst());
@@ -88,21 +94,70 @@ class FieldButtonsTest {
             fake.pickAnswer = new CompletableFuture<>();
             Page page = page();
             shown.set(Optional.of("https://www.example.com"));
-            buttons.query(query(page, "https://www.example.com", pick("password", 0, 0, 10, 10), true), window, anchors);
+            buttons.query(query(page, "https://www.example.com", pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
             fake.pickAnswer.complete(new CredentialPickResult.Cancelled());
             fake.pickAnswer = new CompletableFuture<>();
             shown.set(Optional.of("https://www.www.example.com:8443"));
-            buttons.query(query(page, "https://www.www.example.com:8443", pick("password", 0, 0, 10, 10), true), window, anchors);
+            buttons.query(query(page, "https://www.www.example.com:8443", pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
             assertThat(fake.picks).extracting(request -> request.search()).containsExactly("example.com", "www.example.com");
         });
     }
 
-    /** F3: a pick the user's click did not allow opens no picker, and the page is told why. */
+    /**
+     * F3: a pick the user's click did not allow opens no picker, and the page is told why: no press within the
+     * activation, or a press whose activation the page has spent; the anchor made for the latter is closed.
+     */
     @Test void aPickWithoutTheUsersClickIsRefused() throws Exception {
         onUi(() -> {
-            buttons.query(query(page(), ORIGIN, pick("password", 8, 16, 200, 24), false), window, anchors);
+            Page page = page();
+            press.set(Optional.empty());
+            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
+            assertThat(areas).as("no press: no anchor").isEmpty();
+            assertThat(activations).as("and nothing spent").hasValue(0);
+            press.set(Optional.of(click(12, 22)));
+            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), false), window, canvas, anchors);
+            assertThat(made).singleElement().satisfies(anchor -> assertThat(anchor.closed).as("closed unused").isTrue());
             assertThat(fake.picks).as("no picker").isEmpty();
+            assertThat(replies).hasSize(2).allSatisfy(reply -> assertThat(reply)
+                .isEqualTo(PageQuery.REFUSED + " The password manager opens only after a click in the page."));
+        });
+    }
+
+    /**
+     * L20, the double-click clickjack: a page's own request names a field just above where the user's second press
+     * lands, so the picker would open under the pointer. A press outside the area the pick names, its right and bottom
+     * edges included, opens nothing, makes no anchor and spends no click; one inside it opens the picker.
+     */
+    @Test void aPressOutsideTheFieldIsRefused() throws Exception {
+        onUi(() -> {
+            fake.pickAnswer = new CompletableFuture<>();
+            Page page = page();
+            for (LastPress outside : List.of(click(100, 52), click(100, 50), click(260, 30), click(9, 30), click(100, 19))) {
+                press.set(Optional.of(outside));
+                buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
+            }
+            assertThat(replies).hasSize(5).allSatisfy(reply -> assertThat(reply)
+                .isEqualTo(PageQuery.REFUSED + " The password manager opens only after a click in the page."));
             assertThat(areas).as("no anchor").isEmpty();
+            assertThat(activations).as("no click spent").hasValue(0);
+            assertThat(fake.picks).isEmpty();
+            press.set(Optional.of(click(259, 49)));
+            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
+            assertThat(fake.picks).as("its last pixel is inside").hasSize(1);
+        });
+    }
+
+    /** L20: the press is compared with the field's area after the zoom, in the canvas's coordinates. */
+    @Test void theZoomIsAppliedToThePress() throws Exception {
+        onUi(() -> {
+            fake.pickAnswer = new CompletableFuture<>();
+            Page page = page();
+            press.set(Optional.of(click(9, 22)));
+            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
+            assertThat(fake.picks).as("inside (8, 16, 200, 24), outside it at 125%").isEmpty();
+            press.set(Optional.of(click(255, 45)));
+            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
+            assertThat(fake.picks).as("outside (8, 16, 200, 24), inside it at 125%").hasSize(1);
             assertThat(replies).containsExactly(PageQuery.REFUSED + " The password manager opens only after a click in the page.");
         });
     }
@@ -112,14 +167,14 @@ class FieldButtonsTest {
         onUi(() -> {
             fake.pickAnswer = new CompletableFuture<>();
             Page page = page();
-            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, anchors);
-            buttons.query(query(page, ORIGIN, pick("username", 8, 48, 200, 24), true), window, anchors);
+            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
+            buttons.query(query(page, ORIGIN, pick("username", 8, 48, 200, 24), true), window, canvas, anchors);
             assertThat(fake.picks).hasSize(1);
             assertThat(replies).containsExactly(PageQuery.BUSY + " The password manager is open already.");
             assertThat(activations).as("only the first click is spent").hasValue(1);
             fake.pickAnswer.complete(new CredentialPickResult.Cancelled());
             fake.pickAnswer = new CompletableFuture<>();
-            buttons.query(query(page, ORIGIN, pick("username", 8, 48, 200, 24), true), window, anchors);
+            buttons.query(query(page, ORIGIN, pick("username", 8, 16, 200, 24), true), window, canvas, anchors);
             assertThat(fake.picks).as("once it closed, a pick opens").hasSize(2);
         });
     }
@@ -127,29 +182,39 @@ class FieldButtonsTest {
     @Test void aFileOrOpaqueOriginIsRefused() throws Exception {
         onUi(() -> {
             Page page = page();
-            buttons.query(query(page, Optional.of("file://"), pick("password", 8, 16, 200, 24), true), window, anchors);
-            buttons.query(query(page, Optional.empty(), pick("password", 8, 16, 200, 24), true), window, anchors);
-            buttons.query(query(page, Optional.of("jasper-about://welcome"), pick("password", 8, 16, 200, 24), true), window, anchors);
+            buttons.query(query(page, Optional.of("file://"), pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
+            buttons.query(query(page, Optional.empty(), pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
+            buttons.query(query(page, Optional.of("jasper-about://welcome"), pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
             assertThat(fake.picks).isEmpty();
             assertThat(replies).hasSize(3).allSatisfy(reply -> assertThat(reply)
                 .isEqualTo(PageQuery.REFUSED + " The password manager fills only web pages."));
         });
     }
 
-    /** F3: a malformed request, an origin that is no web page's and a busy page leave the click to a later request. */
+    /**
+     * F3, L20: a malformed request, an origin that is no web page's, a field off the page, a press elsewhere, an anchor
+     * the host refuses and a busy page leave the click to a later request.
+     */
     @Test void aRefusedRequestKeepsTheClick() throws Exception {
         onUi(() -> {
             fake.pickAnswer = new CompletableFuture<>();
             Page page = page();
-            buttons.query(query(page, ORIGIN, pick("email", 8, 16, 200, 24), true), window, anchors);
-            buttons.query(query(page, Optional.of("file://"), pick("password", 8, 16, 200, 24), true), window, anchors);
-            assertThat(activations).as("malformed and not a web page").hasValue(0);
-            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, anchors);
+            buttons.query(query(page, ORIGIN, pick("email", 8, 16, 200, 24), true), window, canvas, anchors);
+            buttons.query(query(page, Optional.of("file://"), pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
+            buttons.query(query(page, ORIGIN, pick("password", 8, 700, 200, 24), true), window, canvas, anchors);
+            press.set(Optional.of(click(100, 60)));
+            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
+            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, area -> {
+                throw new IllegalArgumentException("An area must lie inside its content");
+            });
+            assertThat(activations).as("malformed, not a web page, off the page, a press elsewhere, an anchor refused").hasValue(0);
+            press.set(Optional.of(click(12, 22)));
+            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
             assertThat(activations).hasValue(1);
-            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, anchors);
+            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
             assertThat(activations).as("busy").hasValue(1);
-            assertThat(replies).extracting(reply -> reply.substring(0, 1))
-                .containsExactly("" + PageQuery.MALFORMED, "" + PageQuery.REFUSED, "" + PageQuery.BUSY);
+            assertThat(replies).extracting(reply -> reply.substring(0, 1)).containsExactly("" + PageQuery.MALFORMED,
+                "" + PageQuery.REFUSED, "" + PageQuery.REFUSED, "" + PageQuery.REFUSED, "" + PageQuery.REFUSED, "" + PageQuery.BUSY);
         });
     }
 
@@ -173,7 +238,7 @@ class FieldButtonsTest {
             malformed.add(pick("password", 8, -1_000_001, 200, 24));
             malformed.add(with(pick("password", 8, 16, 200, 24), "rect", Map.of("x", 8L)));
             malformed.add(with(pick("password", 8, 16, 200, 24), "value", "pw"));
-            for (Map<String, Object> request : malformed) buttons.query(query(page, ORIGIN, request, true), window, anchors);
+            for (Map<String, Object> request : malformed) buttons.query(query(page, ORIGIN, request, true), window, canvas, anchors);
             assertThat(replies).hasSize(malformed.size())
                 .allSatisfy(reply -> assertThat(reply).isEqualTo(PageQuery.MALFORMED + " Jasper does not understand this request."));
             assertThat(fake.picks).isEmpty();
@@ -200,7 +265,7 @@ class FieldButtonsTest {
     @Test void aPasswordFieldGetsThePasswordOnly() throws Exception {
         onUi(() -> {
             fake.login(NAME, "ada", "pw");
-            buttons.query(query(page(), ORIGIN, pick("password", 8, 16, 200, 24), true), window, anchors);
+            buttons.query(query(page(), ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
             assertThat(replies).containsExactly("0 {\"password\":\"pw\"}");
             assertThat(fake.issued).singleElement().satisfies(credential -> assertThat(FakeVault.closed(credential)).isTrue());
             assertThat(made.getFirst().closed).as("the pick's anchor closes with it").isTrue();
@@ -211,11 +276,11 @@ class FieldButtonsTest {
         onUi(() -> {
             fake.login(NAME, "ada", "pw");
             Page page = page();
-            buttons.query(query(page, ORIGIN, pick("username", 8, 16, 200, 24), true), window, anchors);
+            buttons.query(query(page, ORIGIN, pick("username", 8, 16, 200, 24), true), window, canvas, anchors);
             assertThat(replies).containsExactly("0 {\"username\":\"ada\",\"password\":\"pw\"}");
             UUID empty = fake.login("https://example.com (Empty)", "", "");
             fake.pickAnswer = CompletableFuture.completedFuture(new CredentialPickResult.Chosen(fake.descriptor(empty)));
-            buttons.query(query(page, ORIGIN, pick("username", 8, 16, 200, 24), true), window, anchors);
+            buttons.query(query(page, ORIGIN, pick("username", 8, 16, 200, 24), true), window, canvas, anchors);
             assertThat(replies).as("empty members left out").containsExactly("0 {\"username\":\"ada\",\"password\":\"pw\"}", "0 {}");
         });
     }
@@ -224,7 +289,7 @@ class FieldButtonsTest {
         onUi(() -> {
             fake.login(NAME, "ada", "pw");
             fake.pickAnswer = CompletableFuture.completedFuture(new CredentialPickResult.Cancelled());
-            buttons.query(query(page(), ORIGIN, pick("username", 8, 16, 200, 24), true), window, anchors);
+            buttons.query(query(page(), ORIGIN, pick("username", 8, 16, 200, 24), true), window, canvas, anchors);
             assertThat(replies).containsExactly("0 {}");
             assertThat(fake.calls).as("nothing fetched").isEmpty();
             assertThat(made.getFirst().closed).isTrue();
@@ -236,7 +301,7 @@ class FieldButtonsTest {
         onUi(() -> {
             UUID login = fake.login(NAME, "ada", "pw");
             fake.pickAnswer = new CompletableFuture<>();
-            buttons.query(query(page(), ORIGIN, pick("username", 8, 16, 200, 24), true), window, anchors);
+            buttons.query(query(page(), ORIGIN, pick("username", 8, 16, 200, 24), true), window, canvas, anchors);
             shown.set(Optional.of("https://evil.example"));
             fake.pickAnswer.complete(new CredentialPickResult.Chosen(fake.descriptor(login)));
             assertThat(fake.calls).as("fetched, so the one-time grant is spent (F15)").containsExactly("credential " + NAME);
@@ -245,12 +310,15 @@ class FieldButtonsTest {
         });
     }
 
-    /** F29, L17: for a query that would answer {@code GONE}, no reply text, and so no password string, is made. */
+    /**
+     * F29, L17: for a query that would answer {@code GONE}, no reply text, and so no password string, is made: the
+     * writer, which is where the password's text is made, is never asked.
+     */
     @Test void noPasswordStringIsMadeForAGoneQuery() throws Exception {
         onUi(() -> {
             UUID login = fake.login(NAME, "ada", "pw");
             fake.pickAnswer = new CompletableFuture<>();
-            buttons.query(query(page(), ORIGIN, pick("password", 8, 16, 200, 24), true), window, anchors);
+            buttons.query(query(page(), ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
             shown.set(Optional.empty());
             fake.pickAnswer.complete(new CredentialPickResult.Chosen(fake.descriptor(login)));
             assertThat(written).as("no reply text").hasValue(0);
@@ -264,13 +332,13 @@ class FieldButtonsTest {
             Page page = page();
             PageQuery cancelled = query(page, ORIGIN, pick("password", 8, 16, 200, 24), true);
             cancelled.cancelled();
-            buttons.query(cancelled, window, anchors);
+            buttons.query(cancelled, window, canvas, anchors);
             assertThat(fake.picks).isEmpty();
             assertThat(activations).hasValue(0);
             assertThat(replies).as("nothing sent").isEmpty();
             PageQuery gone = query(page, ORIGIN, pick("password", 8, 16, 200, 24), true);
             shown.set(Optional.of("https://other.example"));
-            buttons.query(gone, window, anchors);
+            buttons.query(gone, window, canvas, anchors);
             assertThat(fake.picks).isEmpty();
             assertThat(activations).hasValue(0);
             assertThat(replies).singleElement().asString().startsWith(PageQuery.GONE + " ");
@@ -285,13 +353,13 @@ class FieldButtonsTest {
             fake.pickAnswer = picker;
             Page page = page();
             PageQuery query = query(page, ORIGIN, pick("password", 8, 16, 200, 24), true);
-            buttons.query(query, window, anchors);
+            buttons.query(query, window, canvas, anchors);
             query.cancelled();
             assertThat(picker).as("the pick withdrawn, which closes the picker").isCancelled();
             assertThat(made.getFirst().closed).isTrue();
             assertThat(replies).as("nothing sent").isEmpty();
             fake.pickAnswer = new CompletableFuture<>();
-            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, anchors);
+            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
             assertThat(fake.picks).as("no longer busy").hasSize(2);
         });
     }
@@ -302,7 +370,7 @@ class FieldButtonsTest {
             CompletableFuture<CredentialPickResult> picker = new CompletableFuture<>();
             fake.pickAnswer = picker;
             Page page = page();
-            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, anchors);
+            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
             page.close();
             assertThat(picker).isCancelled();
             assertThat(made.getFirst().closed).isTrue();
@@ -317,7 +385,7 @@ class FieldButtonsTest {
             fake.pickAnswer = picker;
             Page page = page();
             buttons.closePicker();
-            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, anchors);
+            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
             buttons.closePicker();
             assertThat(picker).isCancelled();
             assertThat(made.getFirst().closed).isTrue();
@@ -325,7 +393,7 @@ class FieldButtonsTest {
             buttons.closePicker();
             assertThat(replies).as("once").hasSize(1);
             fake.pickAnswer = new CompletableFuture<>();
-            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, anchors);
+            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
             assertThat(fake.picks).as("no longer busy").hasSize(2);
         });
     }
@@ -335,7 +403,7 @@ class FieldButtonsTest {
         onUi(() -> {
             CompletableFuture<CredentialPickResult> picker = new CompletableFuture<>();
             fake.pickAnswer = picker;
-            buttons.query(query(page(), ORIGIN, pick("password", 8, 16, 200, 24), true), window, anchors);
+            buttons.query(query(page(), ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
             made.getFirst().close();
             assertThat(picker).isCancelled();
             assertThat(replies).containsExactly("0 {}");
@@ -346,10 +414,10 @@ class FieldButtonsTest {
     @Test void anAnchorThatThrowsIsRefused() throws Exception {
         onUi(() -> {
             Page page = page();
-            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, css -> {
+            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, area -> {
                 throw new IllegalArgumentException("An area must lie inside its content");
             });
-            buttons.query(query(page, ORIGIN, pick("password", 8, 700, 200, 24), true), window, anchors);
+            buttons.query(query(page, ORIGIN, pick("password", 8, 700, 200, 24), true), window, canvas, anchors);
             assertThat(fake.picks).isEmpty();
             assertThat(replies).hasSize(2).allSatisfy(reply -> assertThat(reply)
                 .isEqualTo(PageQuery.REFUSED + " The field is not on the page."));
@@ -358,13 +426,13 @@ class FieldButtonsTest {
 
     /** F29: a fill that fails is logged with the exception alone, and the page is told nothing was chosen. */
     @Test void aFailedFillIsLoggedWithoutTheLogin() throws Exception {
-        var failing = new FieldButtons(new VaultLogins(fake.api()), members -> {
+        var failing = new FieldButtons(new VaultLogins(fake.api()), (username, password) -> {
             throw new IllegalStateException("The reply could not be written");
         });
         try (var log = new CapturedLog(FieldButtons.class.getName())) {
             onUi(() -> {
                 fake.login(NAME, "ada", "pw");
-                failing.query(query(page(), ORIGIN, pick("username", 8, 16, 200, 24), true), window, anchors);
+                failing.query(query(page(), ORIGIN, pick("username", 8, 16, 200, 24), true), window, canvas, anchors);
                 assertThat(replies).containsExactly("0 {}");
                 assertThat(fake.issued).singleElement().satisfies(credential -> assertThat(FakeVault.closed(credential)).isTrue());
             });
@@ -379,9 +447,9 @@ class FieldButtonsTest {
     @Test void aQueryOfAnotherPageThrows() throws Exception {
         onUi(() -> {
             fake.pickAnswer = new CompletableFuture<>();
-            buttons.query(query(page(), ORIGIN, pick("password", 8, 16, 200, 24), true), window, anchors);
+            buttons.query(query(page(), ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
             PageQuery other = query(page(), ORIGIN, pick("password", 8, 16, 200, 24), true);
-            org.assertj.core.api.Assertions.assertThatThrownBy(() -> buttons.query(other, window, anchors))
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> buttons.query(other, window, canvas, anchors))
                 .isInstanceOf(IllegalArgumentException.class);
             assertThat(fake.picks).hasSize(1);
         });
@@ -390,6 +458,14 @@ class FieldButtonsTest {
     @Test void theScriptIsTheResource() {
         assertThat(FieldButtons.SCRIPT).startsWith("/*").contains("Symbol.for('dev.jasper.browser.logins')").endsWith("})();");
         assertThat(FieldButtons.PICK).isEqualTo("login.pick");
+    }
+
+    /** F19: the answer is the login's non-empty members, in order, written strictly. */
+    @Test void theReplyIsTheLoginsNonEmptyMembers() {
+        assertThat(FieldButtons.reply("ada", "pw".toCharArray())).isEqualTo("{\"username\":\"ada\",\"password\":\"pw\"}");
+        assertThat(FieldButtons.reply("", "pw".toCharArray())).isEqualTo("{\"password\":\"pw\"}");
+        assertThat(FieldButtons.reply("a\"b", new char[0])).isEqualTo("{\"username\":\"a\\\"b\"}");
+        assertThat(FieldButtons.reply("", new char[0])).isEqualTo("{}");
     }
 
     /** A {@code login.pick} of {@code field} at the CSS rectangle given, as login-fields.js sends it. */
@@ -418,12 +494,17 @@ class FieldButtonsTest {
         return new PageQuery(page, origin, request, () -> {
             activations.incrementAndGet();
             return clicked;
-        }, shown::get, (code, text) -> replies.add(code + " " + text));
+        }, press::get, shown::get, (code, text) -> replies.add(code + " " + text));
     }
 
     private static Page page() {
         return new Page(URI.create("https://example.com/sign-in"), () -> { }, PageTestAccess.noFavicons(), Runnable::run,
             PageContext.persistent());
+    }
+
+    /** A left click at {@code x}, {@code y} on the page's canvas. */
+    private static LastPress click(int x, int y) {
+        return new LastPress(1, 0, 0, x, y);
     }
 
     private static String text(LogRecord record) {

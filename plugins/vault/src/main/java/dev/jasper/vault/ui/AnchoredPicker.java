@@ -5,10 +5,18 @@ import dev.jasper.sdk.ui.*;
 import dev.jasper.vault.api.*;
 import dev.jasper.vault.service.AnchoredPickPrompt;
 import java.util.*;
+import java.util.function.LongSupplier;
 
-/** Vault producer: popover -> owned real editor -> same pending picker; creation never selects or grants. */
+/**
+ * Vault producer: popover -> owned real editor -> same pending picker; creation never selects or grants. A choice (a
+ * credential's row, None or New Credential…, pressed or entered) that comes within {@link #SETTLE_NANOS} of the popover
+ * showing, each time it shows, is ignored and the picker stays open, so a press meant for what was under it, as a
+ * double-click's second press, chooses nothing (Browser plan 8's L20); Cancel, Escape and the search are never ignored.
+ */
 public final class AnchoredPicker {
     public static final String MENU="credential.menu",NONE="credential.none",CREATE="credential.create",CANCEL="credential.cancel";
+    /** How long after the popover shows a choice is ignored: 500 ms. */
+    public static final long SETTLE_NANOS=500_000_000L;
     private final PluginContext context;
     private final VaultManager manager;
     private final AnchoredPickPrompt prompt;
@@ -17,8 +25,12 @@ public final class AnchoredPicker {
     private UiView view;
     private String query,active="";
     private boolean creating;
-    public AnchoredPicker(PluginContext context,VaultManager manager,AnchoredPickPrompt prompt){
-        this.context=context;this.manager=manager;this.prompt=prompt;editors=new EntryPresenter(context);
+    // The clock a choice is timed by, in nanoseconds, and when the popover last showed on it.
+    private final LongSupplier clock;
+    private long shownAt;
+    /** The picker of {@code prompt}, timing a choice by {@code clock}, in nanoseconds: {@code System::nanoTime}, or a test's. */
+    public AnchoredPicker(PluginContext context,VaultManager manager,AnchoredPickPrompt prompt,LongSupplier clock){
+        this.context=context;this.manager=manager;this.prompt=prompt;this.clock=Objects.requireNonNull(clock,"clock");editors=new EntryPresenter(context);
         query=prompt.request().search();
         prompt.onDismiss(()->{editors.close();if(popup!=null)popup.close();});
     }
@@ -27,7 +39,7 @@ public final class AnchoredPicker {
         var shown=context.windows().popover(prompt.request().anchor());popup=shown;
         view=context.kit().create(new ViewSpec(menu()),this::handle);shown.setContent(view);
         shown.onClosed(()->{if(popup==shown)popup=null;if(!creating&&!prompt.settled())prompt.cancel();});
-        shown.show();view.focus(MENU);
+        shown.show();shownAt=clock.getAsLong();view.focus(MENU);
     }
     private Nodes.PickerMenu menu(){
         var items=new ArrayList<Nodes.PickerItem>();
@@ -44,12 +56,15 @@ public final class AnchoredPicker {
             case UiEvent.Edited e when e.id().equals(MENU)->{query=e.text();active="";view.update(new ViewSpec(menu()));}
             case UiEvent.Selected e when e.id().equals(MENU)->active=e.ids().stream().findFirst().orElse("");
             case UiEvent.Action e when e.id().equals(CANCEL)->prompt.cancel();
+            case UiEvent.Action _ when settling()->{}
             case UiEvent.Action e when e.id().equals(NONE)->prompt.clear();
             case UiEvent.Action e when e.id().equals(CREATE)->create();
             case UiEvent.Action e->{try{prompt.choose(UUID.fromString(e.id()));}catch(IllegalArgumentException ignored){}}
             default->{}
         }
     }
+    /** Whether the popover showed less than {@link #SETTLE_NANOS} ago, when a choice is ignored. */
+    private boolean settling(){return clock.getAsLong()-shownAt<SETTLE_NANOS;}
     private void create(){
         creating=true;popup.close();
         if(prompt.settled()||!prompt.request().anchor().isOpen()){creating=false;return;}
