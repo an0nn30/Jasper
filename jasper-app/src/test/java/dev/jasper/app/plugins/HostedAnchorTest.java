@@ -3,6 +3,7 @@ package dev.jasper.app.plugins;
 import dev.jasper.sdk.ui.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.*;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
@@ -33,18 +34,86 @@ class HostedAnchorTest {
             .as("a window at the screen's edge: the screen still bounds it").isEqualTo(new java.awt.Rectangle(760,142,240,150));
     }
 
-    /** Browser plan 8 Task 1b: an area popover goes through {@code fit} from the area on the screen, below it or above it. */
+    /** Browser plan 8 Task 1b: an area popover is fitted from the area on the screen, below it or above it. */
     @Test void anAreaPopoverFitsBelowTheArea() {
         var screen=new java.awt.Rectangle(0,0,1000,800);
         var area=new java.awt.Rectangle(10,20,30,8);
         var onScreen=HostedPopover.onScreen(new java.awt.Point(100,100),new java.awt.Dimension(640,480),area);
         assertThat(onScreen).isEqualTo(new java.awt.Rectangle(110,120,30,8));
-        assertThat(HostedPopover.fit(onScreen,new java.awt.Dimension(200,100),screen,screen)).isEqualTo(new java.awt.Rectangle(110,128,200,100));
-        assertThat(HostedPopover.fit(HostedPopover.onScreen(new java.awt.Point(100,700),new java.awt.Dimension(640,480),area),new java.awt.Dimension(200,100),screen,screen))
+        assertThat(HostedPopover.fitBeside(onScreen,new java.awt.Dimension(200,100),screen,screen)).isEqualTo(new java.awt.Rectangle(110,128,200,100));
+        assertThat(HostedPopover.fitBeside(HostedPopover.onScreen(new java.awt.Point(100,700),new java.awt.Dimension(640,480),area),new java.awt.Dimension(200,100),screen,screen))
             .as("no room below: above the area").isEqualTo(new java.awt.Rectangle(110,620,200,100));
-        assertThat(HostedPopover.fit(onScreen,new java.awt.Dimension(20,100),screen,screen).width).as("as wide as the area").isEqualTo(30);
+        assertThat(HostedPopover.fitBeside(onScreen,new java.awt.Dimension(20,100),screen,screen).width).as("as wide as the area").isEqualTo(30);
         assertThat(HostedPopover.onScreen(new java.awt.Point(100,100),new java.awt.Dimension(190,22),null))
             .as("a control's anchor is its bounds").isEqualTo(new java.awt.Rectangle(100,100,190,22));
+    }
+
+    /**
+     * Browser plan 8's L37: an area anchor's popover never covers its area, so it never opens over the press that opened
+     * it. It is no taller than the larger room the usable screen leaves below or above the area, below the area where it
+     * fits there and otherwise above it; a control's popover keeps its clamp.
+     */
+    @Test void anAreaPopoverNeverCoversItsArea() {
+        var screen=new java.awt.Rectangle(0,0,1000,800);
+        var window=new java.awt.Rectangle(100,100,600,600);
+        var tall=new java.awt.Rectangle(110,100,580,600);
+        var preferred=new java.awt.Dimension(220,300);
+        assertThat(HostedPopover.room(tall,screen)).isEqualTo(100);
+        assertThat(HostedPopover.fitBeside(tall,preferred,screen,window)).as("an area filling its window's height: below it, squeezed")
+            .isEqualTo(new java.awt.Rectangle(110,700,580,100));
+        assertThat(HostedPopover.fit(tall,preferred,screen,window).intersects(tall)).as("a control's placement clamps over it").isTrue();
+
+        var shortScreen=new java.awt.Rectangle(0,0,800,300);
+        var middle=new java.awt.Rectangle(50,120,200,60);
+        assertThat(HostedPopover.fitBeside(middle,new java.awt.Dimension(220,200),shortScreen,shortScreen)).as("the middle of a short screen: below, squeezed")
+            .isEqualTo(new java.awt.Rectangle(50,180,220,120));
+        var lower=new java.awt.Rectangle(50,150,200,60);
+        assertThat(HostedPopover.fitBeside(lower,new java.awt.Dimension(220,200),shortScreen,shortScreen)).as("more room above: above, squeezed")
+            .isEqualTo(new java.awt.Rectangle(50,0,220,150));
+
+        var bottom=new java.awt.Rectangle(10,700,300,100);
+        assertThat(HostedPopover.fitBeside(bottom,preferred,screen,screen)).as("an area at the screen's bottom: above it")
+            .isEqualTo(new java.awt.Rectangle(10,400,300,300));
+
+        for(var area:List.of(tall,middle,lower,bottom,new java.awt.Rectangle(10,20,30,8),new java.awt.Rectangle(0,-50,40,500),new java.awt.Rectangle(0,650,40,500)))
+            for(var usable:List.of(screen,shortScreen)){
+                var fitted=HostedPopover.fitBeside(area,new java.awt.Dimension(400,900),usable,usable);
+                if(fitted!=null)assertThat(fitted.intersects(area)).as("%s on %s: %s",area,usable,fitted).isFalse();
+            }
+    }
+
+    /** L37: with no room below or above the area, there is nowhere off it to put a popover. */
+    @Test void anAreaFillingTheScreenLeavesNoRoom() {
+        var screen=new java.awt.Rectangle(0,20,1000,780);
+        assertThat(HostedPopover.room(new java.awt.Rectangle(0,20,1000,780),screen)).isZero();
+        assertThat(HostedPopover.fitBeside(new java.awt.Rectangle(0,20,1000,780),new java.awt.Dimension(200,100),screen,screen)).isNull();
+        assertThat(HostedPopover.fitBeside(new java.awt.Rectangle(300,0,30,900),new java.awt.Dimension(200,100),screen,screen)).as("past both edges").isNull();
+        assertThat(HostedPopover.fitBeside(new java.awt.Rectangle(300,21,30,778),new java.awt.Dimension(200,100),screen,screen)).as("a pixel either side: below it")
+            .isEqualTo(new java.awt.Rectangle(300,799,200,1));
+    }
+
+    /**
+     * L37: placing an area anchor's popover where neither side of the area has room closes it on the next turn, as a
+     * dismissal does, so its producer hears it closed; with room it stays open beside the area.
+     */
+    @Test void anAreaPopoverWithNoRoomBesideItsAreaCloses() throws Exception {
+        var page=new AtomicReference<Page>();var closed=new AtomicInteger();var popover=new AtomicReference<HostedPopover>();
+        var screen=new java.awt.Rectangle(0,0,1000,800);
+        SwingUtilities.invokeAndWait(() -> {
+            page.set(Page.open("test.area.room"));
+            popover.set(page.get().popover());popover.get().onClosed(closed::incrementAndGet);
+            var area=new java.awt.Rectangle(100,700,30,90);
+            var placed=popover.get().place(area,screen,screen);
+            assertThat(placed).isNotNull();assertThat(placed.intersects(area)).isFalse();
+            assertThat(placed.y+placed.height).as("above the area").isEqualTo(700);
+            assertThat(popover.get().place(new java.awt.Rectangle(100,0,30,800),screen,screen)).as("no room").isNull();
+            assertThat(closed).as("not while it is being placed").hasValue(0);
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            assertThat(closed).as("closed on the next turn").hasValue(1);
+            assertThat(page.get().anchor().isOpen()).as("the anchor stays open").isTrue();
+            page.get().close();
+        });
     }
 
     /** A view on a page: a Custom node whose canvas content is registered, in a content tab, and an area anchor on it. */
@@ -55,7 +124,7 @@ class HostedAnchorTest {
             model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(java.util.UUID.randomUUID(),tab -> {},tab -> {},tab -> {},() -> {}));
             var ui=new HostedUi(id,model,new Containment(() -> true),Runnable::run,() -> true,() -> true,Page.class.getClassLoader(),() -> dev.jasper.sdk.Variant.DARK,h -> () -> {},windows,null);
             var kit=new HostedKit(id,() -> true,ui::kitThemes,null,new Containment(() -> true));ui.kit(kit);
-            var view=(HostedKitView) kit.create(new ViewSpec(new Nodes.Custom("page",ControlState.READY,"page.content",Nodes.CustomKind.PREVIEW,"Page")),e -> {});
+            var view=kit.create(new ViewSpec(new Nodes.Custom("page",ControlState.READY,"page.content",Nodes.CustomKind.PREVIEW,"Page")),e -> {});
             var canvas=new JComponent(){};canvas.setSize(640,480);
             view.registerContent(new CustomContent("page.content",Nodes.CustomKind.PREVIEW,canvas,() -> {}));
             var window=ui.windows().openTab(new ContentSpec("owner","Owner"),null,view);

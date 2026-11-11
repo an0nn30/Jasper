@@ -37,14 +37,15 @@ final class HostedPopover implements PluginPopover {
     @Override public void show(){kit.guard();if(closed||!anchor.isOpen())throw new IllegalArgumentException("Expired anchor");if(content==null)throw new IllegalStateException("Missing popup content");shown=true;
         // An area's content is the page, no picker: it gets neither picker property (F16).
         if(anchor.area==null){anchor.expanded(true);anchor.target.putClientProperty("Jasper.pickerDismiss",dismiss);}
-        if(!GraphicsEnvironment.isHeadless()){refit();var p=anchor.target.getLocationOnScreen();var bounds=placement();popup.show(anchor.target,bounds.x-p.x,bounds.y-p.y);refit();}
+        if(!GraphicsEnvironment.isHeadless()){var bounds=refit();if(bounds==null)return;var p=anchor.target.getLocationOnScreen();popup.show(anchor.target,bounds.x-p.x,bounds.y-p.y);refit();}
     }
     /**
      * Fitting is host geometry, and for an area anchor the producer's area, which minting kept inside its content; no
-     * producer descriptor values enter attachment authority. The popover goes below
-     * the control (or the area, for an area anchor), or above it where the screen has no room below; its left edge is the control's while the control's
-     * window has room to the right, and otherwise its right edge is the control's, as Chrome's bookmark bubble under its
-     * menu button and IntelliJ's popups sit, though never left of the window. The usable screen bounds it last.
+     * producer descriptor values enter attachment authority. The popover goes below the control, or above it where the
+     * screen has no room below; its left edge is the control's while the control's window has room to the right, and
+     * otherwise its right edge is the control's, as Chrome's bookmark bubble under its menu button and IntelliJ's popups
+     * sit, though never left of the window. The usable screen bounds it last, so a popover taller than the room on
+     * either side covers part of its control. An area anchor's popover goes through {@link #fitBeside} instead.
      */
     static Rectangle fit(Rectangle anchor,Dimension preferred,Rectangle usable,Rectangle window){
         // A popover is at least as wide as the control that opened it (a picker matches its face).
@@ -54,20 +55,46 @@ final class HostedPopover implements PluginPopover {
         int x=anchor.x+width<=window.x+window.width?anchor.x:Math.max(window.x,anchor.x+anchor.width-width);
         return new Rectangle(Math.max(usable.x,Math.min(x,usable.x+usable.width-width)),Math.max(usable.y,Math.min(y,usable.y+usable.height-height)),width,height);
     }
+    /**
+     * An area anchor's popover: as {@link #fit} places it, but never over the area, so it never opens over the press that
+     * opened it (Browser plan 8's L37). It is no taller than the larger {@link #room} beside the area, so it goes below the
+     * area where it fits there and above it otherwise, its rows scrolling.
+     *
+     * @return where it goes, or null when the usable screen leaves no room below or above the area
+     */
+    static Rectangle fitBeside(Rectangle area,Dimension preferred,Rectangle usable,Rectangle window){
+        int room=room(area,usable);
+        return room<1?null:fit(area,new Dimension(preferred.width,Math.min(preferred.height,room)),usable,window);
+    }
+    /** The larger room the usable screen leaves below or above {@code area}; zero or less when it leaves none. */
+    static int room(Rectangle area,Rectangle usable){return Math.max(usable.y+usable.height-(area.y+area.height),area.y-usable.y);}
     private Rectangle screen(){var gc=anchor.target.getGraphicsConfiguration();var bounds=new Rectangle(gc.getBounds());var insets=Toolkit.getDefaultToolkit().getScreenInsets(gc);bounds.x+=insets.left;bounds.y+=insets.top;bounds.width-=insets.left+insets.right;bounds.height-=insets.top+insets.bottom;return bounds;}
     /** Where an anchor is on the screen: its control's bounds, or the area of its content for an area anchor. */
     static Rectangle onScreen(Point location,Dimension size,Rectangle area){
         return area==null?new Rectangle(location,size):new Rectangle(location.x+area.x,location.y+area.y,area.width,area.height);
     }
-    private Rectangle placement(){var p=anchor.target.getLocationOnScreen();return fit(onScreen(p,anchor.target.getSize(),anchor.area),content.component().getPreferredSize(),screen(),window());}
     /** The anchor's window on the screen; the usable screen when it has none. */
     private Rectangle window(){var window=SwingUtilities.getWindowAncestor(anchor.target);return window==null||!window.isShowing()?screen():new Rectangle(window.getLocationOnScreen(),window.getSize());}
-    private void refit(){
-        if(closed||!shown||fitting||content==null||GraphicsEnvironment.isHeadless()||!anchor.isOpen())return;
-        fitting=true;try{
-            content.component().setAvailableHeight(Math.max(1,com.formdev.flatlaf.util.UIScale.unscale(screen().height)));
-            var bounds=placement();popup.setPopupSize(bounds.getSize());if(popup.isVisible())popup.setLocation(bounds.x,bounds.y);
-        }finally{fitting=false;}
+    /** Fits the shown popover to where its anchor is now, as {@link #place} does; null when it did nothing or there was no room. */
+    private Rectangle refit(){
+        if(closed||!shown||fitting||content==null||GraphicsEnvironment.isHeadless()||!anchor.isOpen())return null;
+        fitting=true;try{return place(onScreen(anchor.target.getLocationOnScreen(),anchor.target.getSize(),anchor.area),screen(),window());}
+        finally{fitting=false;}
+    }
+    /**
+     * Sizes and moves the popover for its anchor at {@code at} on a screen whose usable bounds are {@code usable}, and
+     * answers where it goes. Its content may be as tall as the usable screen, or for an area anchor as the larger room
+     * beside the area. Where an area anchor leaves no room below or above its area, the popover closes on the next turn,
+     * as a dismissal does, and the answer is null; its anchor stays open.
+     */
+    Rectangle place(Rectangle at,Rectangle usable,Rectangle window){
+        int room=anchor.area==null?usable.height:room(at,usable);
+        if(anchor.area!=null&&room<1){SwingUtilities.invokeLater(this::close);return null;}
+        content.component().setAvailableHeight(Math.max(1,com.formdev.flatlaf.util.UIScale.unscale(room)));
+        var preferred=content.component().getPreferredSize();
+        var bounds=anchor.area==null?fit(at,preferred,usable,window):fitBeside(at,preferred,usable,window);
+        popup.setPopupSize(bounds.getSize());if(popup.isVisible())popup.setLocation(bounds.x,bounds.y);
+        return bounds;
     }
     /**
      * The popup went away while {@code current} was being dispatched, or none was. Swing closes a popup on the press that

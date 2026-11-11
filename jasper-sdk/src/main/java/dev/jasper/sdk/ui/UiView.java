@@ -17,11 +17,13 @@ public interface UiView extends Subscription {
  /**
   * Mint attachment authority from an area of a mounted, visible, enabled, not busy {@link Nodes.Custom} node with
   * registered content, in the content component's coordinates, such as a field on a page. A popover opens below the
-  * area, or above it when the screen has no room below, at least as wide as the area; a dialog may take the anchor as
-  * its owner. A press inside the area closes the popover and goes no further; a press elsewhere closes it and reaches
-  * the content. Hiding, disabling, removing or moving the node closes the anchor, and so does resizing the content: a
-  * page laid out again has moved what was in the area. The host sees where the content is, not what it draws there: a
-  * content that moves what it draws, by scrolling or zooming, closes the anchor itself.
+  * area, or above it when the screen has no room below, at least as wide as the area, and never over it: it is no
+  * taller than the larger room the screen leaves below or above the area (a picker menu's rows scroll), and it closes
+  * when neither side has room. A dialog may take the anchor as its owner. A press inside the area closes the popover
+  * and goes no further; a press elsewhere closes it and reaches the content. Hiding, disabling, removing or moving the
+  * node closes the anchor, and so does resizing the content: a page laid out again has moved what was in the area. The
+  * host sees where the content is, not what it draws there: a content that moves what it draws, by scrolling or
+  * zooming, closes the anchor itself.
   *
   * @param customId a Custom node's id
   * @param area the area of its content, inside the content's bounds

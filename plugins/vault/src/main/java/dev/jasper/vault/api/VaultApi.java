@@ -110,9 +110,10 @@ public interface VaultApi {
      * attaches to the anchor too): a search field holding the request's search, a None row when the request allows
      * clearing and the search is empty, a row for each credential the search matches and New Credential…, which opens
      * Vault's own editor and then the chooser again without choosing or granting anything. A choice made within 500 ms
-     * of the chooser showing is ignored. Choosing a credential is a one-time grant for this plugin; naming an id in the
-     * request grants nothing. The interface default shows {@link #pick(WindowHandle)} instead, without the search, and
-     * answers Chosen or Cancelled.
+     * of the chooser showing is ignored. A chooser with a starting search has no active row until the user moves to one
+     * with Up, Down or the pointer, so Enter in its search chooses nothing; without one, the first row is active.
+     * Choosing a credential is a one-time grant for this plugin; naming an id in the request grants nothing. The
+     * interface default shows {@link #pick(WindowHandle)} instead, without the search, and answers Chosen or Cancelled.
      *
      * @param owner the window the request comes from
      * @param request the anchor, the current credential, whether None is offered and the starting search

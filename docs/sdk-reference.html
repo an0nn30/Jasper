@@ -8795,20 +8795,23 @@ and draws a UTILITY row's icon without a tile.</p></div>
 <div class="doc"><p>A searchable menu of rich rows, such as a <a href="#dev.jasper.sdk.ui.PluginPopover"><code>PluginPopover</code></a>'s content for a PICKER choice: a search field over
 <code>items</code>, then a footer row after a hairline. The kit does not filter: typing reports <a href="#dev.jasper.sdk.ui.UiEvent.Edited"><code>UiEvent.Edited</code></a>
 naming this node, and the owner answers with the matching items. Up and Down move the active row, wrapping round
-and including the footer, and report <a href="#dev.jasper.sdk.ui.UiEvent.Selected"><code>UiEvent.Selected</code></a> naming this node and the row; Enter or a left press
-accepts a row as <a href="#dev.jasper.sdk.ui.UiEvent.Action"><code>UiEvent.Action</code></a> with the row's id (<code>footerAction</code> for the footer); Escape reports
-<code>cancelAction</code>. While an input method holds uncommitted text these keys do nothing. The checked row (the
+and including the footer (from no active row, Down goes to the first row and Up to the last), and report
+<a href="#dev.jasper.sdk.ui.UiEvent.Selected"><code>UiEvent.Selected</code></a> naming this node and the row; Enter or a left press accepts a row as <a href="#dev.jasper.sdk.ui.UiEvent.Action"><code>UiEvent.Action</code></a>
+with the row's id (<code>footerAction</code> for the footer), and Enter accepts nothing while no row is active; Escape
+reports <code>cancelAction</code>. While an input method holds uncommitted text these keys do nothing. The checked row (the
 current value) and the active row (the keyboard highlight) are distinct. At most nine rows show before the list
 scrolls.</p></div>
 <h5>Components</h5>
 <div class="table-wrap"><table class="components"><tbody>
 <tr id="dev.jasper.sdk.ui.Nodes.PickerMenu.id()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>id</b></code></td><td>the node id, unique in its view</td></tr>
 <tr id="dev.jasper.sdk.ui.Nodes.PickerMenu.state()"><td class="ct"><code><a class="tl" href="#dev.jasper.sdk.ui.ControlState">ControlState</a></code></td><td class="cn"><code><b>state</b></code></td><td>visibility and interaction state</td></tr>
-<tr id="dev.jasper.sdk.ui.Nodes.PickerMenu.query()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>query</b></code></td><td>the search field's text; the field takes it whenever it changes</td></tr>
+<tr id="dev.jasper.sdk.ui.Nodes.PickerMenu.query()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>query</b></code></td><td>the search field's text; the field takes it whenever it changes, with the caret at its end, and keeps
+    it unselected when it takes the focus</td></tr>
 <tr id="dev.jasper.sdk.ui.Nodes.PickerMenu.placeholder()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>placeholder</b></code></td><td>the search field's hint while it is empty, and its accessible name</td></tr>
 <tr id="dev.jasper.sdk.ui.Nodes.PickerMenu.items()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/List.html" title="java.util.List">List</a>&lt;<a class="tl" href="#dev.jasper.sdk.ui.Nodes.PickerItem">Nodes.PickerItem</a>&gt;</code></td><td class="cn"><code><b>items</b></code></td><td>the rows in order; ids are unique, and accepting a row reports its id as the action</td></tr>
 <tr id="dev.jasper.sdk.ui.Nodes.PickerMenu.checkedId()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>checkedId</b></code></td><td>the id of the row drawn with a check mark (the current value); empty for none</td></tr>
-<tr id="dev.jasper.sdk.ui.Nodes.PickerMenu.activeId()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>activeId</b></code></td><td>the id of the keyboard-active row, applied when it or the rows change</td></tr>
+<tr id="dev.jasper.sdk.ui.Nodes.PickerMenu.activeId()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>activeId</b></code></td><td>the id of the keyboard-active row, applied when it or the rows change; one naming no row, such as
+    empty, leaves no row active</td></tr>
 <tr id="dev.jasper.sdk.ui.Nodes.PickerMenu.noMatches()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>noMatches</b></code></td><td>the line shown, muted, while <code>items</code> is empty</td></tr>
 <tr id="dev.jasper.sdk.ui.Nodes.PickerMenu.footerLabel()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>footerLabel</b></code></td><td>the footer row's label, drawn in the link colour; the default look draws the add glyph before
     it, so the footer suits a command that creates a value. Not blank</td></tr>
@@ -11550,11 +11553,13 @@ for good) or removed one (Backspace with nothing typed, or a token's remove butt
 <p class="badges"><span class="since">since 0.32.0</span></p>
 <div class="doc"><p>Mint attachment authority from an area of a mounted, visible, enabled, not busy <a href="#dev.jasper.sdk.ui.Nodes.Custom"><code>Nodes.Custom</code></a> node with
 registered content, in the content component's coordinates, such as a field on a page. A popover opens below the
-area, or above it when the screen has no room below, at least as wide as the area; a dialog may take the anchor as
-its owner. A press inside the area closes the popover and goes no further; a press elsewhere closes it and reaches
-the content. Hiding, disabling, removing or moving the node closes the anchor, and so does resizing the content: a
-page laid out again has moved what was in the area. The host sees where the content is, not what it draws there: a
-content that moves what it draws, by scrolling or zooming, closes the anchor itself.</p></div>
+area, or above it when the screen has no room below, at least as wide as the area, and never over it: it is no
+taller than the larger room the screen leaves below or above the area (a picker menu's rows scroll), and it closes
+when neither side has room. A dialog may take the anchor as its owner. A press inside the area closes the popover
+and goes no further; a press elsewhere closes it and reaches the content. Hiding, disabling, removing or moving the
+node closes the anchor, and so does resizing the content: a page laid out again has moved what was in the area. The
+host sees where the content is, not what it draws there: a content that moves what it draws, by scrolling or
+zooming, closes the anchor itself.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>customId</code> a Custom node's id</dd><dd><code>area</code> the area of its content, inside the content's bounds</dd><dt>Returns</dt><dd>scoped capability</dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalArgumentException.html">IllegalArgumentException</a> when the id names no such node, the view is not mounted, or the area does not lie
     inside the content's bounds now (an empty area on its edge does)</dd><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/UnsupportedOperationException.html">UnsupportedOperationException</a> if the host predates area anchors</dd></dl>
 </div>
@@ -14744,9 +14749,10 @@ ignores <code>owner</code>.</p></div>
 attaches to the anchor too): a search field holding the request's search, a None row when the request allows
 clearing and the search is empty, a row for each credential the search matches and New Credential…, which opens
 Vault's own editor and then the chooser again without choosing or granting anything. A choice made within 500 ms
-of the chooser showing is ignored. Choosing a credential is a one-time grant for this plugin; naming an id in the
-request grants nothing. The interface default shows <a href="#dev.jasper.vault.api.VaultApi.pick(WindowHandle)"><code>pick(WindowHandle)</code></a> instead, without the search, and
-answers Chosen or Cancelled.</p></div>
+of the chooser showing is ignored. A chooser with a starting search has no active row until the user moves to one
+with Up, Down or the pointer, so Enter in its search chooses nothing; without one, the first row is active.
+Choosing a credential is a one-time grant for this plugin; naming an id in the request grants nothing. The
+interface default shows <a href="#dev.jasper.vault.api.VaultApi.pick(WindowHandle)"><code>pick(WindowHandle)</code></a> instead, without the search, and answers Chosen or Cancelled.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>owner</code> the window the request comes from</dd><dd><code>request</code> the anchor, the current credential, whether None is offered and the starting search</dd><dt>Returns</dt><dd>the outcome</dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalArgumentException.html">IllegalArgumentException</a> when the anchor is not a live anchor Jasper issued</dd></dl>
 </div>
 <div class="member" id="dev.jasper.vault.api.VaultApi.saveLogin(WindowHandle,String,String,char[])">

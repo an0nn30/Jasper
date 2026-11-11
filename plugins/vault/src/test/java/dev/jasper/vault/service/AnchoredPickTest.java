@@ -147,6 +147,58 @@ class AnchoredPickTest extends VaultServiceTest {
    assertThat(result.join()).isInstanceOf(CredentialPickResult.Cleared.class);
   });
  }
+ // Browser plan 8's L36: a chooser opened with a starting search (a page's) activates no row until the user moves to one,
+ // so Enter on what the user types chooses nothing; one without keeps its first row active.
+ /** Adds a login a page's search ({@code example.com}) matches. */
+ void addSite(UUID site){lock.vault().accounts().add(new dev.jasper.vault.model.Account(site,"https://example.com (Corp)","u",new dev.jasper.vault.model.Auth.Password("pw".toCharArray()),java.time.Instant.EPOCH,java.time.Instant.EPOCH));lock.save().join();}
+ @Test void aStartingSearchActivatesNoRowUntilTheUserMovesToOne(@TempDir Path dir)throws Exception{
+  var api=service(dir).forConsumer(SSH);populate();UUID site=UUID.randomUUID();addSite(site);long[] now={0};
+  withChooser(dir,()->now[0],(host,anchor)->{
+   var result=api.pick(window,new CredentialPickRequest(anchor,Optional.empty(),true,"example.com"));
+   assertThat(rows(host)).containsExactly(site.toString());
+   assertThat(menu(host).activeId()).as("no row active, New Credential… included").isEmpty();
+   chooser(host).emit(new dev.jasper.sdk.ui.UiEvent.Selected(dev.jasper.vault.ui.AnchoredPicker.MENU,Set.of(site.toString())));
+   chooser(host).emit(new dev.jasper.sdk.ui.UiEvent.Action(site.toString()));
+   assertThat(result).as("the 500 ms wait still holds").isNotDone();
+   now[0]+=500*MS;
+   chooser(host).emit(new dev.jasper.sdk.ui.UiEvent.Edited(dev.jasper.vault.ui.AnchoredPicker.MENU,"example.co"));
+   assertThat(menu(host).activeId()).as("typing leaves no row active").isEmpty();
+   chooser(host).emit(new dev.jasper.sdk.ui.UiEvent.Action(site.toString()));
+   assertThat(result).as("a row the user has not moved to since typing").isNotDone();
+   assertThat(host.popoverViews(VAULT.id())).as("still open").hasSize(1);
+   chooser(host).emit(new dev.jasper.sdk.ui.UiEvent.Selected(dev.jasper.vault.ui.AnchoredPicker.MENU,Set.of(site.toString())));
+   assertThat(menu(host).activeId()).as("the row the user moved to, in the menu").isEqualTo(site.toString());
+   chooser(host).emit(new dev.jasper.sdk.ui.UiEvent.Action(site.toString()));
+   assertThat(result.join()).isInstanceOfSatisfying(CredentialPickResult.Chosen.class,chosen->assertThat(chosen.credential().id()).isEqualTo(site));
+  });
+ }
+ @Test void aStartingSearchMatchingNothingLeavesNewCredentialInactiveToo(@TempDir Path dir)throws Exception{
+  var api=service(dir).forConsumer(SSH);populate();long[] now={0};
+  withChooser(dir,()->now[0],(host,anchor)->{
+   var result=api.pick(window,new CredentialPickRequest(anchor,Optional.empty(),true,"nothing.example"));
+   assertThat(rows(host)).isEmpty();assertThat(menu(host).activeId()).isEmpty();
+   now[0]+=500*MS;chooser(host).emit(new dev.jasper.sdk.ui.UiEvent.Action(dev.jasper.vault.ui.AnchoredPicker.CREATE));
+   assertThat(host.windowView(VAULT.id(),"New Credential")).as("no editor").isEmpty();
+   chooser(host).emit(new dev.jasper.sdk.ui.UiEvent.Edited(dev.jasper.vault.ui.AnchoredPicker.MENU,""));
+   assertThat(rows(host)).as("cleared: None and every credential").containsExactly(dev.jasper.vault.ui.AnchoredPicker.NONE,PROD.toString(),KEY.toString());
+   assertThat(menu(host).activeId()).as("None is not active either").isEmpty();
+   chooser(host).emit(new dev.jasper.sdk.ui.UiEvent.Selected(dev.jasper.vault.ui.AnchoredPicker.MENU,Set.of(dev.jasper.vault.ui.AnchoredPicker.CREATE)));
+   chooser(host).emit(new dev.jasper.sdk.ui.UiEvent.Action(dev.jasper.vault.ui.AnchoredPicker.CREATE));
+   assertThat(host.windowView(VAULT.id(),"New Credential")).as("the footer the user moved to").isPresent();
+   result.cancel(false);
+  });
+ }
+ @Test void withoutAStartingSearchTheFirstRowIsActiveAsBefore(@TempDir Path dir)throws Exception{
+  var api=service(dir).forConsumer(SSH);populate();long[] now={0};
+  withChooser(dir,()->now[0],(host,anchor)->{
+   var result=api.pick(window,new CredentialPickRequest(anchor,Optional.empty(),true));
+   assertThat(menu(host).activeId()).isEqualTo(dev.jasper.vault.ui.AnchoredPicker.NONE);
+   chooser(host).emit(new dev.jasper.sdk.ui.UiEvent.Edited(dev.jasper.vault.ui.AnchoredPicker.MENU,"prod"));
+   assertThat(menu(host).activeId()).as("the first match").isEqualTo(PROD.toString());
+   now[0]+=500*MS;chooser(host).emit(new dev.jasper.sdk.ui.UiEvent.Action(PROD.toString()));
+   assertThat(result.join()).as("Enter on the active row").isInstanceOfSatisfying(CredentialPickResult.Chosen.class,chosen->assertThat(chosen.credential().id()).isEqualTo(PROD));
+  });
+ }
  @Test void cancelAndTheSearchNeverWait(@TempDir Path dir)throws Exception{
   var api=service(dir).forConsumer(SSH);populate();long[] now={0};
   withChooser(dir,()->now[0],(host,anchor)->{

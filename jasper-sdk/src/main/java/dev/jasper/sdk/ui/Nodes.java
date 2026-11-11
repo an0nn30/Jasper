@@ -652,19 +652,22 @@ public final class Nodes {
      * A searchable menu of rich rows, such as a {@link PluginPopover}'s content for a PICKER choice: a search field over
      * {@code items}, then a footer row after a hairline. The kit does not filter: typing reports {@link UiEvent.Edited}
      * naming this node, and the owner answers with the matching items. Up and Down move the active row, wrapping round
-     * and including the footer, and report {@link UiEvent.Selected} naming this node and the row; Enter or a left press
-     * accepts a row as {@link UiEvent.Action} with the row's id ({@code footerAction} for the footer); Escape reports
-     * {@code cancelAction}. While an input method holds uncommitted text these keys do nothing. The checked row (the
+     * and including the footer (from no active row, Down goes to the first row and Up to the last), and report
+     * {@link UiEvent.Selected} naming this node and the row; Enter or a left press accepts a row as {@link UiEvent.Action}
+     * with the row's id ({@code footerAction} for the footer), and Enter accepts nothing while no row is active; Escape
+     * reports {@code cancelAction}. While an input method holds uncommitted text these keys do nothing. The checked row (the
      * current value) and the active row (the keyboard highlight) are distinct. At most nine rows show before the list
      * scrolls.
      *
      * @param id the node id, unique in its view
      * @param state visibility and interaction state
-     * @param query the search field's text; the field takes it whenever it changes
+     * @param query the search field's text; the field takes it whenever it changes, with the caret at its end, and keeps
+     *     it unselected when it takes the focus
      * @param placeholder the search field's hint while it is empty, and its accessible name
      * @param items the rows in order; ids are unique, and accepting a row reports its id as the action
      * @param checkedId the id of the row drawn with a check mark (the current value); empty for none
-     * @param activeId the id of the keyboard-active row, applied when it or the rows change
+     * @param activeId the id of the keyboard-active row, applied when it or the rows change; one naming no row, such as
+     *     empty, leaves no row active
      * @param noMatches the line shown, muted, while {@code items} is empty
      * @param footerLabel the footer row's label, drawn in the link colour; the default look draws the add glyph before
      *     it, so the footer suits a command that creates a value. Not blank
