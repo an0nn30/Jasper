@@ -124,6 +124,7 @@ public class VaultPlugin implements Plugin {
                 case UNLOCKED -> CompletableFuture.completedFuture(true);
             }, this::showImport, this::vaultChanged);
         service.anchoredPicker(prompt -> new dev.jasper.vault.ui.AnchoredPicker(context,manager,prompt).show(), anchor -> context.windows().popover(anchor).close());
+        service.managerOpener(window -> open(window, Optional.empty()));
         context.services().publishPerConsumer(VaultApi.class, service::forConsumer);
         locked = "lock";
         unlocked = "unlock";

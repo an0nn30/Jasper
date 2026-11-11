@@ -8,11 +8,14 @@ import dev.jasper.vault.api.CredentialDescriptor;
 import dev.jasper.vault.api.Kind;
 import dev.jasper.vault.api.LockState;
 import dev.jasper.vault.api.VaultApi;
+import dev.jasper.vault.crypto.SecureBytes;
 import dev.jasper.vault.lock.LockManager;
 import dev.jasper.vault.model.Account;
 import dev.jasper.vault.model.Auth;
 import dev.jasper.vault.model.Grant;
 import dev.jasper.vault.model.SshKey;
+import dev.jasper.vault.model.Vault;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -50,8 +53,13 @@ public final class VaultService {
     private final Set<AnchoredPickPrompt> anchored=new HashSet<>();
     /** Installs the producer and host capability validation before the API is published. */
     public void anchoredPicker(Consumer<AnchoredPickPrompt> show,Consumer<dev.jasper.sdk.ui.UiAnchor> validate){showAnchored=java.util.Objects.requireNonNull(show);validateAnchor=java.util.Objects.requireNonNull(validate);}
+    private Consumer<WindowHandle> openManager;
+    /** Installs how {@link VaultApi#openManager} opens the manager over a window, before the API is published. */
+    public void managerOpener(Consumer<WindowHandle> open) { openManager = java.util.Objects.requireNonNull(open); }
     private final Set<Grant> oneTime = new HashSet<>();
     private final Map<String, WindowHandle> lastOwner = new HashMap<>();
+    /** For tests: sees each copy {@code saveLogin} takes of a password, so a test can check that it is zeroed. */
+    Consumer<char[]> saveCopies = copy -> { };
 
     public VaultService(LockManager lock, Supplier<Optional<WindowHandle>> fallbackOwner, Consumer<UnlockPrompt> showUnlock,
                         Consumer<GrantPrompt> showGrant, Consumer<PickPrompt> showPick, NotificationGroup notifications) {
@@ -285,5 +293,87 @@ public final class VaultService {
             });
             return result;
         }
+
+        @Override public CompletableFuture<Optional<CredentialDescriptor>> saveLogin(WindowHandle owner, String name,
+                String username, char[] password) {
+            if (name == null || name.isBlank()) throw new IllegalArgumentException("A login needs a name");
+            if (username == null || password == null) throw new IllegalArgumentException("A login's username and password must not be null");
+            if (owner == null || !owner.isOpen()) return CompletableFuture.completedFuture(Optional.empty());
+            lastOwner.put(consumer.id(), owner);
+            char[] copy = password.clone();
+            saveCopies.accept(copy);
+            var result = new CompletableFuture<Optional<CredentialDescriptor>>();
+            // However the save ends, this copy goes; a saved login holds its own (Browser plan 8 F10).
+            result.whenComplete((saved, failure) -> SecureBytes.zero(copy));
+            CompletableFuture<Boolean> unlocked = requestUnlock(owner);
+            result.whenComplete((saved, failure) -> { if (result.isCancelled()) unlocked.cancel(false); });
+            unlocked.whenComplete((ok, failure) -> {
+                if (result.isDone()) return;
+                if (failure != null || !Boolean.TRUE.equals(ok) || !owner.isOpen() || lock.state() != LockState.UNLOCKED) {
+                    result.complete(Optional.empty()); return;
+                }
+                long session = lock.generation();
+                try {
+                    lock.transact(draft -> save(draft, name, username, copy), result::isCancelled).whenComplete((saved, failed) -> {
+                        if (failed == null) result.complete(Optional.of(saved));
+                        // Locked between the unlock and the commit: as a cancelled unlock, no failure to report.
+                        else if (lock.generation() != session) result.complete(Optional.empty());
+                        else result.completeExceptionally(new IllegalStateException("Could not save the login", unwrapped(failed)));
+                    });
+                } catch (RuntimeException failed) { result.completeExceptionally(new IllegalStateException("Could not save the login", failed)); }
+            });
+            return result;
+        }
+
+        /**
+         * In {@code transact}'s draft: the last password login named exactly {@code name} whose only grant is this
+         * plugin's takes the new username and password, keeping its id, grants and created time (F11); otherwise a new
+         * login with a saved grant for this plugin. The draft gets its own copy of {@code password}.
+         */
+        private CredentialDescriptor save(Vault draft, String name, String username, char[] password) {
+            List<Account> accounts = draft.accounts();
+            int replaced = -1;
+            for (int i = 0; i < accounts.size(); i++) {
+                Account account = accounts.get(i);
+                if (account.auth() instanceof Auth.Password && account.name().equals(name) && onlyGrantIsThisPlugins(draft, account.id())) replaced = i;
+            }
+            Instant now = Instant.now();
+            if (replaced >= 0) {
+                Account old = accounts.get(replaced);
+                Account saved = new Account(old.id(), name, username, new Auth.Password(password.clone()), old.created(), now);
+                accounts.set(replaced, saved);
+                old.auth().zero();
+                return describe(saved);
+            }
+            Account saved = new Account(UUID.randomUUID(), name, username, new Auth.Password(password.clone()), now, now);
+            accounts.add(saved);
+            draft.grants().add(new Grant(consumer.id(), saved.id()));
+            return describe(saved);
+        }
+
+        private boolean onlyGrantIsThisPlugins(Vault vault, UUID id) {
+            boolean ours = false;
+            for (Grant grant : vault.grants()) {
+                if (!grant.credentialId().equals(id)) continue;
+                if (!grant.pluginId().equals(consumer.id())) return false;
+                ours = true;
+            }
+            return ours;
+        }
+
+        @Override public Optional<Credential> credentialIfGranted(UUID id) {
+            if (id == null || lock.state() != LockState.UNLOCKED || !lock.vault().grants().contains(new Grant(consumer.id(), id))) return Optional.empty();
+            return copyOf(id);
+        }
+
+        @Override public void openManager(WindowHandle owner) {
+            if (openManager == null) return;
+            lastOwner.put(consumer.id(), owner);
+            openManager.accept(owner);
+        }
+    }
+
+    private static Throwable unwrapped(Throwable failure) {
+        return failure instanceof java.util.concurrent.CompletionException wrapped && wrapped.getCause() != null ? wrapped.getCause() : failure;
     }
 }

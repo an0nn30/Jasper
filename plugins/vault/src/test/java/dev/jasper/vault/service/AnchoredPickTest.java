@@ -66,4 +66,48 @@ class AnchoredPickTest extends VaultServiceTest {
   var pending=api.pick(window,new CredentialPickRequest(new Anchor(),Optional.empty(),true));lock.vault().accounts().clear();shown.getLast().choose(PROD);
   assertThat(pending).isNotDone();shown.getLast().cancel();assertThat(pending.join()).isInstanceOf(CredentialPickResult.Cancelled.class);
  }
+
+ // Browser plan 8 Task 2: the chooser's starting search.
+ static final dev.jasper.sdk.PluginInfo VAULT=new dev.jasper.sdk.PluginInfo("dev.jasper.vault","Credential Vault","0.9.0",Set.of());
+ /** The real chooser on a host-issued anchor: a button in a tab of a fake host whose data lives under {@code dir}. */
+ interface Chooser{void run(dev.jasper.sdk.testing.FakePluginHost host,UiAnchor anchor)throws Exception;}
+ void withChooser(Path dir,Chooser body)throws Exception{
+  dev.jasper.vault.testsupport.KitViews.edt(()->{
+   try(var host=new dev.jasper.sdk.testing.FakePluginHost(dir.resolve("host"))){
+    var context=host.start(VAULT,Set.of(),Set.of(),started->{});
+    var manager=new dev.jasper.vault.ui.VaultManager(lock,Runnable::run,Runnable::run,()->{});
+    service.anchoredPicker(prompt->new dev.jasper.vault.ui.AnchoredPicker(context,manager,prompt).show(),anchor->{});
+    var view=context.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Button("key",dev.jasper.sdk.ui.ControlState.READY,"Key","",dev.jasper.sdk.ui.Nodes.ButtonKind.GHOST,"key","")),event->{});
+    context.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("dev.jasper.vault.page","Page"),null,view);
+    body.run(host,view.anchor("key"));
+   }
+  });
+ }
+ static dev.jasper.sdk.ui.Nodes.PickerMenu menu(dev.jasper.sdk.testing.FakePluginHost host){return (dev.jasper.sdk.ui.Nodes.PickerMenu)host.popoverViews(VAULT.id()).getFirst().spec().root();}
+ static List<String> rows(dev.jasper.sdk.testing.FakePluginHost host){return menu(host).items().stream().map(dev.jasper.sdk.ui.Nodes.PickerItem::id).toList();}
+ @Test void aRequestsSearchStartsTheChooserFiltered(@TempDir Path dir)throws Exception{
+  var api=service(dir).forConsumer(SSH);populate();UUID site=UUID.randomUUID();
+  lock.vault().accounts().add(new dev.jasper.vault.model.Account(site,"https://example.com (Corp)","u",new dev.jasper.vault.model.Auth.Password("pw".toCharArray()),java.time.Instant.EPOCH,java.time.Instant.EPOCH));lock.save().join();
+  assertThat(new CredentialPickRequest(new Anchor(),Optional.empty(),true," example.com\n").search()).as("stripped").isEqualTo("example.com");
+  assertThatThrownBy(()->new CredentialPickRequest(new Anchor(),Optional.empty(),true,null)).isInstanceOf(NullPointerException.class);
+  withChooser(dir,(host,anchor)->{
+   var result=api.pick(window,new CredentialPickRequest(anchor,Optional.empty(),true,"example.com"));
+   assertThat(menu(host).query()).isEqualTo("example.com");
+   assertThat(rows(host)).as("only the matching login, and no None row").containsExactly(site.toString());
+   host.popoverViews(VAULT.id()).getFirst().emit(new dev.jasper.sdk.ui.UiEvent.Edited(dev.jasper.vault.ui.AnchoredPicker.MENU,""));
+   assertThat(rows(host)).as("cleared: None and every credential").containsExactly(dev.jasper.vault.ui.AnchoredPicker.NONE,PROD.toString(),site.toString(),KEY.toString());
+   result.cancel(false);assertThat(host.popoverViews(VAULT.id())).isEmpty();
+  });
+ }
+ @Test void theThreeArgumentRequestStartsWithAnEmptySearch(@TempDir Path dir)throws Exception{
+  var api=service(dir).forConsumer(SSH);populate();
+  var fake=new Anchor();
+  assertThat(new CredentialPickRequest(fake,Optional.empty(),true)).isEqualTo(new CredentialPickRequest(fake,Optional.empty(),true,""));
+  withChooser(dir,(host,anchor)->{
+   var result=api.pick(window,new CredentialPickRequest(anchor,Optional.empty(),true));
+   assertThat(menu(host).query()).isEmpty();
+   assertThat(rows(host)).containsExactly(dev.jasper.vault.ui.AnchoredPicker.NONE,PROD.toString(),KEY.toString());
+   result.cancel(false);
+  });
+ }
 }

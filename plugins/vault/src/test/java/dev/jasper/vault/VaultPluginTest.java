@@ -473,6 +473,48 @@ class VaultPluginTest {
         }
     }); }
 
+    /** Browser plan 8 Task 2: another plugin opens the manager over its window, creating or unlocking first as Open Vault... does. */
+    @Test void openManagerOpensTheManagerOverTheOwner(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
+        VaultPlugin plugin = plugin();
+        try (var host = new FakePluginHost(dir)) {
+            host.setSetting(INFO.id(), "bind_new_vaults_to_device", false);
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            AtomicReference<VaultApi> api = new AtomicReference<>();
+            var consumer = host.start(SSH, Set.of("dev.jasper.vault"), Set.of(), context -> api.set(context.services().require(VaultApi.class)));
+            UUID active = host.addTerminalWindow(), other = host.addTerminalWindow();
+            host.activateTerminalWindow(active);
+            var owner = consumer.terminals().window(other).orElseThrow();
+
+            api.get().openManager(owner);
+            assertThat(host.windows()).as("no vault: the create flow").containsExactly("dialog|Create Vault|true");
+            var create = host.windowView(INFO.id(), "Create Vault").orElseThrow();
+            dev.jasper.vault.testsupport.KitViews.type(create, "password", "test-password");
+            dev.jasper.vault.testsupport.KitViews.type(create, "confirm", "test-password");
+            dev.jasper.vault.testsupport.KitViews.press(create, "submit");
+            host.runBackground(); host.flush();
+            assertThat(plugin.lockManager().state()).isEqualTo(LockState.UNLOCKED);
+            assertThat(host.windows()).as("then the manager").containsExactly("dialog|Credential Vault|true");
+            assertThat(host.openRequests()).as("over the owner").contains("front|" + other).doesNotContain("front|" + active);
+
+            host.requestClose("dialog");
+            assertThat(host.windows()).isEmpty();
+            int fronted = host.openRequests().size();
+            api.get().openManager(owner);
+            assertThat(host.windows()).as("unlocked: the manager at once").containsExactly("dialog|Credential Vault|true");
+            assertThat(host.openRequests().subList(fronted, host.openRequests().size())).contains("front|" + other).doesNotContain("front|" + active);
+
+            host.requestClose("dialog");
+            plugin.lockManager().lock();
+            api.get().openManager(owner);
+            assertThat(host.windows()).as("locked: the unlock prompt first").containsExactly("dialog|Unlock Vault|true");
+            assertThat(plugin.currentUnlock().owner()).isSameAs(owner);
+            plugin.currentUnlock().submit("test-password".toCharArray());
+            host.runBackground(); host.flush();
+            assertThat(host.windows()).containsExactly("dialog|Credential Vault|true");
+            assertThat(host.failures()).isEmpty();
+        }
+    }); }
+
     @Test void grantAndPickerDialogsAnswerThroughTheirViewsAndEscapeDenies() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
         VaultPlugin plugin = plugin();
         try (var host = new FakePluginHost()) {

@@ -15,10 +15,11 @@ public final class AnchoredPicker {
     private final EntryPresenter editors;
     private PluginPopover popup;
     private UiView view;
-    private String query="",active="";
+    private String query,active="";
     private boolean creating;
     public AnchoredPicker(PluginContext context,VaultManager manager,AnchoredPickPrompt prompt){
         this.context=context;this.manager=manager;this.prompt=prompt;editors=new EntryPresenter(context);
+        query=prompt.request().search();
         prompt.onDismiss(()->{editors.close();if(popup!=null)popup.close();});
     }
     public void show(){

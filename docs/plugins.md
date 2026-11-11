@@ -46,7 +46,7 @@ and the action's row in Settings › Keymap shows the same text in its tooltip. 
 | Plugin | Id | Version | On by default | Guide |
 |---|---|---|---|---|
 | Remote | `dev.jasper.remote` | 0.19.0 | Yes | [Remote](remote.md) |
-| Credential Vault | `dev.jasper.vault` | 0.8.0 | Yes | [Credential Vault](credential-vault.md) |
+| Credential Vault | `dev.jasper.vault` | 0.9.0 | Yes | [Credential Vault](credential-vault.md) |
 | Editor | `dev.jasper.editor` | 0.19.0 | Yes | [Editor](editor.md) |
 | File Server | `dev.jasper.fileserver` | 0.8.0 | Yes | [File Server](file-server.md) |
 | Project Index | `dev.jasper.indexer` | 0.4.0 | Yes | [Project Index](project-index.md) |

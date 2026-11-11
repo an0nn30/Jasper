@@ -255,8 +255,15 @@ its grants. The importing plugin gets a saved grant for every key and for each c
 key file. Escape or **Cancel** stops the import until saving starts. If the import's window closed during the save, the
 keys stay in the vault and a notice asks you to re-import the hosts.
 
-**Vault Plugin Grants...** shows the saved grants as "*plugin id* — *entry name*"; select one and press **Revoke** to
-make that plugin ask again, or **Back to entries**. One-time permissions end when the vault locks.
+A plugin can also save a login, as the Browser does when its sign-in dialog's **Remember this password** is on. The
+vault unlocks first if needed, and the login comes with a saved grant for that plugin. Saving again under the same name
+replaces the username and password of the plugin's own login of that name, the one whose only saved grant is that
+plugin's; a login of that name that another plugin may also read, or that the plugin has no grant for, is left alone,
+and a new one is added beside it.
+
+**Vault Plugin Grants...** shows the saved grants as "*plugin id* — *entry name*", a saved login's grant among them;
+select one and press **Revoke** to make that plugin ask again, or **Back to entries**. One-time permissions end when the
+vault locks.
 
 ## Settings
 
