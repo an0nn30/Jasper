@@ -50,11 +50,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  * chosen in the Vault's picker sign in, anything else cancels; the dialog offers the Vault's controls only as the
  * challenge allows, and none without the Vault or in /dev/null; a main-frame load start cancels the earlier document's
  * challenges (F8); one answer serves the page's waiting challenges of the same protection space (F30); a sign-in
- * answered with "Remember this password" is saved at the page's next main-frame 2xx from its origin, and a remembered
- * login fills the top-level challenge in without the dialog, once until its origin answers and that page commits
- * (review focus 1, L30); and the item's close and the plugin's stop cancel every challenge exactly once and drop every
- * save, its password zeroed (review focus 5). The pages are stand-in items' own on the testkit's fake host, the Vault is
- * {@link FakeVault}, and Chromium's side is a recording {@link SignIn}.
+ * answered with "Remember this password" is saved at the page's next main-frame 2xx from its origin in the same
+ * navigation (L34), and a remembered login fills the top-level challenge of a navigation the user began in without the
+ * dialog (L35), once until its origin answers and that page commits (review focus 1, L30); and the item's close and
+ * the plugin's stop cancel every challenge exactly once and drop every save, its password zeroed (review focus 5). The
+ * pages are stand-in items' own on the testkit's fake host, the Vault is {@link FakeVault}, and Chromium's side is a
+ * recording {@link SignIn}.
  */
 class HttpSignInsTest {
     private static final String ID = "dev.jasper.browser";
@@ -62,6 +63,8 @@ class HttpSignInsTest {
     private static final String TOP = "https://intranet.example/", NEXT = "https://intranet.example/next";
     // The login name of TOP's sign-ins for the realm Corp.
     private static final String CORP = "https://intranet.example (Corp)";
+    // When the user's press or key activates the page, and when a script's navigation starts long after it (L35).
+    private static final long CLICK = 1_000, SCRIPTED = CLICK + 60_000;
     private final MemoryStores memory = new MemoryStores();
     private final FakeVault fake = new FakeVault();
     // What Chromium was told, in order: "NAME proceed USER PASSWORD" or "NAME cancel".
@@ -1105,12 +1108,12 @@ class HttpSignInsTest {
         fake.login(CORP, "u", "wrong");
         String bounce = TOP + "redirect?to=https://elsewhere.example/";
         onUiThread(() -> {
-            page.mainFrameRequested(TOP);
+            clicked(TOP);
             challenge("a", TOP, "intranet.example", 443, "Corp", false);
-            page.mainFrameRequested(bounce);
+            clicked(bounce);
             page.mainFrameResponded(bounce, 200);
             PageTestAccess.loadStarted(page, bounce);
-            page.mainFrameRequested(TOP);
+            clicked(TOP);
             challenge("again", TOP, "intranet.example", 443, "Corp", false);
         });
         onUiThread(() -> {
@@ -1127,12 +1130,12 @@ class HttpSignInsTest {
         open(true);
         fake.login(CORP, "u", "pw");
         onUiThread(() -> {
-            page.mainFrameRequested(TOP);
+            clicked(TOP);
             challenge("a", TOP, "intranet.example", 443, "Corp", false);
             page.mainFrameRedirected(TOP + "y");
             page.mainFrameResponded(TOP + "y", 200);
             PageTestAccess.loadStarted(page, TOP + "y");
-            page.mainFrameRequested(TOP);
+            clicked(TOP);
             challenge("later", TOP, "intranet.example", 443, "Corp", false);
             assertThat(told).containsExactly("a proceed u pw", "later proceed u pw");
             assertThat(host.windows()).isEmpty();
@@ -1148,12 +1151,12 @@ class HttpSignInsTest {
         open(true);
         fake.login(CORP, "u", "pw");
         onUiThread(() -> {
-            page.mainFrameRequested(TOP);
+            clicked(TOP);
             challenge("a", TOP, "intranet.example", 443, "Corp", false);
-            page.mainFrameRequested(NEXT);
+            clicked(NEXT);
             page.mainFrameResponded(NEXT, 200);
             PageTestAccess.loadStarted(page, NEXT);
-            page.mainFrameRequested(TOP);
+            clicked(TOP);
             challenge("b", TOP, "intranet.example", 443, "Corp", false);
         });
         onUiThread(() -> {
@@ -1162,7 +1165,7 @@ class HttpSignInsTest {
             press(ok());
             page.mainFrameResponded(TOP, 200);
             PageTestAccess.loadStarted(page, TOP);
-            page.mainFrameRequested(TOP);
+            clicked(TOP);
             challenge("c", TOP, "intranet.example", 443, "Corp", false);
         });
         onUiThread(() -> {
@@ -1182,7 +1185,7 @@ class HttpSignInsTest {
         open(true);
         fake.login(CORP, "u", "pw");
         onUiThread(() -> {
-            page.mainFrameRequested(TOP);
+            clicked(TOP);
             challenge("a", TOP, "intranet.example", 443, "Corp", false);
             page.mainFrameResponded(TOP, 200);
             PageTestAccess.loadFailed(page, TOP, "ERR_ABORTED");
@@ -1206,17 +1209,17 @@ class HttpSignInsTest {
         UUID id = fake.login(CORP, "u", "pw");
         fake.ungranted.add(id);
         onUiThread(() -> {
-            page.mainFrameRequested(TOP);
+            clicked(TOP);
             challenge("a", TOP, "intranet.example", 443, "Corp", false);
         });
         onUiThread(() -> {
             assertThat(host.windowView(ID, TITLE)).as("no login the Browser may read").isPresent();
             press(form().cancelAction());
-            page.mainFrameRequested(NEXT);
+            clicked(NEXT);
             page.mainFrameResponded(NEXT, 200);
             PageTestAccess.loadStarted(page, NEXT);
             fake.ungranted.remove(id);
-            page.mainFrameRequested(TOP);
+            clicked(TOP);
             challenge("b", TOP, "intranet.example", 443, "Corp", false);
             assertThat(told).containsExactly("a cancel", "b proceed u pw");
             assertThat(host.failures()).isEmpty();
@@ -1344,6 +1347,205 @@ class HttpSignInsTest {
     }
 
     /**
+     * L34: a pending save belongs to the navigation its sign-in answered. A new main-frame request before that
+     * navigation's response drops it, zeroed, so the new navigation's 2xx of the same origin saves nothing.
+     */
+    @Test void aNewNavigationDropsThePendingSave() throws Exception {
+        open(true);
+        char[] given = "pw".toCharArray();
+        onUiThread(() -> challenge("a", TOP, "intranet.example", 443, "Corp", false));
+        onUiThread(() -> {
+            okShown("u", given, true);
+            clicked(NEXT);
+            page.mainFrameResponded(NEXT, 200);
+            assertThat(fake.calls).as("nothing saved").isEmpty();
+            assertThat(given).as("dropped").containsOnly((char) 0);
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /** L34: a main-frame load failure before the sign-in's response drops the pending save, zeroed. */
+    @Test void aLoadFailureDropsThePendingSave() throws Exception {
+        open(true);
+        char[] given = "pw".toCharArray();
+        onUiThread(() -> challenge("a", TOP, "intranet.example", 443, "Corp", false));
+        onUiThread(() -> {
+            okShown("u", given, true);
+            PageTestAccess.loadFailed(page, TOP, "ERR_ABORTED");
+            assertThat(given).as("dropped").containsOnly((char) 0);
+            page.mainFrameResponded(TOP, 200);
+            assertThat(fake.calls).as("nothing saved").isEmpty();
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /** L34 and F6: a redirect is the sign-in's own navigation, so the 2xx it ends in saves the pending save. */
+    @Test void theSignInsOwnRedirectStillSaves() throws Exception {
+        open(true);
+        char[] given = "pw".toCharArray();
+        onUiThread(() -> challenge("a", TOP, "intranet.example", 443, "Corp", false));
+        onUiThread(() -> {
+            okShown("u", given, true);
+            page.mainFrameRedirected(TOP + "home");
+            page.mainFrameResponded(TOP + "home", 200);
+            assertThat(fake.calls).containsExactly("saveLogin " + CORP + " u");
+            assertThat(fake.savedPasswords).containsExactly("pw");
+            assertThat(given).as("zeroed once saved").containsOnly((char) 0);
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * L29: only a load failure of the address the user's navigation's challenge was asked from ends its bypass. One
+     * before any challenge, when no address is known, and one of another address, as the late ERR_ABORTED of a
+     * navigation this one replaced, end nothing; the failure of the challenge's own address ends it.
+     */
+    @Test void onlyTheChallengesOwnLoadFailureEndsTheUsersNavigationsBypass() throws Exception {
+        trip();
+        String replaced = TOP + "replaced";
+        onUiThread(() -> {
+            page.load(URI.create(NEXT));
+            PageTestAccess.loadFailed(page, replaced, "ERR_ABORTED");
+            challenge("navigation", NEXT, "intranet.example", 443, "One", false);
+        });
+        onUiThread(() -> {
+            assertThat(host.windowView(ID, TITLE)).as("a failure before any challenge").isPresent();
+            type("u", "wrong");
+            press(ok());
+            PageTestAccess.loadFailed(page, replaced, "ERR_ABORTED");
+            challenge("again", NEXT, "intranet.example", 443, "One", false);
+        });
+        onUiThread(() -> {
+            assertThat(host.windowView(ID, TITLE)).as("another address's failure").isPresent();
+            type("u", "pw");
+            press(ok());
+            PageTestAccess.loadFailed(page, NEXT, "ERR_ABORTED");
+            challenge("after", NEXT, "intranet.example", 443, "One", false);
+        });
+        onUiThread(() -> {
+            assertThat(told).endsWith("navigation proceed u wrong", "again proceed u pw", "after cancel");
+            assertThat(host.windowView(ID, TITLE)).as("its own address failed").isEmpty();
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * L29 and B's Minor 2: a fill's navigation keeps the answer its origin gave through a load failure of another
+     * address, as a replaced navigation's late ERR_ABORTED, so the commit that follows re-arms the fill; a failure of
+     * the challenge's own address ends that answer, so the commit after it re-arms nothing.
+     */
+    @Test void onlyTheChallengesOwnLoadFailureEndsTheFillsAnswer() throws Exception {
+        open(true);
+        fake.login(CORP, "u", "pw");
+        onUiThread(() -> {
+            clicked(TOP);
+            challenge("a", TOP, "intranet.example", 443, "Corp", false);
+            page.mainFrameResponded(TOP, 200);
+            PageTestAccess.loadFailed(page, NEXT, "ERR_ABORTED");
+            PageTestAccess.loadStarted(page, TOP);
+            challenge("b", TOP, "intranet.example", 443, "Corp", false);
+            assertThat(told).as("re-armed despite another address's failure")
+                .containsExactly("a proceed u pw", "b proceed u pw");
+            page.mainFrameResponded(TOP, 200);
+            PageTestAccess.loadFailed(page, TOP, "ERR_ABORTED");
+            PageTestAccess.loadStarted(page, TOP);
+            challenge("c", TOP, "intranet.example", 443, "Corp", false);
+        });
+        onUiThread(() -> {
+            assertThat(host.windowView(ID, TITLE)).as("its own address failed").isPresent();
+            press(form().cancelAction());
+            assertThat(told).containsExactly("a proceed u pw", "b proceed u pw", "c cancel");
+            assertThat(fake.calls).as("two silent fills").hasSize(2);
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * L35: a silent fill needs the user's action. A navigation a script starts, with no user activation and not
+     * Jasper's, to a site with a remembered login shows the dialog, with Password Manager and Remember, and sends
+     * nothing; the name is not tried, so the user's own navigation to the site then fills.
+     */
+    @Test void aScriptsNavigationToARememberedSiteShowsTheDialog() throws Exception {
+        open(true);
+        fake.login(CORP, "u", "pw");
+        onUiThread(() -> {
+            scripted(TOP);
+            challenge("scripted", TOP, "intranet.example", 443, "Corp", false);
+        });
+        onUiThread(() -> {
+            assertThat(labels()).containsExactly("Password Manager", "Cancel", "OK");
+            assertThat(remember()).isTrue();
+            assertThat(told).as("nothing sent").isEmpty();
+            assertThat(fake.calls).as("the Vault not asked").isEmpty();
+            press(form().cancelAction());
+            clicked(TOP);
+            challenge("clicked", TOP, "intranet.example", 443, "Corp", false);
+            assertThat(told).containsExactly("scripted cancel", "clicked proceed u pw");
+            assertThat(host.windows()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * L35: a navigation that began within the page's user activation fills, as a link the user clicks or a key the
+     * user presses begins one, and so do its redirects, however long they take; a script's redirects do not.
+     */
+    @Test void theRedirectsOfANavigationTheUserBeganFillAndAScriptsDoNot() throws Exception {
+        open(true);
+        fake.login(CORP, "u", "pw");
+        fake.login("https://intranet.example (Other)", "u", "pw");
+        onUiThread(() -> {
+            PageTestAccess.activate(page, CLICK);
+            PageTestAccess.mainFrameRequested(page, "http://intranet.example/", CLICK + 5_000);
+            page.mainFrameRedirected(TOP);
+            challenge("redirected", TOP, "intranet.example", 443, "Corp", false);
+            assertThat(told).as("within 5 s of the press").containsExactly("redirected proceed u pw");
+            PageTestAccess.mainFrameRequested(page, "http://intranet.example/", CLICK + 5_001);
+            page.mainFrameRedirected(TOP);
+            challenge("late", TOP, "intranet.example", 443, "Other", false);
+        });
+        onUiThread(() -> {
+            assertThat(host.windowView(ID, TITLE)).as("a request past the activation, redirected").isPresent();
+            press(form().cancelAction());
+            assertThat(told).containsExactly("redirected proceed u pw", "late cancel");
+            assertThat(fake.calls).as("one silent fill").containsExactly("credentialIfGranted " + CORP);
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * L35 and L27: a navigation Jasper starts for the user, as from the address field, fills without the page's
+     * activation; once the user cancels one of its dialogs, a challenge of it still waiting shows the dialog instead
+     * (L28).
+     */
+    @Test void jaspersNavigationForTheUserFillsUntilTheUserCancelsOneOfItsDialogs() throws Exception {
+        open(true);
+        fake.login(CORP, "u", "pw");
+        fake.ungranted.add(fake.login("https://intranet.example (Other)", "u", "pw"));
+        fake.login("https://intranet.example (Third)", "u", "pw");
+        onUiThread(() -> {
+            page.load(URI.create(NEXT));
+            scripted(NEXT);
+            challenge("typed", NEXT, "intranet.example", 443, "Corp", false);
+            assertThat(told).as("Jasper's own navigation").containsExactly("typed proceed u pw");
+            page.load(URI.create(NEXT));
+            scripted(NEXT);
+            challenge("other", NEXT, "intranet.example", 443, "Other", false);
+            challenge("third", NEXT, "intranet.example", 443, "Third", false);
+        });
+        onUiThread(() -> {
+            assertThat(heading()).as("no login the Browser may read").contains("“Other”");
+            press(form().cancelAction());
+        });
+        onUiThread(() -> {
+            assertThat(heading()).as("after the user's Cancel").contains("“Third”");
+            press(form().cancelAction());
+            assertThat(told).containsExactly("typed proceed u pw", "other cancel", "third cancel");
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
      * A Basic challenge of the page's top-level navigation to {@link #TOP}, as Chromium's thread hands it over, to the
      * item's sign-ins, outside /dev/null. UI thread.
      */
@@ -1352,12 +1554,28 @@ class HttpSignInsTest {
         items.signIns().challenged(page, place, false, signIn(name, top, top, challenger, port, realm, proxy, "basic"));
     }
 
-    /** A sign-in Chromium asks for a request of {@code origin}'s on the top address {@code top}, told to {@link #told}. */
+    /**
+     * A sign-in Chromium asks for a request of {@code origin}'s on the top address {@code top}, told to {@link #told},
+     * in the page's latest navigation, as Chromium's thread reads it.
+     */
     private SignIn signIn(String name, String origin, String top, String challenger, int port, String realm, boolean proxy,
                           String scheme) {
         if (items == null) open(false);
-        return new SignIn(origin, proxy, challenger, port, realm, scheme, top, page.navigation(),
-            (user, password) -> told.add(name + " proceed " + user + " " + password), () -> told.add(name + " cancel"));
+        Page.Navigation navigation = page.latestNavigation();
+        return new SignIn(origin, proxy, challenger, port, realm, scheme, top, navigation.number(),
+            navigation.activated(), (user, password) -> told.add(name + " proceed " + user + " " + password),
+            () -> told.add(name + " cancel"));
+    }
+
+    /** The page's main frame requests {@code url} as a link the user clicks does: within its activation (L35). */
+    private void clicked(String url) {
+        PageTestAccess.activate(page, CLICK);
+        PageTestAccess.mainFrameRequested(page, url, CLICK);
+    }
+
+    /** The page's main frame requests {@code url} as a page's script does: with no user activation, nor Jasper's. */
+    private void scripted(String url) {
+        PageTestAccess.mainFrameRequested(page, url, SCRIPTED);
     }
 
     /** The sign-in dialogs from now on read one moment, so each opens straight after the one before closed. */
@@ -1399,6 +1617,8 @@ class HttpSignInsTest {
             item = items.open(URI.create(TOP), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
             page = ItemTestAccess.page(item);
             place = page.dialogPlace().orElseThrow();
+            // The user's click begins the page's navigation, so its remembered logins may fill (L35).
+            clicked(TOP);
         };
         if (SwingUtilities.isEventDispatchThread()) opening.run();
         else {

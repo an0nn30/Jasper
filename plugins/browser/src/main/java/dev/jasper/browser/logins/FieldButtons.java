@@ -31,11 +31,13 @@ import java.util.function.Function;
  * each http or https document of the page's main frame and shows a button inside the field the user focuses: a
  * password field's opens the Vault's picker for a password, a username field's for a username and a password. Its click
  * sends a {@value #PICK} query, which this class answers. Any script of the page can send one, so each is untrusted
- * (R38): the picker opens, one at a time, only for an http or https document, only at a field on the page's canvas, and
- * only after a click in the page inside that field (L20), so it opens at the area that holds the click, below or above
- * it, but where the popover is clamped to the screen; a press outside the area a pick names spends the click, so each
- * press answers a page one such question. The picker is searched for the asking origin's host, never a text the page
- * gives. The page is sent only what the user chose, and only while it shows the origin that asked.
+ * (R38): the picker opens, one at a time, only for an http or https document, only at a field on the page's canvas no
+ * taller than {@value #TALLEST} CSS pixels, and only after a click in the page inside that field (L20), so it opens
+ * beside the area that holds the click, below or above it and never over it; when neither side has room it does not
+ * show, and the page is told nothing was chosen (L37, L40). A press outside the area a pick names spends the click, and
+ * so do a field too tall and an anchor refused, so each press answers a page one such question. The picker is searched
+ * for the asking origin's host, never a text the page gives. The page is sent only what the user chose, and only while
+ * it shows the origin that asked.
  *
  * <p>The picker closes, with its anchor, as the query is cancelled (the page scrolled, which the script reports by
  * cancelling it, or its frame navigated), as the anchor closes (the page's canvas was resized, hidden or moved), as the
@@ -56,6 +58,8 @@ public final class FieldButtons {
     // The members a pick has, and the largest a coordinate or size may be, either way.
     private static final Set<String> MEMBERS = Set.of("op", "field", "x", "y", "width", "height");
     private static final long LIMIT = 1_000_000;
+    /** The tallest field a pick may name, in CSS pixels before the zoom: a login field, never a page's region (L37). */
+    static final int TALLEST = 200;
     private static final System.Logger LOG = System.getLogger(FieldButtons.class.getName());
     private final VaultLogins vault;
     private final BiFunction<String, char[], String> writer;
@@ -157,16 +161,16 @@ public final class FieldButtons {
      * another op, an unknown field or a place {@link #rect} refuses; {@link PageQuery#REFUSED} for an origin that is
      * opaque or not http or https; {@link PageQuery#BUSY} while this page's picker is open; nothing more for a query that
      * is over, and {@link PageQuery#GONE} for one whose page shows another origin (L18); {@link PageQuery#REFUSED} when
-     * {@code area} gives nothing, as for a field off the canvas; {@link PageQuery#REFUSED} without a press within the
-     * activation, and for a press outside that area, which spends the activation, so a page learns where a press was
-     * at most once per press (L21); {@link PageQuery#REFUSED} when {@code anchor} refuses the area with an
-     * {@link IllegalArgumentException} or gives a closed anchor; and {@link PageQuery#REFUSED} when the activation does
-     * not allow it, which is spent then, as the picker is about to open. The Vault's picker then opens
-     * on the anchor, searched for the origin's host without one leading {@code www.} (F26), and the query is answered
-     * later, once: a password field {@code {"password": …}}, a username field {@code {"username": …, "password": …}},
-     * each without an empty member, and {@code {}} when nothing was chosen. The answer's text is made only while the
-     * query is live, so no password's text is made for a page that would not be sent it; that text, a Java string,
-     * cannot be zeroed.
+     * {@code area} gives nothing, as for a field off the canvas; {@link PageQuery#REFUSED} without the query's press
+     * ({@link PageQuery#press()}); then, each spending the activation, so a page learns where a press was at most once
+     * per press (L21, L22, L37), {@link PageQuery#REFUSED} for a field taller than {@value #TALLEST} CSS pixels, for a
+     * press outside that area, and when {@code anchor} refuses the area with an {@link IllegalArgumentException} or
+     * gives a closed anchor; and {@link PageQuery#REFUSED} when the activation does not allow it, which is spent then,
+     * as the picker is about to open. The Vault's picker then opens on the anchor, searched for the origin's host
+     * without one leading {@code www.} (F26), and the query is answered later, once: a password field
+     * {@code {"password": …}}, a username field {@code {"username": …, "password": …}}, each without an empty member,
+     * and {@code {}} when nothing was chosen. The answer's text is made only while the query is live, so no password's
+     * text is made for a page that would not be sent it; that text, a Java string, cannot be zeroed.
      *
      * @param query the page's query
      * @param window the window the item shows in, which the Vault's prompts open over
@@ -211,8 +215,9 @@ public final class FieldButtons {
             query.fail(PageQuery.REFUSED, NO_CLICK);
             return;
         }
-        if (!inside(pressed.get(), covered.get())) {
-            query.consumeActivation(); // L21: each press answers one such question, as the real button's lies inside
+        if (rect.get().height() > TALLEST || !inside(pressed.get(), covered.get())) {
+            // L21, L37: each press answers one such question, as the real button's lies inside a field's area
+            query.consumeActivation();
             query.fail(PageQuery.REFUSED, NO_CLICK);
             return;
         }
@@ -223,6 +228,7 @@ public final class FieldButtons {
             at = null;
         }
         if (at == null || !at.isOpen()) {
+            query.consumeActivation(); // L22: so does a refused anchor
             query.fail(PageQuery.REFUSED, OFF_PAGE);
             return;
         }

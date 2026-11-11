@@ -124,7 +124,7 @@ class BrowserPluginTest {
             host.set(new FakePluginHost(root));
             host.get().start(INFO, Set.of(), Set.of(), plugin);
         });
-        try {
+        try (var log = new CapturedLog(FilterList.class.getName())) {
             assertThat(ask(plugin, "onboarding-setup", 1, "{\"op\":\"switches\"}")).isEqualTo("{\"switches\":[{\"id\":\"ad-blocker\",\"title\":"
                 + "\"Ad Blocker\",\"description\":\"Block ads with a filter list that updates every day.\",\"on\":false}]}");
             assertThat(ask(plugin, "onboarding-setup", 1, "{\"op\":\"switch\",\"id\":\"ad-blocker\",\"on\":\"true\"}")).isEqualTo("{\"on\":true}");
@@ -137,6 +137,9 @@ class BrowserPluginTest {
             assertThat(plugin.filters().active()).isEmpty();
             assertThat(root.resolve(ID).resolve("data").resolve("adblock").resolve("rules.json")).doesNotExist();
             SwingUtilities.invokeAndWait(() -> assertThat(host.get().failures()).isEmpty());
+            assertThat(log.records()).extracting(LogRecord::getLevel, LogRecord::getMessage)
+                .containsExactly(tuple(Level.WARNING,
+                    "The ad blocking filter list could not be updated: no network in tests"));
         } finally {
             SwingUtilities.invokeAndWait(() -> host.get().close());
         }
@@ -163,7 +166,7 @@ class BrowserPluginTest {
                 host.get().setSetting(ID, "proxy_port", (long) first.port());
                 host.get().start(INFO, Set.of(), Set.of(), plugin);
             });
-            try {
+            try (var log = new CapturedLog(FilterList.class.getName())) {
                 download(plugin, host);
                 assertThat(first.next()).as("through the proxy's tunnel").isEqualTo("CONNECT list.invalid:443 HTTP/1.1");
                 SwingUtilities.invokeAndWait(() -> host.get().setSetting(ID, "proxy_port", (long) second.port()));
@@ -177,6 +180,9 @@ class BrowserPluginTest {
                 assertThat(origin.next()).as("off: the JDK's default").isEqualTo("GET /list.json HTTP/1.1");
                 assertThat(first.asked() || second.asked() || origin.asked()).as("each download asked once").isFalse();
                 SwingUtilities.invokeAndWait(() -> assertThat(host.get().failures()).isEmpty());
+                assertThat(log.records()).as("each download's failure, as no stand-in answers a list").hasSize(4)
+                    .allSatisfy(record -> assertThat(record.getMessage())
+                        .startsWith("The ad blocking filter list could not be updated: "));
             } finally {
                 SwingUtilities.invokeAndWait(() -> host.get().close());
             }
@@ -246,19 +252,25 @@ class BrowserPluginTest {
     @Test void aProxyChromiumRefusesPostsThePluginsError() throws Exception {
         var lines = new AtomicReference<List<String>>();
         var host = new AtomicReference<FakePluginHost>();
-        SwingUtilities.invokeAndWait(() -> {
-            host.set(new FakePluginHost());
-            host.get().setSetting(ID, "http_proxy", true);
-            var plugin = plugin();
-            host.get().start(INFO, Set.of(), Set.of(), plugin);
-            EngineTestAccess.contextInitialized(plugin.chromium(), new RecordingContext(1).refusing("called on invalid thread"));
-        });
-        try {
-            // Told on the UI thread, after the work that was refused.
-            SwingUtilities.invokeAndWait(() -> lines.set(host.get().notifications().lines()));
-            assertThat(lines.get()).containsExactly("dev.jasper.browser|ERROR|" + Chromium.PROXY_REFUSED + "|called on invalid thread");
-        } finally {
-            SwingUtilities.invokeAndWait(() -> host.get().close());
+        try (var log = new CapturedLog("dev.jasper.plugins." + ID)) {
+            SwingUtilities.invokeAndWait(() -> {
+                host.set(new FakePluginHost());
+                host.get().setSetting(ID, "http_proxy", true);
+                var plugin = plugin();
+                host.get().start(INFO, Set.of(), Set.of(), plugin);
+                EngineTestAccess.contextInitialized(plugin.chromium(),
+                    new RecordingContext(1).refusing("called on invalid thread"));
+            });
+            try {
+                // Told on the UI thread, after the work that was refused.
+                SwingUtilities.invokeAndWait(() -> lines.set(host.get().notifications().lines()));
+                assertThat(lines.get())
+                    .containsExactly("dev.jasper.browser|ERROR|" + Chromium.PROXY_REFUSED + "|called on invalid thread");
+                assertThat(log.records()).extracting(LogRecord::getLevel, LogRecord::getMessage)
+                    .containsExactly(tuple(Level.WARNING, Chromium.PROXY_REFUSED + ": called on invalid thread"));
+            } finally {
+                SwingUtilities.invokeAndWait(() -> host.get().close());
+            }
         }
     }
 
@@ -320,7 +332,8 @@ class BrowserPluginTest {
     }
 
     @Test void aChromiumThatCannotStartPostsOneNotificationWithTheReasonWhileThePluginRuns() throws Exception {
-        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost();
+                                                  var log = new CapturedLog("dev.jasper.plugins." + ID)) {
             var plugin = plugin();
             host.start(INFO, Set.of(), Set.of(), plugin);
             plugin.startFailed(new IllegalStateException("Chromium did not start within 90 seconds"));
@@ -329,6 +342,11 @@ class BrowserPluginTest {
             host.stopAll();
             plugin.startFailed(new IllegalStateException("late"));
             assertThat(host.notifications().lines()).as("a stopped plugin only logs").hasSize(1);
+            assertThat(log.records()).extracting(LogRecord::getLevel, LogRecord::getMessage).containsExactly(
+                tuple(Level.WARNING, "The browser could not start: Chromium did not start within 90 seconds"),
+                tuple(Level.WARNING, "The browser could not start: late"));
+            assertThat(log.records())
+                .allSatisfy(logged -> assertThat(logged.getThrown()).isInstanceOf(IllegalStateException.class));
             assertThat(host.failures()).isEmpty();
         } });
     }
@@ -413,7 +431,8 @@ class BrowserPluginTest {
      * preview hears once when Chromium's start fails, and a closed one hears nothing. Nothing starts Chromium.
      */
     @Test void thePluginPublishesTheMarkdownPreviewsAndTellsThemWhenChromiumCannotStart() throws Exception {
-        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost();
+                                                  var log = new CapturedLog("dev.jasper.plugins." + ID)) {
             var plugin = plugin();
             host.start(INFO, Set.of(), Set.of(), plugin);
             MarkdownPreviews previews = previews(host);
@@ -427,6 +446,8 @@ class BrowserPluginTest {
             preview.close();
             assertThat(plugin.chromium().state()).as("nothing asked for Chromium").isEqualTo(Chromium.State.NOT_STARTED);
             host.stopAll();
+            assertThat(log.records()).extracting(LogRecord::getMessage)
+                .containsExactly("The browser could not start: Chromium did not start within 90 seconds");
             assertThat(host.failures()).isEmpty();
         } });
     }
@@ -475,7 +496,7 @@ class BrowserPluginTest {
     /** A Basic challenge of the top-level navigation to intranet.example, for realm {@code name}, told to {@code told}. */
     private static SignIn signIn(String name, List<String> told) {
         String top = "https://intranet.example/";
-        return new SignIn(top, false, "intranet.example", 443, name, "basic", top, 0,
+        return new SignIn(top, false, "intranet.example", 443, name, "basic", top, 0, false,
             (user, password) -> told.add(name + " proceed"), () -> told.add(name + " cancel"));
     }
 

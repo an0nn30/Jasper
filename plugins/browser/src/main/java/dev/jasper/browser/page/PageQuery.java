@@ -101,8 +101,10 @@ public final class PageQuery {
     }
 
     /**
-     * Consumes the user's activation for this request: whether it allows the request, asked once. Ask it only once the
-     * request is otherwise allowed, so a refused request spends nothing.
+     * Consumes the user's activation for this request: whether it allows the request, asked once. Its answerer asks it
+     * once the request is otherwise allowed, and also to spend the activation of a request it refuses for where the
+     * press was, so each press answers a page one such question (plan 8's L21, L22, L37); a request refused before
+     * either spends nothing.
      *
      * @return whether the activation allowed it the first time; false each time after
      */
@@ -115,7 +117,8 @@ public final class PageQuery {
      * canvas, says where the user clicked, which a password manager's pick must lie in (plan 8's L20). Asking spends
      * nothing.
      *
-     * @return the press; empty when no press within the activation came before the request
+     * @return the press; empty when no press within the activation came before the request, and when the page was
+     *     activated again after it, as by a key, or its activation was consumed since (plan 8's L38)
      */
     public Optional<LastPress> press() {
         return press.get();

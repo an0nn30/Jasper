@@ -97,9 +97,9 @@ public final class PageDownloads {
     /**
      * A download a browser starts, from plain values: for a page's own browser, whether the page is activated now, read
      * without consuming the activation, the allowance its downloads count in ({@link Page#downloadDocument}), and whether
-     * it asks where it goes, which takes the page's ask ({@link DownloadAsk#take}). A download of the page's top
-     * address is its main frame's request become a download, which is the top address no more (plan 8's L24).
-     * Chromium's thread.
+     * it asks where it goes, which takes the page's ask ({@link DownloadAsk#take}). Any download of the page's top
+     * address, such as its main frame's request become a download, makes the commit before it the top address again
+     * (plan 8's L24, L25). Chromium's thread.
      *
      * @param browser the browser's identifier
      * @param pageUrl the address the browser shows

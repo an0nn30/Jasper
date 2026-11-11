@@ -61,7 +61,8 @@ import org.cef.security.CefSSLInfo;
  * ({@link Page#topAddress()}), which is posted to Swing's thread for the page's item to answer once, later
  * ({@link Page#signIn}), and Chromium is told at once that Jasper answers. A browser that is no page's, DevTools'
  * among them, gets none, and CEF cancels its challenge. The address of each main-frame navigation request of a page,
- * and of each redirect of it, is the page's top address until the next request or commit (F6, L23).
+ * and of each redirect of it, is the page's top address until the next request or commit (F6, L23), and each request
+ * notes whether the page had a user activation as it started (plan 8's L35).
  *
  * <p>The request handler also serves {@code jasper-about:} to the pages of an in-memory context, a /dev/null group's:
  * Chromium's scheme handler factory serves the global context alone, so such a page's main-frame {@code jasper-about:}
@@ -160,13 +161,13 @@ public final class PageNavigation {
 
     /**
      * Chromium asks for a sign-in for a request of {@code browser}'s, which {@code host} challenged (F12): for a page's
-     * browser, a {@link SignIn} over {@code callback}, with the page's navigation and top address, is handed to
-     * {@code ui} for the page ({@link Page#signIn}), which answers it once, later. It never blocks, takes no lock and
-     * reads only volatile state, as Chromium's thread waits on it. The first sign-in of Jasper's run while DEBUG is on
-     * logs, at DEBUG, the thread it came on and whether {@code originUrl} is a full address or an origin alone, for
-     * Task 8, and nothing more. An answer that comes once Chromium has stopped touches {@code callback} no more (plan
-     * 6's F43). A failure inside is logged, with the exception alone, and answers false. Chromium's IO thread, or its
-     * UI thread.
+     * browser, a {@link SignIn} over {@code callback}, with the page's navigation, whether the page's user activation
+     * began it, and its top address, is handed to {@code ui} for the page ({@link Page#signIn}), which answers it once,
+     * later. It never blocks, takes no lock and reads only volatile state, as Chromium's thread waits on it. The first
+     * sign-in of Jasper's run while DEBUG is on logs, at DEBUG, the thread it came on and whether {@code originUrl} is
+     * a full address or an origin alone, for Task 8, and nothing more. An answer that comes once Chromium has stopped
+     * touches {@code callback} no more (plan 6's F43). A failure inside is logged, with the exception alone, and
+     * answers false. Chromium's IO thread, or its UI thread.
      *
      * @return true when Jasper answers {@code callback} later; false, and {@code callback} left alone, for a browser
      *     that is no page's and on a failure, as CEF then cancels the challenge itself
@@ -177,15 +178,15 @@ public final class PageNavigation {
             Page page = browser instanceof PageBrowser shown ? shown.owner() : null;
             if (page == null || callback == null) return false;
             // The navigation first: a request that starts between the two reads then never passes for the one asked in.
-            long navigation = page.navigation();
+            Page.Navigation navigation = page.latestNavigation();
             BiConsumer<String, String> proceed = (user, password) -> {
                 if (!stopped.getAsBoolean()) callback.Continue(user, password);
             };
             Runnable cancel = () -> {
                 if (!stopped.getAsBoolean()) callback.cancel();
             };
-            var signIn = new SignIn(originUrl, isProxy, host, port, realm, scheme, page.topAddress(), navigation,
-                proceed, cancel);
+            var signIn = new SignIn(originUrl, isProxy, host, port, realm, scheme, page.topAddress(),
+                navigation.number(), navigation.activated(), proceed, cancel);
             if (LOG.isLoggable(System.Logger.Level.DEBUG) && SIGN_IN_LOGGED.compareAndSet(false, true))
                 LOG.log(System.Logger.Level.DEBUG, "Chromium asked for a sign-in on the thread \"{0}\", naming {1}",
                     Thread.currentThread().getName(), signIn.originOnly() ? "an origin alone" : "a full address");
@@ -253,11 +254,11 @@ public final class PageNavigation {
      * the factory would answer it; it is never blocked (the plan's call). Every other request of a page's browser, a
      * /dev/null page's too, gets ad blocking's part while the filter list has a rule set active, and nothing else: a
      * {@code jasper-about:} one of a sub-frame or a sub-resource goes as Chromium takes it, as no Jasper page loads one,
-     * and in an in-memory context nothing serves it. A page's DevTools get none of ad blocking. The address of a page's
-     * main-frame navigation is its top address until its next request or commit, and a new navigation
-     * ({@link Page#mainFrameRequested}, F6, L31).
-     * The request's address is read only for a main frame, once: a page's navigation, or an in-memory browser's, as
-     * reading it copies it across JNI and a {@code data:} address can run to megabytes. Chromium's IO thread.
+     * and in an in-memory context nothing serves it. A page's DevTools get none of ad blocking. Each main-frame
+     * navigation request of a page is a new navigation, begun with the page's user activation or not, and its address
+     * the page's top address until the next request, redirect or commit ({@link Page#mainFrameRequested}, F6, L31,
+     * L35). The request's address is read only for a main frame, once: a page's navigation, or an in-memory browser's,
+     * as reading it copies it across JNI and a {@code data:} address can run to megabytes. Chromium's IO thread.
      *
      * @param browser the browser whose request it is
      * @param request the request

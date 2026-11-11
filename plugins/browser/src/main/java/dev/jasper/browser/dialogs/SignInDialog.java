@@ -34,9 +34,10 @@ import java.util.function.LongSupplier;
  * window's active item, waiting until then; it waits while the page has a permission prompt asked (ruling V19); and it
  * shares the page's {@link DialogFlood}, which refuses the third of the page's dialogs to open within a second of the
  * one before closing, and every later one, until the page loads again (F4), so a page that retries a sign-in after
- * each Cancel cannot hold the window. The top-level sign-in of a navigation Jasper started for the user shows even then
- * (L27): a page cannot start one, so it opens no loop, and the user's own navigation is never refused for what the page
- * did. It names no Chromium type and no Vault type.
+ * each Cancel cannot hold the window. Its caller can have the top-level sign-in of a navigation Jasper started for the
+ * user show even then (L27): a page cannot start one, so it opens no loop, and the page's dialogs before it do not
+ * refuse it; the caller ends that once the user cancels one of that navigation's dialogs, or the address its sign-in
+ * was asked from fails to load (L28, L29). It names no Chromium type and no Vault type.
  *
  * <p>The caller is answered exactly once: {@link Outcome.Ok} with what was typed, {@link Outcome.Picked} with the
  * login chosen, or {@link Outcome.Cancelled} for Cancel, Escape, the dialog's own close, its item's close, Chromium's

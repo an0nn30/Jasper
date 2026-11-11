@@ -149,6 +149,18 @@ public final class PageTestAccess {
     }
 
     /**
+     * The page's main frame starts a navigation request for {@code url} at {@code nowMillis}, as Chromium's IO thread
+     * notes it: begun with the page's user activation when that is active then (plan 8's L35). Any thread.
+     *
+     * @param page a page
+     * @param url the request's address
+     * @param nowMillis when, in milliseconds since the epoch
+     */
+    public static void mainFrameRequested(Page page, String url, long nowMillis) {
+        page.mainFrameRequested(url, nowMillis);
+    }
+
+    /**
      * The page's main frame finished loading its document, as the client's load handler tells it. UI thread.
      *
      * @param page a page

@@ -36,6 +36,17 @@ public final class Activation {
     }
 
     /**
+     * Whether the press or key at {@code whenMillis} is what last activated the page: nothing activated it after, and
+     * nothing consumed it since (plan 8's L38).
+     *
+     * @param whenMillis when a press or key happened, in milliseconds since the epoch
+     * @return whether the activation is still that one's; false for {@link Long#MIN_VALUE}, which is never
+     */
+    public boolean lastActivatedAt(long whenMillis) {
+        return whenMillis != Long.MIN_VALUE && at.get() == whenMillis;
+    }
+
+    /**
      * Consumes the activation for one popup: true, once, while the page is {@link #active}; false until the next
      * press or key after that.
      *

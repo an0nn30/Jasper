@@ -12,6 +12,7 @@ import dev.jasper.browser.page.PageBrowser;
 import dev.jasper.browser.page.PageEvents;
 import dev.jasper.browser.page.PageFind;
 import dev.jasper.browser.page.PageQuery;
+import dev.jasper.browser.permissions.Origins;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.ui.TabPlacement;
 import java.awt.EventQueue;
@@ -32,6 +33,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiPredicate;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -98,9 +100,11 @@ import org.cef.network.CefResponse;
  *   else. It becomes a {@link PageQuery} the page's password manager answers later, once ({@link Page#loginQuery}), so
  *   it holds none of the page's waiting places, and Chromium's cancel, as the asking frame navigates or closes or the
  *   page cancels it, cancels it. The manager opens one picker per page at a time, only for an http or https document,
- *   and only after a click in the page: Jasper's record of a mouse press within the activation as well as the page's
- *   own activation, which the pick consumes, so a key alone opens nothing; and that press must lie in the field the
- *   pick names. Its answer reaches the page only while the page's main frame shows the origin that asked.</li>
+ *   and only after a click in the page: Jasper's record of a mouse press within the activation, after which nothing
+ *   activated the page, as well as the page's own activation, which the pick consumes, so a key alone opens nothing;
+ *   and that press must lie in the field the pick names. A pick from a frame whose own address has another origin than
+ *   the document the bridge heard its main frame shows is told that document has gone. Its answer reaches the page
+ *   only while the page's main frame shows the origin that asked.</li>
  * </ul>
  *
  * <p>A link ends as Chromium's window groups do: when the popup closes, when the user sends either page elsewhere
@@ -147,6 +151,7 @@ final class OpenerBridge {
         NOT_WEB_ICON = new Answer(REFUSED, "Jasper shows only icons at http and https addresses."),
         NOT_PARTY = new Answer(REFUSED, "This page is not part of that link."),
         OTHER_CLOSED = new Answer(GONE, "The other page is closed."),
+        ASKER_GONE = new Answer(GONE, "The document that asked is no longer shown."),
         UNANSWERED = new Answer(REFUSED, AboutScheme.UNANSWERED);
     // What a request the page answers later is answered at once: nothing. Compared by identity, and never sent.
     private static final Answer LATER = new Answer(0, "later");
@@ -847,23 +852,31 @@ final class OpenerBridge {
      * {@code login.pick}: the page's password manager answers it as the user chooses, so it becomes a
      * {@link PageQuery}, put in {@code handed}, which the page is handed ({@link Page#loginQuery}) and which replies
      * through {@code reply} once, told whether the reply was sent. Its origin is the asking document's, as Chromium's
-     * thread saw it; its answer reaches the page only while the page's main frame shows that origin, as the bridge has
-     * heard. Its activation needs a mouse press within the activation as well as the page's activation, which it
-     * consumes, both as at {@code nowMillis}, when Chromium took the request (plan 8's F3), and it gives that press,
-     * whose point the password manager checks (L20). It waits for Chromium's cancel until it is over; one Chromium
-     * cancelled before the UI thread took it is never handed over, and spends nothing (plan 8's L16). UI thread.
+     * thread saw it; one whose asking frame's own address has another origin than that document, as a message an
+     * outgoing document sends after the next load start, is told {@link #GONE} at once and never handed over (plan
+     * 8's L38). Its answer reaches the page only while the page's main frame shows that origin, as the bridge has
+     * heard. Its activation needs a mouse press within the activation that nothing activated the page after, a key
+     * included (L38), as well as the page's activation, which it consumes, both as at {@code nowMillis}, when Chromium
+     * took the request (plan 8's F3), and it gives that press, whose point the password manager checks (L20). It waits
+     * for Chromium's cancel until it is over; one Chromium cancelled before the UI thread took it is never handed
+     * over, and spends nothing (plan 8's L16). UI thread.
      *
-     * @return {@code LATER}
+     * @return {@code LATER}, or the answer that refuses it
      */
     private Answer loginPick(Party sender, Sender asker, Pending asked, Map<String, Object> request, long nowMillis,
                              Predicate<Answer> reply, PageQuery[] handed) {
+        Optional<String> origin = asker.document().origin();
+        if (origin.isPresent() && !Origins.of(asker.address()).equals(origin)) return ASKER_GONE;
         Page page = sender.page();
-        Supplier<Optional<LastPress>> press = () -> Optional.of(sender.lastPress().get()).filter(last -> last.withinActivation(nowMillis));
-        BooleanSupplier activation = () -> press.get().isPresent() && sender.activation().consume(nowMillis);
-        var query = new PageQuery(page, asker.document().origin(), request, activation, press, () -> document(page).origin(), (code, text) -> {
+        Activation activated = sender.activation();
+        Supplier<Optional<LastPress>> press = () -> Optional.of(sender.lastPress().get())
+            .filter(last -> last.withinActivation(nowMillis) && activated.lastActivatedAt(last.whenMillis()));
+        BooleanSupplier activation = () -> press.get().isPresent() && activated.consume(nowMillis);
+        BiPredicate<Integer, String> replying = (code, text) -> {
             pending.remove(asked.id, asked);
             return reply.test(new Answer(code, text));
-        });
+        };
+        var query = new PageQuery(page, origin, request, activation, press, () -> document(page).origin(), replying);
         if (!asked.attach(query)) return LATER;
         handed[0] = query;
         query.onCancelled(() -> pending.remove(asked.id, asked));

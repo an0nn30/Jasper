@@ -6,7 +6,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -16,9 +15,9 @@ import java.util.function.Consumer;
  * holds the tools' part: the login script each of its main frames runs as an http or https document starts loading,
  * read on Chromium's thread, and the handler its {@link PageQuery}s go to, with the queries handed to it that are not
  * yet over, which the page's close cancels; and its HTTP sign-ins: who hears each {@link SignIn} Chromium asks for, the
- * page's top address they are judged against and the number of its main frame's navigation requests, noted on
- * Chromium's threads, and who hears each final response to a main-frame navigation. It reaches no browser. UI thread,
- * but where a method says otherwise.
+ * page's top address they are judged against and its main frame's latest navigation, the number of its requests and
+ * whether the page's user activation began the latest, noted on Chromium's threads, and who hears each final response
+ * to a main-frame navigation. It reaches no browser. UI thread, but where a method says otherwise.
  */
 final class PageLoginHooks {
     /** What a query is told when the page has no password manager to hand it to. */
@@ -34,8 +33,9 @@ final class PageLoginHooks {
     // came last; and that latest commit. Null before the first. Written on Chromium's threads, read on any.
     private final AtomicReference<String> top = new AtomicReference<>();
     private volatile String committedTop;
-    // The main frame's navigation requests so far, their redirects not counted (L31). Written on Chromium's threads.
-    private final AtomicLong navigations = new AtomicLong();
+    // The main frame's latest navigation: the number of its requests so far, their redirects not counted (L31), and
+    // whether the latest began with the page's user activation (L35). Written on Chromium's threads.
+    private final AtomicReference<Page.Navigation> navigation = new AtomicReference<>(Page.Navigation.NONE);
     private final List<Consumer<SignIn>> signIns = new CopyOnWriteArrayList<>();
     private final List<BiConsumer<String, Integer>> responses = new CopyOnWriteArrayList<>();
 
@@ -89,12 +89,14 @@ final class PageLoginHooks {
     }
 
     /**
-     * The main frame starts a navigation request for {@code url}: a new navigation, and the top address from now on. A
-     * null address is not noted, but the request counts. Any thread.
+     * The main frame starts a navigation request for {@code url}, {@code activated} telling whether the page had a user
+     * activation then: the top address from now on, and then a new navigation, so a read of the navigation and then of
+     * the top address never pairs the new navigation with the old address (L32). A null address is not noted, but the
+     * request counts. Any thread.
      */
-    void mainFrameRequested(String url) {
-        navigations.incrementAndGet();
+    void mainFrameRequested(String url, boolean activated) {
         if (url != null) top.set(url);
+        navigation.updateAndGet(last -> new Page.Navigation(last.number() + 1, activated));
     }
 
     /**
@@ -105,9 +107,12 @@ final class PageLoginHooks {
         if (url != null) top.set(url);
     }
 
-    /** The number of the main frame's navigation requests so far, their redirects not counted (L31). Any thread. */
-    long navigation() {
-        return navigations.get();
+    /**
+     * The main frame's latest navigation: the number of its requests so far, their redirects not counted (L31), and
+     * whether the latest began with the page's user activation, which its redirects keep (L35). Any thread.
+     */
+    Page.Navigation navigation() {
+        return navigation.get();
     }
 
     /**

@@ -57,8 +57,8 @@ import org.cef.browser.CefRequestContext;
  * close cancels the queries not answered (plan 8). Each HTTP sign-in Chromium asks for one of the page's requests goes
  * to its item, to answer once ({@link #onSignIn}, {@link SignIn}), judged against the page's top address: its main
  * frame's latest navigation request, after its redirects, or its latest commit, whichever came last
- * ({@link #topAddress()}), and stamped with the number of that navigation ({@link #navigation()}); and so does each
- * final main-frame response's status ({@link #onMainFrameResponse}).
+ * ({@link #topAddress()}), and stamped with that navigation's number and whether the page's user activation began it
+ * ({@link #latestNavigation()}); and so does each final main-frame response's status ({@link #onMainFrameResponse}).
  */
 public final class Page implements AutoCloseable {
     /** The longest {@link #source} waits for Chromium's HTML. */
@@ -965,14 +965,33 @@ public final class Page implements AutoCloseable {
     }
 
     /**
+     * A main-frame navigation of a page, as Chromium's IO thread noted its request (plan 8's L31, L35).
+     *
+     * @param number the number of the page's main-frame navigation requests up to it: each new request raises it, a
+     *     redirect does not; 0 before the first
+     * @param activated whether the page had a user activation as its request started, as a link the user clicks or a
+     *     key the user presses gives one; its redirects keep it
+     */
+    public record Navigation(long number, boolean activated) {
+        /** No navigation yet. */
+        public static final Navigation NONE = new Navigation(0, false);
+    }
+
+    /**
      * Chromium's IO thread notes that the page's main frame starts a navigation request for {@code url}: a new
-     * navigation ({@link #navigation()}), and the page's top address until the next request, redirect or commit
-     * ({@link #topAddress()}). Any thread.
+     * navigation ({@link #latestNavigation()}), begun with the page's user activation or not, as the activation reads
+     * now, unconsumed, and the page's top address until the next request, redirect or commit ({@link #topAddress()}).
+     * Any thread.
      *
      * @param url the request's address, as Chromium names it; a null address is not noted, but the request counts
      */
     public void mainFrameRequested(String url) {
-        loginHooks.mainFrameRequested(url);
+        mainFrameRequested(url, System.currentTimeMillis());
+    }
+
+    /** As {@link #mainFrameRequested(String)}, the page's activation read at {@code nowMillis}. Any thread. */
+    void mainFrameRequested(String url, long nowMillis) {
+        loginHooks.mainFrameRequested(url, activation().active(nowMillis));
     }
 
     /**
@@ -993,6 +1012,16 @@ public final class Page implements AutoCloseable {
      * @return the number; 0 before the first
      */
     public long navigation() {
+        return loginHooks.navigation().number();
+    }
+
+    /**
+     * The page's latest main-frame navigation, as Chromium's IO thread noted its request: its number
+     * ({@link #navigation()}) and whether it began with the page's user activation, read together. Any thread.
+     *
+     * @return the navigation; {@link Navigation#NONE} before the first
+     */
+    public Navigation latestNavigation() {
         return loginHooks.navigation();
     }
 
@@ -1015,11 +1044,12 @@ public final class Page implements AutoCloseable {
 
     /**
      * The address an HTTP sign-in of the page is judged against ({@link SignIn#topAddress()}): that of its main frame's
-     * latest navigation request, after its redirects ({@link #mainFrameRequested}), or of its latest commit, whichever
-     * came last, as Chromium's threads noted them; a request that failed or became a download falls back to the commit
-     * before it. Before either, the committed address ({@link #committedAddress()}). A request that has not committed
-     * counts, as a main frame's own challenge comes before its commit; a commit with no request of its own, as a
-     * document restored without one, counts too, so it never inherits the request before it (L23). Any thread.
+     * latest navigation request ({@link #mainFrameRequested}), after its redirects ({@link #mainFrameRedirected}), or
+     * of its latest commit, whichever came last, as Chromium's threads noted them; a request that failed or became a
+     * download falls back to the commit before it. Before either, the committed address ({@link #committedAddress()}).
+     * A request that has not committed counts, as a main frame's own challenge comes before its commit; a commit with
+     * no request of its own, as a document restored without one, counts too, so it never inherits the request before it
+     * (L23). Any thread.
      *
      * @return the address, as Chromium writes it; empty before the page has either
      */

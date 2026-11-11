@@ -129,7 +129,7 @@ class ChallengeTest {
     /** The user's call: a proxy challenge gets the plain dialog, which names the proxy's host and port. */
     @Test void aProxysHostAndPortAreTheProxys() {
         var signIn = new SignIn("https://intranet.example/page", true, "proxy.example", 8118, "Squid", "Basic",
-            "https://intranet.example/page", 0, (user, password) -> { }, () -> { });
+            "https://intranet.example/page", 0, false, (user, password) -> { }, () -> { });
         Challenge proxy = Challenge.of(signIn);
         assertThat(proxy.proxy()).isTrue();
         assertThat(proxy.host()).isEqualTo("proxy.example");
@@ -141,7 +141,7 @@ class ChallengeTest {
 
     @Test void aServersHostAndPortAndTheLoginName() {
         var signIn = new SignIn("https://user:pw@Intranet.Example:8443/page", false, "intranet.example", 8443, "Corp", "Basic",
-            "https://intranet.example:8443/", 0, (user, password) -> { }, () -> { });
+            "https://intranet.example:8443/", 0, false, (user, password) -> { }, () -> { });
         Challenge challenge = Challenge.of(signIn);
         assertThat(challenge.origin()).as("no user info (R46)").isEqualTo("https://intranet.example:8443");
         assertThat(challenge.host()).isEqualTo("intranet.example");
@@ -169,7 +169,7 @@ class ChallengeTest {
     }
 
     private static Challenge challenge(String originUrl, String topAddress, boolean proxy, String scheme, String realm) {
-        return Challenge.of(new SignIn(originUrl, proxy, "a.example", 443, realm, scheme, topAddress, 0,
+        return Challenge.of(new SignIn(originUrl, proxy, "a.example", 443, realm, scheme, topAddress, 0, false,
             (user, password) -> { }, () -> { }));
     }
 }

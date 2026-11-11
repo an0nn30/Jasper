@@ -29,7 +29,7 @@ class PageSignInsTest {
             assertThat(page.topAddress()).as("before any request").isEqualTo("https://start.example/");
             page.mainFrameRequested("http://intranet.example/");
             assertThat(page.topAddress()).as("a request").isEqualTo("http://intranet.example/");
-            page.mainFrameRequested("https://intranet.example/");
+            page.mainFrameRedirected("https://intranet.example/");
             assertThat(page.topAddress()).as("its redirect").isEqualTo("https://intranet.example/");
             committed(page, "https://intranet.example/home");
             assertThat(page.topAddress()).as("a commit").isEqualTo("https://intranet.example/home");
@@ -58,7 +58,7 @@ class PageSignInsTest {
         onUiThread(() -> {
             Page page = page();
             page.mainFrameRequested("http://intranet.example/");
-            page.mainFrameRequested("https://intranet.example/");
+            page.mainFrameRedirected("https://intranet.example/");
             assertThat(page.topAddress()).isEqualTo("https://intranet.example/");
             committed(page, "https://intranet.example/");
             assertThat(page.topAddress()).isEqualTo("https://intranet.example/");
@@ -106,6 +106,29 @@ class PageSignInsTest {
             PageTestAccess.downloadStart(page, 1, 8, "https://files.example/other.pdf", "other.pdf", "https://start.example/", 0);
             PageEvents.loadError(page, frame(false), null, "https://next.example/", task -> { });
             assertThat(page.topAddress()).as("another address's end, or a sub-frame's").isEqualTo("https://next.example/");
+        });
+    }
+
+    /**
+     * L35: each main-frame navigation request notes whether the page had a user activation as it started, read and not
+     * consumed: one within 5 s of the page's press or key has it, a later one has not, and a redirect keeps its
+     * navigation's, as does the number, read together with it.
+     */
+    @Test void aNavigationNotesWhetherThePagesActivationBeganIt() throws Exception {
+        onUiThread(() -> {
+            Page page = page();
+            assertThat(page.latestNavigation()).as("before any").isEqualTo(Page.Navigation.NONE);
+            PageTestAccess.activate(page, 1_000);
+            PageTestAccess.mainFrameRequested(page, "https://intranet.example/", 6_000);
+            assertThat(page.latestNavigation()).as("within the activation").isEqualTo(new Page.Navigation(1, true));
+            assertThat(page.activation().active(6_000)).as("not consumed").isTrue();
+            page.mainFrameRedirected("https://intranet.example/home");
+            assertThat(page.latestNavigation()).as("its redirect").isEqualTo(new Page.Navigation(1, true));
+            PageTestAccess.mainFrameRequested(page, "https://intranet.example/next", 6_001);
+            assertThat(page.latestNavigation()).as("after it").isEqualTo(new Page.Navigation(2, false));
+            page.mainFrameRedirected("https://intranet.example/last");
+            assertThat(page.latestNavigation()).as("its redirect").isEqualTo(new Page.Navigation(2, false));
+            assertThat(page.navigation()).isEqualTo(2);
         });
     }
 
@@ -213,12 +236,13 @@ class PageSignInsTest {
 
     private SignIn signIn(String topAddress) {
         return new SignIn("https://intranet.example/private", false, "intranet.example", 443, "Corp", "basic", topAddress,
-            0, (user, password) -> told.add("continue " + user), () -> told.add("cancel"));
+            0, false, (user, password) -> told.add("continue " + user), () -> told.add("cancel"));
     }
 
     private SignIn signIn() {
         return new SignIn("https://intranet.example/", false, "intranet.example", 443, "Corp", "basic",
-            "https://intranet.example/", 0, (user, password) -> told.add("continue " + user), () -> told.add("cancel"));
+            "https://intranet.example/", 0, false, (user, password) -> told.add("continue " + user),
+            () -> told.add("cancel"));
     }
 
     private static Page page() {

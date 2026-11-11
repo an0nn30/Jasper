@@ -648,17 +648,26 @@ class OpenerBridgeTest {
         });
     }
 
-    /** A page the bridge cannot reach as another closes does not keep that page's other close listeners from hearing it. */
+    /**
+     * A page the bridge cannot reach as another closes does not keep that page's other close listeners from hearing it;
+     * the failure is logged, with the exception alone.
+     */
     @Test void aPageTheBridgeCannotReachDoesNotStopTheOtherCloseListeners() throws Exception {
-        onUiThread(() -> {
-            var link = link();
-            var told = new AtomicInteger();
-            link.popup.page.onClose(told::incrementAndGet);
-            link.opener.failing = true;
-            link.popup.page.close();
-            assertThat(told).hasValue(1);
-            assertThat(bridge.links()).isZero();
-        });
+        try (var log = new CapturedLog(OpenerBridge.class.getName())) {
+            onUiThread(() -> {
+                var link = link();
+                var told = new AtomicInteger();
+                link.popup.page.onClose(told::incrementAndGet);
+                link.opener.failing = true;
+                link.popup.page.close();
+                assertThat(told).hasValue(1);
+                assertThat(bridge.links()).isZero();
+            });
+            assertThat(log.records()).singleElement().satisfies(record -> {
+                assertThat(record.getMessage()).isEqualTo("The opener bridge could not reach a page");
+                assertThat(record.getThrown()).hasMessage("the page's browser has gone");
+            });
+        }
     }
 
     @Test void aMalformedRequestFailsWithoutThrowing() throws Exception {
@@ -1078,6 +1087,66 @@ class OpenerBridgeTest {
             assertThat(page.activation.active(NOW)).as("consumed").isFalse();
             assertThat(clicked.consumeActivation()).isFalse();
             assertThat(answers).isEmpty();
+        });
+    }
+
+    /**
+     * L38: a pick needs that nothing activated the page after its press. A key after the press activates the page
+     * again, which leaves the pick no press and spends nothing; and once a pick spent a press's activation, as a press
+     * outside its field does (L21), a key gives the next pick on that press no click either, so each press still
+     * answers one question.
+     */
+    @Test void aKeyAfterThePressLeavesALoginPickNoPress() throws Exception {
+        onUiThread(() -> {
+            var page = new Document(APP);
+            var held = new ArrayList<PageQuery>();
+            page.page.handleLogins("login();", held::add);
+            bridge.loadStarted(page.party(), APP);
+            var press = new LastPress(1, 0, NOW - 300, 40, 30);
+            Party party = page.pressed(() -> press);
+            var answers = new ArrayList<Answer>();
+            page.activation.activate(NOW - 300);
+            page.activation.activate(NOW - 200); // a key the page got after the press
+            bridge.answer(party, true, bridge.sender(page.page, "main", () -> APP), asked(), PICK, NOW, answers::add);
+            assertThat(held.getLast().press()).as("a key after the press").isEmpty();
+            assertThat(held.getLast().consumeActivation()).isFalse();
+            assertThat(page.activation.active(NOW)).as("nothing spent").isTrue();
+
+            page.activation.activate(NOW - 300); // the press alone, as if no key came
+            bridge.answer(party, true, bridge.sender(page.page, "main", () -> APP), asked(), PICK, NOW, answers::add);
+            assertThat(held.getLast().press()).as("the press").contains(press);
+            assertThat(held.getLast().consumeActivation()).as("spent, as for a press outside the field").isTrue();
+            page.activation.activate(NOW - 100); // a key after that
+            bridge.answer(party, true, bridge.sender(page.page, "main", () -> APP), asked(), PICK, NOW, answers::add);
+            assertThat(held.getLast().press()).as("the spent press, a key after it").isEmpty();
+            assertThat(held.getLast().consumeActivation()).isFalse();
+            assertThat(answers).isEmpty();
+        });
+    }
+
+    /**
+     * L38: a pick is judged by the document the bridge heard its page's main frame shows, so it must come from that
+     * document: one whose asking frame's own address has another origin, as a message an outgoing document sends after
+     * the next load start, is told the document has gone, and the page's password manager is never handed it.
+     */
+    @Test void aLoginPickFromAnotherOriginThanItsDocumentIsGone() throws Exception {
+        onUiThread(() -> {
+            var page = new Document(APP);
+            var held = new ArrayList<PageQuery>();
+            page.page.handleLogins("login();", held::add);
+            bridge.loadStarted(page.party(), APP);
+            var answers = new ArrayList<Answer>();
+            for (String address : java.util.Arrays.asList(LOGIN, "https://app.example:8443/start", null))
+                bridge.answer(page.party(), true, bridge.sender(page.page, "main", () -> address), asked(), PICK, NOW,
+                    answers::add);
+            assertThat(answers).hasSize(3)
+                .containsOnly(new Answer(OpenerBridge.GONE, "The document that asked is no longer shown."));
+            assertThat(held).isEmpty();
+            String same = "https://APP.example/other#x";
+            bridge.answer(page.party(), true, bridge.sender(page.page, "main", () -> same), asked(), PICK, NOW, answers::add);
+            assertThat(held).as("another address of its origin").hasSize(1);
+            assertThat(bridge.cancellable()).isOne();
+            assertThat(bridge.waiting()).isZero();
         });
     }
 

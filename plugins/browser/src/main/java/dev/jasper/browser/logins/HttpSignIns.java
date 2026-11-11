@@ -37,19 +37,24 @@ import java.util.function.Function;
  * Vault the dialog still shows, with neither, so pages can still sign in.
  *
  * <p>A challenge that can be remembered is, as its turn comes and while the vault is unlocked, signed in without the
- * dialog with the Browser's remembered login of its name ({@link VaultLogins#useGranted}), once per name until the
+ * dialog with the Browser's remembered login of its name ({@link VaultLogins#useGranted}) when the user began its
+ * navigation (L35): it started while the page had a user activation, as a link the user clicks or a form the user
+ * submits with a key starts one, its redirects included ({@link SignIn#activated()}), or it is a navigation Jasper
+ * started for the user ({@link #navigating}) none of whose dialogs the user cancelled. Any other, such as one a page's
+ * script starts on its own, shows the dialog, Password Manager included. A name is so signed in once until the
  * navigation the fill answered, after its redirects, gets an answer from that name's own origin that is neither a 401
  * nor a 407 and the page that answer brings commits (L30, L31). Chromium's challenge again for a wrong password so
  * shows the dialog rather than looping (review focus 1), and no other navigation, origin or page, nor the origin's own
  * answer that commits nothing, such as a 204 or a download, lets the password be sent again: a fill whose navigation is
- * replaced or fails first leaves its name tried while the page lasts. A name whose fill found no login, so sent
- * nothing, is tried again once any answer of its origin commits a page. OK with Remember ticked keeps a pending save
- * for the page, with the answer's password array, until the page's next main-frame response: a 2xx from the
- * challenge's origin, after any redirect, saves it in the Vault ({@link VaultLogins#save}); any other response, a
- * main-frame load start before it, a new challenge of the page and the page's close drop it, zeroed. A save the Vault
- * cannot make posts "Could not save the password for HOST", with the Vault's reason; one it makes or declines, such as
- * when unlocking is cancelled, posts nothing. Neither a silent fill nor the other challenges one answer serves (F30)
- * is remembered.
+ * replaced, or whose challenge's own address fails to load first, leaves its name tried while the page lasts (L29). A
+ * name whose fill found no login, so sent nothing, is tried again once any answer of its origin commits a page. OK
+ * with Remember ticked keeps a pending save for the page, with the answer's password array, until the page's next
+ * main-frame response: a 2xx from the challenge's origin, after any redirect, in the navigation the sign-in answered,
+ * saves it in the Vault ({@link VaultLogins#save}); any other response, one of a later navigation, a main-frame load
+ * start or load failure before it, a new challenge of the page and the page's close drop it, zeroed (L34). A save the
+ * Vault cannot make posts "Could not save the password for HOST", with the Vault's reason; one it makes or declines,
+ * such as when unlocking is cancelled, posts nothing. Neither a silent fill nor the other challenges one answer serves
+ * (F30) is remembered.
  *
  * <p>Each challenge is stamped with the page's document as it arrives; the page's next main-frame load start cancels
  * every challenge stamped earlier, shown or waiting, and closes its dialog (F8), as Chromium never says the request
@@ -57,12 +62,12 @@ import java.util.function.Function;
  * name and password given for one challenge also answer the page's waiting challenges of the same server or proxy,
  * port, realm and scheme (F30), which Chromium does not resupply itself. The page's flood guard refuses its dialogs
  * once they come one straight after another, but not the top-level challenge of a navigation Jasper started for the
- * user ({@link #navigating}) while that navigation is pending and the user has cancelled none of its dialogs (L27,
- * L28). {@link #closed} cancels every challenge of the page, shown or waiting, exactly once, withdraws a pick and a
- * save under way, and drops the pending save; {@link #close()} does so for every page as the plugin stops. A password
- * reaches Chromium as a {@code String}, which its callback takes and which cannot be zeroed; every array is zeroed once
- * used, a save's once the save ends however it ends (F10). A failure is logged with the exception alone. Names no
- * Chromium type. UI thread.
+ * user ({@link #navigating}) while that navigation is pending, the user has cancelled none of its dialogs, and the
+ * address its latest challenge was asked from has not failed to load (L27, L28, L29). {@link #closed} cancels every
+ * challenge of the page, shown or waiting, exactly once, withdraws a pick and a save under way, and drops the pending
+ * save; {@link #close()} does so for every page as the plugin stops. A password reaches Chromium as a {@code String},
+ * which its callback takes and which cannot be zeroed; every array is zeroed once used, a save's once the save ends
+ * however it ends (F10). A failure is logged with the exception alone. Names no Chromium type. UI thread.
  */
 public final class HttpSignIns {
     /** The most challenges a page has waiting behind its dialog: one more is cancelled at once. */
@@ -115,25 +120,28 @@ public final class HttpSignIns {
     /**
      * Jasper sends {@code page} elsewhere for the user ({@link Page#onNavigate}), which a page's script cannot do:
      * until the page's next main-frame load start, a top-level challenge that arrives shows its dialog even once the
-     * page's flood guard has tripped (L27), so the user's own navigation is never refused for what the page did before
-     * it. A main-frame load failure ends that, and so does a Cancel of one of those dialogs, which then refuses those
-     * still waiting too (L28): a navigation that never commits gives a page at most one dialog past the trip. Nothing
-     * for a page that has closed, or once the plugin stopped.
+     * page's flood guard has tripped (L27), so the page's own dialogs before it do not refuse the user's navigation;
+     * and a remembered login may fill it without the page's activation (L35). A Cancel of one of those dialogs ends
+     * that, refusing those still waiting too (L28), so a navigation that never commits gives the page no more dialogs
+     * past the trip once the user cancels one; and so does a main-frame load failure of the address the latest of
+     * those challenges was asked from, but not one before any of them, nor one of another address, such as the late
+     * end of a navigation this one replaced (L29). Nothing for a page that has closed, or once the plugin stopped.
      *
      * @param page the page
      */
     public void navigating(Page page) {
         Objects.requireNonNull(page, "page");
         if (stopped || page.dialogPlace().isEmpty()) return;
-        of(page).navigating = true;
+        of(page).navigating();
     }
 
     /**
      * The page's main frame got the final response to a navigation, a redirect being none: a 2xx from the origin of the
-     * page's pending save saves it in the Vault, over the window of the page's item; any other response drops it,
-     * zeroed. A response that is neither a 401 nor a 407 lets the page's next challenge of each name of its origin be
-     * signed in with a remembered login again, once the page it brings commits, if the name's fill answered that very
-     * navigation or sent nothing (L31). Nothing for a page with no challenge, or once the plugin stopped.
+     * page's pending save, in the navigation its sign-in answered (L34), saves it in the Vault, over the window of the
+     * page's item; any other response drops it, zeroed. A response that is neither a 401 nor a 407 lets the page's
+     * next challenge of each name of its origin be signed in with a remembered login again, once the page it brings
+     * commits, if the name's fill answered that very navigation or sent nothing (L31). Nothing for a page with no
+     * challenge, or once the plugin stopped.
      *
      * @param page the page
      * @param url the response's address
@@ -226,16 +234,19 @@ public final class HttpSignIns {
 
     /**
      * A sign-in answered with "Remember this password", kept until the page's next main-frame response: the origin
-     * whose 2xx saves it, the login's name, the challenger's host, which a failure names, where the Vault's prompts
-     * show, the user name and the answer's password array, which it zeroes once its save ends or it is dropped.
+     * whose 2xx saves it, the page's main-frame navigation that 2xx must answer (L34), the login's name, the
+     * challenger's host, which a failure names, where the Vault's prompts show, the user name and the answer's password
+     * array, which it zeroes once its save ends or it is dropped.
      */
     private static final class Pending {
         final String origin, name, host, user;
+        final long navigation;
         final DialogPlace place;
         final char[] password;
 
         Pending(Asked asked, String user, char[] password) {
             origin = asked.challenge.origin();
+            navigation = asked.signIn.navigation();
             name = asked.challenge.loginName();
             host = asked.challenge.host();
             place = asked.place;
@@ -254,19 +265,21 @@ public final class HttpSignIns {
     }
 
     /**
-     * A login name a remembered login was tried for (L30, L31): its origin; the page's main-frame navigation the fill
-     * answered, once a password went out; and whether the page's latest main-frame response came from that origin and
-     * was neither a 401 nor a 407, for the commit that follows it.
+     * A login name a remembered login was tried for (L30, L31): its origin; the top address of the challenge it was
+     * tried for, whose own load failure ends the answer (L29); the page's main-frame navigation the fill answered, once
+     * a password went out; and whether the page's latest main-frame response came from that origin and was neither a
+     * 401 nor a 407, for the commit that follows it.
      */
     private static final class Tried {
         private static final long NONE = -1;
-        final String origin;
+        final String origin, address;
         // The navigation the fill sent a password in; NONE while none went out.
         long filled = NONE;
         boolean answered;
 
-        Tried(String origin) {
+        Tried(String origin, String address) {
             this.origin = origin;
+            this.address = address;
         }
 
         /**
@@ -291,14 +304,16 @@ public final class HttpSignIns {
         // The saves under way, which the page's close withdraws.
         private final List<CompletableFuture<Boolean>> saves = new ArrayList<>();
         // Whether a navigation Jasper started for the user is pending since the page's last main-frame load start, with
-        // no main-frame load failure and no Cancel of its dialogs since.
+        // no load failure of its challenge's address and no Cancel of its dialogs since.
         private boolean navigating;
+        // The top address of that navigation's latest challenge, whose own load failure ends it (L29); null before one.
+        private String marked;
         private boolean ended;
 
         PageSignIns(Page page) {
             this.page = page;
-            heard = List.of(page.onLoadStart(this::loadStarted), page.onLoadFailure(failure -> loadFailed()),
-                page.onClose(() -> closed(page)));
+            heard = List.of(page.onLoadStart(this::loadStarted),
+                page.onLoadFailure(failure -> loadFailed(failure.url())), page.onClose(() -> closed(page)));
         }
 
         void add(Asked asked) {
@@ -312,8 +327,15 @@ public final class HttpSignIns {
                 asked.signIn.cancel();
                 return;
             }
+            if (asked.usersNavigation) marked = asked.signIn.topAddress();
             waiting.add(asked);
             next();
+        }
+
+        /** Jasper sends the page elsewhere for the user: a navigation with no challenge yet (L27, L29). */
+        void navigating() {
+            navigating = true;
+            marked = null;
         }
 
         /** While no dialog shows, signs the next challenges in with remembered logins, or shows the next one's. */
@@ -326,20 +348,21 @@ public final class HttpSignIns {
 
         /**
          * Signs {@code asked} in with the Browser's remembered login of its name, with no dialog, when it can be
-         * remembered (never in /dev/null), the vault is unlocked and its name is not tried; the name is marked tried
-         * first, with its origin, so Chromium's challenge again for a wrong password shows the dialog (review focus 1),
-         * and once a password went out, with the navigation it went in, whose own answer alone can re-arm it (L30,
-         * L31). A failure of the Vault's is logged with the exception alone.
+         * remembered (never in /dev/null), the user began its navigation ({@link #byTheUser}), the vault is unlocked
+         * and its name is not tried; the name is marked tried first, with its origin and the challenge's top address,
+         * so Chromium's challenge again for a wrong password shows the dialog (review focus 1), and once a password
+         * went out, with the navigation it went in, whose own answer alone can re-arm it (L29, L30, L31). A failure of
+         * the Vault's is logged with the exception alone.
          *
          * @return whether it was signed in
          */
         private boolean filledSilently(Asked asked) {
-            if (!asked.challenge.remembers(asked.devNull, vault.isPresent())) return false;
+            if (!asked.challenge.remembers(asked.devNull, vault.isPresent()) || !byTheUser(asked)) return false;
             VaultLogins logins = vault.get();
             String name = asked.challenge.loginName();
             try {
                 if (!logins.unlocked() || tried.containsKey(name)) return false;
-                tried.put(name, new Tried(asked.challenge.origin()));
+                tried.put(name, new Tried(asked.challenge.origin(), asked.signIn.topAddress()));
                 // Chromium's callback takes a String, which cannot be zeroed; the array is the credential's, which the
                 // Vault zeroes as it closes.
                 logins.useGranted(name, (user, password) -> asked.signIn.proceed(user, new String(password)));
@@ -351,6 +374,16 @@ public final class HttpSignIns {
             if (!asked.signIn.answered()) return false;
             tried.get(name).filled = asked.signIn.navigation();
             return true;
+        }
+
+        /**
+         * Whether the user began {@code asked}'s navigation (L35): it started while the page had a user activation, as
+         * a link the user clicks starts one, its redirects included; or it is a navigation Jasper started for the user
+         * that is still pending, none of whose dialogs the user cancelled (L27, L28). A page's script alone begins
+         * neither.
+         */
+        private boolean byTheUser(Asked asked) {
+            return asked.signIn.activated() || asked.usersNavigation && navigating;
         }
 
         /** Shows {@code asked}'s dialog. */
@@ -414,10 +447,11 @@ public final class HttpSignIns {
         }
 
         /**
-         * The page's main frame got a response: a 2xx from the pending save's origin saves it, and any other drops it.
-         * The response decides, for the commit that follows it, which tried names its origin answered (L30): those of
-         * its origin, unless it is a challenge's, a 401 or a 407, which Chromium may report for a wrong remembered
-         * password before it challenges again (L24). The commit tells whether it was the fill's own navigation (L31).
+         * The page's main frame got a response: a 2xx from the pending save's origin, while the page is at the
+         * navigation the save's sign-in answered (L34), saves it, and any other drops it. The response decides, for the
+         * commit that follows it, which tried names its origin answered (L30): those of its origin, unless it is a
+         * challenge's, a 401 or a 407, which Chromium may report for a wrong remembered password before it challenges
+         * again (L24). The commit tells whether it was the fill's own navigation (L31).
          */
         void responded(String url, int status) {
             if (ended) return;
@@ -426,7 +460,8 @@ public final class HttpSignIns {
             Pending save = pending;
             pending = null;
             if (save == null) return;
-            if (status >= 200 && status < 300 && Origins.of(url).equals(Optional.of(save.origin))) save(save);
+            if (status >= 200 && status < 300 && page.navigation() == save.navigation
+                    && Origins.of(url).equals(Optional.of(save.origin))) save(save);
             else save.zero();
         }
 
@@ -452,12 +487,16 @@ public final class HttpSignIns {
         }
 
         /**
-         * A main-frame load failure: the user's navigation's bypass ends (L28), and so does every answer the tried
-         * names had, as the navigation that brought it commits nothing (L31).
+         * A main-frame load of {@code url} failed: the pending save is dropped, zeroed, as its navigation's response
+         * will not come (L34). When {@code url} is the top address of the user's navigation's latest challenge, that
+         * navigation's bypass ends (L28); and when it is that of the challenge a name was tried for, the answer that
+         * name had ends, as the navigation that brought it commits nothing (L31). A failure of another address, as the
+         * late end of a navigation the next replaced, ends neither, and before any challenge none is known (L29).
          */
-        private void loadFailed() {
-            navigating = false;
-            for (Tried name : tried.values()) name.answered = false;
+        private void loadFailed(String url) {
+            drop();
+            if (url.equals(marked)) navigating = false;
+            for (Tried name : tried.values()) if (url.equals(name.address)) name.answered = false;
         }
 
         /** Drops the pending save, if any, its array zeroed. */
@@ -468,13 +507,15 @@ public final class HttpSignIns {
         }
 
         /**
-         * A main-frame load start, a commit of {@code address}: the pending save is dropped, as the response it waits
-         * for comes before its commit; a tried name its origin answered in the response before is tried no more if
-         * {@code address} is of that origin, in the same navigation, and any other commit ends that answer (L30, L31);
-         * and each challenge of an earlier document is cancelled, its dialog closed (F8).
+         * A main-frame load start, a commit of {@code address}: the user's navigation's bypass ends, and the pending
+         * save is dropped, as the response it waits for comes before its commit; a tried name its origin answered in
+         * the response before is tried no more if {@code address} is of that origin and, when its fill sent a password,
+         * the page is still at the navigation that fill answered, and any other commit ends that answer (L30, L31); and
+         * each challenge of an earlier document is cancelled, its dialog closed (F8).
          */
         private void loadStarted(String address) {
             navigating = false;
+            marked = null;
             drop();
             Optional<String> origin = Origins.of(address);
             long navigation = page.navigation();

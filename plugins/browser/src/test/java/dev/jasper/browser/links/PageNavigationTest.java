@@ -308,12 +308,15 @@ class PageNavigationTest {
         PageBrowser browser = PageTestAccess.pageBrowser(page);
         var navigation = new Request("http://intranet.example/", ResourceType.RT_MAIN_FRAME);
         long before = page.navigation();
+        PageTestAccess.activate(page, System.currentTimeMillis()); // the user's click on a link
         var handler = PageNavigation.requests(browser, navigation, true, new OpenerBridge()::responses, null, Optional::empty);
         assertThat(page.topAddress()).isEqualTo("http://intranet.example/");
-        assertThat(page.navigation()).as("L31: a new navigation").isEqualTo(before + 1);
+        assertThat(page.latestNavigation()).as("L31: a new navigation; L35: the click began it")
+            .isEqualTo(new Page.Navigation(before + 1, true));
         handler.onResourceRedirect(browser, null, navigation, new Response(301), new StringRef("https://intranet.example/"));
         assertThat(page.topAddress()).as("after the redirect").isEqualTo("https://intranet.example/");
-        assertThat(page.navigation()).as("L31: a redirect is the same navigation").isEqualTo(before + 1);
+        assertThat(page.latestNavigation()).as("L31: a redirect is the same navigation, and keeps its activation")
+            .isEqualTo(new Page.Navigation(before + 1, true));
         assertThat(handler.onResourceResponse(browser, null, new Request("https://intranet.example/", ResourceType.RT_MAIN_FRAME),
             new Response(401))).as("nothing about the load changes").isFalse();
         onUiThread(() -> { }); // the response is posted to the UI thread
@@ -375,6 +378,7 @@ class PageNavigationTest {
     @Test void aPagesSignInIsHandedToItsPageAndAnsweredOnceLater() throws Exception {
         onUiThread(() -> {
             Page page = page();
+            PageTestAccess.activate(page, System.currentTimeMillis()); // the user's click on a link
             page.mainFrameRequested("https://intranet.example/start");
             long navigation = page.navigation();
             var heard = new ArrayList<SignIn>();
@@ -394,6 +398,7 @@ class PageNavigationTest {
                 assertThat(signIn.proxy()).isFalse();
                 assertThat(signIn.topAddress()).isEqualTo("https://intranet.example/start");
                 assertThat(signIn.navigation()).as("L31: the navigation asked in").isEqualTo(navigation);
+                assertThat(signIn.activated()).as("L35: the click began it").isTrue();
             });
             assertThat(callback.told).as("answered later").isEmpty();
             assertThat(heard.getFirst().proceed("u", "pw")).isTrue();

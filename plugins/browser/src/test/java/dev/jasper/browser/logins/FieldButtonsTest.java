@@ -37,7 +37,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code login-fields.js} send, over {@link FakeVault} and a recording query. A click opens the Vault's picker at the
  * field, its CSS rectangle scaled by the zoom, searched for the asking origin's host without one {@code www.}; a
  * malformed request, an origin that is no web page's, a second pick while one is open, a missing click and a field off
- * the page are refused, and only the missing click and what follows it spend the click (F3). A choice answers the
+ * the page are refused, and only what follows the missing click spends the click (F3): a press outside the field, a
+ * field taller than 200 CSS pixels and a refused anchor (L21, L22, L37), and the picker's opening. A choice answers the
  * field's members (F19), nothing chosen answers {@code {}}, and a choice for a document that has gone fills nothing
  * and makes no reply text (F29). The query's cancel, the page's close (F15) and the item's own close (L6) close the
  * picker and its anchor. Run on the UI thread, where the Vault is called.
@@ -222,8 +223,8 @@ class FieldButtonsTest {
     }
 
     /**
-     * F3, L20: a malformed request, an origin that is no web page's, a field off the page, an anchor the host refuses
-     * and a busy page leave the click to a later request; a press elsewhere does not (L21).
+     * F3, L20: a malformed request, an origin that is no web page's, a field off the page and a busy page leave the
+     * click to a later request; a press elsewhere does not (L21), nor does a refused anchor (L22).
      */
     @Test void aRefusedRequestKeepsTheClick() throws Exception {
         onUi(() -> {
@@ -232,10 +233,7 @@ class FieldButtonsTest {
             buttons.query(query(page, ORIGIN, pick("email", 8, 16, 200, 24), true), window, canvas, anchors);
             buttons.query(query(page, Optional.of("file://"), pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
             buttons.query(query(page, ORIGIN, pick("password", 8, 700, 200, 24), true), window, canvas, anchors);
-            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, area -> {
-                throw new IllegalArgumentException("An area must lie inside its content");
-            });
-            assertThat(activations).as("malformed, not a web page, off the page, an anchor refused").hasValue(0);
+            assertThat(activations).as("malformed, not a web page, off the page").hasValue(0);
             press.set(Optional.of(click(100, 60)));
             buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
             assertThat(activations).as("a press elsewhere spends it").hasValue(1);
@@ -245,7 +243,52 @@ class FieldButtonsTest {
             buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
             assertThat(activations).as("busy").hasValue(2);
             assertThat(replies).extracting(reply -> reply.substring(0, 1)).containsExactly("" + PageQuery.MALFORMED,
-                "" + PageQuery.REFUSED, "" + PageQuery.REFUSED, "" + PageQuery.REFUSED, "" + PageQuery.REFUSED, "" + PageQuery.BUSY);
+                "" + PageQuery.REFUSED, "" + PageQuery.REFUSED, "" + PageQuery.REFUSED, "" + PageQuery.BUSY);
+        });
+    }
+
+    /**
+     * L22: an anchor the host refuses, or one that is closed already, refuses the pick and spends its click, as a press
+     * outside the area does (L21), so a refusal there answers a page no more questions about the press.
+     */
+    @Test void aRefusedAnchorSpendsTheClick() throws Exception {
+        onUi(() -> {
+            Page page = page();
+            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, area -> {
+                throw new IllegalArgumentException("An area must lie inside its content");
+            });
+            assertThat(activations).as("a refused anchor").hasValue(1);
+            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, area -> {
+                var closed = new Anchor();
+                closed.close();
+                return closed;
+            });
+            assertThat(activations).as("a closed anchor").hasValue(2);
+            assertThat(replies).hasSize(2).allSatisfy(reply -> assertThat(reply)
+                .isEqualTo(PageQuery.REFUSED + " The field is not on the page."));
+            assertThat(fake.picks).isEmpty();
+        });
+    }
+
+    /**
+     * L37: a field taller than 200 CSS pixels before the zoom, which no login field is, is refused as no click and
+     * spends the press's click, as a press outside it does, so the picker never opens beside a region that leaves it no
+     * room; a field 200 high opens it.
+     */
+    @Test void aFieldTallerThan200CssPixelsIsRefusedAndSpendsTheClick() throws Exception {
+        onUi(() -> {
+            fake.pickAnswer = new CompletableFuture<>();
+            Page page = page();
+            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 201), true), window, canvas, anchors);
+            assertThat(replies)
+                .containsExactly(PageQuery.REFUSED + " The password manager opens only after a click in the page.");
+            assertThat(areas).as("no anchor").isEmpty();
+            assertThat(activations).as("its click spent").hasValue(1);
+            assertThat(fake.picks).isEmpty();
+            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 200), true), window, canvas, anchors);
+            assertThat(areas).as("200 CSS pixels, 250 on the canvas at 125%")
+                .containsExactly(new ContentArea(10, 20, 250, 250));
+            assertThat(fake.picks).hasSize(1);
         });
     }
 

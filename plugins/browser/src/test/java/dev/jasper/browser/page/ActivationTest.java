@@ -35,6 +35,20 @@ class ActivationTest {
         assertThat(activation.consume(102_500)).isFalse();
     }
 
+    /** Plan 8's L38: the activation tells whether a press is still what last activated it, unconsumed. */
+    @Test void theActivationTellsWhetherAPressIsStillWhatLastActivatedIt() {
+        var activation = new Activation();
+        assertThat(activation.lastActivatedAt(Long.MIN_VALUE)).as("never").isFalse();
+        activation.activate(100_000);
+        assertThat(activation.lastActivatedAt(100_000)).isTrue();
+        assertThat(activation.lastActivatedAt(99_000)).as("an earlier press").isFalse();
+        activation.activate(100_500);
+        assertThat(activation.lastActivatedAt(100_000)).as("a key after it").isFalse();
+        assertThat(activation.consume(101_000)).isTrue();
+        assertThat(activation.lastActivatedAt(100_500)).as("consumed").isFalse();
+        assertThat(activation.lastActivatedAt(Long.MIN_VALUE)).as("still never").isFalse();
+    }
+
     @Test void anExpiredActivationConsumesNothing() {
         var activation = new Activation();
         assertThat(activation.consume(0)).isFalse();
