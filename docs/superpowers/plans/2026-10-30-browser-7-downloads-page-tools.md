@@ -142,7 +142,7 @@ text, each with its ruling:
   Browser 1,621), and the example external plugin's `check pluginZip` passed.
 - **The final fix wave** (after the final reviews, dispatched 2026-11-10 over `44c11698e..6a5042193`, this plan's own
   diff after the merge: A, Tasks 1-4, and B, Tasks 5-7, each "With fixes", and C, the docs, "Approved with fixes";
-  rulings D45-D49):
+  rulings D45-D50):
   - `291a42772` "Browser: plan 7's final fixes" (W1, D46, D47): `PageDownloadState` keeps the download allowance, which
     `Page.load` renews (D20) and `Page.documentStarting`, called by `FrameScripts.loadStarting` for main frames, renews
     only while the page's `Activation` is active, the audio count still counting every document (D46);
@@ -304,6 +304,8 @@ The controller's rulings, one line each:
   no plugin class; D46 misses a document that starts more than 5 s after its click; a timed-out lookup refuses its
   name for the rest of the save; a lost Escape keyup keeps Escape from the page until a stop, the next start or the
   page going; `FilterListTest`'s hourly-check failure is a deferred flake for plan 8's first full checks.
+- D50: an abandoned name lookup's thread holds only the name, the resolver and its future, never the save
+  (`72d581607`, after the W1 re-review).
 
 Known gaps:
 - D19: a download Chromium never updates after `before()` keeps its name and its page's browser until Jasper quits,

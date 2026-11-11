@@ -215,6 +215,8 @@ it applied):
   no plugin class; D46 misses a document that starts more than 5 s after its click; a timed-out lookup refuses its
   name for the rest of the save; a lost Escape keyup keeps Escape from the page until a stop, the next start or the
   page going; `FilterListTest`'s hourly-check failure is a deferred flake for plan 8's first full checks.
+- D50: an abandoned name lookup's thread holds only the name, the resolver and its future, never the save
+  (`72d581607`, after the W1 re-review).
 
 Known gaps and follow-ups (the banner has them all, with the recorded minors and the deferred minors the final reviews
 kept): a download Chromium never updates after `before()` holds its name and its page's browser until quit, a
