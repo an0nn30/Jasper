@@ -959,3 +959,195 @@ Alt in place of Option; a window manager may take Alt with a drag.
     there (F31);
   - Open still opens a file, as Linux has no mark (F6), and `getfattr -d <file>` shows no attribute Jasper added;
   - the F18 clip line, the More menu line and the crosshair, as on Windows.
+
+## Plan 8: logins
+
+### Batch 1: the user's check on macOS (pending)
+
+- **How to run it:** with the user's OK for each batch, `./gradlew :jasper-app:run` from `claude/browser-logins`
+  (worktree `.claude/worktrees/browser-4b-4c-e6deab`), on JBR 25.0.4.1 b635.75 with JCEF. Its Jasper home,
+  `jasper-app/build/dev-home`, holds its own vault: use a test vault there, never the user's everyday one, and line 5's
+  relaunch keeps it. The network the lines use, which the user has accepted:
+  `https://httpbin.org/basic-auth/user/passwd` and `https://httpbin.org/digest-auth/auth/user/passwd`, a public sign-in
+  page whose user name field has `autocomplete=username` (github.com's), and for F6, F5 and the realm lines a small
+  local server that answers 301 and 401 (a few lines of Python's `http.server`) or an intranet host, and for F22 a local
+  proxy on port 8118 that asks for a password. F12's line needs the logger `dev.jasper.browser.links.PageNavigation` at
+  FINE (a `java.util.logging` configuration file with `dev.jasper.browser.links.PageNavigation.level = FINE`, named by
+  `-Djava.util.logging.config.file`, for `:jasper-app:run` in `JAVA_TOOL_OPTIONS`); its line then lands in
+  `jasper-app/build/dev-home/logs`.
+- Each line is recorded pass or fail. Every line is pending.
+
+#### First: what only the GUI can show
+
+1. **The sign-in's thread and address (F12):** the log's one line "Chromium asked for a sign-in on the thread
+   "*name*", naming a full address" or "… naming an origin alone": record which thread calls `getAuthCredentials`
+   (Chromium's IO thread, or AppKit's main thread) and which form `originUrl` takes. F5's top-level rule depends on the
+   second: with an origin alone, every sign-in of the tab's site counts as the tab's own. Pending.
+2. **The router's cancel (F14):** navigating, reloading or closing the tab with the picker open closes the picker and
+   fills nothing. Pending.
+3. **A redirect before the sign-in (F6):** an `http://` address that answers 301 to `https://`, which answers 401 (an
+   intranet host, or a local server), offers Remember this password. Pending.
+4. **The field script runs first (F13):** as a rule `login-fields.js` runs before the page's own scripts: a page that
+   replaces `HTMLInputElement.prototype.value`'s setter early still gets the native fill. Pending.
+5. **Settings and the manager (F7, L2):** Manage Saved Passwords closes Settings first, and the manager and its unlock
+   prompt then take clicks and keys. Pending.
+
+#### The plan's checklist
+
+1. **Buttons:** on a sign-in page, the password field shows 🔑 and an `autocomplete=username` field shows 🎫, each
+   titled "Open Password Manager". Pending.
+
+   From the task reviews (**Task 4b**):
+   - L-F13 (plan 7's F11): on github.com's sign-in page, with its strict `style-src`, the buttons show styled;
+   - the button sits inside the field's right edge and follows scrolling and resizing; a press on it keeps the focus in
+     the field; once the picker opens the field loses the focus and its button hides, and it comes back when the page
+     has the focus again; after a 🎫 fill the password field shows 🔑;
+   - a user name field without `autocomplete=username` shows no 🎫, and a login form in a cross-origin iframe, or any
+     iframe, shows no buttons (the user's call);
+   - F24: a /dev/null item shows the buttons and fills;
+   - a page that removes or covers the button only loses its own button;
+   - L19 (known gap; record): on a page whose root element has a `transform` or a `filter`, as some dark-mode pages
+     have, the button sits off its field.
+2. **Filling:** 🔑 opens the Vault's picker under the field, searched for the host, and the choice fills the password;
+   🎫 fills the username, then focuses and fills the password; a locked Vault asks to unlock first. Pending.
+
+   From the task reviews:
+   - **Task 1b:** the picker opens under the field, or above it near the screen's bottom, at HiDPI too, and a window
+     resize closes it;
+   - **Task 2:** the picker opened with a search lists only the matching logins and no None row, and clearing the search
+     lists every one;
+   - **Task 3 (L12, L14):** choosing an SSH key, an account key or a key-and-password login, in a field's picker or in
+     the sign-in dialog's Password Manager, fills nothing: the field is unchanged, the dialog stays open, and no prompt
+     follows;
+   - **Task 4b:**
+     - F26: on a `www.` host the search drops `www.`;
+     - F25: on a pinch-zoomed page (trackpad) the picker opens under the field;
+     - F16: a click elsewhere on the page closes the picker and reaches the page, and a second click on the field's 🔑
+       closes the picker without reopening it;
+     - L6 and L19: with the picker open, scrolling the page closes it, which rests on `jasperBridgeCancel` reaching
+       Jasper as `onQueryCanceled`; a scroll of an unrelated scroller, such as a carousel, leaves it open; Cmd+= and
+       Cmd+- close it; resizing the window or opening the find bar closes it;
+     - F3, L20 and L21: typing never opens the picker; a page's own `login.pick` after a click elsewhere is refused
+       ("The password manager opens only after a click in the page.") and spends that click, so a second ask after the
+       same click is refused too; a double-click whose second press lands where a page-placed field's picker opens
+       chooses nothing;
+     - L20: in every anchored picker (the Browser's, Remote's host editor and File Server's server editor), a row
+       pressed or entered within half a second of the picker opening does nothing, and works after it; Cancel and
+       typing in the search work at once;
+     - L20 (per-host zoom): with two items on one host at different zooms, the picker either opens under the field or
+       the pick is refused; it never opens elsewhere;
+     - L21 (record, the Vault's follow-up): whether the picker's starting search is selected as it opens, so that typing
+       replaces it.
+3. **Leaving:** navigating away with the picker open fills nothing. Pending.
+
+   From the task reviews: F14's line above; F15, closing the tab with the picker open closes it and fills nothing; L19,
+   a page's `pushState` while the picker is open closes it.
+4. **Basic:** `https://httpbin.org/basic-auth/user/passwd` shows "The website “httpbin.org” requires a user name and
+   password for “Fake Realm”."; OK signs in, Cancel shows the 401 page, and Password Manager signs in with a chosen
+   login. Pending.
+
+   From the task reviews (**Task 5b**):
+   - the dialog is titled "Sign In", the heading wraps under it (a long realm from the local server), and the switch
+     reads "Remember this password", off;
+   - Enter in the password field signs in, and so does Enter in the user name field; Escape cancels to the 401 page;
+   - F30: a page of several images behind one realm asks once;
+   - F8: navigating away with the dialog open closes it, and the new page's own sign-in shows;
+   - Password Manager opens the Vault's picker under the button, searched for the host without `www.`; cancelling the
+     picker keeps the dialog; closing the tab while the picker shows closes both;
+   - with the Vault locked, Password Manager shows the Vault's unlock prompt over the sign-in overlay, then the picker,
+     which takes clicks and typing inside the modal overlay;
+   - (record) a navigation's own sign-in dialog stays up until it is answered, with nothing, such as Chromium's reset of
+     the page's dialogs, closing it early;
+   - quitting Jasper with a sign-in dialog open and another waiting quits promptly, with nothing hanging on the
+     requests;
+   - **Task 5a:** a Basic-protected download (`Content-Disposition: attachment` behind a 401) still gets the sign-in.
+5. **Remember:** ticked, the Vault then holds "https://httpbin.org (Fake Realm)"; after a relaunch with the Vault
+   unlocked the page signs in with no dialog; locked, the dialog shows; a remembered wrong password shows the dialog on
+   the second try, with no loop. Pending.
+
+   From the task reviews:
+   - **Task 2:** the saved login shows in the manager under its name, and in Vault Plugin Grants as the Browser's
+     (`dev.jasper.browser — https://httpbin.org (Fake Realm)`); with the manager open, the save adds its row at once and
+     Plugin Grants lists the grant without the manager reopening; with the Vault locked, saving asks to unlock first,
+     and cancelling the unlock saves nothing and posts nothing;
+   - **Task 2 (F11):** saving again for the site with a new password replaces the Browser's own login, one row; a login
+     of that name that another plugin also has a grant for is left alone, and a second entry appears;
+   - **Task 6:**
+     - a site that redirects after the sign-in (`/basic-auth` to another path, or the local server) still saves, and
+       its next visit in the same tab fills silently again, as a redirect is the same navigation;
+     - F10: closing the tab while the save's unlock prompt shows saves nothing, and the prompt closes;
+     - L24 (record): whether Chromium reports the main-frame 401 before it challenges again after a wrong remembered
+       password; either way the second try shows the dialog;
+     - two quick navigations to a remembered site (Enter twice in the address field) give at most one dialog, and no
+       loop;
+     - a remembered password changed on the server: one silent try, then the dialog; OK with Remember replaces the
+       Browser's login, and the next visit fills silently again;
+     - L30: after a wrong remembered password, each later sign-in shows the dialog until the site answers a page and
+       that page commits; after a correct one, the next visit fills silently again; Remember saving on httpbin shows the
+       response is told before its commit, which the save and the re-arm rely on;
+     - L31: after a silent fill, Stop (or a navigation at once) before the page loads makes the next sign-in to that
+       site in that tab show the dialog, and a new tab fills silently again;
+   - **Task 5a (L23, record):** after a sign-in, Back to a page of another origin and Forward again: whether CEF
+     restores the page from its back/forward cache without a request; either way the restored page's commit is the top
+     address.
+6. **Plain dialogs:** `https://httpbin.org/digest-auth/auth/user/passwd` and a /dev/null item get the dialog without
+   Vault controls; a local page framing the Basic URL gets it without Remember (with Password Manager, L27). Pending.
+
+   From the task reviews:
+   - **Task 5a (F5):** a page that fetches another origin's Basic address gets the dialog without Remember, and no
+     silent fill;
+   - **Task 5b:**
+     - F4: a page that fetches a 401 in a loop gets two dialogs, then none until it loads again; a sign-in waits behind
+       a camera prompt and shows once the prompt is answered;
+     - L26 (known gap): a page whose requests three different realms challenge at once shows two dialogs, and the third
+       request fails;
+     - L27 and L28: trip the guard on a page (three realms, or a 401 retry page cancelled twice), then type a protected
+       address in the address field: its sign-in dialog shows; a link clicked inside the tripped page shows the 401
+       page instead (the known gap); cancel the typed address's sign-in: the 401 page shows, and a second protected
+       address typed in asks again;
+     - L29 (record): a first navigation's late `ERR_ABORTED` ending a quick second navigation's bypass;
+     - F22: a proxy on port 8118 that asks for a password shows "The proxy “127.0.0.1:8118” requires a user name and
+       password…", and each tab it challenges asks on its own (the known gap);
+   - **Task 5a (L13):** a host whose name has an underscore, such as an intranet name, gets the dialog without either
+     Vault control;
+   - **Task 5a (L25, record):** a page that rewrites its address on a timer during a navigation, and a 204 followed by
+     the page's own fetch of that address: neither gets Remember;
+   - **Task 6 (L32, record):** whether a prerendered page's activation brings a sign-in Jasper treats as the top-level
+     navigation's.
+7. **Manage Saved Passwords** opens the Vault manager, usable from Settings. Pending.
+
+   From the task reviews (**Tasks 1b and 3**):
+   - F7: it closes Settings first, asking about unsaved changes, where Keep Editing leaves Settings open and opens
+     nothing; then the manager opens over the window Settings was over, in front of it and owned by it;
+   - F21: the row, Manage Saved Passwords with the button Manage Passwords and no description, follows Manage Site
+     Permissions in Settings › Tools › Browser › Privacy & Data, and searching Settings for "passwords" finds and
+     highlights it;
+   - locked, the unlock prompt comes first, in the manager; with no vault, the create flow runs, as for Open Vault....
+8. **No Vault:** with the Vault plugin off, there are no buttons and no Manage Saved Passwords, and the dialog has
+   neither Vault control. Pending.
+
+   From the task reviews (**Task 3**): the dialog still signs in (the user's call); the Browser starts normally; and
+   "passwords" does not lead to the Browser's Settings page.
+
+#### The known gaps' lines
+
+Each is pending.
+
+- **The HTTP auth cache (F23):** after a sign-in, Clear Website Data leaves the site signed in until Jasper quits.
+- **The realm (F9):** a realm with a right-to-left override (U+202E), a line break or more than 100 characters, sent by
+  the local server, shows cleaned and cut, and the saved login's name has the same realm.
+
+### Batch 2: start-up and memory
+
+None new: the plugin's start finds the Vault and makes `HttpSignIns`, and loads no Chromium class.
+
+### Plan 8 on Windows and Linux (not run)
+
+The user has no Windows or Linux host yet. Every line above waits for each of them too, with Ctrl in place of Cmd.
+
+- **Windows:** an intranet host's NTLM or Negotiate sign-in may sign in with the system's credentials and no dialog;
+  record it (F27).
+- **Linux:** a Kerberos sign-in with a ticket may sign in with no dialog; without an emoji font such as Noto Color
+  Emoji, the button shows a box, still titled "Open Password Manager" (F27).
+- **Both:** the field buttons and the dialog as on macOS; and F7's Settings line: Manage Saved Passwords closes
+  Settings first, and the manager is in front of and owned by the window Settings was over, on x64 and aarch64.

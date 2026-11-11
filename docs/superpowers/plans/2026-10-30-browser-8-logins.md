@@ -4,8 +4,8 @@
 > superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Execution status (2026-11-11): Tasks 1-6 executed and reviewed (Task 1 as 1a and 1b, Task 4 as 4a and 4b and Task 5 as
-5a and 5b, ruling L-F17), and Task 7, the docs; the final whole-branch review and its fix wave come next; Task 8, the
-user's GUI check on macOS, is pending** (branch `claude/browser-logins`, worktree
+5a and 5b, ruling L-F17), Task 7, the docs, and Task 8's checklist; the final whole-branch review and its fix wave come
+next; Task 8, the user's GUI check on macOS, is pending** (branch `claude/browser-logins`, worktree
 `.claude/worktrees/browser-4b-4c-e6deab`, cut from local `main` `c01d2feec`, which has plans 4a, 4b, 4c, 9, 5, 6 and 7
 merged; the plan `58962695b`, brought in from `5c42e4a82`, then commits `a2b5c118a` to `322bd5793`, and the docs; not
 merged or pushed; see `docs/STATUS.md`). Executed with per-task subagents and reviews, each task's fix rounds until a
@@ -127,6 +127,10 @@ API (L2). The task reviews recorded these deviations from the plan's text, each 
   16,220 (6), each with 0 failures, 0 errors and 105 skipped; the example external plugin's `check pluginZip` against
   `build/sdk-release` passed after each; D49's `FilterListTest` flake did not show. The full check and the
   external-plugin check on the docs commits are the controller's. No GUI was launched.
+- **Task 8** ("Docs: plan 8's GUI check, pending"), the checklist:
+  [Plan 8: logins](../../browser-verification.md#plan-8-logins), every line pending, as nothing was run: no GUI, no
+  packaging with AOT, no benchmark. Its commit is not the plan's "Browser: the logins' GUI check on macOS", since
+  nothing is checked yet.
 
 The controller's rulings, one line each:
 - L0: every ruling the pre-flight scan proposed (F1-F30) is adopted and cited as L-F*n*, except where L1-L3 decide
@@ -248,8 +252,9 @@ Deferred minors:
   `onResourceLoadComplete` with the request's identity (L25).
 
 Not run:
-- **Task 8**, the user's GUI check on macOS, with their OK for each batch: pending, F12, F14, F6, F13 and F7 first,
-  then the plan's eight lines, each with the task reviews' lines, and the known gaps' lines.
+- **Task 8**, the user's GUI check on macOS, with their OK for each batch: pending
+  ([checklist](../../browser-verification.md#plan-8-logins)), F12, F14, F6, F13 and F7 first, then the plan's eight
+  lines, each with the task reviews' lines, and the known gaps' lines.
 - **Benchmarks:** none new; the plugin's start finds the Vault and makes `HttpSignIns`, and loads no Chromium class
   (`StartLoadsNoChromiumTest`).
 - **Windows and Linux** (no hosts): NTLM or Negotiate on an intranet host, Kerberos with a ticket, the emoji font, and

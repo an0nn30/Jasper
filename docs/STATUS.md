@@ -84,7 +84,7 @@ Each task's commits (the banner has each one's deviations):
 - Task 6: `f59b26b0b` "Browser: Remember this password, and remembered sign-ins without the dialog", `171e595d6`
   "Browser: the silent fill re-arms only on its own origin's page" and `322bd5793` "Browser: a silent fill re-arms only
   after its own answer".
-- Task 7: "Docs: the Browser's logins".
+- Task 7: "Docs: the Browser's logins"; Task 8: "Docs: plan 8's GUI check, pending".
 
 The controller's rulings, one line each (the pre-flight scan's F1-F30 adopted as L0):
 - L0: every ruling the pre-flight scan proposed (F1-F30) is adopted, except where L1-L3 decide otherwise.
@@ -182,9 +182,9 @@ pre-existing in the Vault and unfixed in plan 8 (L11): `VaultManagerDialog` keep
 `panel.showUnlock` throws, so `changed()` skips `passiveUnlock()` until the next prompt replaces it; and
 `UnlockPrompt.finish` runs its dismiss listeners before it completes the waiters, so a throwing listener leaves them
 incomplete (`unlock` is already null, so the next request still makes a fresh prompt). Task 8 (the user's check on
-macOS, with their OK): pending, F12, F14, F6, F13 and F7 first, then the plan's eight lines with the task reviews'
-lines. Windows and Linux are not run; plan 8 adds no start-up or memory line; no JavaScript runs in a test
-(`login-fields.js` is checked as text, with `node --check` and a stub harness).
+macOS, with their OK): pending, F12, F14, F6, F13 and F7 first, then the plan's eight lines with the task reviews' lines
+([checklist](browser-verification.md#plan-8-logins)). Windows and Linux are not run; plan 8 adds no start-up or memory
+line; no JavaScript runs in a test (`login-fields.js` is checked as text, with `node --check` and a stub harness).
 
 **Browser plan 7: downloads and page tools — 2026-11-10** (`claude/browser-downloads-page-tools`, worktree
 `.claude/worktrees/browser-4b-4c-e6deab`, from local `main` `417e2270f`, which has plans 4a, 4b, 4c, 9, 5 and 6 merged;
