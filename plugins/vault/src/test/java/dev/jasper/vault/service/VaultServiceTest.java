@@ -28,6 +28,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.*;
@@ -622,13 +623,41 @@ class VaultServiceTest {
 
     // Browser plan 8 Task 2, review round 1 (L9).
 
-    /** A service over the same lock whose unlock prompt cannot be shown, as with no window to show it in. */
-    VaultApi unshowable() {
-        service = new VaultService(lock, () -> Optional.of(window), prompt -> { throw new IllegalStateException("No window to show the vault dialog in"); },
-            grants::add, picks::add, notifications.group("dev.jasper.vault"), importBackground, Runnable::run,
-            owner -> CompletableFuture.completedFuture(lock.state() == LockState.UNLOCKED), imports::add, () -> changes++);
+    /** A service over the same lock with these parts, otherwise as {@link #service(Path)} makes it. */
+    VaultApi rebuilt(Consumer<UnlockPrompt> showUnlock, dev.jasper.sdk.notifications.NotificationGroup group, Runnable changed) {
+        service = new VaultService(lock, () -> Optional.of(window), showUnlock, grants::add, picks::add, group, importBackground, Runnable::run,
+            owner -> CompletableFuture.completedFuture(lock.state() == LockState.UNLOCKED), imports::add, changed);
         service.uiThread = () -> true; service.saveCopies = copies::add;
         return service.forConsumer(SSH);
+    }
+
+    /** An unlock prompt that cannot be shown while {@code refuse[0]} is true, as with no window to show it in. */
+    VaultApi refusing(boolean[] refuse) {
+        return rebuilt(prompt -> {
+            if (refuse[0]) throw new IllegalStateException("No window to show the vault dialog in");
+            unlocks.add(prompt);
+        }, notifications.group("dev.jasper.vault"), () -> changes++);
+    }
+
+    /** Captures what {@link VaultService} logs, without passing it on. */
+    static final class Logged extends java.util.logging.Handler implements AutoCloseable {
+        final java.util.logging.Logger logger = java.util.logging.Logger.getLogger(VaultService.class.getName());
+        final List<java.util.logging.LogRecord> records = new ArrayList<>();
+        private final boolean parents = logger.getUseParentHandlers();
+        Logged() { logger.setUseParentHandlers(false); logger.addHandler(this); }
+        @Override public void publish(java.util.logging.LogRecord record) { records.add(record); }
+        @Override public void flush() { }
+        @Override public void close() { logger.removeHandler(this); logger.setUseParentHandlers(parents); }
+        /** Every message, parameter and exception message logged. */
+        String text() {
+            var out = new StringBuilder();
+            for (var record : records) {
+                out.append(record.getMessage()).append('\n');
+                if (record.getParameters() != null) for (Object parameter : record.getParameters()) out.append(parameter).append('\n');
+                for (Throwable t = record.getThrown(); t != null; t = t.getCause()) out.append(t.getMessage()).append('\n');
+            }
+            return out.toString();
+        }
     }
 
     @Test void saveLoginRefreshesTheVaultsViewsBeforeItAnswers(@TempDir Path dir) throws IOException {
@@ -649,12 +678,90 @@ class VaultServiceTest {
         assertThat(changes).as("only a commit refreshes").isEqualTo(1);
     }
 
-    @Test void aThrowFromTheUnlockPromptZeroesTheCopy(@TempDir Path dir) {
-        service(dir); populate(); lock.lock();
-        VaultApi api = unshowable();
+    @Test void aThrowFromRequestUnlockZeroesTheCopy(@TempDir Path dir) {
+        service(dir);
+        var throwing = (dev.jasper.sdk.notifications.NotificationGroup) java.lang.reflect.Proxy.newProxyInstance(
+            getClass().getClassLoader(), new Class<?>[] {dev.jasper.sdk.notifications.NotificationGroup.class}, (proxy, method, args) -> switch (method.getName()) {
+                case "toString" -> "throwing notifications";
+                case "hashCode" -> System.identityHashCode(proxy);
+                case "equals" -> proxy == args[0];
+                default -> throw new IllegalStateException("Notifications are unavailable");
+            });
+        VaultApi api = rebuilt(unlocks::add, throwing, () -> changes++);
+        assertThat(lock.state()).as("no vault: requestUnlock posts, and the post throws").isEqualTo(LockState.NO_VAULT);
         assertThatThrownBy(() -> api.saveLogin(window, SITE, "u", "pw".toCharArray()))
-            .isInstanceOf(IllegalStateException.class).hasMessage("No window to show the vault dialog in");
+            .isInstanceOf(IllegalStateException.class).hasMessage("Notifications are unavailable");
         assertCopiesZeroed();
+    }
+
+    // Browser plan 8 Task 2, review round 2 (L10).
+
+    @Test void anUnlockPromptThatCannotShowIsForgotten(@TempDir Path dir) {
+        service(dir); populate(); lock.lock();
+        boolean[] refuse = {true};
+        VaultApi api = refusing(refuse);
+        try (var logged = new Logged()) {
+            assertThat(api.ensureUnlocked(window)).as("its prompt cannot show: false").isCompletedWithValue(false);
+            assertThat(api.credential(window, PROD)).isCompletedWithValue(Optional.empty());
+            assertThat(api.saveLogin(window, SITE, "user-synthetic-7", "pw-synthetic-7".toCharArray())).isCompletedWithValue(Optional.empty());
+            assertCopiesZeroed();
+            assertThat(logged.records).as("each failure logged").hasSize(3).allSatisfy(record -> {
+                assertThat(record.getLevel()).isEqualTo(java.util.logging.Level.WARNING);
+                assertThat(record.getThrown()).hasMessage("No window to show the vault dialog in");
+            });
+            assertThat(logged.text()).doesNotContain("pw-synthetic-7", "user-synthetic-7", SITE);
+        }
+        refuse[0] = false;
+        var unlocking = api.ensureUnlocked(window);
+        assertThat(unlocks).as("a fresh prompt, shown, not the dead one").hasSize(1);
+        assertThat(unlocking).isNotDone();
+        unlocks.getFirst().submit("pw".toCharArray());
+        assertThat(unlocking).isCompletedWithValue(true);
+    }
+
+    @Test void aPromptThatCannotShowAgainForTheNextWaiterIsForgotten(@TempDir Path dir) {
+        service(dir); populate(); lock.lock();
+        boolean[] refuse = {false}, open = {true};
+        VaultApi api = refusing(refuse);
+        var first = window(open);
+        var second = window();
+        var leaving = api.ensureUnlocked(first);
+        var staying = service.forConsumer(OTHER).ensureUnlocked(second);
+        assertThat(unlocks).hasSize(1);
+        open[0] = false; refuse[0] = true;
+        try (var logged = new Logged()) {
+            leaving.cancel(false);
+            assertThat(staying).as("shown again over the survivor, which could not show").isCompletedWithValue(false);
+            assertThat(logged.records).hasSize(1);
+        }
+        refuse[0] = false;
+        var fresh = service.forConsumer(OTHER).ensureUnlocked(second);
+        assertThat(unlocks).hasSize(2);
+        unlocks.getLast().submit("pw".toCharArray());
+        assertThat(fresh).isCompletedWithValue(true);
+    }
+
+    @Test void aThrowingChangedHookIsContained(@TempDir Path dir) throws Exception {
+        service(dir);
+        VaultApi api = rebuilt(unlocks::add, notifications.group("dev.jasper.vault"), () -> { changes++; throw new IllegalStateException("The views could not refresh"); });
+        populate();
+        var key = new dev.jasper.vault.keygen.KeyGenerator(dir.resolve("keys")).generate(dev.jasper.vault.keygen.KeyAlgorithm.ED25519, "fixture", "test");
+        try (var logged = new Logged()) {
+            var saved = api.saveLogin(window, SITE, "user-synthetic-7", "pw-synthetic-7".toCharArray());
+            assertThat(saved).as("the save still answers").isDone();
+            assertThat(saved.join()).isPresent();
+            assertCopiesZeroed();
+            var imported = api.importSshKeys(window, List.of(new dev.jasper.vault.api.SshKeySource(UUID.randomUUID(), "imported", key.privatePath())), List.of());
+            imports.getFirst().commit();
+            assertThat(imported).as("the key import still answers").isDone();
+            assertThat(imported.join()).isPresent();
+            assertThat(changes).isEqualTo(2);
+            assertThat(logged.records).as("each refresh failure logged").hasSize(2).allSatisfy(record -> {
+                assertThat(record.getLevel()).isEqualTo(java.util.logging.Level.WARNING);
+                assertThat(record.getThrown()).hasMessage("The views could not refresh");
+            });
+            assertThat(logged.text()).doesNotContain("pw-synthetic-7", "user-synthetic-7", SITE);
+        }
     }
 
     @Test void saveLoginAnswersEmptyForAnOwnerClosedAtTheCallOrAfterTheUnlock(@TempDir Path dir) {

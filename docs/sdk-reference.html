@@ -14701,7 +14701,8 @@ interface default fails with <a class="ext" href="https://docs.oracle.com/en/jav
 prompt: a request made while the prompt is open joins it where it is, and while the Credential Vault manager is
 open the prompt opens in it. Without a vault it posts a notification saying to create one and answers
 <code>false</code>.</p></div>
-<dl class="tags"><dt>Parameters</dt><dd><code>owner</code> the window the prompt opens over</dd><dt>Returns</dt><dd><code>true</code> once unlocked; <code>false</code> when the user cancels or there is no vault</dd></dl>
+<dl class="tags"><dt>Parameters</dt><dd><code>owner</code> the window the prompt opens over</dd><dt>Returns</dt><dd><code>true</code> once unlocked; <code>false</code> when the user cancels, the prompt cannot be shown or there is no
+    vault</dd></dl>
 </div>
 <div class="member" id="dev.jasper.vault.api.VaultApi.credentials()">
 <pre class="sig"><a class="self" href="#dev.jasper.vault.api.VaultApi.credentials()" aria-label="Link to this member">#</a><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/List.html" title="java.util.List">List</a>&lt;<a class="tl" href="#dev.jasper.vault.api.CredentialDescriptor">CredentialDescriptor</a>&gt; <b>credentials</b>()</code></pre>

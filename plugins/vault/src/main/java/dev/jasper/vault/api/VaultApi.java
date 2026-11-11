@@ -58,7 +58,8 @@ public interface VaultApi {
      * {@code false}.
      *
      * @param owner the window the prompt opens over
-     * @return {@code true} once unlocked; {@code false} when the user cancels or there is no vault
+     * @return {@code true} once unlocked; {@code false} when the user cancels, the prompt cannot be shown or there is no
+     *     vault
      */
     CompletableFuture<Boolean> ensureUnlocked(WindowHandle owner);
 

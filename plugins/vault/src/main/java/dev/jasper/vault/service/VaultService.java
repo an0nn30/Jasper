@@ -30,6 +30,7 @@ import java.util.function.Supplier;
 
 /** One per plugin instance; {@link #forConsumer} hands each requiring plugin its own view. */
 public final class VaultService {
+    private static final System.Logger LOG = System.getLogger(VaultService.class.getName());
     static final String NO_VAULT_TITLE = "No vault yet";
     static final String NO_VAULT_NOTICE = "Create a vault in Credential Vault first (Open Vault...)";
     static final String NO_WINDOW_NOTICE = "Credential Vault has no window to ask in";
@@ -78,7 +79,18 @@ public final class VaultService {
                         Consumer<KeyImportPrompt> showImport, Runnable changed) {
         this(lock, fallbackOwner, showUnlock, showGrant, showPick, notifications);
         this.background = background; this.ui = ui; this.openForImport = openForImport;
-        this.showImport = showImport; this.changed = changed;
+        this.showImport = showImport; this.changed = changed == null ? null : contained(changed);
+    }
+
+    /**
+     * The views' refresh after a save or a key import, at both its callers: a refresh that throws is logged with the
+     * exception alone, and the change it follows still answers (Browser plan 8 L10).
+     */
+    private static Runnable contained(Runnable changed) {
+        return () -> {
+            try { changed.run(); }
+            catch (RuntimeException failure) { LOG.log(System.Logger.Level.WARNING, "Could not refresh Credential Vault after a change", failure); }
+        };
     }
     public void closeImports() { for (KeyImportPrompt prompt : List.copyOf(imports)) prompt.cancel(); }
 
@@ -103,14 +115,28 @@ public final class VaultService {
             default:
         }
         if (unlock == null) {
-            unlock = new UnlockPrompt(owner, presentation, lock, () -> unlock = null);
-            unlock.representWith(showUnlock);
-            CompletableFuture<Boolean> waiter = unlock.attach(owner,presentation);
+            var prompt = new UnlockPrompt(owner, presentation, lock, () -> unlock = null);
+            unlock = prompt;
+            prompt.representWith(this::show);
+            CompletableFuture<Boolean> waiter = prompt.attach(owner,presentation);
             attached.accept(waiter);
-            if(!waiter.isDone())showUnlock.accept(unlock);
+            if(!waiter.isDone())show(prompt);
             return waiter;
         }
         var waiter=unlock.attach(owner,presentation);attached.accept(waiter);return waiter;
+    }
+
+    /**
+     * Shows the unlock prompt, at first and again for a surviving waiter. A prompt that cannot be shown is forgotten and
+     * its waiters answer {@code false}, so the next request makes a fresh one rather than joining a prompt nobody sees
+     * (Browser plan 8 L10).
+     */
+    private void show(UnlockPrompt prompt) {
+        try { showUnlock.accept(prompt); }
+        catch (RuntimeException failure) {
+            LOG.log(System.Logger.Level.WARNING, "Could not show the Unlock Vault prompt", failure);
+            prompt.cancel();
+        }
     }
 
     /** Every account and key without secrets; empty unless unlocked. */
@@ -311,7 +337,7 @@ public final class VaultService {
             // However the save ends, this copy goes; a saved login holds its own (Browser plan 8 F10).
             result.whenComplete((saved, failure) -> SecureBytes.zero(copy));
             CompletableFuture<Boolean> unlocked;
-            // A prompt that cannot be shown throws to the caller, as for the other requests; the copy goes first.
+            // Should requestUnlock throw (a prompt that cannot show is forgotten instead), the copy goes before the throw.
             try { unlocked = requestUnlock(owner); }
             catch (Throwable failure) { result.completeExceptionally(failure); throw failure; }
             result.whenComplete((saved, failure) -> { if (result.isCancelled()) unlocked.cancel(false); });
@@ -324,7 +350,8 @@ public final class VaultService {
                 try {
                     lock.transact(draft -> save(draft, name, username, copy), result::isCancelled).whenComplete((saved, failed) -> {
                         if (failed == null) {
-                            // The manager, its grants and the palette show the login before the caller hears of it.
+                            // The manager, its grants and the palette show the login before the caller hears of it; the
+                            // hook is contained, and the answer stands whatever it does.
                             try { if (changed != null) changed.run(); }
                             finally { result.complete(Optional.of(saved)); }
                         }
