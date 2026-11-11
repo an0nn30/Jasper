@@ -1,6 +1,7 @@
 package dev.jasper.browser.logins;
 
 import dev.jasper.browser.json.StrictJson;
+import dev.jasper.browser.page.Activation;
 import dev.jasper.browser.page.LastPress;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageContext;
@@ -126,7 +127,7 @@ class FieldButtonsTest {
     /**
      * L20, the double-click clickjack: a page's own request names a field just above where the user's second press
      * lands, so the picker would open under the pointer. A press outside the area the pick names, its right and bottom
-     * edges included, opens nothing, makes no anchor and spends no click; one inside it opens the picker.
+     * edges included, opens nothing and makes no anchor, and spends its click (L21); one inside it opens the picker.
      */
     @Test void aPressOutsideTheFieldIsRefused() throws Exception {
         onUi(() -> {
@@ -139,11 +140,40 @@ class FieldButtonsTest {
             assertThat(replies).hasSize(5).allSatisfy(reply -> assertThat(reply)
                 .isEqualTo(PageQuery.REFUSED + " The password manager opens only after a click in the page."));
             assertThat(areas).as("no anchor").isEmpty();
-            assertThat(activations).as("no click spent").hasValue(0);
+            assertThat(activations).as("each press's click spent").hasValue(5);
             assertThat(fake.picks).isEmpty();
             press.set(Optional.of(click(259, 49)));
             buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
             assertThat(fake.picks).as("its last pixel is inside").hasSize(1);
+        });
+    }
+
+    /**
+     * L21, the press oracle: a page that asks again and again, with areas around where it guesses the last press was,
+     * as one in a cross-origin frame, learns one answer per press. The first ask outside the press is refused and
+     * spends the press's click, so a second ask on the same press is refused as no click, whatever its area, even one
+     * that holds the press; the next press inside the field opens the picker.
+     */
+    @Test void aPressOutsideTheAreaSpendsItsClick() throws Exception {
+        onUi(() -> {
+            fake.pickAnswer = new CompletableFuture<>();
+            Page page = page();
+            var activation = new Activation();
+            activation.activate(1_000);
+            press.set(Optional.of(new LastPress(1, 0, 1_000, 100, 60)));
+            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), () -> activation.consume(1_000)), window, canvas, anchors);
+            assertThat(activation.active(1_000)).as("the first probe spent the press").isFalse();
+            buttons.query(query(page, ORIGIN, pick("password", 8, 100, 200, 24), () -> activation.consume(1_000)), window, canvas, anchors);
+            buttons.query(query(page, ORIGIN, pick("password", 72, 40, 40, 16), () -> activation.consume(1_000)), window, canvas, anchors);
+            assertThat(replies).hasSize(3).allSatisfy(reply -> assertThat(reply)
+                .isEqualTo(PageQuery.REFUSED + " The password manager opens only after a click in the page."));
+            assertThat(fake.picks).as("not even an area that holds the spent press").isEmpty();
+            assertThat(made).as("whose anchor was closed unused").allSatisfy(anchor -> assertThat(anchor.closed).isTrue());
+            activation.activate(2_000);
+            press.set(Optional.of(new LastPress(1, 0, 2_000, 12, 22)));
+            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), () -> activation.consume(2_000)), window, canvas, anchors);
+            assertThat(fake.picks).as("the next press, inside the field").hasSize(1);
+            assertThat(activation.active(2_000)).isFalse();
         });
     }
 
@@ -192,8 +222,8 @@ class FieldButtonsTest {
     }
 
     /**
-     * F3, L20: a malformed request, an origin that is no web page's, a field off the page, a press elsewhere, an anchor
-     * the host refuses and a busy page leave the click to a later request.
+     * F3, L20: a malformed request, an origin that is no web page's, a field off the page, an anchor the host refuses
+     * and a busy page leave the click to a later request; a press elsewhere does not (L21).
      */
     @Test void aRefusedRequestKeepsTheClick() throws Exception {
         onUi(() -> {
@@ -202,17 +232,18 @@ class FieldButtonsTest {
             buttons.query(query(page, ORIGIN, pick("email", 8, 16, 200, 24), true), window, canvas, anchors);
             buttons.query(query(page, Optional.of("file://"), pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
             buttons.query(query(page, ORIGIN, pick("password", 8, 700, 200, 24), true), window, canvas, anchors);
-            press.set(Optional.of(click(100, 60)));
-            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
             buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, area -> {
                 throw new IllegalArgumentException("An area must lie inside its content");
             });
-            assertThat(activations).as("malformed, not a web page, off the page, a press elsewhere, an anchor refused").hasValue(0);
+            assertThat(activations).as("malformed, not a web page, off the page, an anchor refused").hasValue(0);
+            press.set(Optional.of(click(100, 60)));
+            buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
+            assertThat(activations).as("a press elsewhere spends it").hasValue(1);
             press.set(Optional.of(click(12, 22)));
             buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
-            assertThat(activations).hasValue(1);
+            assertThat(activations).hasValue(2);
             buttons.query(query(page, ORIGIN, pick("password", 8, 16, 200, 24), true), window, canvas, anchors);
-            assertThat(activations).as("busy").hasValue(1);
+            assertThat(activations).as("busy").hasValue(2);
             assertThat(replies).extracting(reply -> reply.substring(0, 1)).containsExactly("" + PageQuery.MALFORMED,
                 "" + PageQuery.REFUSED, "" + PageQuery.REFUSED, "" + PageQuery.REFUSED, "" + PageQuery.REFUSED, "" + PageQuery.BUSY);
         });
@@ -491,9 +522,18 @@ class FieldButtonsTest {
 
     /** A query of {@code page}'s from {@code origin}, whose activation counts its asks and allows it when {@code clicked}. */
     private PageQuery query(Page page, Optional<String> origin, Map<String, Object> request, boolean clicked) {
+        return query(page, origin, request, () -> clicked);
+    }
+
+    /** A query of {@code page}'s from {@link #ORIGIN}, whose activation is {@code activation}'s, its asks counted. */
+    private PageQuery query(Page page, String origin, Map<String, Object> request, java.util.function.BooleanSupplier activation) {
+        return query(page, Optional.of(origin), request, activation);
+    }
+
+    private PageQuery query(Page page, Optional<String> origin, Map<String, Object> request, java.util.function.BooleanSupplier activation) {
         return new PageQuery(page, origin, request, () -> {
             activations.incrementAndGet();
-            return clicked;
+            return activation.getAsBoolean();
         }, press::get, shown::get, (code, text) -> replies.add(code + " " + text));
     }
 

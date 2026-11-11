@@ -32,9 +32,10 @@ import java.util.function.Function;
  * password field's opens the Vault's picker for a password, a username field's for a username and a password. Its click
  * sends a {@value #PICK} query, which this class answers. Any script of the page can send one, so each is untrusted
  * (R38): the picker opens, one at a time, only for an http or https document, only at a field on the page's canvas, and
- * only after a click in the page inside that field (L20), so a page cannot move a field under a click meant for
- * something else; it is searched for the asking origin's host, never a text the page gives. The page is sent only what
- * the user chose, and only while it shows the origin that asked.
+ * only after a click in the page inside that field (L20), so it opens at the area that holds the click, below or above
+ * it, but where the popover is clamped to the screen; a press outside the area a pick names spends the click, so each
+ * press answers a page one such question. The picker is searched for the asking origin's host, never a text the page
+ * gives. The page is sent only what the user chose, and only while it shows the origin that asked.
  *
  * <p>The picker closes, with its anchor, as the query is cancelled (the page scrolled, which the script reports by
  * cancelling it, or its frame navigated), as the anchor closes (the page's canvas was resized, hidden or moved), as the
@@ -157,9 +158,10 @@ public final class FieldButtons {
      * opaque or not http or https; {@link PageQuery#BUSY} while this page's picker is open; nothing more for a query that
      * is over, and {@link PageQuery#GONE} for one whose page shows another origin (L18); {@link PageQuery#REFUSED} when
      * {@code area} gives nothing, as for a field off the canvas; {@link PageQuery#REFUSED} without a press within the
-     * activation that lies inside that area; {@link PageQuery#REFUSED} when {@code anchor} refuses the area with an
+     * activation, and for a press outside that area, which spends the activation, so a page learns where a press was
+     * at most once per press (L21); {@link PageQuery#REFUSED} when {@code anchor} refuses the area with an
      * {@link IllegalArgumentException} or gives a closed anchor; and {@link PageQuery#REFUSED} when the activation does
-     * not allow it, which is spent then, and only then, as the picker is about to open. The Vault's picker then opens
+     * not allow it, which is spent then, as the picker is about to open. The Vault's picker then opens
      * on the anchor, searched for the origin's host without one leading {@code www.} (F26), and the query is answered
      * later, once: a password field {@code {"password": …}}, a username field {@code {"username": …, "password": …}},
      * each without an empty member, and {@code {}} when nothing was chosen. The answer's text is made only while the
@@ -204,7 +206,13 @@ public final class FieldButtons {
             query.fail(PageQuery.REFUSED, OFF_PAGE);
             return;
         }
-        if (query.press().filter(press -> inside(press, covered.get())).isEmpty()) {
+        Optional<LastPress> pressed = query.press();
+        if (pressed.isEmpty()) {
+            query.fail(PageQuery.REFUSED, NO_CLICK);
+            return;
+        }
+        if (!inside(pressed.get(), covered.get())) {
+            query.consumeActivation(); // L21: each press answers one such question, as the real button's lies inside
             query.fail(PageQuery.REFUSED, NO_CLICK);
             return;
         }

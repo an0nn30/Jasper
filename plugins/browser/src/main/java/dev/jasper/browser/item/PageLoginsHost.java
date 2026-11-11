@@ -11,14 +11,15 @@ import java.util.Objects;
 import java.util.function.IntSupplier;
 
 /**
- * One browser item's password manager (plan 8, F18), made only with the Credential Vault, as {@link PageToolsHost} holds
- * the item's tools: its page's login fields show the Vault's buttons, whose picks the item's {@link FieldButtons}
+ * One browser item's password manager (plan 8, F18), made only with the Credential Vault, as {@link PageToolsHost}
+ * holds the item's tools: its page's login fields show the Vault's buttons, whose picks the item's {@link FieldButtons}
  * answer, the picker anchored on the field's area of the page's canvas, at the zoom the item shows its page at, over
- * the window the item's tab is in, once the click that asked lies in that area (L20). The host sees where the canvas is, not what Chromium draws on it, so the picker
- * closes as the page goes elsewhere (a main frame's load start, a committed address, Jasper sending it elsewhere) and
- * as the item's zoom changes ({@link #zoomChanged}); the page's script closes it as the page scrolls, and its anchor
- * closes it as the canvas is resized (L6). A /dev/null item has the buttons too, as Chrome's Incognito fills saved
- * passwords, and nothing here writes to the Vault (F24). It closes with the item. UI thread.
+ * the window the item's tab is in, once the click that asked lies in that area (L20). The host sees where the canvas
+ * is, not what Chromium draws on it, so the picker closes as the page goes elsewhere (a main frame's load start, a
+ * committed address, Jasper sending it elsewhere) and as the item's zoom changes ({@link #zoomChanged}); the page's
+ * script closes it as the page scrolls, and its anchor closes it as the canvas is resized (L6). A /dev/null item has
+ * the buttons too, as Chrome's Incognito fills saved passwords, and nothing here writes to the Vault (F24). It closes
+ * with the item. UI thread.
  */
 final class PageLoginsHost implements AutoCloseable {
     private final FieldButtons buttons;
