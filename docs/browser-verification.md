@@ -749,16 +749,18 @@ The user has no Windows or Linux host yet. Every line above waits for each of th
    From the task reviews:
    - **Task 3 (F8, D4), the packaged app:** macOS's prompt for the Downloads folder comes at the first download, not at
      the first tab, with "Jasper saves the files you download in the Browser here."; Allow lets downloads go; Deny makes
-     them fail with the notification (record its reason; `docs/packaging.md` expects "Operation not permitted");
-     `plutil -extract NSDownloadsFolderUsageDescription raw` on the bundle shows the string. With the Downloads folder
-     set to a folder inside `~/Documents`, and once inside `~/Desktop`, the prompt comes at the first browser tab, with
-     "Jasper saves files from the Browser here when you choose this folder.".
-   - **D1 and D20:** a page that downloads twice without a click downloads once and posts one "This site tried to
-     download multiple files" with its host; a click downloads again; a reload, a new document, allows one more; two
-     file addresses typed into the address field one after the other both download.
+     them fail with the notification (record the reason); `plutil -extract NSDownloadsFolderUsageDescription raw` on
+     the bundle shows the string. With the Downloads folder set to a folder inside `~/Documents`, and once inside
+     `~/Desktop`, the prompt comes at the first browser tab, with "Jasper saves files from the Browser here when you
+     choose this folder.".
+   - **D1, D20 and D46:** a page that downloads twice without a click downloads once and posts one "This site tried to
+     download multiple files" with its host; a click downloads again; a page that reloads itself without a click (a
+     meta refresh or `location.reload()`) and downloads at each load downloads once in all, with one notice; a link
+     clicked in the page to such a page allows one more; two file addresses typed into the address field one after the
+     other both download.
    - **D22 (known gaps; record):** one click on a page that starts three downloads within 5 seconds; a click whose
-     download the server answers after more than 5 seconds, which counts as the document's one download without a
-     click.
+     download the server answers after more than 5 seconds, which counts as the page's one download without a click;
+     a click on a link whose page the server answers after more than 5 seconds, which allows no new download (D49).
    - **D19 (known gap; record):** whether any download stays running with no progress, as one Chromium never updates
      after it starts would.
 2. **The menu:** with the menu open during progress, Stop works. Then Open, Show in Finder, Remove from List and Clear
@@ -871,10 +873,14 @@ The user has no Windows or Linux host yet. Every line above waits for each of th
       embedded video;
     - a cookie banner whose dimmer is appended at the end of the document is hidden with it;
     - D35: after hiding a cookie wall that locked scrolling, the page scrolls, also after Escape, and hiding a small
-      banner leaves the page's overflow alone; record a wall whose page locks the body with `position: fixed`, and a
-      modal `<dialog>` hidden by a click (known gaps);
+      banner leaves the page's overflow alone; record a wall whose page locks the body with `position: fixed`, a modal
+      `<dialog>` hidden by a click, and a page that locks `overflow-y` for its own layout, which scrolls after a hide
+      that covers the viewport (known gaps);
     - Remove Distractions while Reader Mode shows closes the reader first, and Reader Mode while removal runs ends
-      removal and the crosshair.
+      removal and the crosshair;
+    - capture listeners (D29, known gap; record): on a test page whose capture listeners on `window`, added before
+      Jasper's scripts, log keys and clicks, they log both in reader mode and in distraction removal; in reader mode one
+      on `document` logs the article's clicks too.
 11. **Remove Element** hides a banner under the pointer, at 100% and 150% zoom. Pending.
 
     From the task reviews (**Task 6**): also on an item reset to a 150% Page zoom (Page zoom 150, then Reset Font
@@ -887,8 +893,8 @@ The user has no Windows or Linux host yet. Every line above waits for each of th
     - offline, `srcset` and `<picture>` images, `@import`ed style sheets and web fonts show;
     - F26 and D7: a second save of the same host offers `host (1)`; a page that navigates while the chooser is open
       fails with "the page navigated away"; Save Page As… is dimmed on `jasper-about:welcome`;
-    - F13: `xattr -p com.apple.quarantine` on `index.html` and on a saved resource shows the mark, which each file took
-      before its rename;
+    - F13: after the save, `xattr -p com.apple.quarantine` on the folder's `index.html` and on a file in its
+      `resources/` shows the mark, which each took before its rename;
     - F27: a page with a `Content-Security-Policy` meta element that limits images opens offline with its images, and a
       page of more than 1 MiB of HTML saves whole;
     - F12: a public page whose image is at a `192.168.x.x` address keeps that image's web address;
@@ -900,6 +906,24 @@ The user has no Windows or Linux host yet. Every line above waits for each of th
     - D36 and D42: a save while reader mode shows, and one while distraction removal outlines a banner, open without
       the overlay, inert or locked scrolling, and without the red outline;
     - D41: quitting during a long save ends without the 10 s stop warning and leaves no unmarked file.
+
+#### Lines the final review's fix wave added
+
+Each is pending.
+
+- **The folder prompt (D48):** in the packaged app, while macOS's prompt for the Downloads folder shows, record whether
+  Jasper's windows still answer the pointer and keys, as Jasper reads the folder for the download's name on Chromium's
+  thread.
+- **A held Escape on a page with its own handler (D47, D48):** on a page whose own Escape handler shows that it ran,
+  such as a test page that logs its keys, holding Escape closes reader mode, and in another run ends distraction
+  removal, and the page's handler hears no Escape until the key is released; the next Escape reaches it. Record, in
+  both, whether releasing Escape after Cmd+Tab has left Jasper keeps the page's next Escape from it (D49: until a
+  stop, the next start or the page going).
+- **A modal `<dialog>` over the reader (D48):** a page that opens a modal `<dialog>` with `showModal()` from a timer
+  while reader mode shows: record whether it shows over the article and takes keys and clicks, as only the page's body
+  is inert.
+- **Back to a cached page (D48):** Reader Mode on an article, a link out, then Back to the page restored from the
+  back-forward cache: record whether ☰ offers Reader Mode again.
 
 ### Batch 2: start-up and memory (pending, F35)
 

@@ -1155,8 +1155,9 @@ one.
 
 - `context.platform().downloadsFolder()` (SDK 0.31.0), on any thread, returns the system's Downloads folder as an
   absolute path: `~/Downloads` on macOS, the Downloads known folder on Windows (else `%USERPROFILE%\Downloads`), and
-  `XDG_DOWNLOAD_DIR` from `user-dirs.dirs` on Linux (else `~/Downloads`). Jasper finds it once, at the first call. It
-  may not exist yet: create it before saving there.
+  `XDG_DOWNLOAD_DIR` from `user-dirs.dirs` on Linux (else `~/Downloads`). Jasper finds it once, at the first call,
+  which may block while it reads the system's settings, so make that call off the UI thread. It may not exist yet:
+  create it before saving there.
 - `context.platform().markDownloaded(file, source, referrer)` (SDK 0.31.0) gives a file the plugin downloaded the
   system's downloaded-file mark, so the system checks it before it is opened or run: the quarantine attribute on
   macOS, the `Zone.Identifier` stream on Windows naming the referrer and the source, and nothing on Linux, which has

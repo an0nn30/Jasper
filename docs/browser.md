@@ -424,8 +424,8 @@ Mode** and **Remove Distractions** at its top.
   between its views, unless only the fragment changed; until then ☰ offers neither. A page that is not showing, such
   as one in a tab behind another, is checked when it shows.
 - Jasper's own `jasper-about:` pages, a challenge provider's page (Cloudflare Turnstile, hCaptcha, reCAPTCHA, Arkose
-  Labs) and a page of more than 50,000 elements offer neither. On a page that enforces Trusted Types, Readability
-  finds no article when it needs a second pass over a page whose first found too little text, or the page has an image
+  Labs) and a page of more than 50,000 elements offer neither. On a page that enforces Trusted Types, Readability may
+  find no article when it needs a second pass over a page whose first found too little text, or the page has an image
   inside `noscript`.
 
 **Reader Mode** lays the article over the page in the workspace theme's colours: its title, or "Article", then its
@@ -461,23 +461,26 @@ manager on Linux).
   `@import` name, is saved, and the copy points to it; every other link, frame and form address is made absolute, so
   links work and frames load from the web. The page's `Content-Security-Policy` meta elements go, so that they do not
   block the saved files. Scripts are kept and run when the saved page opens, from its `file:` address, where they can
-  reach the network, as in Chrome. What a shadow root holds is not saved. The saved page has neither reader mode's
-  overlay nor distraction removal's outline.
+  reach the network. What a shadow root holds is not saved. The saved page has neither reader mode's overlay nor
+  distraction removal's outline.
 - **Fetching:** Jasper fetches each resource again itself ([Jasper's own requests](#jaspers-own-requests)), without
   your cookies, so what a site shows only to you may differ or fail. Only a successful answer (200) is kept, within 15
-  seconds a resource, its redirects (at most 5) and body included: at most 20 MiB a resource and 2 MiB a style sheet,
-  500 resources and 200 MiB in all, and 5 minutes for the save's fetches. A resource that fails or passes a bound keeps
-  its web address in the saved page, and the save goes on; so do those not yet fetched when the HTTP proxy changes.
+  seconds a resource, its name lookups, redirects (at most 5) and body included: at most 20 MiB a resource and 2 MiB a
+  style sheet, 500 resources and 200 MiB in all, and 5 minutes for the save's fetches. A resource that fails or passes
+  a bound keeps its web address in the saved page, and the save goes on; so do those not yet fetched when the HTTP
+  proxy changes.
 - **Private networks:** for a page on the web, Jasper fetches nothing from this computer, a link-local or private
   network address, such as `192.168.1.1`, `10.0.0.1` or `100.64.0.1`, or an unspecified one: neither from a host
   written as one, such as `localhost`, nor, while the HTTP proxy is off, from a name that resolves to one. Such a
   resource keeps its web address. A page whose own address is written as such a host, such as `http://192.168.1.10/`,
   saves from any host; a page reached by a name counts as on the web. A name whose answer changes between Jasper's
   check and its request (DNS rebinding) can still reach such an address.
-- **The files:** each file gets the [downloaded-file mark](#downloads), a /dev/null page's naming no address, and a
-  resource whose extension is not a web page's, such as an image's, a font's, a style sheet's or a script's, gets
-  `.bin` added. Saving into a folder that exists replaces its files of the same names; a symbolic link at `resources`
-  or `index.html` there fails the save.
+- **The files:** each file gets the [downloaded-file mark](#downloads), a /dev/null page's naming no address; when a
+  mark cannot be written, the file is still saved, and Jasper warns once, in the Downloads group, "“FOLDER” has
+  files without a downloaded-file mark". A style sheet or script whose name does not end in `.css` or `.js` gets it
+  added, and any other resource keeps its extension only when it is a web resource's, such as an image's, a font's, a
+  media file's or a data file's; otherwise it gets `.bin` added. Saving into a folder that exists replaces its files of
+  the same names; a symbolic link at `resources` or `index.html` there fails the save.
 - **Failures:** "Save Failed" says "Could not save the page: …" with the reason, such as a folder that cannot be
   written, "the page navigated away" when the page went to another document first, "the page did not answer" after 30
   seconds, or "the page is too large to save" for a copy of more than 64 MiB. Once the page's tab has closed, the
@@ -570,10 +573,9 @@ downloads nothing.
   opened or run: on macOS the quarantine attribute (`com.apple.quarantine`) that Gatekeeper reads; on Windows the
   `Zone.Identifier` stream (the mark of the web), `ZoneId=3` with the page's address as `ReferrerUrl`, when it is a web
   page, and the file's as `HostUrl`, without user names and passwords. Linux has no such mark. A mark the file already
-  has is kept. Jasper writes the stream itself, not through Windows' attachment service, so an antivirus hooked there
-  does not scan the file as it arrives. When the mark cannot be written, as on a Windows volume without streams (FAT32
-  or exFAT: "This volume cannot keep a downloaded-file mark"), Jasper warns "“NAME” has no downloaded-file mark", and
-  on macOS and Windows the download has no Open: open it from the file manager only if you trust it.
+  has is kept. Jasper writes the stream itself. When the mark cannot be written, as on a Windows volume without streams
+  (FAT32 or exFAT: "This volume cannot keep a downloaded-file mark"), Jasper warns "“NAME” has no downloaded-file
+  mark", and on macOS and Windows the download has no Open: open it from the file manager only if you trust it.
 - **The Downloads menu** joins the menu bar with the first download. It lists the 20 newest downloads, and any older one
   still running, oldest first, each a submenu titled with its name and its progress, such as "report.pdf — 42%", or
   what has arrived while its size is unknown, such as "1.2 MB"; then Finished, Failed or Stopped. A running download's
@@ -586,17 +588,19 @@ downloads nothing.
   and "Download failed for “NAME”.", when a download fails or Jasper refuses it, with the reason when Jasper has one; a
   download you stop posts none.
 - **Downloads without a click:** as in Chrome, a download that does not come within 5 seconds of a click or key press
-  in the page goes once in each of the page's documents; each later one in that document is refused, and the first
-  refusal posts "This site tried to download multiple files" with the page's host. Each load you start from Jasper,
-  such as from the address field, a bookmark or History, allows one again. A download within 5 seconds of a click or
-  key press, and Save Link As… and Save Image As…, always go.
+  in the page goes once; each later one is refused, and the first refusal posts "This site tried to download multiple
+  files" with the page's host. A document that starts loading within 5 seconds of a click or key press in the page,
+  such as the one a clicked link opens, and each page you open from Jasper, such as from the address field, a bookmark
+  or History, allow one again; a document the page loads by itself, through a meta refresh, `location.reload()` or a
+  change of `location`, does not. A download within 5 seconds of a click or key press, and Save Link As… and Save
+  Image As…, always go.
 - **Closing a tab** while one of its page's downloads runs lets the download finish: the page goes blank at once, and
   its browser closes once the download ends. A tab a page opened, through a `target=_blank` link or `window.open`, whose
   first page becomes a download closes, as in Chrome, and the download goes on.
 - **Quitting,** or turning the Browser off, stops the running downloads, and once Chromium has closed, Jasper deletes
   the partial files (`.crdownload`) they left in their folders.
-- **On macOS,** in the packaged Jasper.app, macOS asks whether Jasper may use the Downloads folder at the first
-  download, and a Downloads folder setting inside Documents or Desktop at the first browser page
+- **On macOS,** in the packaged Jasper.app, macOS asks whether Jasper may use the Downloads folder, or a Downloads
+  folder setting inside Documents or Desktop, when Jasper first uses it
   ([macOS Downloads, Desktop and Documents folders](packaging.md#macos-downloads-desktop-and-documents-folders)); while
   it is denied, downloads there fail. System Settings › Privacy & Security › Files and Folders changes the choice.
 

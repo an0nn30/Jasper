@@ -4,23 +4,28 @@
 > superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Execution status (2026-11-10): Tasks 1-7 executed and reviewed (Task 1 as 1a, 1b and 1c, ruling D-F17), and Task 8,
-the docs; Task 9, the user's GUI check on macOS, is pending, and so are the final reviews** (branch
+the docs; the final reviews passed Tasks 1-4 and Tasks 5-7 "With fixes" and the docs "Approved with fixes", and the fix
+wave that followed is done; Task 9, the user's GUI check on macOS, is pending** (branch
 `claude/browser-downloads-page-tools`, worktree `.claude/worktrees/browser-4b-4c-e6deab`, cut from local `main`
 `417e2270f`, which has plans 4a, 4b, 4c, 9, 5 and 6 merged; the plan `a52181595`, brought in from `5c42e4a82`, then
-commits `371a94680` to `87e4fb7c3`, and the docs, `2a8b0a782` and `5949bdfba`, and their counts; not merged or pushed;
-see `docs/STATUS.md`). Executed with per-task subagents and reviews, each task's fix rounds until a re-review found
-every finding addressed. The pre-flight scan's findings F1-F38 were adopted as rulings (D0, cited D-F*n*) except where
-D1-D3 decide otherwise, and the controller's further rulings are D4-D44; plan 4a's R0-R48 and the banners of 4b, 4c, 9,
-5 and 6 bind. On 2026-11-09 the user chose D1 ("Match Chrome"), D2 ("Yes, download it") and D3 ("No"), and asked for no
-change to the plan's own calls. 4b's P6, no Save Link As… or Save Image As… until this plan, is closed by Task 4's items
-(D-F10). The task reviews recorded these deviations from the plan's text, each with its ruling:
+commits `371a94680` to `87e4fb7c3`, and the docs, `2a8b0a782` and `5949bdfba`, and their counts, local `main`
+`44c11698e` (the Editor file associations' plan 1) merged in as `6a5042193`, and the fix wave, `291a42772`, and its docs
+and their counts; not merged or pushed; see `docs/STATUS.md`). Executed with per-task subagents and reviews, each task's
+fix rounds until a re-review found every finding addressed. The pre-flight scan's findings F1-F38 were adopted as
+rulings (D0, cited D-F*n*) except where D1-D3 decide otherwise, and the controller's further rulings are D4-D49; plan
+4a's R0-R48 and the banners of 4b, 4c, 9, 5 and 6 bind. On 2026-11-09 the user chose D1 ("Match Chrome"), D2 ("Yes,
+download it") and D3 ("No"), and asked for no change to the plan's own calls. 4b's P6, no Save Link As… or Save Image
+As… until this plan, is closed by Task 4's items (D-F10). The task reviews recorded these deviations from the plan's
+text, each with its ruling:
 - **Versions:** `JasperSdk.VERSION` 0.30.0 to 0.31.0, every bundled range `>=0.31.0, <0.32` (Task 1a, D-F17), not the
   plan's 0.30.0. New SDK members, each `@since 0.31.0`: `PluginMenu.addEntries(List<MenuItem>, Consumer<String>)` and
   `MenuEntries` (`set(List<MenuItem>)`), and `Platform.downloadsFolder()` and `Platform.markDownloaded(Path, URI,
   Optional<URI>)`; the testkit's `FakePluginHost.chooseMenuEntry`, `setDownloadsFolder`, `markedDownloads`,
-  `failMarks` and `MarkedDownload`. **The Browser stays 0.2.0** (D-F17): `dev.jasper.browser.api` is unchanged, and the
-  plugin asks for no new capability. Readability.js 0.6.0 ships unmodified in the Browser's `third_party/` (D2), with
-  its `notices.toml` component and `ReadabilityBundleTest` (D-F23).
+  `failMarks` and `MarkedDownload`. Local `main`'s Editor file associations, merged in, add `FileOrigin` and
+  `FileEditor`'s four-argument `edit` to the same 0.31.0, which no release carries (D45). **The Browser stays 0.2.0**
+  (D-F17): `dev.jasper.browser.api` is unchanged, and the plugin asks for no new capability. Readability.js 0.6.0 ships
+  unmodified in the Browser's `third_party/` (D2), with its `notices.toml` component and `ReadabilityBundleTest`
+  (D-F23).
 - **Task 1a** (`371a94680` "SDK: 0.31.0"): `827ac12ba`'s 39 files; `15-versions.html`'s `<=0.30.2` example became
   `<=0.31.2`.
 - **Task 1b** (`7b8258f8c` "SDK 0.31.0: menu entries that are not actions"; fix round `ce4a8dd13` "SDK 0.31.0: menu
@@ -130,6 +135,40 @@ change to the plan's own calls. 4b's P6, no Save Link As… or Save Image As… 
 - **Task 9** (`5949bdfba` "Docs: plan 7's GUI check, pending"), the checklist:
   [Plan 7: downloads and page tools](../../browser-verification.md#plan-7-downloads-and-page-tools), every line
   pending, as nothing was run: no GUI, no packaging with AOT, no benchmark.
+- **The merge** (`6a5042193`): local `main` `44c11698e`, the Editor file associations' plan 1, whose SDK additions share
+  0.31.0 with this plan's (D45). Three conflicts, all in the docs: STATUS keeps both entries, plugin authoring's testkit
+  row takes both sides' members, and `sdk-reference.html` was made again by `sdkReference`. At the merge
+  `./gradlew check` gave 15,902 tests, 0 failures, 0 errors, 105 skipped (1,413 classes: jasper-app 5,357, Editor 5,391,
+  Browser 1,621), and the example external plugin's `check pluginZip` passed.
+- **The final fix wave** (after the final reviews, dispatched 2026-11-10 over `44c11698e..6a5042193`, this plan's own
+  diff after the merge: A, Tasks 1-4, and B, Tasks 5-7, each "With fixes", and C, the docs, "Approved with fixes";
+  rulings D45-D49):
+  - `291a42772` "Browser: plan 7's final fixes" (W1, D46, D47): `PageDownloadState` keeps the download allowance, which
+    `Page.load` renews (D20) and `Page.documentStarting`, called by `FrameScripts.loadStarting` for main frames, renews
+    only while the page's `Activation` is active, the audio count still counting every document (D46);
+    `DownloadList.update` returns `Ended(outcome, download)` and `finish` the finished download, so `Downloads` tells an
+    old download's own outcome though the trim drops it (I2); `save-page.js`'s `unhold()` finds every counterpart
+    before the copy changes and removes the reader's host last; `PageSaver` runs a name lookup on a virtual thread,
+    polled every 100 ms against the resource's deadline, the save's and `live()`, a timeout refusing the name;
+    `reader.js` and `distractions.js` stop and prevent every trusted Escape keydown while closing, until Escape's keyup,
+    never reading `repeat`, and retry a busy bridge 20 times, 100 ms apart; the reader's shadow root also stops `copy`,
+    `cut`, `dragstart`, `selectstart`, `focusin` and `focusout`, and `reader.js`'s header says a page's capture
+    listeners hear pointer events first; `SavePage` fails the save and frees its folder for an `Error` too, and
+    rethrows it; one `DownloadAddresses.mark` gives a download's and Save Page As's mark addresses; `Page`'s tools hooks
+    moved, as a pure move, into the package-private `PageToolHooks` (108 lines; `Page` 1,738 to 1,705 lines after
+    D46), with its `migration.csv` row; `COM0` and `LPT0` are device names; `reserveFolder`'s Javadoc names the names'
+    lock it shares, which is bounded; a `PageSaverTest` row with a valid supplementary character, which passed at once.
+    The tests came first: 7 of 153 Java tests failed before the code, and so did harness rows (reader 4 of 24,
+    distractions 2 of 29, save-page 1 of 17); `:jasper-plugin-browser:check` then gave 1,630 tests, 0 failures, 1
+    skipped (9 more); the reviews' probes pass (`SlowLookupProbe`: a 2 s save ends in 2,019 ms and a stop is heard at
+    215 ms, against 3,022 and 3,009 ms).
+  - The docs (W2: review C's fixes, D46-D48 and W1's changes): the Browser guide (the `.bin` rule, D46's allowance, Save
+    Page As's mark warning and its name lookups within the deadline, and four sentences softened: macOS's folder
+    prompt, Trusted Types, kept scripts and the Windows stream), `docs/packaging.md` (macOS asks when Jasper first uses
+    the folder; the quoted reason gone), plugin authoring (`downloadsFolder()`'s first call off the UI thread), the
+    checklist (D46's line, the reason recorded, the saved files' marks, a page's own `overflow-y` lock, earlier capture
+    listeners, and the fix wave's four lines), this banner and STATUS, whose Editor file associations entry says it is
+    merged into local `main`.
 
 The controller's rulings, one line each:
 - D0: every ruling the pre-flight scan proposed (F1-F38) is adopted and cited as D-F*n*, except where D1-D3 decide
@@ -234,59 +273,89 @@ The controller's rulings, one line each:
   `String.getBytes` did; a scheme-relative reference keeps its form without user info, redirects included; `live()`
   checked again before each move, the temporary file marked before it moves and deleted when its mark is refused
   after a stop; `255.255.255.255` and 6to4 addresses (`2002::/16`) embedding a private IPv4 refused.
+- D45: this plan's SDK additions and the Editor file associations' (`FileOrigin`, `FileEditor`'s four-argument
+  `edit`), merged in from local `main` `44c11698e`, share 0.31.0, which no release carries; no 0.32.0 bump.
+- D46: a main-frame document renews D1's allowance only when it starts while the page's `Activation` is active, or
+  through Jasper's own load (D20); a page's own refresh, reload or `location` change keeps the count, as Chrome keeps
+  its limiter's state across navigations without a gesture, so a site that reloads itself to deliver files needs a
+  click; `DownloadsTest`'s Javadoc and the Task 9 line corrected.
+- D47: the final wave's code: I2 (`finish` and `update` return what they made, so a trimmed download's outcome is still
+  told); D46; final review B's minors 1-7 (`unhold()` finds every counterpart first and removes the host last; the
+  name lookup polled every 100 ms against both deadlines and `live()`, a timeout counting as refused; every trusted
+  Escape keydown stopped and prevented while closing until Escape's keyup, `repeat` never read; six more event types
+  stopped at the reader's shadow root; `report()` retrying a busy bridge; `SavePage` failing for an `Error`;
+  `reader.js`'s header on capture listeners); A's minors 5-7 (one `DownloadAddresses` rule, `PageToolHooks`, `COM0`
+  and `LPT0`); a valid supplementary character row.
+- D48: recorded, not coded: a download that completes as Jasper quits (F30); whether macOS's folder prompt freezes the
+  window (a Task 9 line); a DevTools download whose page closes (D19's gap); `reserveFolder` sharing the names' lock
+  (its Javadoc); D20 renewing only through `Page.load`; final review B's kept list and the old route after a proxy
+  change; Task 9 lines for a held Escape on a page with its own handler, a modal `<dialog>` over the reader and a
+  back-forward cache restore; Task 1b's deferred (b) dropped, as `MenuItem` refuses a blank id.
+- D49: W1's calls are accepted and recorded: the app's `DownloadMark` keeps its own `about:internet`, as the app uses
+  no plugin class; D46 misses a document that starts more than 5 s after its click; a timed-out lookup refuses its
+  name for the rest of the save; a lost Escape keyup keeps Escape from the page until a stop, the next start or the
+  page going; `FilterListTest`'s hourly-check failure is a deferred flake for plan 8's first full checks.
 
 Known gaps:
 - D19: a download Chromium never updates after `before()` keeps its name and its page's browser until Jasper quits,
   and a DevTools download from a /dev/null page stays in the Downloads menu after its group closes, as it holds no
-  page.
+  page; a DevTools download whose page closes has no hold, so it lands unmarked and stays listed as running (D48).
 - D22: a click allows any number of downloads within Chromium's 5 seconds, as no download consumes it, and a click
-  whose server answers after 5 seconds counts as a download without one.
+  whose server answers after 5 seconds counts as a download without one; a document that starts more than 5 seconds
+  after its click, as a slow server's does, gives no fresh allowance (D49); Jasper's Reload, Back and Forward give none
+  either, as only `Page.load` renews (D20, D48).
+- F30 (D48): a download that completes as Jasper quits lands unmarked and unwarned.
 - D23: the hover address lags the pointer, so an Alt-click made as the pointer reaches a link may still download.
 - D25: a page that downloads and calls `window.close()` in the same task may land no file at all, when its close comes
   before Chromium asks where the file goes.
 - D-F33: on Windows Jasper writes `Zone.Identifier` itself, not through the attachment service, so an antivirus hooked
-  there does not scan a download on arrival.
+  there may not scan a download on arrival.
 - D10 and D-F24: a site's own challenge page, such as Cloudflare's "Just a moment…" on the site's host, is checked for
-  reader mode; on a page that enforces Trusted Types, Readability finds no article where it parses HTML text (a second
-  pass, an image inside `noscript`).
+  reader mode; on a page that enforces Trusted Types, Readability may find no article where it parses HTML text (a
+  second pass, an image inside `noscript`).
 - The reader check's full Readability parse at each load end and each settled route change, which the benchmark
   sitting measures (D30); a hash-routed app is not checked again on a route change (D30, D32).
 - A capture listener a page put on its window before Jasper's scripts still hears keys and clicks first, in reader
-  mode and distraction removal, and one that stops Escape keeps the reader open, which Exit Reader Mode still closes
-  (D29).
+  mode and distraction removal, and in reader mode one on its window, document or root element hears the overlay's
+  pointer events first (D47); one that stops Escape keeps the reader open, which Exit Reader Mode still closes (D29).
+  When Escape's keyup is lost, as when the focus leaves Jasper while Escape is held, the page hears no Escape until a
+  stop, the next start or the page going (D49).
 - D35: hiding a wall leaves a body locked with `position: fixed`, and a modal `<dialog>` hidden with `display: none`
   may keep its top layer; a page that locks `overflow-y` for its own layout scrolls after a full-viewport hide.
 - D-F12 and D40: DNS rebinding, narrowed to the time between the check and the connect; D5: with the HTTP proxy on,
   only the host as written is checked, so a name that resolves to a private address goes through the proxy; D39: a
-  LAN page reached by a name saves with its private resources left absolute.
+  LAN page reached by a name saves with its private resources left absolute; D49: a name lookup that outlasts its
+  deadline refuses that name for the rest of the save; D6: a proxy change lets the fetches under way finish over the
+  old route, for up to 15 seconds (plan 6's V51).
+- D48: Save Page As's folder reservation holds the download names' lock for at most 1,000 folder reads, which a
+  download starting meanwhile waits for on Chromium's thread.
 - D37: Jasper's fetches send the JDK's User-Agent, and a resource a CDN refuses for it stays absolute.
 - Save Page As does not save shadow DOM content, `<template>` content's references, SVG `image` and `use` references
   (made absolute) or CSS `image-set()` strings; lazy-loaded `data-src` images stay as written.
 - The measured heap of a maximal save (64 parts of 1 MiB, D43): it completes in `-Xmx320m` when the HTML is ASCII
   and in `-Xmx512m` when it is held as UTF-16, against the app's default 2 GiB.
-- Recorded minors: no test for a symbolic-link `user-dirs.dirs` or an escaped quote in it (the code is right), and the
-  Linux fallback stays `home/Downloads` (Task 1c); no test drives a page's own `location.href` through the real loads
-  counter (Task 3); `stopAll` leaves the `unupdated` and `uncounted` sets, at quit only (Task 4); no `PageSaverTest`
-  row with a valid supplementary character, and `localhost.localdomain` is refused only by its resolved address while
-  the proxy is off (Task 7).
+- Recorded minors: no test for a symbolic-link `user-dirs.dirs` or an escaped quote in it (the code is right), the
+  Linux fallback stays `home/Downloads`, and the `sdkReference` page of Task 1c's round first landed on the other
+  session's commit and moved into `e4d709ac1` when the round was tidied (Task 1c); a throw from `abandoned.accept`
+  itself is not caught (Task 3); `stopAll` leaves the `unupdated` and `uncounted` sets, at quit only (Task 4);
+  `localhost.localdomain` is refused only by its resolved address while the proxy is off (Task 7); the app's
+  `DownloadMark` keeps its own `about:internet` beside the Browser's `DownloadAddresses` (D49).
 
-Deferred minors, by task, for the final reviews:
+Deferred minors, by task, less those the fix wave fixed; the final reviews kept the rest:
 - Task 1b: the rebuild may run in the one turn between More closing and its pending `restoreMenus` (handled,
-  untested); a blank `MenuItem` id gives a non-blank key (prefix and `""`), so whether `MenuItem` refuses a blank id
-  wants checking; the folded bar's restore order is checked by reading only.
-- Task 5: while the reader closes, Escape's auto-repeat keydowns reach the page; only `body` is inert, so a replaced
-  body, nodes under `<html>` outside it and the top layer escape it; a script-made customized built-in (an `is` value
-  without the attribute) still upgrades; `reader.js`'s `report()` does not retry a busy bridge, so an answer or
-  Escape's "off" can be lost; copy, cut, `dragstart` and `focusin` from the overlay reach the page's listeners.
-- Task 6: `distractions.js`'s `report()` has no retry either.
+  untested); the folded bar's restore order is checked by reading only.
+- Task 5: only `body` is inert, so a replaced body, nodes under `<html>` outside it and the top layer escape it; a
+  script-made customized built-in (an `is` value without the attribute) still upgrades.
 - Task 7: an IPv4-translated address (`::ffff:0:0/96`) embedding a private IPv4 is not refused; a stop during the
   write keeps the files already in place, each marked. `255.255.255.255` and 6to4, deferred after round 1, were folded
   into D44.
+- A test flake (D49): `FilterListTest.theHourlyCheckRunsByItself` failed once in W1's first Browser check, as JUnit
+  could not delete its temporary `adblock` folder, and passed every run after; plan 8's first full checks look at it.
 
 Not run:
 - **Task 9**, the user's GUI check on macOS, with their OK for each batch: pending
   ([checklist](../../browser-verification.md#plan-7-downloads-and-page-tools)), F1, F2, F9 and F29 first, then the
-  plan's twelve lines with the task reviews' lines.
+  plan's twelve lines with the task reviews' lines, and the fix wave's.
 - **Benchmarks:** the start-up and memory batch (D-F35, as plan 6's V4), with the reader's parse cost and the save heap,
   waits for the benchmark sitting.
 - **Windows and Linux** (no hosts): the known folder, `Zone.Identifier` on NTFS and FAT32, Explorer's `/select,`, the
