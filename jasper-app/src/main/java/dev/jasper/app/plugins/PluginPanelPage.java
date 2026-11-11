@@ -212,6 +212,13 @@ final class PluginPanelPage implements SettingsPage {
             applied = false;
             context.changed().run();
         }
+
+        /** The dialog's own: it asks about unsaved changes as Cancel does, closes (disposing this page), then runs it. */
+        @Override public void closeThen(Runnable action) {
+            guard();
+            java.util.Objects.requireNonNull(action, "action");
+            context.closeThen().accept(action);
+        }
     }
 
 }

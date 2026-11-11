@@ -406,6 +406,30 @@ class UiValuesTest {
             .isThrownBy(() -> older(PluginMenu.class).addEntries(List.of(new MenuItem("a", "A", "", "a", true, false)), id -> { }));
     }
 
+    /**
+     * Browser plan 8 Task 1b (SDK 0.32.0): an anchor on an area of custom content and closing Settings from a plugin's
+     * page are defaults that an older host refuses.
+     */
+    @Test void areaAnchorsAndClosingSettingsFirstAreDefaultsThatAnOlderHostRefuses() throws Exception {
+        assertThat(UiView.class.getMethod("anchorAt", String.class, ContentArea.class).isDefault()).isTrue();
+        assertThat(UiView.class.getMethod("anchorAt", String.class, ContentArea.class).getReturnType()).isEqualTo(UiAnchor.class);
+        assertThatExceptionOfType(UnsupportedOperationException.class)
+            .isThrownBy(() -> older(UiView.class).anchorAt("page", new ContentArea(0, 0, 10, 10)));
+        var settings = dev.jasper.sdk.settings.SettingsPanelHost.class;
+        assertThat(settings.getMethod("closeThen", Runnable.class).isDefault()).isTrue();
+        assertThatExceptionOfType(UnsupportedOperationException.class).isThrownBy(() -> older(settings).closeThen(() -> { }));
+    }
+
+    /** Browser plan 8 Task 1b (SDK 0.32.0): an area is a position anywhere and a size that is not negative, empty included. */
+    @Test void anAreaIsAPositionAndASizeThatIsNotNegative() {
+        var area = new ContentArea(-4, 20, 30, 8);
+        assertThat(area).isEqualTo(new ContentArea(-4, 20, 30, 8)).isNotEqualTo(new ContentArea(-4, 20, 30, 9));
+        assertThat(List.of(area.x(), area.y(), area.width(), area.height())).containsExactly(-4, 20, 30, 8);
+        assertThat(new ContentArea(5, 5, 0, 0).width()).as("an empty area is a point").isZero();
+        assertThatIllegalArgumentException().isThrownBy(() -> new ContentArea(0, 0, -1, 8)).withMessageContaining("width");
+        assertThatIllegalArgumentException().isThrownBy(() -> new ContentArea(0, 0, 30, -1)).withMessageContaining("height");
+    }
+
     /** Browser plan 5 Task 10 (SDK 0.29.0): inserted text is any text, empty included, and whether Return follows it. */
     @Test void insertedTextIsAnyTextAndWhetherReturnFollowsIt() {
         assertThat(new InsertedText("ls -la", true)).isEqualTo(new InsertedText("ls -la", true))

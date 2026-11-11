@@ -80,6 +80,68 @@ public abstract class AnchorContractTest {
   }
  });}
  static ViewSpec actions(){return new ViewSpec(new Nodes.Stack("actions",ControlState.READY,Nodes.LayoutRole.INLINE,List.of(new Nodes.Button("lock",ControlState.READY,"Lock","lock",Nodes.ButtonKind.GHOST,"lock",""))));}
+ /** A page: a Custom node for canvas content, as a browser page is, beside a button. */
+ static ViewSpec page(ControlState state){return new ViewSpec(new Nodes.Stack("root",ControlState.READY,Nodes.LayoutRole.VERTICAL,List.of(
+    new Nodes.Custom("page",state,"page.content",Nodes.CustomKind.PREVIEW,"Page"),new Nodes.Button("go",ControlState.READY,"Go","",Nodes.ButtonKind.GHOST,"go",""))));}
+ /** A custom-painted component for the page's content, at a size of its own. */
+ static javax.swing.JComponent canvas(){var canvas=new javax.swing.JComponent(){};canvas.setSize(640,480);return canvas;}
+ static CustomContent content(javax.swing.JComponent canvas){return new CustomContent("page.content",Nodes.CustomKind.PREVIEW,canvas,()->{});}
+ /** Browser plan 8 Task 1b (SDK 0.32.0): an area of a mounted Custom node's content issues an anchor a popover and a dialog attach to. */
+ @Test void anAreaOfCustomContentIssuesAnAnchorForAPopover()throws Exception{SwingUtilities.invokeAndWait(()->{
+  try(var f=fixture()){
+   var source=f.endpoint("source");var view=source.kit().create(page(ControlState.READY),e->{});view.registerContent(content(canvas()));
+   var area=new ContentArea(10,20,30,8);
+   assertThatThrownBy(()->view.anchorAt("page",area)).as("an unmounted view").isInstanceOf(IllegalArgumentException.class);
+   mount(source,view,"source");var anchor=view.anchorAt("page",area);assertThat(anchor.isOpen()).isTrue();
+   var popup=source.windows().popover(anchor);var content=source.kit().create(actions(),e->{});popup.setContent(content);popup.show();
+   var closed=new AtomicInteger();popup.onClosed(closed::incrementAndGet);
+   view.update(page(ControlState.READY));assertThat(anchor.isOpen()).as("the same node again").isTrue();assertThat(closed).hasValue(0);
+   var child=source.windows().dialog(new DialogSpec("Owned child",anchor,true));child.show();assertThat(anchor.isOpen()).isTrue();child.close();
+   assertThat(view.anchorAt("page",new ContentArea(0,0,0,0)).isOpen()).as("an empty area is a point").isTrue();
+   anchor.close();assertThat(closed).hasValue(1);assertThatThrownBy(content::spec).isInstanceOf(IllegalStateException.class);
+   assertThatThrownBy(()->source.windows().popover(anchor)).as("a closed anchor").isInstanceOf(IllegalArgumentException.class);
+  }
+ });}
+ @Test void anAreaAnchorClosesWhenItsCustomNodeHidesOrLeaves()throws Exception{SwingUtilities.invokeAndWait(()->{
+  try(var f=fixture()){
+   var source=f.endpoint("source");
+   var replacements=List.of(page(new ControlState(false,true,false,"")),page(new ControlState(true,false,false,"")),
+      new ViewSpec(new Nodes.Stack("root",ControlState.READY,Nodes.LayoutRole.VERTICAL,List.of(new Nodes.Button("go",ControlState.READY,"Go","",Nodes.ButtonKind.GHOST,"go","")))));
+   for(var replacement:replacements){var view=source.kit().create(page(ControlState.READY),e->{});view.registerContent(content(canvas()));var window=mount(source,view,"source");
+    var anchor=view.anchorAt("page",new ContentArea(10,20,30,8));var popup=source.windows().popover(anchor);popup.setContent(source.kit().create(actions(),e->{}));popup.show();
+    var count=new AtomicInteger();popup.onClosed(count::incrementAndGet);
+    view.update(replacement);assertThat(anchor.isOpen()).as("after %s",replacement).isFalse();assertThat(count).hasValue(1);
+    if(replacement.root() instanceof Nodes.Stack stack&&stack.children().size()==1)assertThatThrownBy(()->view.anchorAt("page",new ContentArea(10,20,30,8))).as("a node that left").isInstanceOf(IllegalArgumentException.class);
+    else{view.update(page(ControlState.READY));assertThat(anchor.isOpen()).as("closed for good").isFalse();}
+    window.close();}
+  }
+ });}
+ /** A page laid out again has moved what was in the area: resizing the content closes the anchor and its popover. */
+ @Test void resizingAnAreasContentClosesItsAnchor()throws Exception{SwingUtilities.invokeAndWait(()->{
+  try(var f=fixture()){
+   var source=f.endpoint("source");var view=source.kit().create(page(ControlState.READY),e->{});var canvas=canvas();view.registerContent(content(canvas));mount(source,view,"source");
+   var anchor=view.anchorAt("page",new ContentArea(10,20,30,8));var popup=source.windows().popover(anchor);popup.setContent(source.kit().create(actions(),e->{}));popup.show();
+   var count=new AtomicInteger();popup.onClosed(count::incrementAndGet);
+   canvas.setLocation(5,5);assertThat(anchor.isOpen()).as("moving the content keeps the area where it is in it").isTrue();
+   canvas.setSize(800,480);assertThat(anchor.isOpen()).isFalse();assertThat(count).hasValue(1);
+   canvas.setSize(640,480);assertThat(anchor.isOpen()).as("closed for good").isFalse();
+   assertThat(view.anchorAt("page",new ContentArea(10,20,30,8)).isOpen()).as("a new anchor at the new layout").isTrue();
+  }
+ });}
+ @Test void onlyARegisteredCustomNodeIssuesAnAreaAnchor()throws Exception{SwingUtilities.invokeAndWait(()->{
+  try(var f=fixture()){
+   var source=f.endpoint("source");var view=source.kit().create(page(ControlState.READY),e->{});mount(source,view,"source");var area=new ContentArea(10,20,30,8);
+   assertThatThrownBy(()->view.anchorAt("page",area)).as("no content registered").isInstanceOf(IllegalArgumentException.class);
+   view.registerContent(content(canvas()));
+   assertThatThrownBy(()->view.anchorAt("go",area)).as("a button").isInstanceOf(IllegalArgumentException.class);
+   assertThatThrownBy(()->view.anchorAt("missing",area)).as("an unknown id").isInstanceOf(IllegalArgumentException.class);
+   assertThatThrownBy(()->view.anchorAt("root",area)).as("a stack").isInstanceOf(IllegalArgumentException.class);
+   assertThatThrownBy(()->new ContentArea(10,20,-1,8)).as("a negative width").isInstanceOf(IllegalArgumentException.class);
+   assertThatThrownBy(()->new ContentArea(10,20,30,-1)).as("a negative height").isInstanceOf(IllegalArgumentException.class);
+   assertThatThrownBy(()->view.anchor("page")).as("a Custom node is no control").isInstanceOf(IllegalArgumentException.class);
+   assertThat(view.anchorAt("page",area).isOpen()).isTrue();
+  }
+ });}
  /** A dialog's content replaced while a child its old content owns closes the dialog still releases both views. */
  @Test void bodyReplacementClosedReentrantlyByOwnedChildStillReleasesAcceptedReplacement()throws Exception{SwingUtilities.invokeAndWait(()->{
   try(var f=fixture()){var e=f.endpoint("source");var tab=mount(e,e.kit().create(actions(),event->{}),"source");

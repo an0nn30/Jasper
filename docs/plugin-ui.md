@@ -46,7 +46,8 @@ Keep ids stable for the life of a control; changing a node's id or kind replaces
 - `UiView` also has `spec()`, the current descriptor; `focus(id)`; `reveal(id)`, which scrolls a node into view without
   moving the focus; `selectAll(fieldId)`, which selects a field's live text without editing or focusing it;
   `composing(fieldId)`, true while an input method holds uncommitted text; `anchor(id)` for
-  [popovers](plugin-authoring.md#dialogs-overlays-and-popovers); and the [secret](#secrets) methods.
+  [popovers](plugin-authoring.md#dialogs-overlays-and-popovers), and `anchorAt(customId, area)` for one on an area of a
+  `Custom` node's content (since 0.32.0); and the [secret](#secrets) methods.
 
 [`ControlState`](sdk-reference.html#dev.jasper.sdk.ui.ControlState)`(visible, enabled, busy, error)` is every node's
 state; `ControlState.READY` is visible, enabled, not busy and without an error. `error` is validation prose the

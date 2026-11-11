@@ -76,6 +76,7 @@ views close when it stops.</p>
 <tr><td>{@link UiView#selectAll(String)}</td><td>Select a field's text without editing it or moving focus.</td></tr>
 <tr><td>{@link UiView#composing(String)}</td><td>Whether an input method holds uncommitted text in a field; leave keys to it while true.</td></tr>
 <tr><td>{@link UiView#anchor(String)}</td><td>A {@link UiAnchor} on a mounted button, menu button (since 0.29.0) or PICKER choice, for a popover or a dialog attached to it.</td></tr>
+<tr><td>{@link UiView#anchorAt(String,ContentArea)}</td><td>Since 0.32.0, a {@link UiAnchor} on a {@link ContentArea} of a mounted {@link Nodes.Custom} node's content, such as a field on a page; a press inside the area closes its popover and goes no further, and resizing the content closes the anchor.</td></tr>
 <tr><td>{@link UiView#withSecret(String,Consumer)}, {@link UiView#clearSecret(String)}, {@link UiView#replaceSecret(String,char[])}</td><td>Read a secret field's characters (erased after the callback), clear it, or set it without an edit event.</td></tr>
 <tr><td>{@link UiView#registerContent(CustomContent)}</td><td>Fill a {@link Nodes.Custom} node with a component; see below.</td></tr>
 </tbody>

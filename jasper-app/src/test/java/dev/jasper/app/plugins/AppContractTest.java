@@ -358,6 +358,31 @@ class AppContractTest extends PluginContractTest {
                 return diagnostics.stream().filter(diagnostic -> diagnostic.file().equals(files.file(pluginId)))
                     .map(diagnostic -> diagnostic.key() + ": " + diagnostic.message()).toList();
             }
+            /** The real Settings dialog over the plugins' pages, its discard question scripted. */
+            private dev.jasper.app.settingsui.SettingsDialog settings;
+            private dev.jasper.app.settingsui.PageContext settingsContext;
+            private volatile boolean discard = true;
+            private volatile int questions;
+            @Override public void openSettingsPage(String pluginId) {
+                onEdt(() -> {
+                    if (settings == null) {
+                        var state = new dev.jasper.app.config.ConfigService.State(dev.jasper.app.config.ConfigSnapshot.defaults(), List.of(),
+                            data.resolve("config.toml"), false);
+                        settings = new dev.jasper.app.settingsui.SettingsDialog(auxiliary, context -> { settingsContext = context; return host.settingsPages(context); },
+                            new dev.jasper.app.settingsui.SettingsDialog.Hooks(edit -> CompletableFuture.completedFuture(state), () -> state,
+                                listener -> new dev.jasper.app.lifecycle.Subscription(() -> { }), () -> { }, () -> { }, uri -> { },
+                                (parent, count) -> { questions++; return discard; }, dev.jasper.app.testsupport.KitTestSupport::context));
+                    }
+                    settings.open(null, PluginRuntime.settingsPageId(pluginId));
+                });
+            }
+            @Override public boolean settingsOpen() { return onEdtValue(() -> settings != null && settings.isOpen()); }
+            @Override public void answerDiscard(boolean value) { discard = value; }
+            @Override public int discardQuestions() { return questions; }
+            /** Closes Settings, discarding what it holds, as the harness closes. */
+            private void closeSettings() {
+                onEdt(() -> { if (settings != null && settings.isOpen()) { discard = true; settingsContext.closeThen().accept(() -> { }); } });
+            }
             @Override public void start(PluginInfo info, Set<String> requires, Set<String> optional, Plugin plugin) {
                 onEdt(() -> host.start(new HostedPlugin(info, requires, optional,
                     Set.of(PluginContractTest.class.getPackageName()), PluginContractTest.class.getClassLoader(), () -> plugin)));
@@ -871,7 +896,7 @@ class AppContractTest extends PluginContractTest {
             }
             @Override public void copyOnSelect(boolean on) { onEdt(() -> host.copyOnSelect = on); }
             @Override public void close() {
-                try { stopAll(); flush(); }
+                try { closeSettings(); stopAll(); flush(); }
                 finally { dev.jasper.app.testsupport.TempFolders.delete(data); }
             }
         };

@@ -108,7 +108,9 @@ it starts. Settings calls {@link SettingsPanel#create(SettingsPanelHost)} the fi
 opening of Settings; the page returns a <a href="#ui">view</a>. {@link SettingsPanelHost#row(Setting)} gives the standard
 row for a declared setting, bound to the page's unsaved value, and Settings saves those on Apply itself.
 {@link SettingsPanelHost#stage(Setting,Object)} sets an unsaved value from a control of the plugin's own and
-{@link SettingsPanelHost#changed()} says the page's modified state changed. {@link SettingsPanel#modified()},
+{@link SettingsPanelHost#changed()} says the page's modified state changed. Settings is modal, so a control that opens
+a window of the plugin's own calls {@link SettingsPanelHost#closeThen(Runnable)} (since 0.32.0): Settings closes,
+asking about unsaved changes as Cancel does, then runs the action. {@link SettingsPanel#modified()},
 {@link SettingsPanel#apply()} and {@link SettingsPanel#reset()} cover only state of the plugin's own beyond its declared
 settings; {@link SettingsPanel#dispose()} runs when Settings closes the page.</p>
 <p>{@link SettingsPanel#pendingChanged()} runs after a standard row handles the user's edit, choice, list action,

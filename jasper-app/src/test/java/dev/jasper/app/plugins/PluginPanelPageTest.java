@@ -575,6 +575,31 @@ class PluginPanelPageTest {
         });
     }
 
+    /**
+     * Browser plan 8 Task 1b (SDK 0.32.0, F7): the page's host hands {@code closeThen} to the dialog it is in, which closes
+     * (asking about unsaved changes) and runs the action; a closed page refuses it.
+     */
+    @Test void closeThenAsksTheDialogToCloseAndAClosedPageRefusesIt() {
+        var panel = startWithPanel();
+        var requests = new ArrayList<Runnable>();
+        var dialog = new PageContext(null, id -> { }, requests::add, (title, initial) -> Optional.empty(), () -> changes[0]++, () -> null,
+            dev.jasper.app.testsupport.KitTestSupport::context);
+        var page = onEdtValue(() -> host.settingsPages(dialog)).getFirst();
+        var ran = new ArrayList<String>();
+        onEdt(() -> {
+            page.component();
+            panel.host.closeThen(() -> ran.add("action"));
+            assertThat(requests).as("the dialog decides").hasSize(1);
+            assertThat(ran).isEmpty();
+            assertThatNullPointerException().isThrownBy(() -> panel.host.closeThen(null));
+            page.dispose();
+            requests.getFirst().run();
+            assertThat(ran).as("the dialog runs it once closed").containsExactly("action");
+            assertThatIllegalStateException().isThrownBy(() -> panel.host.closeThen(() -> ran.add("late")));
+            assertThat(requests).hasSize(1);
+        });
+    }
+
     @Test void stagingTheDefaultOfAnUnsetKeyLeavesThePageUnmodified() {
         var panel = startWithPanel();
         var page = onEdtValue(() -> host.settingsPages(context)).getFirst();

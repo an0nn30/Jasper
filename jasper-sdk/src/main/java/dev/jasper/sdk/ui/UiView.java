@@ -14,6 +14,24 @@ public interface UiView extends Subscription {
   * @return scoped capability
   */
  UiAnchor anchor(String nodeId);
+ /**
+  * Mint attachment authority from an area of a mounted, visible, enabled, not busy {@link Nodes.Custom} node with
+  * registered content, in the content component's coordinates, such as a field on a page. A popover opens below the
+  * area, or above it when the screen has no room below, at least as wide as the area; a dialog may take the anchor as
+  * its owner. A press inside the area closes the popover and goes no further; a press elsewhere closes it and reaches
+  * the content. Hiding, disabling, removing or moving the node closes the anchor, and so does resizing the content: a
+  * page laid out again has moved what was in the area.
+  *
+  * @param customId a Custom node's id
+  * @param area the area of its content
+  * @return scoped capability
+  * @throws IllegalArgumentException when the id names no such node, or the view is not mounted
+  * @throws UnsupportedOperationException if the host predates area anchors
+  * @since 0.32.0
+  */
+ default UiAnchor anchorAt(String customId, ContentArea area) {
+  throw new UnsupportedOperationException("Area anchors are unavailable");
+ }
  /** Current descriptor, without pending edits or secrets.
  * @return immutable tree */
  ViewSpec spec();

@@ -39,4 +39,18 @@ public interface SettingsPanelHost {
      * Tells Settings that the page's modified state changed.
      */
     void changed();
+
+    /**
+     * Closes Settings, asking about unsaved changes as Cancel does, then runs {@code action} on the UI thread; nothing
+     * runs when the user keeps Settings open. Settings is modal, so a control that opens a window of the plugin's own,
+     * such as a manager, closes Settings first. The page is disposed by the time {@code action} runs.
+     *
+     * @param action what to do once Settings has closed
+     * @throws IllegalStateException when the page is closed
+     * @throws UnsupportedOperationException if the host predates this call
+     * @since 0.32.0
+     */
+    default void closeThen(Runnable action) {
+        throw new UnsupportedOperationException("Closing Settings is unavailable");
+    }
 }

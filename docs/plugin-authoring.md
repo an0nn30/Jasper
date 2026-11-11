@@ -582,6 +582,11 @@ and not busy. A [`PluginPopover`](sdk-reference.html#dev.jasper.sdk.ui.PluginPop
 at least as wide. Its left edge is the control's, or, when the control's window has no room to the right, its right edge
 is. It does not block; Escape or a click outside closes it and its content. Hiding, disabling, removing, retyping or
 moving the control, closing its surface or stopping the plugin closes the anchor for good; `onClosed` hears it.
+Since 0.32.0 `view.anchorAt(customId, area)` mints one on a
+[`ContentArea`](sdk-reference.html#dev.jasper.sdk.ui.ContentArea) of a `Custom` node's registered content, in the
+content component's coordinates, such as a field on a page: the popover opens below the area (above when there is no
+room), at least as wide as it. A press inside the area closes the popover and goes no further; a press elsewhere closes
+it and reaches the content. The node's rules are a control's, and resizing the content closes the anchor too.
 Credential Vault's credential picker opens over another plugin's anchor this way ([plugin APIs](plugin-apis.md)).
 
 ### Quit guards
@@ -1417,7 +1422,9 @@ size.set(15);   // writes plugins/<id>/<id>.toml, keeping its comments
   values, as the Editor's page does. The plugin's own `host.stage` calls do not trigger it. Use
   `modified`, `apply` and `reset` only for state of the plugin's own, and `keywords` and `highlight` for search. The
   panel lives as long as the plugin, so Settings calls `reset` before `dispose` whenever it closes a page without a
-  successful Apply, as on Cancel. Compose the page as the generated ones are
+  successful Apply, as on Cancel. Settings is modal, so a control that opens a window of the plugin's own calls
+  `host.closeThen(action)` (since 0.32.0): Settings closes, asking about unsaved changes as Cancel does, then runs
+  `action`; nothing runs when the user keeps Settings open. Compose the page as the generated ones are
   ([Building plugin UI](plugin-ui.md#settings-pages)); the Sample's `SampleSettingsPanel` is a complete example.
 - **Opening Settings.** [`context.settings().show()`](sdk-reference.html#dev.jasper.sdk.settings.PluginSettings.show())
   opens Settings at the plugin's page over the active window; UI thread.
@@ -1517,10 +1524,10 @@ try (var host = new FakePluginHost()) {
 
 | To test | Use |
 | --- | --- |
-| Settings | `setSetting(id, key, value)` (before `start` it is the starting file), `settingsReports(id)` as `key: message`, `savedSettings(id)`, `declared(id)`; `settingsPanel`, `settingsPanelView` (an event a standard row handles there calls `pendingChanged()`), `pendingSettings`, `settingsPanelChanges`, `applySettingsPanel`, `closeSettingsPanel`; `setKitDefault(id, key, value)` (a look's default, before any plugin starts) and `lookDefaultProblems(id)` |
+| Settings | `setSetting(id, key, value)` (before `start` it is the starting file), `settingsReports(id)` as `key: message`, `savedSettings(id)`, `declared(id)`; `settingsPanel`, `settingsPanelView` (an event a standard row handles there calls `pendingChanged()`), `pendingSettings`, `settingsPanelChanges`, `applySettingsPanel`, `closeSettingsPanel`, `answerDiscard` (how Settings answers its discard question when a page's `closeThen` closes it) and `discardQuestions`; `setKitDefault(id, key, value)` (a look's default, before any plugin starts) and `lookDefaultProblems(id)` |
 | The look and the terminal font | `setPresentation(presentation)` before any plugin starts, with `FakePresentations.STANDARD` (what the fake reports until told otherwise) or `CLASSIC`; `presentation()`; `setTerminalTypography(value)`, delivered by `flush()` |
 | Commands and chrome | `actions()`, `actionSpec(id)`, `invoke(id, windowId, paneIdOrNull)`, `toolbar()`, `toolbarViews(windowId)`, `menu("TOOLS")`, `menuBar(windowId)` (the plugin menus a window's menu bar shows), `contextMenu(paneId)`, `chooseFromContextMenu(paneId, actionId)`, `status()`, `progress()`, `rail()` |
-| Tool windows and dialogs | `panels()` (each tool window's id, title, anchor, split and toggle action), `openPanel` (in the most recently active window, or `openPanel(panelId, windowId)`), `panelView`, `panelHeader`, `placePanel` (moves the tool window as a drag would, to a `PanelPlacement`; one that is not open is built there), `closePanel`; `windows()` (the open dialogs and overlays), `windowView`, `dialogPresentation`, `dialogSwatch`, `popoverViews`, `requestClose`, `requestQuit`; `queueFileSelection`, `queuePathSelection`, `queueFileChoice`, `fileChoices` |
+| Tool windows and dialogs | `panels()` (each tool window's id, title, anchor, split and toggle action), `openPanel` (in the most recently active window, or `openPanel(panelId, windowId)`), `panelView`, `panelHeader`, `placePanel` (moves the tool window as a drag would, to a `PanelPlacement`; one that is not open is built there), `closePanel`; `windows()` (the open dialogs and overlays), `windowView`, `dialogPresentation`, `dialogSwatch`, `popoverViews`, `popoverAreas` (the areas of popovers on area anchors), `requestClose`, `requestQuit`; `queueFileSelection`, `queuePathSelection`, `queueFileChoice`, `fileChoices` |
 | Terminals | `addTerminalWindow()`, `addTerminalTab`, `addTerminalPane` (a terminal tab's one pane), `addContentTab`, `moveTab`, `closeTab`, `windowTabs(windowId)` (a window's tabs, each its items pane by pane), `focusTerminalPane`, `closeTerminalPane`, `holdPane` (a local pane that waits, `NOT_STARTED`, until its tab is shown), `setPaneInfo`, `setSelection`, `setForegroundJob`, `setShellProfiles`; `sent(paneId)`, `openRequests()`; `commandStarted`, `commandFinished`, `titleChanged`, `cwdChanged`, `remoteCwdChanged`, `sessionExited`, `bell` |
 | Restoring | `restoreState(tab)` (the restore state a tab gives), `savedTitle(tab)` (the title Jasper saves it with), `restoreTab(pluginId, windowId, title, state)` (runs the plugin's restorer as Jasper does: the tab is placed in that window, not shown, and a session's tab waits, `NOT_STARTED`, until it is shown), `declinedRestores()` (the reasons restorers gave when no tab came back) |
 | Provided sessions | `sessionState(paneId)`, `typeIntoSession`, `sessionOutput`, `cancelSession`, `reconnectSession`, `pumpSessions` |

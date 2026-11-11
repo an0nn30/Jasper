@@ -18,6 +18,43 @@ import static org.assertj.core.api.Assertions.*;
 class FakePanelsAndWindowsTest {
     private static final PluginInfo INFO = new PluginInfo("dev.x.tool", "Tool", "1.0.0", Set.of());
 
+    /**
+     * Browser plan 8 Task 1b (SDK 0.32.0): {@code popoverAreas} lists the areas of the shown popovers on area anchors, not
+     * those on controls; the content's first resize closes them, as the host's, without the anchor being asked.
+     */
+    @Test void popoverAreasListTheShownPopoversOnAreasOfContent() throws Exception {
+        try (var host = new FakePluginHost()) {
+            var canvas = new javax.swing.JComponent() {};
+            canvas.setSize(640, 480);
+            var popovers = new ArrayList<dev.jasper.sdk.ui.PluginPopover>();
+            javax.swing.SwingUtilities.invokeAndWait(() -> {
+                var context = host.start(INFO, Set.of(), Set.of(), plugin -> {});
+                var view = context.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack("root", dev.jasper.sdk.ui.ControlState.READY,
+                    dev.jasper.sdk.ui.Nodes.LayoutRole.VERTICAL, List.of(
+                        new dev.jasper.sdk.ui.Nodes.Custom("page", dev.jasper.sdk.ui.ControlState.READY, "page.content", dev.jasper.sdk.ui.Nodes.CustomKind.PREVIEW, "Page"),
+                        new dev.jasper.sdk.ui.Nodes.Button("go", dev.jasper.sdk.ui.ControlState.READY, "Go", "", dev.jasper.sdk.ui.Nodes.ButtonKind.GHOST, "go", "")))), e -> {});
+                view.registerContent(new dev.jasper.sdk.ui.CustomContent("page.content", dev.jasper.sdk.ui.Nodes.CustomKind.PREVIEW, canvas, () -> {}));
+                context.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("dev.x.tool.page", "Page"), null, view);
+                for (var anchor : List.of(view.anchorAt("page", new dev.jasper.sdk.ui.ContentArea(10, 20, 30, 8)), view.anchor("go"))) {
+                    var popover = context.windows().popover(anchor);
+                    popover.setContent(KitFixtures.view(context));
+                    popover.show();
+                    popovers.add(popover);
+                }
+                assertThat(host.popoverAreas(INFO.id())).containsExactly(new dev.jasper.sdk.ui.ContentArea(10, 20, 30, 8));
+                assertThat(host.popoverViews(INFO.id())).as("both show").hasSize(2);
+                canvas.setSize(800, 480);
+            });
+            // The resize's event, which the next turn of the event queue delivers, closes the area's popover.
+            javax.swing.SwingUtilities.invokeAndWait(() -> {
+                assertThat(host.popoverAreas(INFO.id())).isEmpty();
+                assertThat(host.popoverViews(INFO.id())).as("the control's popover stays").hasSize(1);
+                popovers.forEach(dev.jasper.sdk.ui.PluginPopover::close);
+            });
+            assertThat(host.popoverAreas("dev.x.unknown")).isEmpty();
+        }
+    }
+
     @Test void panelHeadersContainFailuresAndIgnoreRetainedActionsAfterClose() throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
         try (var host = new FakePluginHost()) {
             var context = host.start(INFO, Set.of(), Set.of(), plugin -> {});

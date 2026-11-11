@@ -254,6 +254,10 @@ where the look draws one (`TitleInset`).
 - **Anchors and popovers.** `UiView.anchor(id)` mints a `UiAnchor` only for a mounted, visible, enabled, not busy
   `Button`, `MenuButton` or PICKER `Choice`. Hiding, disabling, busying, removing, retyping or reparenting the control,
   closing its surface or stopping the plugin invalidates it for good; a refresh of the same control keeps it.
+  `UiView.anchorAt(id, area)` mints one on a `ContentArea` of a live `Custom` node's registered content
+  (`KitView.customTarget`), which `HostedKitView` turns into a `Rectangle`; a resize of the content invalidates it too
+  (a `ComponentListener` closes it at once), its popover consumes only a press inside the area and sets no picker
+  property on the content.
   `Windows.popover` attaches non-modal content from the anchor's own plugin; an anchor also owns a `DialogSpec` dialog
   above the surface that shows it. Neither passes view ownership to another plugin.
 - **File pickers.** `WindowSurface.chooseFile`, `Windows.chooseFiles`, `chooseDirectory`, `chooseSaveFile` and
@@ -567,7 +571,8 @@ A rejected value, and once `start` returns a key the plugin never declared, is l
 `PluginRuntime.settingsPages` returns, for each running plugin with settings, a generated page (`PluginSettingsPage`, a
 `SchemaPage` over the plugin's own draft) or the plugin's own (`PluginPanelPage`, every call contained; after one of its
 standard rows handles an event it re-renders the view with the rows' new state, then calls the panel's
-`pendingChanged`), and a `PluginStubPage` with Open in Editor for a plugin the user meant to run that is not running
+`pendingChanged`; its host's `closeThen` is the dialog's `PageContext.closeThen`, which asks about unsaved changes as
+Cancel does), and a `PluginStubPage` with Open in Editor for a plugin the user meant to run that is not running
 (awaiting consent, skipped, failed or disabled by safe mode), at most one page per plugin id. `CorePages` places them
 under Settings › Tools. Apply writes the plugin's file through `DeclaredSettings.save`.
 
