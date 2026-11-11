@@ -5,7 +5,12 @@
  * {@link dev.jasper.browser.page.Page}: the page loads it, or its item opens an item of its own beside itself. The
  * request handler also lets Chromium go on past a certificate it could not verify only when the page allows it, and
  * otherwise hands the page the certificate for its error page, and it serves {@code jasper-about:} to the pages of an
- * in-memory context, which Chromium's scheme handler factory does not reach.
+ * in-memory context, which Chromium's scheme handler factory does not reach. It hands a page each HTTP sign-in
+ * Chromium asks for one of its requests, as a {@link dev.jasper.browser.page.SignIn} over Chromium's callback, posted
+ * to the page, whose item answers it later, once ({@link dev.jasper.browser.page.Page#signIn}); it never blocks
+ * Chromium's thread, and a browser that is no page's gets none. It notes the address of each main-frame navigation
+ * request of a page, and the opener bridge's reader each redirect of one, as the page's top address, which a sign-in
+ * is judged against, and that reader posts the page each final main-frame response's status (plan 8).
  * {@code OpenerBridge}, with its page script {@code opener-bridge.js} and {@code BridgeJson}, opens a script's
  * {@code window.open} the same way and keeps the popup's {@code window.opener} working through the client's message
  * router, within the limits {@code Isolation} reads from each main frame's response: its origin, a sandbox, and its

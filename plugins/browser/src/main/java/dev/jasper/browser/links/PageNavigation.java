@@ -9,18 +9,21 @@ import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageBrowser;
 import dev.jasper.browser.page.PageView;
 import dev.jasper.browser.page.ServerCertificate;
+import dev.jasper.browser.page.SignIn;
 import dev.jasper.sdk.ui.TabPlacement;
 import java.awt.EventQueue;
 import java.util.Collections;
 import java.util.Optional;
 import java.util.Set;
 import java.util.WeakHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import org.cef.CefClient;
 import org.cef.browser.CefBrowser;
 import org.cef.browser.CefFrame;
+import org.cef.callback.CefAuthCallback;
 import org.cef.callback.CefCallback;
 import org.cef.handler.CefLifeSpanHandlerAdapter;
 import org.cef.handler.CefLoadHandler;
@@ -29,6 +32,7 @@ import org.cef.handler.CefResourceHandler;
 import org.cef.handler.CefResourceRequestHandler;
 import org.cef.handler.CefResourceRequestHandlerAdapter;
 import org.cef.misc.BoolRef;
+import org.cef.misc.StringRef;
 import org.cef.network.CefRequest;
 import org.cef.network.CefResponse;
 import org.cef.security.CefSSLInfo;
@@ -50,12 +54,21 @@ import org.cef.security.CefSSLInfo;
  * certificate, and otherwise the page is told the certificate, which its item's error page shows with the failure that
  * follows (spec section 14). Chromium checks certificates against the system's trust store.
  *
+ * <p>The request handler also hands a page each HTTP sign-in Chromium asks for one of its requests
+ * ({@code getAuthCredentials}, plan 8), on Chromium's IO thread, or perhaps its UI thread (F12), and never blocks
+ * there: the challenge becomes a {@link SignIn} over Chromium's callback, judged against the page's top address
+ * ({@link Page#topAddress()}), which is posted to Swing's thread for the page's item to answer once, later
+ * ({@link Page#signIn}), and Chromium is told at once that Jasper answers. A browser that is no page's, DevTools'
+ * among them, gets none, and CEF cancels its challenge. The address of each main-frame navigation request of a page,
+ * and of each redirect of it, is the page's top address from then on (F6).
+ *
  * <p>The request handler also serves {@code jasper-about:} to the pages of an in-memory context, a /dev/null group's:
  * Chromium's scheme handler factory serves the global context alone, so such a page's main-frame {@code jasper-about:}
  * request is answered through {@link Chromium#aboutResource}, as the factory would answer it. And while ad blocking's
  * filter list has a rule set active, every request of a page but its main frame's meets it ({@link AdBlockRequests}),
  * a /dev/null page's too (spec section 12). A request's handler is one composite ({@code PageRequests}) of what each
- * part asks of it: the opener bridge's for a main frame's navigation, ad blocking's, and this.
+ * part asks of it: the opener bridge's for a main frame's navigation, its redirects and its response, ad blocking's,
+ * and this.
  *
  * <p>JCEF keeps a client's first request handler, so this is the only one: what else a request handler is asked goes to
  * its defaults. Life span handlers are a list, which JetBrains' runtime adds its own to, so this adds one and removes
@@ -65,6 +78,9 @@ import org.cef.security.CefSSLInfo;
  */
 public final class PageNavigation {
     private static final boolean MAC_OS = System.getProperty("os.name", "").startsWith("Mac");
+    private static final System.Logger LOG = System.getLogger(PageNavigation.class.getName());
+    // Whether this run's first sign-in has been logged: the thread Chromium asks on, and the form of its address (F12).
+    static final AtomicBoolean SIGN_IN_LOGGED = new AtomicBoolean();
     // The Chromiums given the handlers, held weakly: each client gets them once, however often a page asks.
     private static final Set<Chromium> PREPARED = Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
 
@@ -83,12 +99,12 @@ public final class PageNavigation {
     }
 
     private static void install(CefClient client, Chromium chromium, FilterList filters) {
-        // Neither router answers a query once Chromium has stopped (plan 6's F43, plan 8's L15).
+        // Once Chromium has stopped, neither router answers a query, nor a sign-in its callback (plan 6's F43, L15).
         BooleanSupplier stopped = () -> chromium.state() == Chromium.State.STOPPED;
         OpenerBridge bridge = OpenerBridge.install(client, stopped);
         // The page scripts' privacy router reads what the bridge records of each page's document.
         PrivacyQueries.install(client, bridge, stopped);
-        client.addRequestHandler(new Links(bridge, chromium, filters));
+        client.addRequestHandler(new Links(bridge, chromium, filters, stopped));
         client.addLifeSpanHandler(new Popups());
     }
 
@@ -101,11 +117,13 @@ public final class PageNavigation {
         private final OpenerBridge bridge;
         private final Chromium chromium;
         private final FilterList filters;
+        private final BooleanSupplier stopped;
 
-        Links(OpenerBridge bridge, Chromium chromium, FilterList filters) {
+        Links(OpenerBridge bridge, Chromium chromium, FilterList filters, BooleanSupplier stopped) {
             this.bridge = bridge;
             this.chromium = chromium;
             this.filters = filters;
+            this.stopped = stopped;
         }
 
         @Override public CefResourceRequestHandler getResourceRequestHandler(CefBrowser browser, CefFrame frame, CefRequest request,
@@ -125,12 +143,50 @@ public final class PageNavigation {
             return true;
         }
 
+        @Override public boolean getAuthCredentials(CefBrowser browser, String originUrl, boolean isProxy, String host, int port,
+                                                    String realm, String scheme, CefAuthCallback callback) {
+            return signIn(browser, originUrl, isProxy, host, port, realm, scheme, callback, stopped, EventQueue::invokeLater);
+        }
+
         @Override public boolean onOpenURLFromTab(CefBrowser browser, CefFrame frame, String url, boolean userGesture) {
             if (fromDevTools(browser, url, EventQueue::invokeLater)) return true;
             if (browser instanceof PageBrowser page)
                 LinkRoute.link(sender(page, frame), url, page.view().lastPress(), userGesture, System.currentTimeMillis(), MAC_OS)
                     .ifPresent(where -> EventQueue.invokeLater(() -> go(page, url, where)));
             return true;
+        }
+    }
+
+    /**
+     * Chromium asks for a sign-in for a request of {@code browser}'s, which {@code host} challenged (F12): for a page's
+     * browser, a {@link SignIn} over {@code callback}, with the page's top address, is handed to {@code ui} for the
+     * page ({@link Page#signIn}), which answers it once, later. It never blocks, takes no lock and reads only volatile
+     * state, as Chromium's thread waits on it. The first sign-in of Jasper's run logs, at DEBUG, the thread it came on
+     * and whether {@code originUrl} is a full address or an origin alone, for Task 8, and nothing more. An answer that
+     * comes once Chromium has stopped touches {@code callback} no more (plan 6's F43). A failure inside is logged, with
+     * the exception alone, and answers false. Chromium's IO thread, or its UI thread.
+     *
+     * @return true when Jasper answers {@code callback} later; false, and {@code callback} left alone, for a browser
+     *     that is no page's and on a failure, as CEF then cancels the challenge itself
+     */
+    static boolean signIn(CefBrowser browser, String originUrl, boolean isProxy, String host, int port, String realm, String scheme,
+                          CefAuthCallback callback, BooleanSupplier stopped, Consumer<Runnable> ui) {
+        try {
+            Page page = browser instanceof PageBrowser shown ? shown.owner() : null;
+            if (page == null || callback == null) return false;
+            var signIn = new SignIn(originUrl, isProxy, host, port, realm, scheme, page.topAddress(), (user, password) -> {
+                if (!stopped.getAsBoolean()) callback.Continue(user, password);
+            }, () -> {
+                if (!stopped.getAsBoolean()) callback.cancel();
+            });
+            if (SIGN_IN_LOGGED.compareAndSet(false, true))
+                LOG.log(System.Logger.Level.DEBUG, "Chromium asked for a sign-in on the thread \"{0}\", naming {1}",
+                    Thread.currentThread().getName(), signIn.originOnly() ? "an origin alone" : "a full address");
+            ui.accept(() -> page.signIn(signIn));
+            return true;
+        } catch (RuntimeException failure) {
+            LOG.log(System.Logger.Level.WARNING, "A page's sign-in could not be asked", failure);
+            return false;
         }
     }
 
@@ -147,9 +203,10 @@ public final class PageNavigation {
     }
 
     /**
-     * One request's handler, the composite of its parts: the opener bridge's reader of a main frame's response, null when
-     * the request has none; whether a {@code jasper-about:} request of an in-memory context is answered here; and ad
-     * blocking's part, which cancels what the filter list blocks, null when the request has none. Chromium's IO thread.
+     * One request's handler, the composite of its parts: the opener bridge's reader of a main frame's response and its
+     * redirects, null when the request has none; whether a {@code jasper-about:} request of an in-memory context is
+     * answered here; and ad blocking's part, which cancels what the filter list blocks, null when the request has none.
+     * Chromium's IO thread.
      */
     static final class PageRequests extends CefResourceRequestHandlerAdapter {
         final CefResourceRequestHandler responses;
@@ -172,6 +229,11 @@ public final class PageNavigation {
             return about ? chromium.aboutResource(browser, request) : null;
         }
 
+        @Override public void onResourceRedirect(CefBrowser browser, CefFrame frame, CefRequest request, CefResponse response,
+                                                 StringRef newUrl) {
+            if (responses != null) responses.onResourceRedirect(browser, frame, request, response, newUrl);
+        }
+
         @Override public boolean onResourceResponse(CefBrowser browser, CefFrame frame, CefRequest request, CefResponse response) {
             return responses != null && responses.onResourceResponse(browser, frame, request, response);
         }
@@ -184,9 +246,10 @@ public final class PageNavigation {
      * the factory would answer it; it is never blocked (the plan's call). Every other request of a page's browser, a
      * /dev/null page's too, gets ad blocking's part while the filter list has a rule set active, and nothing else: a
      * {@code jasper-about:} one of a sub-frame or a sub-resource goes as Chromium takes it, as no Jasper page loads one,
-     * and in an in-memory context nothing serves it. A page's DevTools get none of ad blocking. The request's address is
-     * read only for an in-memory page's main frame, as reading it copies it across JNI and a {@code data:} address can
-     * run to megabytes. Chromium's IO thread.
+     * and in an in-memory context nothing serves it. A page's DevTools get none of ad blocking. The address of a page's
+     * main-frame navigation is its top address from now on ({@link Page#mainFrameRequested}, F6). The request's address
+     * is read only for a main frame, once: a page's navigation, or an in-memory browser's, as reading it copies it
+     * across JNI and a {@code data:} address can run to megabytes. Chromium's IO thread.
      *
      * @param browser the browser whose request it is
      * @param request the request
@@ -201,7 +264,10 @@ public final class PageNavigation {
         if (!(browser instanceof PageBrowser page)) return null;
         CefRequest.ResourceType type = request.getResourceType();
         if (type == CefRequest.ResourceType.RT_MAIN_FRAME) {
-            boolean about = page.inMemory() && AboutScheme.page(request.getURL()).isPresent();
+            Page owner = isNavigation ? page.owner() : null;
+            String url = owner != null || page.inMemory() ? request.getURL() : null;
+            if (owner != null) owner.mainFrameRequested(url);
+            boolean about = page.inMemory() && AboutScheme.page(url).isPresent();
             if (!isNavigation && !about) return null;
             return new PageRequests(isNavigation ? responses.get() : null, about, null, chromium);
         }

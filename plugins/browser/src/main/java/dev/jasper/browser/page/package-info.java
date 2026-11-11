@@ -79,9 +79,16 @@
  * {@link dev.jasper.browser.page.PageQuery}, to its item's handler, to answer later, once, and only while the page
  * shows the origin that asked ({@link dev.jasper.browser.page.Page#handleLogins},
  * {@link dev.jasper.browser.page.Page#loginQuery}); {@code PageLoginHooks} holds the script and the handler, and the
- * page's close cancels the queries not answered.
+ * page's close cancels the queries not answered. Each HTTP sign-in Chromium asks for one of a page's requests reaches
+ * the page from the {@code links} package's request handler as a {@link dev.jasper.browser.page.SignIn}, answered
+ * once, which the page hands its item, or cancels when nothing listens or it has closed
+ * ({@link dev.jasper.browser.page.Page#onSignIn}); it is judged against the page's top address, the address of its
+ * main frame's latest navigation request after its redirects, which that handler and the opener bridge note on
+ * Chromium's IO thread ({@link dev.jasper.browser.page.Page#topAddress}), and the page tells its item each final
+ * main-frame response's status ({@link dev.jasper.browser.page.Page#onMainFrameResponse}).
  * {@link dev.jasper.browser.page.LastPress}, {@code Favicons}, {@code DownloadStart}, {@code DownloadTarget},
- * {@code DownloadProgress}, {@code PageQuery}, {@code Page}'s methods and {@code PreviewPage}'s name no Chromium type,
+ * {@code DownloadProgress}, {@code PageQuery}, {@code SignIn}, {@code Page}'s methods and {@code PreviewPage}'s name no
+ * Chromium type,
  * and none of these classes loads until a browser item opens or a Markdown preview is made.
  */
 package dev.jasper.browser.page;

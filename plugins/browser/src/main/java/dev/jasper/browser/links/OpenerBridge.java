@@ -47,6 +47,7 @@ import org.cef.callback.CefQueryCallback;
 import org.cef.handler.CefMessageRouterHandlerAdapter;
 import org.cef.handler.CefResourceRequestHandler;
 import org.cef.handler.CefResourceRequestHandlerAdapter;
+import org.cef.misc.StringRef;
 import org.cef.network.CefRequest;
 import org.cef.network.CefResponse;
 
@@ -633,7 +634,8 @@ final class OpenerBridge {
 
     /**
      * Chromium's handler for a main frame's resources, which hands the bridge each response's opener policy and content
-     * security policies. Chromium's IO thread.
+     * security policies, and the page each redirect's address, as its top address, and each final response's status
+     * (plan 8). Chromium's IO thread.
      *
      * @return a handler for a main frame's navigation
      */
@@ -1075,8 +1077,10 @@ final class OpenerBridge {
     }
 
     /**
-     * A main frame's navigation request: its response's opener policy and content security policies go to the bridge,
-     * and nothing about the load changes. Chromium's IO thread.
+     * A main frame's navigation request: its response's opener policy and content security policies go to the bridge;
+     * the address each redirect sends it to is the page's top address from then on ({@link Page#mainFrameRequested},
+     * plan 8's F6); and the final response's address and status are posted to the page
+     * ({@link Page#mainFrameResponded}). Nothing about the load changes. Chromium's IO thread.
      */
     private static final class Responses extends CefResourceRequestHandlerAdapter {
         private final OpenerBridge bridge;
@@ -1085,11 +1089,26 @@ final class OpenerBridge {
             this.bridge = bridge;
         }
 
+        @Override public void onResourceRedirect(CefBrowser browser, CefFrame frame, CefRequest request, CefResponse response,
+                                                 StringRef newUrl) {
+            try {
+                Page page = browser instanceof PageBrowser shown ? shown.owner() : null;
+                if (page != null && newUrl != null && request.getResourceType() == CefRequest.ResourceType.RT_MAIN_FRAME)
+                    page.mainFrameRequested(newUrl.get());
+            } catch (RuntimeException failure) {
+                LOG.log(System.Logger.Level.WARNING, "The opener bridge could not read a page's redirect", failure);
+            }
+        }
+
         @Override public boolean onResourceResponse(CefBrowser browser, CefFrame frame, CefRequest request, CefResponse response) {
             try {
                 Page page = browser instanceof PageBrowser shown ? shown.owner() : null;
-                if (page != null && request.getResourceType() == CefRequest.ResourceType.RT_MAIN_FRAME)
-                    bridge.responded(page, request.getURL(), response.getHeaderByName(OPENER_POLICY), contentPolicies(response));
+                if (page != null && request.getResourceType() == CefRequest.ResourceType.RT_MAIN_FRAME) {
+                    String url = request.getURL();
+                    bridge.responded(page, url, response.getHeaderByName(OPENER_POLICY), contentPolicies(response));
+                    int status = response.getStatus();
+                    if (url != null) EventQueue.invokeLater(() -> page.mainFrameResponded(url, status));
+                }
             } catch (RuntimeException failure) {
                 LOG.log(System.Logger.Level.WARNING, "The opener bridge could not read a page's response", failure);
             }

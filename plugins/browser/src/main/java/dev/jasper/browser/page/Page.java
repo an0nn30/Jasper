@@ -54,7 +54,10 @@ import org.cef.browser.CefRequestContext;
  * <p><b>Logins.</b> Its item's password manager runs a login script in each http or https document of the page's main
  * frame as it starts loading, and answers the page's login queries later, once each ({@link #handleLogins},
  * {@link #loginQuery}, {@link PageQuery}); {@link PageLoginHooks} holds the script and the handler, and the page's
- * close cancels the queries not answered (plan 8).
+ * close cancels the queries not answered (plan 8). Each HTTP sign-in Chromium asks for one of the page's requests goes
+ * to its item, to answer once ({@link #onSignIn}, {@link SignIn}), judged against the page's top address: its main
+ * frame's latest navigation request, after its redirects ({@link #topAddress()}); and so does each final main-frame
+ * response's status ({@link #onMainFrameResponse}).
  */
 public final class Page implements AutoCloseable {
     /** The longest {@link #source} waits for Chromium's HTML. */
@@ -958,6 +961,78 @@ public final class Page implements AutoCloseable {
      */
     Optional<String> loginScript(String address) {
         return loginHooks.script(address);
+    }
+
+    /**
+     * Chromium's IO thread notes that the page's main frame asks for {@code url}, as each of its navigation requests
+     * starts, or is redirected there (F6): the page's top address from now on ({@link #topAddress()}). Any thread.
+     *
+     * @param url the request's address, as Chromium names it; a null is ignored
+     */
+    public void mainFrameRequested(String url) {
+        loginHooks.mainFrameRequested(url);
+    }
+
+    /**
+     * The address an HTTP sign-in of the page is judged against ({@link SignIn#topAddress()}): that of its main frame's
+     * latest navigation request, after its redirects, as Chromium noted it ({@link #mainFrameRequested}), or the
+     * committed address before the first ({@link #committedAddress()}). A request that has not committed counts, as a
+     * main frame's own challenge comes before its commit. Any thread.
+     *
+     * @return the address, as Chromium writes it; empty before the page has either
+     */
+    public String topAddress() {
+        return loginHooks.topAddress(committed);
+    }
+
+    /**
+     * Tells {@code listener} each HTTP sign-in Chromium asks for one of the page's requests ({@link #signIn}), to
+     * answer once, later: Chromium's request waits until it is. The page's item listens, with or without a password
+     * manager (plan 8).
+     *
+     * @param listener told on the UI thread
+     * @return the registration; the page's close ends it
+     */
+    public Subscription onSignIn(Consumer<SignIn> listener) {
+        Objects.requireNonNull(listener, "listener");
+        return loginHooks.onSignIn(listener);
+    }
+
+    /**
+     * Chromium asks for an HTTP sign-in for one of the page's requests, which the {@code links} package's request
+     * handler has made and posted: those who asked {@link #onSignIn} are told it. It is cancelled at once when no one
+     * has asked, after {@link #close()}, or when one of them throws, so that no request waits on nothing. UI thread.
+     *
+     * @param signIn the sign-in, not yet answered
+     */
+    public void signIn(SignIn signIn) {
+        Objects.requireNonNull(signIn, "signIn");
+        loginHooks.signIn(signIn);
+    }
+
+    /**
+     * Tells {@code listener} the address and HTTP status of each final response to a navigation of the page's main
+     * frame, as Chromium reports it ({@link #mainFrameResponded}): a redirect is none.
+     *
+     * @param listener told the response's address and status, on the UI thread
+     * @return the registration; the page's close ends it
+     */
+    public Subscription onMainFrameResponse(BiConsumer<String, Integer> listener) {
+        Objects.requireNonNull(listener, "listener");
+        return loginHooks.onMainFrameResponse(listener);
+    }
+
+    /**
+     * The page's main frame got the final response to a navigation, as the {@code links} package's opener bridge reads
+     * it on Chromium's IO thread and posts it: those who asked {@link #onMainFrameResponse} are told. Nothing after
+     * {@link #close()}. UI thread.
+     *
+     * @param url the response's address, as Chromium names it
+     * @param status its HTTP status, such as 200 or 401
+     */
+    public void mainFrameResponded(String url, int status) {
+        Objects.requireNonNull(url, "url");
+        loginHooks.mainFrameResponded(url, status);
     }
 
     /**
