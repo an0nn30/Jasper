@@ -22,6 +22,7 @@ import dev.jasper.browser.item.SourcePage;
 import dev.jasper.browser.item.WebMenu;
 import dev.jasper.browser.item.WebsiteData;
 import dev.jasper.browser.links.PageNavigation;
+import dev.jasper.browser.logins.HttpSignIns;
 import dev.jasper.browser.logins.VaultLogins;
 import dev.jasper.browser.page.DownloadProgress;
 import dev.jasper.browser.page.DownloadStart;
@@ -249,7 +250,10 @@ public class BrowserPlugin implements Plugin {
         } catch (NoClassDefFoundError absent) {
             vault = Optional.empty();
         }
-        var items = new BrowserItems(context, settings::read, dataStores, vault, page -> {
+        // Plan 8 Task 5: the run's HTTP sign-ins, whose dialog shows with or without the Vault; its failures post in the
+        // plugin's own group.
+        var signIns = new HttpSignIns(vault, context.notifications().group());
+        var items = new BrowserItems(context, settings::read, dataStores, vault, signIns, page -> {
             PageNavigation.prepare(engine, filters);
             PageDownloads.prepare(engine, downloadStarts, downloadUpdates, downloadsAbandoned);
             // Plan 7's F3: the Downloads folder is read and made on the background executor as the first page starts.

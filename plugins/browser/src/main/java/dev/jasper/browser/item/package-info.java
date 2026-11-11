@@ -41,9 +41,11 @@
  * {@link dev.jasper.browser.tools.PageTools}, whose Reader Mode and Remove Distractions lead the menu button while the
  * page offers them, and gives the reader the theme's colours through {@link dev.jasper.browser.pages.PageHtml}; and holds
  * the item's Save Page As saves ({@link dev.jasper.browser.tools.SavePage}), which {@code BrowserItems} starts in the
- * {@code downloads} package's Downloads folder, showing the saved folder with its {@code FileManager}. With the
- * Credential Vault, {@code BrowserItems} holds the {@code logins} package's {@code VaultLogins} for its items, and each
- * item's {@code PageLoginsHost} has its page's login fields show the Vault's buttons, whose picks the {@code logins}
- * package's {@code FieldButtons} answer with the Vault's picker on the field's area of the item's view.
+ * {@code downloads} package's Downloads folder, showing the saved folder with its {@code FileManager}.
+ * {@code BrowserItems} holds the {@code logins} package's {@code HttpSignIns}, which each item's {@code PageLoginsHost}
+ * hands its page's HTTP sign-ins to, whose dialog shows over the item, with or without the Credential Vault. With the
+ * Vault, {@code BrowserItems} holds the {@code logins} package's {@code VaultLogins} for its items too, and each item's
+ * {@code PageLoginsHost} has its page's login fields show the Vault's buttons, whose picks the {@code logins} package's
+ * {@code FieldButtons} answer with the Vault's picker on the field's area of the item's view.
  */
 package dev.jasper.browser.item;

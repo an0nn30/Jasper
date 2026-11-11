@@ -10,8 +10,10 @@
  * {@link dev.jasper.browser.logins.Challenge} judges an HTTP sign-in the {@code page} package hands over as a
  * {@link dev.jasper.browser.page.SignIn}: whether it is framed, as the {@code permissions} package names origins, and
  * the top-level navigation's own, what the sign-in dialog offers, and the login name, from a realm cleaned of what
- * could pass for Jasper's own words. Names no Chromium type. May depend on the {@code page}, {@code permissions},
- * {@code dialogs} and {@code json} packages, the SDK, the JDK and {@code dev.jasper.vault.api}; the {@code settings}
- * package names none of its types.
+ * could pass for Jasper's own words. {@link dev.jasper.browser.logins.HttpSignIns}, which the plugin makes once and its
+ * browser items hand their pages' sign-ins to, with or without the Vault, shows the {@code dialogs} package's
+ * {@link dev.jasper.browser.dialogs.SignInDialog} for each, one per page at a time, and gives Chromium what it answers.
+ * Names no Chromium type. May depend on the {@code page}, {@code permissions}, {@code dialogs} and {@code json}
+ * packages, the SDK, the JDK and {@code dev.jasper.vault.api}; the {@code settings} package names none of its types.
  */
 package dev.jasper.browser.logins;

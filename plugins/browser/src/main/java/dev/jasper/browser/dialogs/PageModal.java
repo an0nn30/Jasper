@@ -24,7 +24,9 @@ import java.util.function.Consumer;
  * its page's permission prompt is asked, and may ignore an action for now, as a prompt ignores Allow until the
  * double-click interval has passed. Anything else that ends it dismisses it: its own close, the page's close with its
  * item, Chromium's reset of the page's dialogs, {@link #dismiss()}, or a dialog that cannot open or show. It is answered
- * exactly once. UI thread.
+ * exactly once. Its asker may see its view once it is made ({@link #viewMade}), as a sign-in dialog reads its password
+ * and anchors a picker on a button, and hear the events no answer maps ({@link #otherEvents}), such as an edit, a toggle
+ * or a button that answers nothing. UI thread.
  *
  * @param <T> what it answers
  */
@@ -78,6 +80,9 @@ final class PageModal<T> {
     private final Consumer<T> answer;
     private final Gate gate;
     private final AtomicBoolean answered = new AtomicBoolean();
+    // Told the view once it is made, and the events no answer maps; nothing by default.
+    private Consumer<UiView> viewMade = view -> { };
+    private Consumer<UiEvent> others = event -> { };
     private boolean started;
     private PluginDialog dialog;
     // While it waits for its item to become active, and while its gate holds it.
@@ -115,6 +120,27 @@ final class PageModal<T> {
         this.answers = Map.copyOf(answers);
         this.dismissed = Objects.requireNonNull(dismissed, "dismissed");
         this.answer = Objects.requireNonNull(answer, "answer");
+    }
+
+    /**
+     * Has {@code made} told the modal's view once it is made and set in its dialog, before the dialog shows: a view the
+     * dialog owns, which closes as the dialog closes. Before {@link #show()}.
+     *
+     * @param made told once, if the modal's dialog opens
+     */
+    void viewMade(Consumer<UiView> made) {
+        viewMade = Objects.requireNonNull(made, "made");
+    }
+
+    /**
+     * Has {@code heard} told each event of the modal's view that no answer maps, such as an edit, a toggle or an action
+     * of a button that answers nothing, while the modal is not answered: it neither answers nor closes it. Before
+     * {@link #show()}.
+     *
+     * @param heard told each such event
+     */
+    void otherEvents(Consumer<UiEvent> heard) {
+        others = Objects.requireNonNull(heard, "heard");
     }
 
     /**
@@ -172,7 +198,9 @@ final class PageModal<T> {
         try {
             view = place.kit().create(content, this::event);
             dialog.setContent(view);
+            UiView set = view;
             view = null; // the dialog's now, which disposes it as it closes
+            viewMade.accept(set);
             gate.showing();
             dialog.show(); // a modal overlay returns once it closes
         } catch (RuntimeException failed) {
@@ -183,7 +211,11 @@ final class PageModal<T> {
     }
 
     private void event(UiEvent event) {
-        if (!(event instanceof UiEvent.Action action) || answered.get() || !answers.containsKey(action.id())) return;
+        if (answered.get()) return;
+        if (!(event instanceof UiEvent.Action action) || !answers.containsKey(action.id())) {
+            others.accept(event);
+            return;
+        }
         if (!gate.accepts(action.id())) return;
         finish(answers.get(action.id()));
         dialog.close();
