@@ -38,10 +38,11 @@ import java.util.function.Function;
  * name and password given for one challenge also answer the page's waiting challenges of the same server or proxy,
  * port, realm and scheme (F30), which Chromium does not resupply itself. The page's flood guard refuses its dialogs
  * once they come one straight after another, but not the top-level challenge of a navigation Jasper started for the
- * user ({@link #navigating}) while that navigation is pending (L27). {@link #closed} cancels every challenge of the
- * page, shown or waiting, exactly once, and withdraws a pick under way; {@link #close()} does so for every page as the
- * plugin stops. A password reaches Chromium as a {@code String}, which its callback takes and which cannot be zeroed;
- * every array is zeroed once used. Names no Chromium type. UI thread.
+ * user ({@link #navigating}) while that navigation is pending and the user has cancelled none of its dialogs (L27,
+ * L28). {@link #closed} cancels every challenge of the page, shown or waiting, exactly once, and withdraws a pick under
+ * way; {@link #close()} does so for every page as the plugin stops. A password reaches Chromium as a {@code String},
+ * which its callback takes and which cannot be zeroed; every array is zeroed once used. Names no Chromium type. UI
+ * thread.
  */
 public final class HttpSignIns {
     /** The most challenges a page has waiting behind its dialog: one more is cancelled at once. */
@@ -92,7 +93,9 @@ public final class HttpSignIns {
      * Jasper sends {@code page} elsewhere for the user ({@link Page#onNavigate}), which a page's script cannot do:
      * until the page's next main-frame load start, a top-level challenge that arrives shows its dialog even once the
      * page's flood guard has tripped (L27), so the user's own navigation is never refused for what the page did before
-     * it. Nothing for a page that has closed, or once the plugin stopped.
+     * it. A main-frame load failure ends that, and so does a Cancel of one of those dialogs, which then refuses those
+     * still waiting too (L28): a navigation that never commits gives a page at most one dialog past the trip. Nothing
+     * for a page that has closed, or once the plugin stopped.
      *
      * @param page the page
      */
@@ -167,7 +170,8 @@ public final class HttpSignIns {
         final boolean devNull;
         // The page's document the challenge arrived in (F8).
         final long document;
-        // Whether it arrived as the top-level challenge of the user's navigation, pending then (L27).
+        // Whether it arrived as a top-level challenge while the user's navigation was pending (L27); it shows past the
+        // trip only if that navigation still is, its dialogs uncancelled, when it shows (L28).
         final boolean usersNavigation;
         // Ends its dialog, once it is shown or waiting to show; null before.
         Subscription dialog;
@@ -195,13 +199,15 @@ public final class HttpSignIns {
         private final List<Subscription> heard;
         private final ArrayDeque<Asked> waiting = new ArrayDeque<>();
         private Asked shown;
-        // Whether a navigation Jasper started for the user is pending since the page's last main-frame load start.
+        // Whether a navigation Jasper started for the user is pending since the page's last main-frame load start, with
+        // no main-frame load failure and no Cancel of its dialogs since.
         private boolean navigating;
         private boolean ended;
 
         PageSignIns(Page page) {
             this.page = page;
-            heard = List.of(page.onLoadStart(address -> loadStarted()), page.onClose(() -> closed(page)));
+            heard = List.of(page.onLoadStart(address -> loadStarted()), page.onLoadFailure(failure -> navigating = false),
+                page.onClose(() -> closed(page)));
         }
 
         void add(Asked asked) {
@@ -230,8 +236,8 @@ public final class HttpSignIns {
                 : anchor -> CompletableFuture.completedFuture(Optional.empty());
             // The dialog shows on a later turn, so what ends it is held at once.
             asked.dialog = SignInDialog.show(page, asked.place, challenge.host(), challenge.port(), challenge.realm(),
-                challenge.proxy(), offers, challenge.remembers(asked.devNull, present), asked.usersNavigation, manager,
-                outcome -> answered(asked, outcome));
+                challenge.proxy(), offers, challenge.remembers(asked.devNull, present), asked.usersNavigation && navigating,
+                manager, outcome -> answered(asked, outcome));
         }
 
         /** {@code asked}'s dialog was answered: it signs in or is cancelled, and the next challenge's dialog shows. */
@@ -240,7 +246,11 @@ public final class HttpSignIns {
             switch (outcome) {
                 case Outcome.Ok ok -> proceed(asked, ok.user(), ok.password());
                 case Outcome.Picked picked -> proceed(asked, picked.user(), picked.password());
-                case Outcome.Cancelled cancelled -> asked.signIn.cancel();
+                case Outcome.Cancelled cancelled -> {
+                    // L28: the user said no to the navigation's sign-in, whose 401 page then commits anyway.
+                    if (asked.usersNavigation) navigating = false;
+                    asked.signIn.cancel();
+                }
             }
             next();
         }

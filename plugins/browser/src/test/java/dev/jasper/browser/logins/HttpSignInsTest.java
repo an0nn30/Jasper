@@ -268,6 +268,64 @@ class HttpSignInsTest {
     }
 
     /**
+     * L28: the user's Cancel of a dialog shown past the trip ends the navigation's bypass, for the challenge waiting
+     * then and for one that comes later, so a navigation that never commits gives the page one dialog; Jasper's next
+     * navigation has a bypass of its own.
+     */
+    @Test void aCancelEndsTheUsersNavigationsBypass() throws Exception {
+        trip();
+        onUiThread(() -> {
+            page.load(URI.create(NEXT));
+            challenge("first", NEXT, "intranet.example", 443, "One", false);
+            challenge("queued", NEXT, "intranet.example", 443, "Two", false);
+        });
+        onUiThread(() -> {
+            assertThat(heading()).as("past the trip").contains("\u201COne\u201D");
+            press(form().cancelAction());
+            assertThat(told).endsWith("first cancel");
+        });
+        onUiThread(() -> {
+            assertThat(told).as("the one waiting, refused unshown").endsWith("queued cancel");
+            assertThat(host.windowView(ID, TITLE)).isEmpty();
+            challenge("later", NEXT, "intranet.example", 443, "Three", false);
+        });
+        onUiThread(() -> {
+            assertThat(told).as("one that comes later").endsWith("later cancel");
+            assertThat(host.windowView(ID, TITLE)).isEmpty();
+            page.load(URI.create(NEXT));
+            challenge("again", NEXT, "intranet.example", 443, "One", false);
+        });
+        onUiThread(() -> {
+            assertThat(host.windowView(ID, TITLE)).as("Jasper's next navigation").isPresent();
+            press(form().cancelAction());
+            assertThat(told).endsWith("again cancel");
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /** L28: a main-frame load failure, such as a download or a stopped load, ends the navigation's bypass. */
+    @Test void aLoadFailureEndsTheUsersNavigationsBypass() throws Exception {
+        trip();
+        onUiThread(() -> {
+            page.load(URI.create(NEXT));
+            challenge("navigation", NEXT, "intranet.example", 443, "One", false);
+        });
+        onUiThread(() -> {
+            assertThat(host.windowView(ID, TITLE)).as("past the trip").isPresent();
+            type("u", "pw");
+            press(ok());
+            assertThat(told).endsWith("navigation proceed u pw");
+            PageTestAccess.loadFailed(page, NEXT, "ERR_ABORTED");
+            challenge("after", NEXT, "intranet.example", 443, "One", false);
+        });
+        onUiThread(() -> {
+            assertThat(told).as("refused once the load failed").endsWith("after cancel");
+            assertThat(host.windowView(ID, TITLE)).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
      * L27 and V-F25: a page that retries its fetch after each Cancel trips the guard at its third retry; then the
      * user's navigation still asks, while the old page's retry during it is refused.
      */
@@ -529,6 +587,19 @@ class HttpSignInsTest {
     private void tripsQuickly() throws Exception {
         clock.close();
         clock = DialogsTestAccess.signInsTimedBy(() -> 50_000);
+    }
+
+    /** Trips the page's flood guard, the sign-ins reading one moment: three realms, the third refused unshown. */
+    private void trip() throws Exception {
+        tripsQuickly();
+        onUiThread(() -> {
+            challenge("t1", TOP, "intranet.example", 443, "T1", false);
+            challenge("t2", TOP, "intranet.example", 443, "T2", false);
+            challenge("t3", TOP, "intranet.example", 443, "T3", false);
+        });
+        onUiThread(() -> press(form().cancelAction()));
+        onUiThread(() -> press(form().cancelAction()));
+        onUiThread(() -> assertThat(told).as("tripped").containsExactly("t1 cancel", "t2 cancel", "t3 cancel"));
     }
 
     /** The plugin's items, opened without the Vault when there are none yet. */
