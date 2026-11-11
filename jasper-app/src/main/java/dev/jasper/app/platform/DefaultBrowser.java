@@ -2,7 +2,6 @@ package dev.jasper.app.platform;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -11,12 +10,9 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
-import java.util.concurrent.FutureTask;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -203,11 +199,7 @@ public final class DefaultBrowser {
      */
     static Optional<Boolean> askWindows(String https, BiFunction<String, String, Optional<String>> registry) {
         try {
-            for (String key : List.of(https + "\\UserChoiceLatest", https + "\\UserChoiceLatest\\ProgId", https + "\\UserChoice")) {
-                Optional<String> progId = registry.apply(key, "ProgId");
-                if (progId.isPresent()) return Optional.of(parseWindows(progId.get()));
-            }
-            return Optional.of(false);
+            return Optional.of(WindowsRegistry.userChoice(https, registry).map(DefaultBrowser::parseWindows).orElse(false));
         } catch (UncheckedIOException failure) {
             LOG.log(System.Logger.Level.DEBUG, "Could not read the user's choice of browser", failure);
             return Optional.empty();
@@ -217,7 +209,7 @@ public final class DefaultBrowser {
     /** A string value under {@code HKEY_CURRENT_USER}, for {@link #askWindows}; Windows only, elsewhere it throws. */
     static Optional<String> readRegistry(String key, String name) {
         try {
-            return WindowsUserPath.read(key, name);
+            return WindowsRegistry.read(key, name);
         } catch (IOException failure) {
             throw new UncheckedIOException(failure);
         }
@@ -230,7 +222,7 @@ public final class DefaultBrowser {
      *     otherwise or is late
      */
     static Optional<Boolean> askLinux(List<String> command, Duration timeout) {
-        return run(command, timeout).map(DefaultBrowser::parseLinux);
+        return ToolProcess.run(command, timeout).map(DefaultBrowser::parseLinux);
     }
 
     /**
@@ -254,40 +246,6 @@ public final class DefaultBrowser {
      */
     static boolean parseLinux(String output) { return output != null && DESKTOP_ID.equals(output.strip()); }
 
-    /**
-     * Runs {@code command} with no input and no shell, its error output discarded.
-     *
-     * @return its output when it exits with 0 within {@code timeout}; empty when it cannot start, exits with another
-     *     code, or is still running at the time-out, when it and every process it started are ended
-     */
-    static Optional<String> run(List<String> command, Duration timeout) {
-        Process process;
-        try {
-            process = new ProcessBuilder(command).redirectError(ProcessBuilder.Redirect.DISCARD).start();
-        } catch (IOException | RuntimeException missing) {
-            return Optional.empty();
-        }
-        try {
-            process.getOutputStream().close();
-            long deadline = System.nanoTime() + timeout.toNanos();
-            // Read while waiting: a child that filled its pipe would otherwise stall until the time-out.
-            var output = new FutureTask<>(() -> process.getInputStream().readAllBytes());
-            Thread.ofVirtual().name("jasper-default-browser-output").start(output);
-            if (!process.waitFor(timeout.toNanos(), TimeUnit.NANOSECONDS)) return Optional.empty();
-            byte[] bytes = output.get(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
-            return process.exitValue() == 0 ? Optional.of(new String(bytes, StandardCharsets.UTF_8)) : Optional.empty();
-        } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
-            return Optional.empty();
-        } catch (IOException | ExecutionException | TimeoutException failure) {
-            return Optional.empty();
-        } finally {
-            // xdg-settings is a shell script: what it started goes too. Once it has exited, its children belong to init
-            // and are no longer its descendants, and a reused process id could be another program's.
-            if (process.isAlive()) {
-                process.descendants().forEach(ProcessHandle::destroyForcibly);
-                process.destroyForcibly();
-            }
-        }
-    }
+    /** {@link ToolProcess#run}: kept here for this class's tests. */
+    static Optional<String> run(List<String> command, Duration timeout) { return ToolProcess.run(command, timeout); }
 }

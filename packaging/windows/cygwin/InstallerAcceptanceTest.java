@@ -80,12 +80,14 @@ public final class InstallerAcceptanceTest {
         return "Software\\Jasper\\Capabilities".equals(userValue("Software\\RegisteredApplications", "Jasper"))
             && "JasperURL".equals(userValue("Software\\Jasper\\Capabilities\\URLAssociations", "http"))
             && "JasperURL".equals(userValue("Software\\Jasper\\Capabilities\\URLAssociations", "https"))
-            && ("\"" + installed.resolve("Jasper.exe") + "\" --url \"%1\"").equals(userValue("Software\\Classes\\JasperURL\\shell\\open\\command", ""));
+            && ("\"" + installed.resolve("Jasper.exe") + "\" --url \"%1\"").equals(userValue("Software\\Classes\\JasperURL\\shell\\open\\command", ""))
+            && ("\"" + installed.resolve("Jasper.exe") + "\" \"%1\"").equals(userValue("Software\\Classes\\JasperFile\\shell\\open\\command", ""));
     }
     private static boolean browserUnregistered() {
         return userValue("Software\\RegisteredApplications", "Jasper") == null
             && !Advapi32Util.registryKeyExists(WinReg.HKEY_CURRENT_USER, "Software\\Jasper\\Capabilities")
-            && !Advapi32Util.registryKeyExists(WinReg.HKEY_CURRENT_USER, "Software\\Classes\\JasperURL");
+            && !Advapi32Util.registryKeyExists(WinReg.HKEY_CURRENT_USER, "Software\\Classes\\JasperURL")
+            && !Advapi32Util.registryKeyExists(WinReg.HKEY_CURRENT_USER, "Software\\Classes\\JasperFile");
     }
     private static String userValue(String key, String name) {
         return Advapi32Util.registryValueExists(WinReg.HKEY_CURRENT_USER, key, name)

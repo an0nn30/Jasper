@@ -389,6 +389,9 @@ public final class ApplicationBootstrap {
             // Whether Jasper is the default browser: asked now, before the plugins start, each time on a thread of its own.
             application.defaultBrowser(new DefaultBrowser(work -> Thread.ofVirtual().name("jasper-default-browser").start(work),
                 java.time.Clock.systemUTC()));
+            application.fileAssociations(dev.jasper.app.platform.FileAssociations.forThisPlatform(
+                System.getProperty("os.name"), dirs, System.getenv(), Path.of(System.getProperty("user.home")),
+                dev.jasper.app.platform.FileAssociations.desktopOpener()));
             // A packaged macOS Jasper keeps running on Quit and leaves the Dock while it has no window.
             if (MacDock.available())
                 application.backgroundOnQuit(new DockControl(dockShow(MacDock::show, ApplicationIcon::installTaskbarIcon),

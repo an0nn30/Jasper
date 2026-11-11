@@ -39,9 +39,13 @@ public final class CygwinInstallerTemplateTest {
         "HKCU|Software\\Jasper\\Capabilities\\URLAssociations|https|JasperURL",
         "HKCU|Software\\Classes\\JasperURL||Jasper URL",
         "HKCU|Software\\Classes\\JasperURL\\DefaultIcon||\"[INSTALLDIR]Jasper.exe\",0",
-        "HKCU|Software\\Classes\\JasperURL\\shell\\open\\command||\"[INSTALLDIR]Jasper.exe\" --url \"%1\"");
+        "HKCU|Software\\Classes\\JasperURL\\shell\\open\\command||\"[INSTALLDIR]Jasper.exe\" --url \"%1\"",
+        "HKCU|Software\\Classes\\JasperFile||Jasper document",
+        "HKCU|Software\\Classes\\JasperFile\\DefaultIcon||\"[INSTALLDIR]Jasper.exe\",0",
+        "HKCU|Software\\Classes\\JasperFile\\shell\\open\\command||\"[INSTALLDIR]Jasper.exe\" \"%1\"");
     // The keys Jasper owns, deleted with everything below them; RegisteredApplications only loses its Jasper value.
-    private static final Set<String> REMOVED_KEYS = Set.of("HKCU|Software\\Jasper\\Capabilities", "HKCU|Software\\Classes\\JasperURL");
+    private static final Set<String> REMOVED_KEYS = Set.of("HKCU|Software\\Jasper\\Capabilities", "HKCU|Software\\Classes\\JasperURL",
+        "HKCU|Software\\Classes\\JasperFile");
     private static int checks, fixtures;
 
     public static void main(String[] args) throws Exception {

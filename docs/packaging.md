@@ -340,6 +340,8 @@ opens in the [Jasper Editor](editor.md#opening-files), or is revealed in the fil
 and each folder as a terminal tab, in the most recently active window
 ([one Jasper per home](command-line.md#one-jasper-per-home)). `verifyPackage` checks the key.
 
+The app also declares the source and text types of its file-type catalogue (`file-types.tsv`) in a third document type, ranked `Alternate`, with `UTImportedTypeDeclarations` for the types macOS lacks (Kotlin, Go, Rust and TOML); installing Jasper makes it the default for none of them.
+
 ### macOS web links
 
 `packageApp` also declares `CFBundleURLTypes`: the `http` and `https` schemes, as "Web site URL" with the role Viewer,
@@ -407,7 +409,9 @@ template's one feature ([Browser](browser.md#making-jasper-your-default-browser)
 | `Software\Classes\JasperURL\shell\open\command` | (Default) = `"[INSTALLDIR]Jasper.exe" --url "%1"` ([`--url`](command-line.md#launching-jasper-with-options)) |
 
 The uninstall, and so an upgrade before it writes the new version's, removes the `Jasper` value and deletes the
-`Capabilities` and `JasperURL` keys. The portable ZIP and `installWindowsUser` register nothing.
+`Capabilities`, `JasperURL` and `JasperFile` keys. The setup also registers the `JasperFile` ProgId under `Software\Classes` (the Editor's File associations use it; its
+open command is `"[INSTALLDIR]Jasper.exe" "%1"`) and sets no default. The portable ZIP and
+`installWindowsUser` register nothing.
 
 The package's architecture is that of the selected JBR SDK, which must match the host's. On Windows on Arm, build the
 ARM64 package: an x64 Jasper there runs entirely under Windows' x64 emulation, including the code the JVM compiles as
@@ -522,8 +526,8 @@ Both packages are named `jasper-workstation` and install the image to `/opt/jasp
 and a desktop menu entry (`/opt/jasper-workstation/lib/jasper-workstation-Jasper.desktop`, categories
 `System;TerminalEmulator;Network;RemoteAccess;`, icon `/opt/jasper-workstation/lib/Jasper.png`) registered through
 `xdg-desktop-menu`. The package tasks write the entry from the selected JBR's own `template.desktop`, changing two
-lines: `Exec=/opt/jasper-workstation/bin/Jasper --url %u` and `MimeType=x-scheme-handler/http;x-scheme-handler/https;`,
-so that desktops offer Jasper as a web browser ([Browser](browser.md#making-jasper-your-default-browser)). The package
+lines: `Exec=/opt/jasper-workstation/bin/Jasper --url %u` and `MimeType=x-scheme-handler/http;x-scheme-handler/https;` followed by the MIME types of the source and text types in the file-type catalogue (`file-types.tsv`),
+so that desktops offer Jasper as a web browser ([Browser](browser.md#making-jasper-your-default-browser)) and under Open With for those files, and installing makes it the default for none of them. The package
 description, which is also the menu entry's comment, is "Jasper DevOps workstation" and the home page
 `https://github.com/an0nn30/Jasper`. DEB builds require `fakeroot`, `dpkg-deb` and a Debian-family host
 whose package database resolves the runtime's mandatory shared libraries to Debian packages. The `.rpm` requires,
@@ -553,7 +557,9 @@ or, where none is, as the default, and its uninstall never takes it out. The ins
 `applications/defaults.list` of the data folders (`XDG_DATA_DIRS`, else `/usr/local/share` and `/usr/share`) before
 the menu install, then writes back each that changed and deletes each that it created, so that the packages make Jasper
 no default. When the copies cannot be made, it prints "jasper: the system's default applications were not saved" and
-the menu install's change stays.
+the menu install's change stays. Removing the package leaves the user's own MIME package
+(`~/.local/share/mime/packages/jasper-workstation.xml`) and `mimeapps.list` entries, which the Editor's File
+associations write, as they are.
 
 With the default `system.run_in_background`, the first eligible installed launch registers the current user's
 `$XDG_CONFIG_HOME/autostart/dev.jasper.background.desktop` (normally under `~/.config`) to run Jasper with

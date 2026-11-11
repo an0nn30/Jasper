@@ -1,6 +1,6 @@
 // Jasper's in-process macOS bridge, one signed library: notifications under Jasper's bundle identity and icon, the
-// Dock presence of a resident Jasper, and which application opens web links. Only native macOS packaging/check needs
-// Apple's command line tools; other hosts skip it.
+// Dock presence of a resident Jasper, and which application opens web links and file types. Only native macOS
+// packaging/check needs Apple's command line tools; other hosts skip it.
 import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.jvm.toolchain.JavaToolchainService
 
@@ -15,6 +15,7 @@ def library = nativeDirectory.map { it.file('libjasper-macos.dylib') }
 def compilerArguments = {
     ['-fobjc-arc', '-fblocks', '-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter',
         '-mmacosx-version-min=11.0', '-framework', 'Foundation', '-framework', 'UserNotifications', '-framework', 'AppKit',
+        '-framework', 'UniformTypeIdentifiers',
         '-I' + sdkHome.get().dir('include').asFile.absolutePath,
         '-I' + sdkHome.get().dir('include/darwin').asFile.absolutePath]
 }
@@ -64,7 +65,9 @@ def nativeTests = [Notifications: 'MacNotificationsTest.m', Dock: 'MacDockTest.m
         group = 'verification'
         description = "Checks the macOS ${suite.toLowerCase(Locale.ROOT)} bridge headlessly with fakes."
         dependsOn(compile, compileBridge)
-        commandLine(executable.get().asFile.absolutePath)
+        // The Launch Services harness also checks the file-type catalogue against the system's type database.
+        def arguments = suite == 'LaunchServices' ? [file('src/main/resources/dev/jasper/app/platform/file-types.tsv').absolutePath] : []
+        commandLine([executable.get().asFile.absolutePath] + arguments)
     }
 }
 tasks.named('check') { dependsOn(nativeTests) }

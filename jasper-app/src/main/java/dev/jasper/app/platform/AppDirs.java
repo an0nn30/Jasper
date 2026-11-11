@@ -61,6 +61,11 @@ public record AppDirs(Path root, Path configFile, Path logs, boolean overridden)
         return root.resolve("workspace.toml");
     }
 
+    /** The handlers Jasper replaced when it claimed file types ({@code file-associations.toml}). */
+    public Path fileAssociations() {
+        return root.resolve("file-associations.toml");
+    }
+
     /** The saved default layout and named layouts ({@code layouts.toml}). */
     public Path layouts() {
         return root.resolve("layouts.toml");
