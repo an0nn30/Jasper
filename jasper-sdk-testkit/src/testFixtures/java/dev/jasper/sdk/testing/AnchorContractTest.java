@@ -138,8 +138,21 @@ public abstract class AnchorContractTest {
    assertThatThrownBy(()->view.anchorAt("root",area)).as("a stack").isInstanceOf(IllegalArgumentException.class);
    assertThatThrownBy(()->new ContentArea(10,20,-1,8)).as("a negative width").isInstanceOf(IllegalArgumentException.class);
    assertThatThrownBy(()->new ContentArea(10,20,30,-1)).as("a negative height").isInstanceOf(IllegalArgumentException.class);
+   assertThatThrownBy(()->new ContentArea(Integer.MAX_VALUE,20,1,8)).as("a right edge past the int range").isInstanceOf(IllegalArgumentException.class);
    assertThatThrownBy(()->view.anchor("page")).as("a Custom node is no control").isInstanceOf(IllegalArgumentException.class);
+   assertThatThrownBy(()->view.anchorAt("page",null)).as("no area").isInstanceOf(NullPointerException.class);
    assertThat(view.anchorAt("page",area).isOpen()).isTrue();
+  }
+ });}
+ /** Task 1b's review (L5): an anchor stays on its content, so an area must lie inside the content's bounds when it is minted. */
+ @Test void anAreaMustLieInsideItsContent()throws Exception{SwingUtilities.invokeAndWait(()->{
+  try(var f=fixture()){
+   var source=f.endpoint("source");var view=source.kit().create(page(ControlState.READY),e->{});view.registerContent(content(canvas()));mount(source,view,"source");
+   for(var outside:List.of(new ContentArea(-5,20,30,8),new ContentArea(10,-1,30,8),new ContentArea(611,20,30,8),new ContentArea(10,473,30,8),
+      new ContentArea(-5000,-5000,0,0),new ContentArea(641,0,0,0),new ContentArea(0,0,641,480)))
+    assertThatThrownBy(()->view.anchorAt("page",outside)).as("%s outside 640 x 480",outside).isInstanceOf(IllegalArgumentException.class);
+   for(var inside:List.of(new ContentArea(0,0,640,480),new ContentArea(610,472,30,8),new ContentArea(640,480,0,0),new ContentArea(0,0,0,0)))
+    assertThat(view.anchorAt("page",inside).isOpen()).as("%s inside 640 x 480",inside).isTrue();
   }
  });}
  /** A dialog's content replaced while a child its old content owns closes the dialog still releases both views. */

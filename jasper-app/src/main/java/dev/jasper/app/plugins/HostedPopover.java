@@ -40,7 +40,8 @@ final class HostedPopover implements PluginPopover {
         if(!GraphicsEnvironment.isHeadless()){refit();var p=anchor.target.getLocationOnScreen();var bounds=placement();popup.show(anchor.target,bounds.x-p.x,bounds.y-p.y);refit();}
     }
     /**
-     * Fitting is host geometry only; no producer descriptor values enter attachment authority. The popover goes below
+     * Fitting is host geometry, and for an area anchor the producer's area, which minting kept inside its content; no
+     * producer descriptor values enter attachment authority. The popover goes below
      * the control (or the area, for an area anchor), or above it where the screen has no room below; its left edge is the control's while the control's
      * window has room to the right, and otherwise its right edge is the control's, as Chrome's bookmark bubble under its
      * menu button and IntelliJ's popups sit, though never left of the window. The usable screen bounds it last.

@@ -20,12 +20,14 @@ public interface UiView extends Subscription {
   * area, or above it when the screen has no room below, at least as wide as the area; a dialog may take the anchor as
   * its owner. A press inside the area closes the popover and goes no further; a press elsewhere closes it and reaches
   * the content. Hiding, disabling, removing or moving the node closes the anchor, and so does resizing the content: a
-  * page laid out again has moved what was in the area.
+  * page laid out again has moved what was in the area. The host sees where the content is, not what it draws there: a
+  * content that moves what it draws, by scrolling or zooming, closes the anchor itself.
   *
   * @param customId a Custom node's id
-  * @param area the area of its content
+  * @param area the area of its content, inside the content's bounds
   * @return scoped capability
-  * @throws IllegalArgumentException when the id names no such node, or the view is not mounted
+  * @throws IllegalArgumentException when the id names no such node, the view is not mounted, or the area does not lie
+  *     inside the content's bounds now (an empty area on its edge does)
   * @throws UnsupportedOperationException if the host predates area anchors
   * @since 0.32.0
   */

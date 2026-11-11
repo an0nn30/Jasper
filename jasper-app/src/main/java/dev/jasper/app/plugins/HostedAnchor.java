@@ -35,8 +35,13 @@ final class HostedAnchor implements UiAnchor {
         target=area==null?source.component().anchorTarget(id):source.component().customTarget(id);
         size=area==null?null:target.getSize();ancestry=ancestry();
         if(!valid())throw new IllegalArgumentException(area==null?"Anchor requires a live mounted control":"Anchor requires live mounted Custom content");
+        if(area!=null&&!inside(area,size))throw new IllegalArgumentException("An area must lie inside its content");
         target.addHierarchyListener(hierarchy);
         if(area!=null)target.addComponentListener(resized);
+    }
+    /** Whether {@code area} lies inside a content of {@code size}; an empty area on its edge does (L5). */
+    static boolean inside(Rectangle area,Dimension size) {
+        return area.x>=0&&area.y>=0&&(long)area.x+area.width<=size.width&&(long)area.y+area.height<=size.height;
     }
     static HostedAnchor require(UiAnchor value,Object host) {
         if(!(value instanceof HostedAnchor anchor)||anchor.host!=host||!anchor.isOpen())throw new IllegalArgumentException("Foreign or expired anchor");

@@ -223,6 +223,7 @@ final class FakeSettingsPanelHost implements SettingsPanelHost {
 
     @Override public void closeThen(Runnable action) {
         guard();
+        if (!EventQueue.isDispatchThread()) throw new IllegalStateException("closeThen must be called on the UI thread");
         java.util.Objects.requireNonNull(action, "action");
         closeThen.accept(action);
     }

@@ -584,9 +584,11 @@ is. It does not block; Escape or a click outside closes it and its content. Hidi
 moving the control, closing its surface or stopping the plugin closes the anchor for good; `onClosed` hears it.
 Since 0.32.0 `view.anchorAt(customId, area)` mints one on a
 [`ContentArea`](sdk-reference.html#dev.jasper.sdk.ui.ContentArea) of a `Custom` node's registered content, in the
-content component's coordinates, such as a field on a page: the popover opens below the area (above when there is no
-room), at least as wide as it. A press inside the area closes the popover and goes no further; a press elsewhere closes
-it and reaches the content. The node's rules are a control's, and resizing the content closes the anchor too.
+content component's coordinates, such as a field on a page; the area must lie inside the content. The popover opens
+below the area (above when there is no room), at least as wide as it. A press inside the area closes the popover and
+goes no further; a press elsewhere closes it and reaches the content. The node's rules are a control's, and resizing the
+content closes the anchor too. Jasper sees where the content is, not what it draws, so a content that scrolls or zooms
+what it draws closes the anchor itself.
 Credential Vault's credential picker opens over another plugin's anchor this way ([plugin APIs](plugin-apis.md)).
 
 ### Quit guards
@@ -1423,8 +1425,8 @@ size.set(15);   // writes plugins/<id>/<id>.toml, keeping its comments
   `modified`, `apply` and `reset` only for state of the plugin's own, and `keywords` and `highlight` for search. The
   panel lives as long as the plugin, so Settings calls `reset` before `dispose` whenever it closes a page without a
   successful Apply, as on Cancel. Settings is modal, so a control that opens a window of the plugin's own calls
-  `host.closeThen(action)` (since 0.32.0): Settings closes, asking about unsaved changes as Cancel does, then runs
-  `action`; nothing runs when the user keeps Settings open. Compose the page as the generated ones are
+  `host.closeThen(action)` (since 0.32.0, UI thread): Settings closes, asking about unsaved changes as Cancel does, and
+  `action` runs in a later UI turn, contained; nothing runs when the user keeps Settings open or the plugin has stopped. Compose the page as the generated ones are
   ([Building plugin UI](plugin-ui.md#settings-pages)); the Sample's `SampleSettingsPanel` is a complete example.
 - **Opening Settings.** [`context.settings().show()`](sdk-reference.html#dev.jasper.sdk.settings.PluginSettings.show())
   opens Settings at the plugin's page over the active window; UI thread.

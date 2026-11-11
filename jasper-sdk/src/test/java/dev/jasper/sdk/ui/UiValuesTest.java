@@ -430,6 +430,15 @@ class UiValuesTest {
         assertThatIllegalArgumentException().isThrownBy(() -> new ContentArea(0, 0, 30, -1)).withMessageContaining("height");
     }
 
+    /** Task 1b's review (L4): an area ends inside the int range, so its right and bottom edges never overflow. */
+    @Test void anAreaEndsInsideTheIntRange() {
+        assertThat(new ContentArea(Integer.MAX_VALUE - 10, 0, 10, 0).width()).as("ending at the last int").isEqualTo(10);
+        assertThat(new ContentArea(0, Integer.MAX_VALUE, 0, 0).y()).as("a point at the last int").isEqualTo(Integer.MAX_VALUE);
+        assertThatIllegalArgumentException().isThrownBy(() -> new ContentArea(Integer.MAX_VALUE, 0, 1, 0)).withMessageContaining("right");
+        assertThatIllegalArgumentException().isThrownBy(() -> new ContentArea(0, Integer.MAX_VALUE - 1, 0, 2)).withMessageContaining("bottom");
+        assertThatIllegalArgumentException().isThrownBy(() -> new ContentArea(1, 1, Integer.MAX_VALUE, Integer.MAX_VALUE));
+    }
+
     /** Browser plan 5 Task 10 (SDK 0.29.0): inserted text is any text, empty included, and whether Return follows it. */
     @Test void insertedTextIsAnyTextAndWhetherReturnFollowsIt() {
         assertThat(new InsertedText("ls -la", true)).isEqualTo(new InsertedText("ls -la", true))

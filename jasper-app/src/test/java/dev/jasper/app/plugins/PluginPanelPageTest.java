@@ -576,8 +576,9 @@ class PluginPanelPageTest {
     }
 
     /**
-     * Browser plan 8 Task 1b (SDK 0.32.0, F7): the page's host hands {@code closeThen} to the dialog it is in, which closes
-     * (asking about unsaved changes) and runs the action; a closed page refuses it.
+     * Browser plan 8 Task 1b (SDK 0.32.0, F7, L5): the page's host hands {@code closeThen} to the dialog it is in, which
+     * closes (asking about unsaved changes) and runs the action; the host contains the action as every plugin callback
+     * is, runs nothing for a plugin that stopped meanwhile, refuses a closed page and refuses any thread but the UI's.
      */
     @Test void closeThenAsksTheDialogToCloseAndAClosedPageRefusesIt() {
         var panel = startWithPanel();
@@ -586,17 +587,27 @@ class PluginPanelPageTest {
             dev.jasper.app.testsupport.KitTestSupport::context);
         var page = onEdtValue(() -> host.settingsPages(dialog)).getFirst();
         var ran = new ArrayList<String>();
+        onEdt(page::component);
+        assertThatIllegalStateException().as("off the UI thread").isThrownBy(() -> panel.host.closeThen(() -> ran.add("off the UI thread")));
         onEdt(() -> {
-            page.component();
+            assertThat(requests).isEmpty();
             panel.host.closeThen(() -> ran.add("action"));
             assertThat(requests).as("the dialog decides").hasSize(1);
             assertThat(ran).isEmpty();
             assertThatNullPointerException().isThrownBy(() -> panel.host.closeThen(null));
+            panel.host.closeThen(() -> { throw new IllegalStateException("a failing action"); });
+            panel.host.closeThen(() -> ran.add("after the plugin stopped"));
             page.dispose();
-            requests.getFirst().run();
+            requests.get(0).run();
             assertThat(ran).as("the dialog runs it once closed").containsExactly("action");
+            int failures = host.failures(ID);
+            assertThatCode(() -> requests.get(1).run()).as("contained").doesNotThrowAnyException();
+            assertThat(host.failures(ID)).as("recorded against the plugin").isEqualTo(failures + 1);
             assertThatIllegalStateException().isThrownBy(() -> panel.host.closeThen(() -> ran.add("late")));
-            assertThat(requests).hasSize(1);
+            assertThat(requests).hasSize(3);
+            host.stop();
+            requests.get(2).run();
+            assertThat(ran).as("nothing runs for a stopped plugin").containsExactly("action");
         });
     }
 

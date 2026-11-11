@@ -46,8 +46,9 @@ public final class FakeKitView implements UiView {
  FakeKitView(FakeKit owner, ViewSpec spec, Consumer<UiEvent> events) {this.owner=owner;this.events=Objects.requireNonNull(events);update(spec);}
  void guard(){owner.guard();if(closed.get())throw new IllegalStateException("View is closed");}
  @Override public UiAnchor anchor(String id){guard();var anchor=new Attachment(id,null);if(!anchor.isOpen())throw new IllegalArgumentException("Unmounted or ineligible control");anchors.add(anchor);return anchor;}
- /** As the host: an anchor on an area of a live Custom node's registered content, which a resize of the content closes. */
- @Override public UiAnchor anchorAt(String id,ContentArea area){guard();Objects.requireNonNull(area,"area");var anchor=new Attachment(id,area);if(!anchor.isOpen())throw new IllegalArgumentException("Unmounted or ineligible Custom content");anchors.add(anchor);return anchor;}
+ /** As the host: an anchor on an area inside a live Custom node's registered content, which a resize of the content closes. */
+ @Override public UiAnchor anchorAt(String id,ContentArea area){guard();Objects.requireNonNull(id,"customId");Objects.requireNonNull(area,"area");var anchor=new Attachment(id,area);if(!anchor.isOpen())throw new IllegalArgumentException("Unmounted or ineligible Custom content");
+  if(!anchor.inside()){anchor.close();throw new IllegalArgumentException("An area must lie inside its content");}anchors.add(anchor);return anchor;}
  /** The registered component of Custom node {@code id}, or null when it is no Custom node or has none. */
  private javax.swing.JComponent registered(String id){return mounted(spec.root()).get(id) instanceof Nodes.Custom custom && contents.get(custom.contentId()) instanceof CustomContent content && content.kind()==custom.kind() ? content.component() : null;}
  final class Attachment implements UiAnchor {
@@ -62,6 +63,8 @@ public final class FakeKitView implements UiView {
    content=area==null?null:registered(id);size=content==null?null:content.getSize();if(content!=null)content.addComponentListener(resized);}
   private Object kind(Nodes.Node node){if(area!=null)return node instanceof Nodes.Custom ? Nodes.Custom.class : null;return node instanceof Nodes.Button ? Nodes.Button.class : node instanceof Nodes.MenuButton ? Nodes.MenuButton.class : node instanceof Nodes.Choice c && c.kind()==Nodes.ChoiceKind.PICKER ? c.kind() : null;}
   private boolean contentHolds(){return area==null||content!=null&&registered(id)==content&&content.getSize().equals(size);}
+  /** Whether the area lies inside the content's size at minting; an empty area on its edge does, as the host's. */
+  boolean inside(){return area.x()>=0&&area.y()>=0&&(long)area.x()+area.width()<=size.width&&(long)area.y()+area.height()<=size.height;}
   private boolean eligible(Nodes.Node node,boolean parent){boolean live=parent&&node.state().visible()&&node.state().enabled()&&!node.state().busy();if(node.id().equals(id))return live;for(var child:mountedChildren(node))if(eligible(child,live))return true;return false;}
   FakeUi.FakeWindow ownerSurface(){return mounted instanceof FakeUi.SurfaceMount slot ? slot.surface() : mounted instanceof FakeUi.FakeWindow window ? window : null;}
   @Override public boolean isOpen(){if(!done&&(closed.get()||mounted==null||mount!=mounted||host==null||kind==null||!kind.equals(kind(mounted(spec.root()).get(id)))||!ancestry.equals(path(spec.root(),id))||!eligible(spec.root(),true)||!contentHolds()||ownerSurface()!=null&&(!ownerSurface().shown||ownerSurface().closed)))close();return !done;}

@@ -110,7 +110,7 @@ row for a declared setting, bound to the page's unsaved value, and Settings save
 {@link SettingsPanelHost#stage(Setting,Object)} sets an unsaved value from a control of the plugin's own and
 {@link SettingsPanelHost#changed()} says the page's modified state changed. Settings is modal, so a control that opens
 a window of the plugin's own calls {@link SettingsPanelHost#closeThen(Runnable)} (since 0.32.0): Settings closes,
-asking about unsaved changes as Cancel does, then runs the action. {@link SettingsPanel#modified()},
+asking about unsaved changes as Cancel does, and the action runs in a later UI turn. {@link SettingsPanel#modified()},
 {@link SettingsPanel#apply()} and {@link SettingsPanel#reset()} cover only state of the plugin's own beyond its declared
 settings; {@link SettingsPanel#dispose()} runs when Settings closes the page.</p>
 <p>{@link SettingsPanel#pendingChanged()} runs after a standard row handles the user's edit, choice, list action,

@@ -213,11 +213,19 @@ final class PluginPanelPage implements SettingsPage {
             context.changed().run();
         }
 
-        /** The dialog's own: it asks about unsaved changes as Cancel does, closes (disposing this page), then runs it. */
+        /**
+         * The dialog's own: it asks about unsaved changes as Cancel does, closes (disposing this page), then runs the
+         * action in a later UI turn; the action is contained as the page's other callbacks are, and dropped once the
+         * plugin has stopped.
+         */
         @Override public void closeThen(Runnable action) {
             guard();
+            if (!java.awt.EventQueue.isDispatchThread()) throw new IllegalStateException("closeThen must be called on the UI thread: " + pluginId);
             java.util.Objects.requireNonNull(action, "action");
-            context.closeThen().accept(action);
+            context.closeThen().accept(() -> {
+                if (kit != null && !kit.live()) return;
+                containment.run(pluginId, "settings page close", action);
+            });
         }
     }
 

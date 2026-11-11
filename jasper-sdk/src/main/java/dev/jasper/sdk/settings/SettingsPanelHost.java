@@ -41,12 +41,13 @@ public interface SettingsPanelHost {
     void changed();
 
     /**
-     * Closes Settings, asking about unsaved changes as Cancel does, then runs {@code action} on the UI thread; nothing
-     * runs when the user keeps Settings open. Settings is modal, so a control that opens a window of the plugin's own,
-     * such as a manager, closes Settings first. The page is disposed by the time {@code action} runs.
+     * Closes Settings, asking about unsaved changes as Cancel does, then runs {@code action}; nothing runs when the user
+     * keeps Settings open. The action runs on the UI thread in a later turn, after this call has returned and Settings
+     * has closed, its page disposed, and not at all once the plugin has stopped; a throw from it is contained. Settings is
+     * modal, so a control that opens a window of the plugin's own, such as a manager, closes Settings first. UI thread.
      *
      * @param action what to do once Settings has closed
-     * @throws IllegalStateException when the page is closed
+     * @throws IllegalStateException when the page is closed, or off the UI thread
      * @throws UnsupportedOperationException if the host predates this call
      * @since 0.32.0
      */

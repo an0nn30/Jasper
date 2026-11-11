@@ -608,7 +608,8 @@ public final class FakePluginHost implements AutoCloseable {
 
     /**
      * As Settings closes for its page's {@code closeThen}: asks about unsaved changes as Cancel does (the page's staged
-     * values or the panel's own {@code modified()}), closes the page as {@link #closeSettingsPanel} does, then runs the action.
+     * values or the panel's own {@code modified()}), closes the page as {@link #closeSettingsPanel} does, then runs the
+     * action in a later UI turn, contained, and not once the plugin has stopped.
      */
     private void closeSettingsThen(String pluginId, Runnable action) {
         var rows = panelHosts.get(pluginId);
@@ -619,7 +620,10 @@ public final class FakePluginHost implements AutoCloseable {
             }
             closeSettingsPanel(pluginId);
         }
-        action.run();
+        java.awt.EventQueue.invokeLater(() -> {
+            if (!active(pluginId)) return;
+            try { action.run(); } catch (Throwable failure) { recordFailure("Settings callback failed"); }
+        });
     }
 
     private boolean settingsModified(String pluginId, FakeSettingsPanelHost rows) {

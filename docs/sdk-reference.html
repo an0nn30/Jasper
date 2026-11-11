@@ -1881,7 +1881,7 @@ views close when it stops.</p>
 <tr><td><a href="#dev.jasper.sdk.ui.UiView.selectAll(String)"><code>UiView.selectAll(String)</code></a></td><td>Select a field's text without editing it or moving focus.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.UiView.composing(String)"><code>UiView.composing(String)</code></a></td><td>Whether an input method holds uncommitted text in a field; leave keys to it while true.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.UiView.anchor(String)"><code>UiView.anchor(String)</code></a></td><td>A <a href="#dev.jasper.sdk.ui.UiAnchor"><code>UiAnchor</code></a> on a mounted button, menu button (since 0.29.0) or PICKER choice, for a popover or a dialog attached to it.</td></tr>
-<tr><td><a href="#dev.jasper.sdk.ui.UiView.anchorAt(String,ContentArea)"><code>UiView.anchorAt(String, ContentArea)</code></a></td><td>Since 0.32.0, a <a href="#dev.jasper.sdk.ui.UiAnchor"><code>UiAnchor</code></a> on a <a href="#dev.jasper.sdk.ui.ContentArea"><code>ContentArea</code></a> of a mounted <a href="#dev.jasper.sdk.ui.Nodes.Custom"><code>Nodes.Custom</code></a> node's content, such as a field on a page; a press inside the area closes its popover and goes no further, and resizing the content closes the anchor.</td></tr>
+<tr><td><a href="#dev.jasper.sdk.ui.UiView.anchorAt(String,ContentArea)"><code>UiView.anchorAt(String, ContentArea)</code></a></td><td>Since 0.32.0, a <a href="#dev.jasper.sdk.ui.UiAnchor"><code>UiAnchor</code></a> on a <a href="#dev.jasper.sdk.ui.ContentArea"><code>ContentArea</code></a> inside a mounted <a href="#dev.jasper.sdk.ui.Nodes.Custom"><code>Nodes.Custom</code></a> node's content, such as a field on a page; a press inside the area closes its popover and goes no further, and resizing the content closes the anchor. A content that scrolls or zooms what it draws closes the anchor itself.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.UiView.withSecret(String,Consumer)"><code>UiView.withSecret(String, Consumer)</code></a>, <a href="#dev.jasper.sdk.ui.UiView.clearSecret(String)"><code>UiView.clearSecret(String)</code></a>, <a href="#dev.jasper.sdk.ui.UiView.replaceSecret(String,char[])"><code>UiView.replaceSecret(String, char[])</code></a></td><td>Read a secret field's characters (erased after the callback), clear it, or set it without an edit event.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.UiView.registerContent(CustomContent)"><code>UiView.registerContent(CustomContent)</code></a></td><td>Fill a <a href="#dev.jasper.sdk.ui.Nodes.Custom"><code>Nodes.Custom</code></a> node with a component; see below.</td></tr>
 </tbody>
@@ -2162,7 +2162,7 @@ row for a declared setting, bound to the page's unsaved value, and Settings save
 <a href="#dev.jasper.sdk.settings.SettingsPanelHost.stage(Setting,Object)"><code>SettingsPanelHost.stage(Setting, Object)</code></a> sets an unsaved value from a control of the plugin's own and
 <a href="#dev.jasper.sdk.settings.SettingsPanelHost.changed()"><code>SettingsPanelHost.changed()</code></a> says the page's modified state changed. Settings is modal, so a control that opens
 a window of the plugin's own calls <a href="#dev.jasper.sdk.settings.SettingsPanelHost.closeThen(Runnable)"><code>SettingsPanelHost.closeThen(Runnable)</code></a> (since 0.32.0): Settings closes,
-asking about unsaved changes as Cancel does, then runs the action. <a href="#dev.jasper.sdk.settings.SettingsPanel.modified()"><code>SettingsPanel.modified()</code></a>,
+asking about unsaved changes as Cancel does, and the action runs in a later UI turn. <a href="#dev.jasper.sdk.settings.SettingsPanel.modified()"><code>SettingsPanel.modified()</code></a>,
 <a href="#dev.jasper.sdk.settings.SettingsPanel.apply()"><code>SettingsPanel.apply()</code></a> and <a href="#dev.jasper.sdk.settings.SettingsPanel.reset()"><code>SettingsPanel.reset()</code></a> cover only state of the plugin's own beyond its declared
 settings; <a href="#dev.jasper.sdk.settings.SettingsPanel.dispose()"><code>SettingsPanel.dispose()</code></a> runs when Settings closes the page.</p>
 <p><a href="#dev.jasper.sdk.settings.SettingsPanel.pendingChanged()"><code>SettingsPanel.pendingChanged()</code></a> runs after a standard row handles the user's edit, choice, list action,
@@ -5475,10 +5475,11 @@ unsaved value. The row marks itself when a search matches it.</p></div>
 <div class="member" id="dev.jasper.sdk.settings.SettingsPanelHost.closeThen(Runnable)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.settings.SettingsPanelHost.closeThen(Runnable)" aria-label="Link to this member">#</a><code><span class="kw">default</span> <span class="kw">void</span> <b>closeThen</b>(<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Runnable.html" title="java.lang.Runnable">Runnable</a> action)</code></pre>
 <p class="badges"><span class="since">since 0.32.0</span></p>
-<div class="doc"><p>Closes Settings, asking about unsaved changes as Cancel does, then runs <code>action</code> on the UI thread; nothing
-runs when the user keeps Settings open. Settings is modal, so a control that opens a window of the plugin's own,
-such as a manager, closes Settings first. The page is disposed by the time <code>action</code> runs.</p></div>
-<dl class="tags"><dt>Parameters</dt><dd><code>action</code> what to do once Settings has closed</dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalStateException.html">IllegalStateException</a> when the page is closed</dd><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/UnsupportedOperationException.html">UnsupportedOperationException</a> if the host predates this call</dd></dl>
+<div class="doc"><p>Closes Settings, asking about unsaved changes as Cancel does, then runs <code>action</code>; nothing runs when the user
+keeps Settings open. The action runs on the UI thread in a later turn, after this call has returned and Settings
+has closed, its page disposed, and not at all once the plugin has stopped; a throw from it is contained. Settings is
+modal, so a control that opens a window of the plugin's own, such as a manager, closes Settings first. UI thread.</p></div>
+<dl class="tags"><dt>Parameters</dt><dd><code>action</code> what to do once Settings has closed</dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalStateException.html">IllegalStateException</a> when the page is closed, or off the UI thread</dd><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/UnsupportedOperationException.html">UnsupportedOperationException</a> if the host predates this call</dd></dl>
 </div>
 </article>
 </section>
@@ -6548,7 +6549,8 @@ widths a user dragged.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.ColumnStateFile"><code>ColumnStateFile</code></a></td><td><span class="kind kind-class">class</span></td><td>A properties file that keeps one <a href="#dev.jasper.sdk.ui.ColumnState"><code>ColumnState</code></a> per key, for a plugin whose tables remember their sort and
 column widths across runs.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.ContentArea"><code>ContentArea</code></a></td><td><span class="kind kind-record">record</span></td><td>An area of a <a href="#dev.jasper.sdk.ui.Nodes.Custom"><code>Nodes.Custom</code></a> node's registered content, in the content component's coordinates, such as a field
-on a page: <a href="#dev.jasper.sdk.ui.UiView.anchorAt(String,ContentArea)"><code>UiView.anchorAt(String, ContentArea)</code></a> anchors a popover to it.</td></tr>
+on a page: <a href="#dev.jasper.sdk.ui.UiView.anchorAt(String,ContentArea)"><code>UiView.anchorAt(String, ContentArea)</code></a> anchors a popover to it, and the area must lie inside the
+content.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.ContentCommand"><code>ContentCommand</code></a></td><td><span class="kind kind-record">record</span></td><td>Command belonging only to an active content tab.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.ContentPresentation"><code>ContentPresentation</code></a></td><td><span class="kind kind-record">record</span></td><td>Host-rendered document metadata; all text is literal.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.ContentSpec"><code>ContentSpec</code></a></td><td><span class="kind kind-record">record</span></td><td>Stable document identity, scoped to the calling plugin, initial literal title, and how the tab comes back.</td></tr>
@@ -7016,7 +7018,9 @@ into place; a missing file starts empty, and a file that cannot be read is left 
 <header class="type-head"><span class="kind kind-record">record</span><h4><a class="self" href="#dev.jasper.sdk.ui.ContentArea">ContentArea</a></h4><span class="since">since 0.32.0</span><span class="pkg">dev.jasper.sdk.ui</span></header>
 <pre class="sig"><code><span class="kw">record</span> <b>ContentArea</b>(<span class="kw">int</span> x, <span class="kw">int</span> y, <span class="kw">int</span> width, <span class="kw">int</span> height)</code></pre>
 <div class="doc"><p>An area of a <a href="#dev.jasper.sdk.ui.Nodes.Custom"><code>Nodes.Custom</code></a> node's registered content, in the content component's coordinates, such as a field
-on a page: <a href="#dev.jasper.sdk.ui.UiView.anchorAt(String,ContentArea)"><code>UiView.anchorAt(String, ContentArea)</code></a> anchors a popover to it. An empty area is a point.</p></div>
+on a page: <a href="#dev.jasper.sdk.ui.UiView.anchorAt(String,ContentArea)"><code>UiView.anchorAt(String, ContentArea)</code></a> anchors a popover to it, and the area must lie inside the
+content. An empty area is a point. The host sees where the content is, not what it draws there: a content that moves
+what it draws, by scrolling or zooming, closes the anchor itself.</p></div>
 <h5>Components</h5>
 <div class="table-wrap"><table class="components"><tbody>
 <tr id="dev.jasper.sdk.ui.ContentArea.x()"><td class="ct"><code><span class="kw">int</span></code></td><td class="cn"><code><b>x</b></code></td><td>the left edge</td></tr>
@@ -7031,8 +7035,9 @@ on a page: <a href="#dev.jasper.sdk.ui.UiView.anchorAt(String,ContentArea)"><cod
         <span class="kw">int</span> y,
         <span class="kw">int</span> width,
         <span class="kw">int</span> height)</code></pre>
-<div class="doc"><p>Refuses a negative width or height.</p></div>
-<dl class="tags"><dt>Parameters</dt><dd><code>x</code></dd><dd><code>y</code></dd><dd><code>width</code></dd><dd><code>height</code></dd></dl>
+<div class="doc"><p>Refuses a negative width or height, and an area whose right or bottom edge is past <a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Integer.html#MAX_VALUE"><code>Integer.MAX_VALUE</code></a>.</p></div>
+<dl class="tags"><dt>Parameters</dt><dd><code>x</code></dd><dd><code>y</code></dd><dd><code>width</code></dd><dd><code>height</code></dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalArgumentException.html">IllegalArgumentException</a> when <code>width</code> or <code>height</code> is negative, or <code>x + width</code> or
+    <code>y + height</code> is greater than <a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Integer.html#MAX_VALUE"><code>Integer.MAX_VALUE</code></a></dd></dl>
 </div>
 </article>
 <article class="type" id="dev.jasper.sdk.ui.ContentCommand">
@@ -11548,8 +11553,10 @@ registered content, in the content component's coordinates, such as a field on a
 area, or above it when the screen has no room below, at least as wide as the area; a dialog may take the anchor as
 its owner. A press inside the area closes the popover and goes no further; a press elsewhere closes it and reaches
 the content. Hiding, disabling, removing or moving the node closes the anchor, and so does resizing the content: a
-page laid out again has moved what was in the area.</p></div>
-<dl class="tags"><dt>Parameters</dt><dd><code>customId</code> a Custom node's id</dd><dd><code>area</code> the area of its content</dd><dt>Returns</dt><dd>scoped capability</dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalArgumentException.html">IllegalArgumentException</a> when the id names no such node, or the view is not mounted</dd><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/UnsupportedOperationException.html">UnsupportedOperationException</a> if the host predates area anchors</dd></dl>
+page laid out again has moved what was in the area. The host sees where the content is, not what it draws there: a
+content that moves what it draws, by scrolling or zooming, closes the anchor itself.</p></div>
+<dl class="tags"><dt>Parameters</dt><dd><code>customId</code> a Custom node's id</dd><dd><code>area</code> the area of its content, inside the content's bounds</dd><dt>Returns</dt><dd>scoped capability</dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalArgumentException.html">IllegalArgumentException</a> when the id names no such node, the view is not mounted, or the area does not lie
+    inside the content's bounds now (an empty area on its edge does)</dd><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/UnsupportedOperationException.html">UnsupportedOperationException</a> if the host predates area anchors</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.ui.UiView.spec()">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.UiView.spec()" aria-label="Link to this member">#</a><code><a class="tl" href="#dev.jasper.sdk.ui.ViewSpec">ViewSpec</a> <b>spec</b>()</code></pre>
@@ -12050,7 +12057,7 @@ close does nothing.</p></div>
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.testing.FakeKitView.anchorAt(String,ContentArea)" aria-label="Link to this member">#</a><code><a class="tl" href="#dev.jasper.sdk.ui.UiAnchor">UiAnchor</a> <b>anchorAt</b>(
         <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> id,
         <a class="tl" href="#dev.jasper.sdk.ui.ContentArea">ContentArea</a> area)</code></pre>
-<div class="doc"><p>As the host: an anchor on an area of a live Custom node's registered content, which a resize of the content closes.</p></div>
+<div class="doc"><p>As the host: an anchor on an area inside a live Custom node's registered content, which a resize of the content closes.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>id</code></dd><dd><code>area</code></dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.testing.FakeKitView.setSecret(String,char[])">

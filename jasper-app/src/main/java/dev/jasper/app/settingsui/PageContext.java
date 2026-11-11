@@ -17,7 +17,8 @@ import java.util.function.Supplier;
  *
  * @param draft the dialog's pending core-setting edits
  * @param navigate selects another page by id
- * @param closeThen closes the dialog (asking about unsaved changes) and then runs the action
+ * @param closeThen closes the dialog (asking about unsaved changes) and then runs the action in a later UI turn, once the
+ *     dialog's modal loop has unwound
  * @param chooseFile asks for an existing file over the dialog: title and initial path in, choice out
  * @param changed tells the dialog a page's validity or modification changed outside the draft
  * @param surface the dialog's surface, for dialogs a page opens over it; null while the dialog is closed
