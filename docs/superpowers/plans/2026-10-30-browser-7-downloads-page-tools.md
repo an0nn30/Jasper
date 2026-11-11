@@ -124,6 +124,10 @@ deviations from the plan's text, each with its ruling:
   from Task 1c on; the example external plugin's `check pluginZip` against `build/sdk-release` passed after each SDK
   task. No GUI was launched.
 
+- **Task 9** ("Docs: plan 7's GUI check, pending"), the checklist:
+  [Plan 7: downloads and page tools](../../browser-verification.md#plan-7-downloads-and-page-tools), every line
+  pending, as nothing was run: no GUI, no packaging with AOT, no benchmark.
+
 The controller's rulings, one line each:
 - D0: every ruling the pre-flight scan proposed (F1-F38) is adopted and cited as D-F*n*, except where D1-D3 decide
   otherwise; its provisional items are re-checked against the merged plan 6 before the task that uses them.
@@ -277,14 +281,16 @@ Deferred minors, by task, for the final reviews:
   into D44.
 
 Not run:
-- **Task 9**, the user's GUI check on macOS, with their OK for each batch: pending.
+- **Task 9**, the user's GUI check on macOS, with their OK for each batch: pending
+  ([checklist](../../browser-verification.md#plan-7-downloads-and-page-tools)), F1, F2, F9 and F29 first, then the
+  plan's twelve lines with the task reviews' lines.
 - **Benchmarks:** the start-up and memory batch (D-F35, as plan 6's V4), with the reader's parse cost and the save heap,
   waits for the benchmark sitting.
 - **Windows and Linux** (no hosts): the known folder, `Zone.Identifier` on NTFS and FAT32, Explorer's `/select,`, the
   XDG folder and `xdg-open`; and **packaging with AOT**, whose training needs the user's OK.
-- **No JavaScript runs in a test** (D3): `reader.js`, `distractions.js`, `save-page.js` and 4b's `find.js` are checked as
-  text, with `node --check` and with stub harnesses (in `.superpowers/sdd/probes/` and the scratchpad); no test starts
-  Chromium.
+- **No JavaScript runs in a test** (D3): `reader.js`, `distractions.js`, `save-page.js` and 4b's `find.js` are checked
+  as text, with `node --check` and with stub harnesses (in `.superpowers/sdd/probes/` and the scratchpad); no test
+  starts Chromium.
 
 **Goal:** Give the Browser iTerm2's downloads and page tools:
 - downloads that go to the Downloads folder without asking, with the system's downloaded-file mark;

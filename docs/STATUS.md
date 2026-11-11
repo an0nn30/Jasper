@@ -68,7 +68,7 @@ Each task's commits (the banner has each one's deviations):
   removal's review fixes".
 - Task 7: `8b3d5375a` "Browser: Save Page As saves a folder with the page and its resources", `de91e3216` "Browser:
   Save Page As's review fixes" and `87e4fb7c3` "Browser: Save Page As's last fixes".
-- Task 8: "Docs: downloads and page tools".
+- Task 8: "Docs: downloads and page tools"; Task 9: "Docs: plan 7's GUI check, pending".
 
 The controller's rulings, one line each (the pre-flight scan's F1-F38 adopted as D0; the banner gives each D-F*n* where
 it applied):
@@ -187,9 +187,10 @@ listeners hear keys and clicks first (D29); D35's `position: fixed` body and mod
 proxy-on literal check (D5) and a LAN page reached by name (D39); the JDK's User-Agent (D37); Save Page As does not save
 shadow DOM, `<template>` references, SVG `image` and `use` references or CSS `image-set()`; a maximal save completes in
 a 320 MiB heap for ASCII HTML and 512 MiB for UTF-16 (D43). Task 9 (the user's check on macOS, with their OK): pending,
-F1, F2, F9 and F29 first, then the plan's twelve lines with the task reviews' lines; the checklist comes with Task 9.
-Windows and Linux are not run; the start-up and memory batch, with the reader's parse cost and the save heap, waits for
-the benchmark sitting (D-F35); no JavaScript runs in a test (D3).
+F1, F2, F9 and F29 first, then the plan's twelve lines with the task reviews' lines
+([checklist](browser-verification.md#plan-7-downloads-and-page-tools)). Windows and Linux are not run; the start-up and
+memory batch, with the reader's parse cost and the save heap, waits for the benchmark sitting (D-F35); no JavaScript
+runs in a test (D3).
 
 **Browser plan 6: privacy — 2026-11-09** (`claude/browser-privacy`, worktree `.claude/worktrees/browser-4b-4c-e6deab`,
 from local `main` `ef3347601`, which has plans 4a, 4b, 4c, 9 and 5 merged; the plan `daa19c574`, commits `827ac12ba`
