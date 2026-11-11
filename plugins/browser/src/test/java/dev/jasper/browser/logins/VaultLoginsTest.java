@@ -103,13 +103,60 @@ class VaultLoginsTest {
         });
     }
 
-    /** The plan's text: the username and the password, each empty when the credential has none. */
-    @Test void aChosenAccountWithoutAPasswordIsUsedWithAnEmptyOne() throws Exception {
+    /**
+     * L12, L14: the Vault's picker lists every kind of credential, but a site's login is a password login. A chosen
+     * account that signs in with a key is fetched, so the pick's one-time grant is spent (F15), and closed unused.
+     */
+    @Test void aChosenKeyAccountIsFetchedAndClosedUnused() throws Exception {
         onUi(() -> {
             fake.keyAccount("deploy key", "deploy");
-            assertThat(logins.pick(owner, anchor, "intranet.example", use)).isCompletedWithValue(true);
-            assertThat(seen).containsExactly("deploy", "");
-            assertThat(fake.issued).allMatch(FakeVault::closed);
+            assertNotAPasswordLogin("deploy key");
+        });
+    }
+
+    /** L12: nor is an SSH key a site's login. */
+    @Test void aChosenSshKeyIsFetchedAndClosedUnused() throws Exception {
+        onUi(() -> {
+            fake.sshKey("deploy ssh key");
+            assertNotAPasswordLogin("deploy ssh key");
+        });
+    }
+
+    /** L14: an SSH account with a key and a password signs in to a server, not a site, as useGranted and saveLogin hold. */
+    @Test void aChosenKeyAndPasswordAccountIsFetchedAndClosedUnused() throws Exception {
+        onUi(() -> {
+            fake.keyAndPasswordAccount("deploy account", "deploy", "pw");
+            assertNotAPasswordLogin("deploy account");
+        });
+    }
+
+    /** A throwing {@code use} still closes, and so zeroes, the login, and the pick's future fails with what it threw. */
+    @Test void aPickWhoseUseThrowsClosesTheLoginAndFailsWithTheThrow() throws Exception {
+        onUi(() -> {
+            fake.login(NAME, "u", "pw");
+            var thrown = new IllegalStateException("filled nothing");
+            CompletableFuture<Boolean> picked = logins.pick(owner, anchor, "intranet.example", (username, password) -> {
+                handed.add(password);
+                throw thrown;
+            });
+            assertThat(picked).isCompletedExceptionally();
+            assertThatThrownBy(picked::join).hasCause(thrown);
+            assertThat(fake.issued).singleElement().satisfies(credential -> assertThat(FakeVault.closed(credential)).isTrue());
+            assertThat(handed.getFirst()).containsOnly((char) 0);
+        });
+    }
+
+    /** A throwing {@code use} still closes, and so zeroes, the login, and {@code useGranted} rethrows what it threw. */
+    @Test void aSilentFillWhoseUseThrowsClosesTheLoginAndRethrows() throws Exception {
+        onUi(() -> {
+            fake.login(NAME, "u", "pw");
+            var thrown = new IllegalStateException("filled nothing");
+            assertThatThrownBy(() -> logins.useGranted(NAME, (username, password) -> {
+                handed.add(password);
+                throw thrown;
+            })).isSameAs(thrown);
+            assertThat(fake.issued).singleElement().satisfies(credential -> assertThat(FakeVault.closed(credential)).isTrue());
+            assertThat(handed.getFirst()).containsOnly((char) 0);
         });
     }
 
@@ -353,6 +400,9 @@ class VaultLoginsTest {
      * names it, never needs the Vault.
      */
     @Test void withoutTheVaultsClassesVaultLoginsLinksAndTheLookupFindsNothing() throws Exception {
+        // The end-to-end guard of the plugin's real start without the Vault's classes is the Editor's
+        // EditorPluginTest.theEditorFindsTheBrowsersMarkdownPreviewsWhenItRequiresTheBrowser, which starts BrowserPlugin
+        // on a test class path that has no Vault; this test pins VaultLogins itself.
         URL browser = VaultLogins.class.getProtectionDomain().getCodeSource().getLocation();
         URL sdk = PluginContext.class.getProtectionDomain().getCodeSource().getLocation();
         try (var loader = new URLClassLoader(new URL[] {browser, sdk}, ClassLoader.getPlatformClassLoader())) {
@@ -372,6 +422,17 @@ class VaultLoginsTest {
             assertThat(isolated.getMethod("find", contextType).invoke(null, context)).isEqualTo(Optional.empty());
             assertThat(asked).as("the Vault's class failed to load before the services were asked").isEmpty();
         }
+    }
+
+    /**
+     * The pick of the only credential, {@code name}, which is not a password login: it answers false, the credential
+     * was fetched, and only fetched, then closed, and {@code use} never ran.
+     */
+    private void assertNotAPasswordLogin(String name) {
+        assertThat(logins.pick(owner, anchor, "intranet.example", use)).isCompletedWithValue(false);
+        assertThat(fake.calls).as("fetched, so the one-time grant is spent").containsExactly("credential " + name);
+        assertThat(seen).as("nothing filled").isEmpty();
+        assertThat(fake.issued).isNotEmpty().allMatch(FakeVault::closed);
     }
 
     /** Runs {@code check} on the UI thread, where the Vault is called, and rethrows what it threw. */

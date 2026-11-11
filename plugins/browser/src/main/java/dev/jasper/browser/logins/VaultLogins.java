@@ -67,18 +67,21 @@ public final class VaultLogins {
 
     /**
      * Lets the user choose a login in the Vault's picker on {@code anchor}, opening with {@code search} (the picker of a
-     * Vault older than 0.9.0 opens without it), unlocking first when needed. A chosen login is always fetched over
-     * {@code owner}, so the one-time grant the choice gave is spent, and {@code use} gets its username, or {@code ""},
-     * and its password, or an empty array, before it closes. Cancelling the returned future withdraws the pick and the
-     * fetch; a login that arrives after that is closed unused.
+     * Vault older than 0.9.0 opens without it), unlocking first when needed. A chosen credential is always fetched over
+     * {@code owner}, so the one-time grant the choice gave is spent, and closed; only a password login, a site's username
+     * and password, is used: {@code use} gets its username, or {@code ""}, and its password, or an empty array, before
+     * it closes. The Vault's picker lists every kind of credential, so an SSH key or an account that signs in with a key
+     * is closed unused. Cancelling the returned future withdraws the pick and the fetch; a login that arrives after
+     * that is closed unused.
      *
      * @param owner the window the request comes from
      * @param anchor where the picker attaches, a live anchor Jasper issued
      * @param search the picker's starting search
      * @param use what fills the login in: the username and the credential's own password array, zeroed once it returns
      * @return true once a login was used; false when nothing was chosen (the picker was dismissed, None chosen, the
-     *     anchor or the owner closed, there is no vault, unlocking was cancelled), the Vault gave no login, it lacks what
-     *     this asks, or the pick or the fetch failed, which is logged; fails as {@code use} fails
+     *     anchor or the owner closed, there is no vault, unlocking was cancelled), the Vault gave no login, the user
+     *     chose a credential that is not a password login, the Vault lacks what this asks, or the pick or the fetch
+     *     failed, which is logged; fails as {@code use} fails
      */
     public CompletableFuture<Boolean> pick(WindowHandle owner, UiAnchor anchor, String search, BiConsumer<String, char[]> use) {
         Objects.requireNonNull(anchor, "anchor");
@@ -212,8 +215,8 @@ public final class VaultLogins {
     }
 
     /**
-     * Fetches the chosen login over {@code owner} and hands it to {@code use} while {@code result} waits; one that
-     * arrives once {@code result} is done is closed unused.
+     * Fetches the chosen credential over {@code owner} and, when it is a password login, hands it to {@code use} while
+     * {@code result} waits; any other kind, and one that arrives once {@code result} is done, is closed unused.
      */
     private void fetch(WindowHandle owner, UUID id, CompletableFuture<Boolean> result,
                        AtomicReference<CompletableFuture<Optional<Credential>>> fetching, BiConsumer<String, char[]> use) {
@@ -240,6 +243,11 @@ public final class VaultLogins {
             Credential login = credential.get();
             try {
                 if (result.isDone()) return;
+                // L12, L14: a site's login is a username and password; an SSH key or an SSH account fills nothing.
+                if (login.kind() != Kind.ACCOUNT_PASSWORD) {
+                    result.complete(false);
+                    return;
+                }
                 use(login, use);
                 result.complete(true);
             } catch (Throwable thrown) {

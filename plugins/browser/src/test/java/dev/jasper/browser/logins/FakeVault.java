@@ -79,6 +79,16 @@ public final class FakeVault implements Plugin {
     }
 
     /**
+     * Adds an account that signs in with a key and a password, an SSH account's, which has both a username and a
+     * password.
+     *
+     * @return its id
+     */
+    public UUID keyAndPasswordAccount(String name, String username, String password) {
+        return add(name, username, Kind.ACCOUNT_KEY_AND_PASSWORD, username, password);
+    }
+
+    /**
      * Adds an SSH key, with neither a username nor a password.
      *
      * @return its id
