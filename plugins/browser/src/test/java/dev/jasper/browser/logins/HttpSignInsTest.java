@@ -1681,6 +1681,62 @@ class HttpSignInsTest {
     }
 
     /**
+     * L44: the user's Stop ends a navigation Jasper started before its request, which Chromium reports nothing of, so
+     * its mark is dropped: a page's script that sends the tab to a remembered site a second later shows the dialog.
+     */
+    @Test void theUsersStopDropsJaspersMark() throws Exception {
+        open(true);
+        fake.login(CORP, "u", "pw");
+        onUiThread(() -> {
+            millis.addAndGet(60_000);
+            page.load(URI.create(NEXT));
+            page.stop();
+            millis.addAndGet(1_000);
+            page.mainFrameRequested(TOP); // the old page's script
+            challenge("stopped", TOP, "intranet.example", 443, "Corp", false);
+        });
+        onUiThread(() -> {
+            assertThat(host.windowView(ID, TITLE)).as("after the Stop").isPresent();
+            press(form().cancelAction());
+            assertThat(told).containsExactly("stopped cancel");
+            assertThat(fake.calls).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * L44: the end of the page's pending navigation that Jasper's replaces is that of the latest request, so it keeps
+     * Jasper's mark for Jasper's own request, which fills; a download of another address drops the mark, so the next
+     * request is not Jasper's and shows the dialog.
+     */
+    @Test void theEndOfTheNavigationJaspersReplacesKeepsTheMark() throws Exception {
+        open(true);
+        fake.login(CORP, "u", "pw");
+        fake.login("https://intranet.example (Other)", "u", "pw");
+        onUiThread(() -> {
+            scripted(NEXT + "slow"); // the page's own navigation, pending
+            page.load(URI.create(TOP));
+            PageTestAccess.mainFrameFailed(page, NEXT + "slow", "ERR_ABORTED");
+            page.mainFrameRequested(TOP);
+            challenge("typed", TOP, "intranet.example", 443, "Corp", false);
+            assertThat(told).as("Jasper's request took the mark").containsExactly("typed proceed u pw");
+            millis.addAndGet(60_000);
+            page.load(URI.create(NEXT));
+            String file = "https://files.example/report.pdf";
+            PageTestAccess.downloadStart(page, 1, 7, file, "report.pdf", TOP, millis.get());
+            millis.addAndGet(1_000);
+            page.mainFrameRequested(TOP);
+            challenge("after a download", TOP, "intranet.example", 443, "Other", false);
+        });
+        onUiThread(() -> {
+            assertThat(host.windowView(ID, TITLE)).as("another address's download").isPresent();
+            press(form().cancelAction());
+            assertThat(told).containsExactly("typed proceed u pw", "after a download cancel");
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
      * A Basic challenge of the page's top-level navigation to {@link #TOP}, as Chromium's thread hands it over, to the
      * item's sign-ins, outside /dev/null. UI thread.
      */

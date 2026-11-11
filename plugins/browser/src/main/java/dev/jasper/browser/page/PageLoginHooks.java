@@ -41,9 +41,10 @@ final class PageLoginHooks {
     // The main frame's latest navigation: the number of its requests so far, their redirects not counted (L31), and
     // whether the latest began with the page's user activation (L35). Written on Chromium's threads.
     private final AtomicReference<Page.Navigation> navigation = new AtomicReference<>(Page.Navigation.NONE);
-    // When Jasper last sent the page elsewhere, until the next main-frame request takes it or a main frame's address
-    // change, load start or load failure drops it (L42); and when the main frame last started loading a document.
-    // Written on the UI thread and Chromium's, read on Chromium's.
+    // When Jasper last sent the page elsewhere, until the next main-frame request takes it or something that ends that
+    // navigation first drops it (L42, L44): a main frame's address change or load start, the end of another request
+    // than the latest, a download start of another address, the user's Stop or a history entry refused; and when the
+    // main frame last started loading a document. Written on the UI thread and Chromium's, read on Chromium's.
     private final AtomicLong mark = new AtomicLong(NONE), loadStarted = new AtomicLong(NONE);
     private final List<Consumer<SignIn>> signIns = new CopyOnWriteArrayList<>();
     private final List<BiConsumer<String, Integer>> responses = new CopyOnWriteArrayList<>();
@@ -161,14 +162,26 @@ final class PageLoginHooks {
 
     /**
      * The main frame's request for {@code url} ended without a commit: it failed, or became a download. When it is the
-     * top address still, the commit before it is from now on; another address's end, such as that of a request the
-     * next one replaced, changes nothing. Jasper's mark, if no request took it, is dropped (L42). A null address is
-     * ignored. Any thread.
+     * top address still, the commit before it is from now on, and Jasper's mark is kept, as that is the end of a
+     * pending navigation Jasper's own replaces, whose request is yet to come (L44). Another address's end, such as
+     * that of a request the next one replaced, or a download of another address, leaves the top address but drops
+     * Jasper's mark, if no request took it (L42); and so does a null address. Any thread.
      */
     void mainFrameRequestEnded(String url) {
-        mark.set(NONE);
         String current = top.get();
-        if (url != null && url.equals(current)) top.compareAndSet(current, committedTop);
+        if (url == null || !url.equals(current)) {
+            mark.set(NONE);
+            return;
+        }
+        top.compareAndSet(current, committedTop);
+    }
+
+    /**
+     * Jasper's navigation will not make its request, as the user stopped it or Chromium refused its history entry:
+     * its mark, if no request took it, is dropped (L44). Any thread.
+     */
+    void dropMark() {
+        mark.set(NONE);
     }
 
     /**

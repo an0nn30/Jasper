@@ -183,7 +183,7 @@ public final class Page implements AutoCloseable {
     public Page(URI url, Runnable changed, Favicons favicons, Executor background, PageContext context) {
         // Functions of the page, not of its browser's type: making a page loads no Chromium class.
         this(url, changed, favicons, background, context, page -> NavigationHistory.read(page.readyBrowser()),
-            (page, id) -> NavigationHistory.goTo(page.readyBrowser(), id));
+            (page, id) -> NavigationHistory.goTo(page.readyBrowser(), id, page::historyEntryRefused));
     }
 
     /**
@@ -469,9 +469,22 @@ public final class Page implements AutoCloseable {
         if (ready) browser.reload();
     }
 
-    /** Stops the page loading. */
+    /**
+     * Stops the page loading: a navigation Jasper started for the user that has not made its request yet makes none,
+     * so its mark is dropped (plan 8's L44), as Chromium reports nothing for a navigation stopped while the old
+     * document's {@code beforeunload} runs.
+     */
     public void stop() {
+        loginHooks.dropMark();
         if (ready && !closed) browser.stopLoad();
+    }
+
+    /**
+     * Chromium refused the history entry Jasper sent the page to ({@link #goToHistoryEntry}), so that navigation makes
+     * no request: its mark is dropped (plan 8's L44). Any thread.
+     */
+    void historyEntryRefused() {
+        loginHooks.dropMark();
     }
 
     /** Cuts the selection of the page's focused frame, as its Edit menu's Cut would. */
@@ -978,8 +991,9 @@ public final class Page implements AutoCloseable {
      * @param activated whether the page had a user activation as its request started, as a link the user clicks or a
      *     key the user presses gives one, from a press or key since the main frame last started loading a document
      * @param byJasper whether its request is the one Jasper's own navigation for the user made: the first main-frame
-     *     request within 10 s after it ({@link #onNavigate}), with no address change, load start or load failure of the
-     *     main frame between
+     *     request within 10 s after it ({@link #onNavigate}), with nothing between that ends that navigation first: no
+     *     address change or load start of the main frame, no end of another request than the latest, no download start
+     *     of another address, no Stop and no history entry refused
      */
     public record Navigation(long number, boolean activated, boolean byJasper) {
         /** No navigation yet. */
@@ -1040,7 +1054,8 @@ public final class Page implements AutoCloseable {
 
     /**
      * The page's latest main-frame navigation, as Chromium's IO thread noted its request: its number
-     * ({@link #navigation()}) and whether it began with the page's user activation, read together. Any thread.
+     * ({@link #navigation()}), whether it began with the page's user activation and whether its request took Jasper's
+     * mark, as Jasper's own navigation's, read together. Any thread.
      *
      * @return the navigation; {@link Navigation#NONE} before the first
      */
