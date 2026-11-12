@@ -987,8 +987,7 @@ Alt in place of Option; a window manager may take Alt with a drag.
 2. **The router's cancel (F14):** navigating, reloading or closing the tab with the picker open closes the picker and
    fills nothing. Pending.
 3. **A redirect before the sign-in (F6):** an `http://` address that answers 301 to `https://`, which answers 401 (an
-   intranet host, or a local server), offers Remember this password. AGENTS.md's Verified JCEF behaviour states this
-   redirect from CEF's documented behaviour, which this line confirms. Pending.
+   intranet host, or a local server), offers Remember this password. Pending.
 4. **The field script runs first (F13):** as a rule `login-fields.js` runs before the page's own scripts: a page that
    replaces `HTMLInputElement.prototype.value`'s setter early still gets the native fill. Pending.
 5. **Settings and the manager (F7, L2):** Manage Saved Passwords closes Settings first, and the manager and its unlock

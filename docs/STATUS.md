@@ -61,7 +61,7 @@ an optional `requires` of the Vault `>=0.9.0`; plan 8 adds no download, no licen
 Browser guide (Logins, /dev/null mode, Clearing data, the HTTP proxy's 407 and Settings), the Credential Vault guide,
 plugin APIs' `credential`, `pick` and `importSshKeys` rows (L11), the README's, Plugins' and the docs index's Browser
 descriptions, AGENTS.md's Verified JCEF behaviour (the auth and query callbacks' finalizers,
-`CefClient.getAuthCredentials` for a null browser, no `ClearHttpAuthCredentials`, the main-frame redirect), the plan's
+`CefClient.getAuthCredentials` for a null browser, no `ClearHttpAuthCredentials`), the plan's
 banner and this entry; the SDK guides, the testkit README and plugin authoring came with Task 1b, plugin APIs and the
 Vault guide with Task 2, and AGENTS.md's architecture sentence and the SDK architecture with Task 3. The final reviews,
 dispatched 2026-11-11 over plan 8's own diff after the merge, `0a4ec9bb9..ebfdc45ac` (A: Tasks 1a-4b; B: Tasks 5a-6;
