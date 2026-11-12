@@ -1158,8 +1158,8 @@ Each is pending.
   before.
 - **Beside the field (L37, L40):** a field near the bottom of the screen opens the picker above it; a field in the
   middle of a short window or screen, or a field nearly 200 CSS pixels tall, shrinks the picker to the larger room
-  above or below the field, its rows scrolling, never over the field, at HiDPI too; with no room above or below for the search box, the picker does not
-  open and the page is told nothing was chosen.
+  above or below the field, its rows scrolling, never over the field, at HiDPI too; with no room above or below for
+  the search box, the picker does not open and the page is told nothing was chosen.
 - **A tall field (L37):** a user name `input` styled taller than 200 CSS pixels: a click on its 🎫 opens no picker; a
   normal field's opens it.
 - **A key after the click (L38):** press 🎫 and type a key before the picker opens, or a page that sends `login.pick`

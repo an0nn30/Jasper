@@ -206,6 +206,8 @@ The controller's rulings, one line each (the pre-flight scan's F1-F30 adopted as
 - L44: `Page.stop()` and a history entry Chromium refuses drop the mark, and a request's end drops it only for another
   address than the latest request's; a new tab's first page and a sub-resource challenge of the top address are
   recorded.
+- L45: AGENTS.md's Verified JCEF behaviour keeps only what javap confirmed; the main-frame redirect sentence waits for
+  the F6 line.
 
 Known gaps and follow-ups (the banner has them all, with the deferred minors): a page that navigates to an address and
 fetches that same address, or its origin's root, gets that navigation's top-level standing, a page can move the top

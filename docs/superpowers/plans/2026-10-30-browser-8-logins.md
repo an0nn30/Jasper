@@ -12,7 +12,7 @@ which has plans 4a, 4b, 4c, 9, 5, 6 and 7 merged; the plan `58962695b`, brought 
 associations' plan 2) merged in as `ebfdc45ac`, and the fix wave, `4c7afdbe7` to `35a622f74`, and its docs; not merged
 into `main` or pushed; see `docs/STATUS.md`). Executed with per-task subagents and reviews, each task's fix rounds until
 a re-review found every finding addressed. The pre-flight scan's findings F1-F30 were adopted as rulings (L0, cited
-L-F*n*) except where L1-L3 decide otherwise, and the controller's further rulings are L4-L44; plan 4a's R0-R48 and the
+L-F*n*) except where L1-L3 decide otherwise, and the controller's further rulings are L4-L45; plan 4a's R0-R48 and the
 banners of 4b, 4c, 9, 5, 6 and 7 bind. The user's answers (2026-11-09): nothing to download, no licence check and no
 third-party file, and no change to the plan's calls: `saveLogin` replaces the granted login of the same name, a proxy
 challenge gets the plain dialog, the sign-in dialog shows without the Vault, no silent fill in /dev/null, and field
@@ -149,7 +149,7 @@ API (L2). The task reviews recorded these deviations from the plan's text, each 
 - **The final fix wave** (after the final reviews, dispatched 2026-11-11 over plan 8's own diff after the merge,
   `0a4ec9bb9..ebfdc45ac`: A, Tasks 1a-4b, and B, Tasks 5a-6, each "With fixes", A with a Critical (a picker the page
   opens under the user's typing) and an Important (a tall area), B with two Importants (a pending save not tied to its
-  navigation; a silent fill with no user action), and C, the docs, "With fixes", polish only; rulings L33-L44):
+  navigation; a silent fill with no user action), and C, the docs, "With fixes", polish only; rulings L33-L45):
   - `4c7afdbe7` "Vault and app: a page's picker pre-selects nothing and never covers its field" (W1a; L36, L37's host
     half, L39): the Vault's `AnchoredPicker` leaves no row active in a chooser with a starting search, echoes each
     `Selected` into its menu for every chooser, and in a searched chooser ignores an `Action` for a row other than the
@@ -299,6 +299,8 @@ The controller's rulings, one line each:
 - L44: `Page.stop()` and a history entry Chromium refuses drop the mark, and a request's end drops it only for another
   address than the latest request's; a new tab's first page and a sub-resource challenge of the top address are
   recorded.
+- L45: AGENTS.md's Verified JCEF behaviour keeps only what javap confirmed; the main-frame redirect sentence waits for
+  the F6 line.
 
 Known gaps:
 - L-F5 and L30: a page that navigates to an address and fetches that same address, or its origin's root, gets that
