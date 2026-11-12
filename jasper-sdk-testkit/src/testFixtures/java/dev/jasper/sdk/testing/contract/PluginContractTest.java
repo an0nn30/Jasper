@@ -4358,6 +4358,64 @@ public abstract class PluginContractTest {
         h.ui(() -> assertThatIllegalStateException().isThrownBy(() -> settings.get().page(panel)));
     }
 
+    /**
+     * Browser plan 8 Task 1b (SDK 0.32.0, F7, L5): a plugin's own page closes Settings, which asks about unsaved changes as
+     * Cancel does, and then runs the action in a later UI turn, once the page is gone; kept open, Settings runs nothing.
+     * Only the UI thread may ask.
+     */
+    @Test void aSettingsPageClosesSettingsFirstAskingAboutUnsavedChanges() {
+        var size = new AtomicReference<Setting<Integer>>();
+        var rows = new AtomicReference<dev.jasper.sdk.settings.SettingsPanelHost>();
+        var calls = new CopyOnWriteArrayList<String>();
+        h.start(info("test.close"), Set.of(), Set.of(), context -> {
+            size.set(context.settings().declare(SettingSpec.of("size", SettingKind.integer(8, 48), 13).label("Size")));
+            context.settings().page(new SettingsPanel() {
+                @Override public dev.jasper.sdk.ui.UiView create(dev.jasper.sdk.settings.SettingsPanelHost host) {
+                    rows.set(host);
+                    return context.kit().create(new ViewSpec(host.row(size.get())), event -> { });
+                }
+                @Override public void dispose() { calls.add("dispose"); }
+            });
+        });
+        h.openSettingsPage("test.close");
+        assertThatIllegalStateException().as("off the UI thread").isThrownBy(() -> rows.get().closeThen(() -> calls.add("off the UI thread")));
+        assertThat(h.settingsOpen()).isTrue();
+        h.answerDiscard(false);
+        h.ui(() -> {
+            rows.get().stage(size.get(), 20);
+            rows.get().closeThen(() -> calls.add("kept open"));
+        });
+        assertThat(h.discardQuestions()).as("asked about the unsaved change").isEqualTo(1);
+        assertThat(h.settingsOpen()).as("Keep Editing").isTrue();
+        assertThat(calls).as("nothing runs").isEmpty();
+        h.answerDiscard(true);
+        h.ui(() -> {
+            rows.get().closeThen(() -> calls.add("then, Settings open: " + h.settingsOpen()));
+            assertThat(calls).as("the action waits for a later UI turn").containsExactly("dispose");
+        });
+        h.ui(() -> { });
+        assertThat(h.discardQuestions()).isEqualTo(2);
+        assertThat(calls).as("the page is gone first").containsExactly("dispose", "then, Settings open: false");
+        assertThat(h.savedSetting("test.close", "size")).as("the change was discarded").isEmpty();
+        h.ui(() -> assertThatIllegalStateException().as("a closed page").isThrownBy(() -> rows.get().closeThen(() -> calls.add("late"))));
+        h.openSettingsPage("test.close");
+        h.ui(() -> rows.get().closeThen(() -> calls.add("unchanged")));
+        h.ui(() -> { });
+        assertThat(h.discardQuestions()).as("nothing to ask about").isEqualTo(2);
+        assertThat(h.settingsOpen()).isFalse();
+        assertThat(calls).containsExactly("dispose", "then, Settings open: false", "dispose", "unchanged");
+        // A throwing action is contained: Settings stays closed, the plugin runs on, and a later action still runs.
+        h.openSettingsPage("test.close");
+        h.ui(() -> rows.get().closeThen(() -> { calls.add("throws"); throw new IllegalStateException("a failing action"); }));
+        h.ui(() -> { });
+        assertThat(h.settingsOpen()).isFalse();
+        assertThat(h.active("test.close")).as("contained").isTrue();
+        h.openSettingsPage("test.close");
+        h.ui(() -> rows.get().closeThen(() -> calls.add("after the failure")));
+        h.ui(() -> { });
+        assertThat(calls).endsWith("dispose", "throws", "dispose", "after the failure");
+    }
+
     /** Vim IdeaVim keys spec 4: a plugin opens Settings at its own page, on the UI thread, while it runs. */
     @Test void aPluginOpensItsSettingsPageOnTheUiThreadWhileItRuns() {
         var settings = new AtomicReference<PluginSettings>();

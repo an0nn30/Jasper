@@ -74,6 +74,11 @@ final class StagedVaultHost implements AutoCloseable {
         if (enterprise) host.presentation = enterprisePresentation();
         loader = new PluginClassLoader(UnboundVault.ID, ManagedVaultLoadingTest.jars(staged), getClass().getClassLoader(), Map.of());
         plugin = (Plugin) loader.loadClass("dev.jasper.vault.VaultPlugin").getConstructor().newInstance();
+        // Browser plan 8's L20: the anchored picker ignores a choice for 500 ms after it shows; these flows choose at once,
+        // so its clock steps a second each time it is read.
+        var pickerClock = plugin.getClass().getDeclaredField("pickerClock"); pickerClock.setAccessible(true);
+        var seconds = new java.util.concurrent.atomic.AtomicLong();
+        pickerClock.set(plugin, (java.util.function.LongSupplier) () -> seconds.addAndGet(1_000_000_000L));
         var opened = new AtomicReference<UUID>();
         onEdt(() -> {
             host.start(new HostedPlugin(VAULT, Set.of(), Set.of(), Set.of("dev.jasper.vault.api"), loader, () -> plugin));

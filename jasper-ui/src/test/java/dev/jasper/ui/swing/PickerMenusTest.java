@@ -38,6 +38,80 @@ class PickerMenusTest {
    }
   }finally{UIManager.put("defaultFont",raw.get("defaultFont"));release(context);}
  });}
+ /**
+  * Browser plan 8's L36: an active id naming no row leaves none active, so Enter accepts nothing, also when the owner
+  * answers an edit with an empty active id over the same rows; Down then activates the first row and Up the last.
+  */
+ @Test void noActiveRowAcceptsNothingUntilTheUserMovesToOne(){Edt.run(()->{
+  var context=KitFixtures.context();var events=new ArrayList<UiEvent>();
+  var items=List.of(new Nodes.PickerItem("a","Alpha","alice","user",Nodes.Hue.BLUE),new Nodes.PickerItem("b","Beta","bob","user",Nodes.Hue.BLUE));
+  java.util.function.Function<String,ViewSpec> menu=active->new ViewSpec(new Nodes.PickerMenu("menu",ControlState.READY,"example","Search",items,"",active,"No matches","New Credential…","create","cancel"));
+  try(var view=new KitView(context,menu.apply(""),events::add)){
+   var field=find(view,"menu.search",JTextField.class);var rows=find(view,"menu.rows",JList.class);
+   Runnable enter=()->field.getActionMap().get("picker.enter").actionPerformed(null);
+   assertThat(rows.getSelectedValue()).as("no row active, the footer included").isNull();
+   enter.run();assertThat(events).as("Enter accepts nothing").isEmpty();
+   field.getActionMap().get("picker.down").actionPerformed(null);
+   assertThat(events).containsExactly(new UiEvent.Selected("menu",Set.of("a")));
+   view.update(menu.apply("a"));enter.run();assertThat(events.getLast()).isEqualTo(new UiEvent.Action("a"));
+   events.clear();view.update(menu.apply(""));
+   assertThat(rows.getSelectedValue()).as("the owner's empty active id over the same rows").isNull();
+   enter.run();assertThat(events).isEmpty();
+   field.getActionMap().get("picker.up").actionPerformed(null);
+   assertThat(((Nodes.PickerItem)rows.getSelectedValue()).id()).as("Up from no row: the last, the footer").isEqualTo("create");
+  }finally{release(context);}
+ });}
+ /**
+  * Browser plan 8's L40: a press on a row reports it as Selected before accepting it, although the look's own press
+  * handler, which runs first, holds the selection adjusting until the release; so an owner that accepts only the row
+  * the user moved to takes the click. The look's handler cannot run headless (it reads the menu shortcut key), so its
+  * press and release are replayed as BasicListUI makes them.
+  */
+ @Test void aPressedRowIsReportedBeforeItIsAccepted(){Edt.run(()->{
+  var context=KitFixtures.context();var priorLaf=UIManager.getLookAndFeel();FlatLafInstaller.install(context.theme(),dev.jasper.ui.kit.Kit.DEFAULT);
+  var events=new ArrayList<UiEvent>();
+  var items=List.of(new Nodes.PickerItem("a","Alpha","alice","user",Nodes.Hue.BLUE),new Nodes.PickerItem("b","Beta","bob","user",Nodes.Hue.BLUE));
+  var menu=new Nodes.PickerMenu("menu",ControlState.READY,"example","Search",items,"","","No matches","New Credential\u2026","create","cancel");
+  try(var view=new KitView(context,new ViewSpec(menu),events::add)){
+   view.setSize(view.getPreferredSize());layout(view);
+   var rows=find(view,"menu.rows",JList.class);var field=find(view,"menu.search",JTextField.class);
+   assertThat(rows.getUI()).as("precondition: FlatLaf's list").isInstanceOf(com.formdev.flatlaf.ui.FlatListUI.class);
+   var listeners=List.of(rows.getMouseListeners());java.util.function.Predicate<Object> ours=listener->listener.getClass().getName().startsWith("dev.jasper.ui.swing.PickerMenus$");
+   int look=-1,own=-1;for(int i=0;i<listeners.size();i++){if(listeners.get(i).getClass().getName().startsWith("javax.swing.plaf.basic.BasicListUI$"))look=i;if(ours.test(listeners.get(i)))own=i;}
+   assertThat(look).as("precondition: the look's press handler runs before the kit's").isNotNegative().isLessThan(own);
+   var kit=listeners.get(own);
+   field.getActionMap().get("picker.enter").actionPerformed(null);
+   assertThat(events).as("Enter with no row active").isEmpty();
+   for(var row:List.of(1,0)){
+    events.clear();var cell=rows.getCellBounds(row,row);
+    var press=new java.awt.event.MouseEvent(rows,java.awt.event.MouseEvent.MOUSE_PRESSED,System.currentTimeMillis(),java.awt.event.InputEvent.BUTTON1_DOWN_MASK,cell.x+4,cell.y+4,1,false,java.awt.event.MouseEvent.BUTTON1);
+    // BasicListUI.Handler.mousePressed: the selection adjusting, then the pressed row.
+    rows.setValueIsAdjusting(true);rows.setSelectionInterval(row,row);
+    assertThat(events).as("silent while adjusting").isEmpty();
+    kit.mousePressed(press);
+    String id=items.get(row).id();
+    assertThat(events).as("row %s: the pressed row, then its acceptance",row).containsExactly(new UiEvent.Selected("menu",Set.of(id)),new UiEvent.Action(id));
+    // BasicListUI.Handler.mouseReleased.
+    rows.setValueIsAdjusting(false);
+    assertThat(events).as("nothing more on the release").hasSize(2);
+   }
+  }finally{release(context);try{UIManager.setLookAndFeel(priorLaf);}catch(UnsupportedLookAndFeelException failure){throw new AssertionError(failure);}}
+ });}
+ /** Browser plan 8's L36: the search takes the focus with the caret at the end of its text and nothing selected, under FlatLaf's select-all-on-focus too. */
+ @Test void theSearchTakesTheFocusWithTheCaretAtItsEndAndNothingSelected(){Edt.run(()->{
+  var context=KitFixtures.context();var priorLaf=UIManager.getLookAndFeel();FlatLafInstaller.install(context.theme(),dev.jasper.ui.kit.Kit.DEFAULT);
+  var menu=new Nodes.PickerMenu("menu",ControlState.READY,"example.com","Search credentials",List.of(),"","","No matches","New Credential…","create","cancel");
+  try(var view=new KitView(context,new ViewSpec(menu),e->{})){
+   var field=find(view,"menu.search",JTextField.class);
+   assertThat(field.getCaret()).as("precondition: FlatLaf's caret, which selects all on a first focus").isInstanceOf(com.formdev.flatlaf.ui.FlatCaret.class);
+   var caret=(java.awt.event.FocusListener)field.getCaret();
+   caret.focusGained(new java.awt.event.FocusEvent(field,java.awt.event.FocusEvent.FOCUS_GAINED));
+   try{
+    assertThat(field.getSelectedText()).as("nothing selected").isNull();
+    assertThat(field.getCaretPosition()).as("the caret at the end").isEqualTo("example.com".length());
+   }finally{caret.focusLost(new java.awt.event.FocusEvent(field,java.awt.event.FocusEvent.FOCUS_LOST));}
+  }finally{release(context);try{UIManager.setLookAndFeel(priorLaf);}catch(UnsupportedLookAndFeelException failure){throw new AssertionError(failure);}}
+ });}
  @Test void disabledOpacityIsDimensionlessAtEveryUiScale(){Edt.run(()->{
   var context=KitFixtures.context();float previous=com.formdev.flatlaf.util.UIScale.getUserScaleFactor();
   try{

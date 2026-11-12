@@ -445,8 +445,12 @@ public final class SettingsDialog {
         return hooks.confirmDiscard().test(view, pendingCount());
     }
 
+    /**
+     * Closes the dialog as Cancel does (asking about unsaved changes); once it closed, runs {@code action} in a later UI
+     * turn, after the modal loop that showed the dialog has unwound.
+     */
     private void closeThen(Runnable action) {
-        if (!isOpen() || surface.requestClose()) action.run();
+        if (!isOpen() || surface.requestClose()) SwingUtilities.invokeLater(action);
     }
 
     private Optional<Path> chooseFile(String title, Optional<Path> initial) {

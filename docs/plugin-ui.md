@@ -46,7 +46,8 @@ Keep ids stable for the life of a control; changing a node's id or kind replaces
 - `UiView` also has `spec()`, the current descriptor; `focus(id)`; `reveal(id)`, which scrolls a node into view without
   moving the focus; `selectAll(fieldId)`, which selects a field's live text without editing or focusing it;
   `composing(fieldId)`, true while an input method holds uncommitted text; `anchor(id)` for
-  [popovers](plugin-authoring.md#dialogs-overlays-and-popovers); and the [secret](#secrets) methods.
+  [popovers](plugin-authoring.md#dialogs-overlays-and-popovers), and `anchorAt(customId, area)` for one on an area of a
+  `Custom` node's content (since 0.32.0); and the [secret](#secrets) methods.
 
 [`ControlState`](sdk-reference.html#dev.jasper.sdk.ui.ControlState)`(visible, enabled, busy, error)` is every node's
 state; `ControlState.READY` is visible, enabled, not busy and without an error. `error` is validation prose the
@@ -412,11 +413,13 @@ description and a colour preview. The label is the accessible name.
   The owner keeps the face describing the selected option.
 - [`PickerMenu`](sdk-reference.html#dev.jasper.sdk.ui.Nodes.PickerMenu) is a searchable menu: a `query` and its
   `placeholder`, [`PickerItem`](sdk-reference.html#dev.jasper.sdk.ui.Nodes.PickerItem)s (a label, a caption, an icon,
-  a hue, and a kind, `VALUE` or `UTILITY`), the checked value (`checkedId`) and the keyboard-active row (`activeId`),
-  which are distinct, a `noMatches` line, a footer (`footerLabel`, `footerAction`) and a `cancelAction`. It reports
-  `Edited` for the query and `Selected` as the active row moves; Enter or a click reports `Action` with the row's id or
-  `footerAction`, and Escape reports `cancelAction`. Credential Vault's credential picker is one, in a popover over the
-  requesting plugin's control.
+  a hue, and a kind, `VALUE` or `UTILITY`), the checked value (`checkedId`) and the keyboard-active row (`activeId`,
+  none when it names no row), which are distinct, a `noMatches` line, a footer (`footerLabel`, `footerAction`) and a
+  `cancelAction`. The search keeps the query unselected, with the caret at its end. It reports `Edited` for the query
+  and `Selected` as the active row moves (from none, Down goes to the first row and Up to the last); Enter or a click
+  reports `Action` with the row's id or `footerAction`, Enter nothing while no row is active, and Escape reports
+  `cancelAction`. Credential Vault's credential picker is one, in a popover over the requesting plugin's control or
+  area.
 
 ### Toggles
 

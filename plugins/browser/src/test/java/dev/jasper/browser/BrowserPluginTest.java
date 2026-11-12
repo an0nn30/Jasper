@@ -10,7 +10,9 @@ import dev.jasper.browser.engine.RecordingContext;
 import dev.jasper.browser.http.StandIn;
 import dev.jasper.browser.item.BrowserItems;
 import dev.jasper.browser.item.ItemTestAccess;
+import dev.jasper.browser.logins.FakeVault;
 import dev.jasper.browser.page.PageTestAccess;
+import dev.jasper.browser.page.SignIn;
 import dev.jasper.browser.permissions.Decision;
 import dev.jasper.browser.permissions.Permission;
 import dev.jasper.browser.restore.BrowserRestore;
@@ -57,6 +59,8 @@ class BrowserPluginTest {
     private static final PluginInfo INFO = new PluginInfo(ID, "Browser", "0.1.0", Set.of("browser.provide", "palette.contribute"));
     /** The filter list's address in these tests, a reserved name. */
     private static final URI LIST = OfflinePlugins.LIST;
+    /** Settings' Manage Saved Passwords button, as the Browser's page names it. */
+    private static final String SAVED_PASSWORDS = "browser.settings.saved-passwords";
 
     /** F9: a plugin whose filter list fails the test if it asks for a client. */
     private static BrowserPlugin plugin() {
@@ -120,7 +124,7 @@ class BrowserPluginTest {
             host.set(new FakePluginHost(root));
             host.get().start(INFO, Set.of(), Set.of(), plugin);
         });
-        try {
+        try (var log = new CapturedLog(FilterList.class.getName())) {
             assertThat(ask(plugin, "onboarding-setup", 1, "{\"op\":\"switches\"}")).isEqualTo("{\"switches\":[{\"id\":\"ad-blocker\",\"title\":"
                 + "\"Ad Blocker\",\"description\":\"Block ads with a filter list that updates every day.\",\"on\":false}]}");
             assertThat(ask(plugin, "onboarding-setup", 1, "{\"op\":\"switch\",\"id\":\"ad-blocker\",\"on\":\"true\"}")).isEqualTo("{\"on\":true}");
@@ -133,6 +137,9 @@ class BrowserPluginTest {
             assertThat(plugin.filters().active()).isEmpty();
             assertThat(root.resolve(ID).resolve("data").resolve("adblock").resolve("rules.json")).doesNotExist();
             SwingUtilities.invokeAndWait(() -> assertThat(host.get().failures()).isEmpty());
+            assertThat(log.records()).extracting(LogRecord::getLevel, LogRecord::getMessage)
+                .containsExactly(tuple(Level.WARNING,
+                    "The ad blocking filter list could not be updated: no network in tests"));
         } finally {
             SwingUtilities.invokeAndWait(() -> host.get().close());
         }
@@ -159,7 +166,7 @@ class BrowserPluginTest {
                 host.get().setSetting(ID, "proxy_port", (long) first.port());
                 host.get().start(INFO, Set.of(), Set.of(), plugin);
             });
-            try {
+            try (var log = new CapturedLog(FilterList.class.getName())) {
                 download(plugin, host);
                 assertThat(first.next()).as("through the proxy's tunnel").isEqualTo("CONNECT list.invalid:443 HTTP/1.1");
                 SwingUtilities.invokeAndWait(() -> host.get().setSetting(ID, "proxy_port", (long) second.port()));
@@ -173,6 +180,9 @@ class BrowserPluginTest {
                 assertThat(origin.next()).as("off: the JDK's default").isEqualTo("GET /list.json HTTP/1.1");
                 assertThat(first.asked() || second.asked() || origin.asked()).as("each download asked once").isFalse();
                 SwingUtilities.invokeAndWait(() -> assertThat(host.get().failures()).isEmpty());
+                assertThat(log.records()).as("each download's failure, as no stand-in answers a list").hasSize(4)
+                    .allSatisfy(record -> assertThat(record.getMessage())
+                        .startsWith("The ad blocking filter list could not be updated: "));
             } finally {
                 SwingUtilities.invokeAndWait(() -> host.get().close());
             }
@@ -242,19 +252,25 @@ class BrowserPluginTest {
     @Test void aProxyChromiumRefusesPostsThePluginsError() throws Exception {
         var lines = new AtomicReference<List<String>>();
         var host = new AtomicReference<FakePluginHost>();
-        SwingUtilities.invokeAndWait(() -> {
-            host.set(new FakePluginHost());
-            host.get().setSetting(ID, "http_proxy", true);
-            var plugin = plugin();
-            host.get().start(INFO, Set.of(), Set.of(), plugin);
-            EngineTestAccess.contextInitialized(plugin.chromium(), new RecordingContext(1).refusing("called on invalid thread"));
-        });
-        try {
-            // Told on the UI thread, after the work that was refused.
-            SwingUtilities.invokeAndWait(() -> lines.set(host.get().notifications().lines()));
-            assertThat(lines.get()).containsExactly("dev.jasper.browser|ERROR|" + Chromium.PROXY_REFUSED + "|called on invalid thread");
-        } finally {
-            SwingUtilities.invokeAndWait(() -> host.get().close());
+        try (var log = new CapturedLog("dev.jasper.plugins." + ID)) {
+            SwingUtilities.invokeAndWait(() -> {
+                host.set(new FakePluginHost());
+                host.get().setSetting(ID, "http_proxy", true);
+                var plugin = plugin();
+                host.get().start(INFO, Set.of(), Set.of(), plugin);
+                EngineTestAccess.contextInitialized(plugin.chromium(),
+                    new RecordingContext(1).refusing("called on invalid thread"));
+            });
+            try {
+                // Told on the UI thread, after the work that was refused.
+                SwingUtilities.invokeAndWait(() -> lines.set(host.get().notifications().lines()));
+                assertThat(lines.get())
+                    .containsExactly("dev.jasper.browser|ERROR|" + Chromium.PROXY_REFUSED + "|called on invalid thread");
+                assertThat(log.records()).extracting(LogRecord::getLevel, LogRecord::getMessage)
+                    .containsExactly(tuple(Level.WARNING, Chromium.PROXY_REFUSED + ": called on invalid thread"));
+            } finally {
+                SwingUtilities.invokeAndWait(() -> host.get().close());
+            }
         }
     }
 
@@ -316,7 +332,8 @@ class BrowserPluginTest {
     }
 
     @Test void aChromiumThatCannotStartPostsOneNotificationWithTheReasonWhileThePluginRuns() throws Exception {
-        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost();
+                                                  var log = new CapturedLog("dev.jasper.plugins." + ID)) {
             var plugin = plugin();
             host.start(INFO, Set.of(), Set.of(), plugin);
             plugin.startFailed(new IllegalStateException("Chromium did not start within 90 seconds"));
@@ -325,6 +342,11 @@ class BrowserPluginTest {
             host.stopAll();
             plugin.startFailed(new IllegalStateException("late"));
             assertThat(host.notifications().lines()).as("a stopped plugin only logs").hasSize(1);
+            assertThat(log.records()).extracting(LogRecord::getLevel, LogRecord::getMessage).containsExactly(
+                tuple(Level.WARNING, "The browser could not start: Chromium did not start within 90 seconds"),
+                tuple(Level.WARNING, "The browser could not start: late"));
+            assertThat(log.records())
+                .allSatisfy(logged -> assertThat(logged.getThrown()).isInstanceOf(IllegalStateException.class));
             assertThat(host.failures()).isEmpty();
         } });
     }
@@ -409,7 +431,8 @@ class BrowserPluginTest {
      * preview hears once when Chromium's start fails, and a closed one hears nothing. Nothing starts Chromium.
      */
     @Test void thePluginPublishesTheMarkdownPreviewsAndTellsThemWhenChromiumCannotStart() throws Exception {
-        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost();
+                                                  var log = new CapturedLog("dev.jasper.plugins." + ID)) {
             var plugin = plugin();
             host.start(INFO, Set.of(), Set.of(), plugin);
             MarkdownPreviews previews = previews(host);
@@ -423,6 +446,8 @@ class BrowserPluginTest {
             preview.close();
             assertThat(plugin.chromium().state()).as("nothing asked for Chromium").isEqualTo(Chromium.State.NOT_STARTED);
             host.stopAll();
+            assertThat(log.records()).extracting(LogRecord::getMessage)
+                .containsExactly("The browser could not start: Chromium did not start within 90 seconds");
             assertThat(host.failures()).isEmpty();
         } });
     }
@@ -441,6 +466,38 @@ class BrowserPluginTest {
             assertThat(previews.available()).isFalse();
             assertThat(host.failures()).isEmpty();
         } });
+    }
+
+    /**
+     * Plan 8's L27: the stop cancels each page's HTTP sign-ins, shown and waiting, once, while Chromium still runs, so
+     * no request of Chromium's waits on a dialog as it closes.
+     */
+    @Test void theStopCancelsEveryPagesSignInBeforeChromiumCloses() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            UUID window = host.addTerminalWindow();
+            host.activateTerminalWindow(window);
+            var plugin = plugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            List<String> told = new ArrayList<>();
+            previews(host).create(event -> told.add("Chromium closed"));
+            assertThat(host.invoke(BrowserPlugin.NEW_TAB, window, null)).isTrue();
+            var page = ItemTestAccess.page(plugin.items().items().getFirst());
+            page.signIn(signIn("a", told));
+            page.signIn(signIn("b", told));
+            assertThat(told).as("asked, not answered").isEmpty();
+            host.stopAll();
+            assertThat(told).as("each cancelled once, before Chromium closed")
+                .containsExactlyInAnyOrder("a cancel", "b cancel", "Chromium closed").endsWith("Chromium closed");
+            assertThat(host.windows()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /** A Basic challenge of the top-level navigation to intranet.example, for realm {@code name}, told to {@code told}. */
+    private static SignIn signIn(String name, List<String> told) {
+        String top = "https://intranet.example/";
+        return new SignIn(top, false, "intranet.example", 443, name, "basic", top, 0, false, false,
+            (user, password) -> told.add(name + " proceed"), () -> told.add(name + " cancel"));
     }
 
     /**
@@ -844,6 +901,62 @@ class BrowserPluginTest {
     }
 
     /**
+     * Plan 8 Task 3: without the Credential Vault the plugin starts as before, with no Vault for its items and no Manage
+     * Saved Passwords in Settings.
+     */
+    @Test void withoutTheVaultNoLoginsAppear() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var plugin = plugin();
+            host.start(INFO, Set.of(), Set.of(FakeVault.INFO.id()), plugin);
+            assertThat(plugin.items().vault()).isEmpty();
+            host.settingsPanel(ID).orElseThrow();
+            assertThat(nodeIds(host.settingsPanelView(ID).orElseThrow().spec().root())).as("the Settings page's nodes")
+                .contains("browser.settings.permissions:row").doesNotContain(SAVED_PASSWORDS + ":row", SAVED_PASSWORDS);
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /**
+     * Plan 8 Task 3 (F7, F21): with the Vault, the items have it, and Settings' Manage Saved Passwords closes Settings
+     * first, then opens the Vault's manager over the active window, the one Settings showed over. A stopped plugin opens
+     * nothing.
+     */
+    @Test void withTheVaultManageSavedPasswordsClosesSettingsThenOpensTheManagerOverTheActiveWindow() throws Exception {
+        var vault = new FakeVault();
+        var host = new AtomicReference<FakePluginHost>();
+        var plugin = plugin();
+        var window = new AtomicReference<UUID>();
+        SwingUtilities.invokeAndWait(() -> {
+            host.set(new FakePluginHost());
+            window.set(host.get().addTerminalWindow());
+            host.get().activateTerminalWindow(window.get());
+            host.get().start(FakeVault.INFO, Set.of(), Set.of(), vault);
+            host.get().start(INFO, Set.of(), Set.of(FakeVault.INFO.id()), plugin);
+        });
+        try {
+            SwingUtilities.invokeAndWait(() -> {
+                assertThat(plugin.items().vault()).isPresent();
+                assertThat(vault.consumers).containsExactly(ID);
+                host.get().settingsPanel(ID).orElseThrow();
+                var view = host.get().settingsPanelView(ID).orElseThrow();
+                assertThat(nodeIds(view.spec().root())).contains(SAVED_PASSWORDS + ":row");
+                view.emit(new dev.jasper.sdk.ui.UiEvent.Action(SAVED_PASSWORDS));
+                assertThat(host.get().settingsPanelView(ID)).as("Settings closes first").isEmpty();
+                assertThat(vault.managerOwners).as("then, in a later turn, the manager").isEmpty();
+            });
+            SwingUtilities.invokeAndWait(() -> {
+                assertThat(vault.managerOwners).extracting(owner -> owner.id()).containsExactly(window.get());
+                host.get().stopAll();
+                plugin.manageSavedPasswords();
+                assertThat(vault.managerOwners).as("a stopped plugin opens nothing").hasSize(1);
+                assertThat(host.get().failures()).isEmpty();
+            });
+        } finally {
+            SwingUtilities.invokeAndWait(() -> host.get().close());
+        }
+    }
+
+    /**
      * Ruling V25: a database file a Clear Website Data could not reach, as the database ran in memory, is deleted before
      * the plugin's database next opens; the profile's wipe stays marked for Chromium's start.
      */
@@ -885,6 +998,21 @@ class BrowserPluginTest {
     private static String ask(BrowserPlugin plugin, String page, int browser, String request) throws Exception {
         String secret = plugin.about().secret(page).orElseThrow();
         return plugin.about().query("jasper-about:" + page, true, browser, secret + request).orElseThrow().get(10, TimeUnit.SECONDS);
+    }
+
+    /** Every node id under {@code node}, through the stacks, sections, cards and rows a Settings page is made of. */
+    private static List<String> nodeIds(Nodes.Node node) {
+        var ids = new ArrayList<String>();
+        ids.add(node.id());
+        List<Nodes.Node> children = switch (node) {
+            case Nodes.Stack stack -> stack.children();
+            case Nodes.Section section -> List.of(section.body());
+            case Nodes.Card card -> card.children();
+            case Nodes.SettingRow row -> List.of(row.control());
+            default -> List.of();
+        };
+        for (Nodes.Node child : children) ids.addAll(nodeIds(child));
+        return ids;
     }
 
     /** Whether the browser item whose tab is called {@code title} shows the placeholder of an item that waits. UI thread. */

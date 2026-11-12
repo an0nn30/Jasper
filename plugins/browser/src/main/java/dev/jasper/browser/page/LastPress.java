@@ -2,15 +2,18 @@ package dev.jasper.browser.page;
 
 /**
  * The last mouse press a page heard, which decides where a link it opens goes and whether its script may open a
- * window. Chromium's transient user activation lasts 5 seconds after a press, or after a key the page got.
+ * window, and where a password manager's pick must lie (plan 8's L20). Chromium's transient user activation lasts 5
+ * seconds after a press, or after a key the page got.
  *
  * @param button the button, as {@link java.awt.event.MouseEvent#getButton()} gives it
  * @param modifiersEx the keys and buttons held, as {@link java.awt.event.InputEvent#getModifiersEx()} gives them
  * @param whenMillis when it happened, in milliseconds since the epoch
+ * @param x where it happened, from the left of the page's canvas
+ * @param y where it happened, from the top of the page's canvas
  */
-public record LastPress(int button, int modifiersEx, long whenMillis) {
+public record LastPress(int button, int modifiersEx, long whenMillis, int x, int y) {
     /** No press yet: it activates nothing. */
-    public static final LastPress NONE = new LastPress(0, 0, Long.MIN_VALUE);
+    public static final LastPress NONE = new LastPress(0, 0, Long.MIN_VALUE, 0, 0);
     private static final long ACTIVATION_MILLIS = 5_000;
 
     /**

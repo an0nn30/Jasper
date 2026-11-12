@@ -5,7 +5,9 @@
  * {@code FileInput}, Jasper's chooser over the item. {@link dev.jasper.browser.dialogs.PermissionPrompt} asks the user
  * for a site's permission in a modal of the same kind, one at a time for each page, whose Allow and Block count only
  * after the double-click interval; a page's alerts wait while it has a prompt asked, and its alerts and prompts share one
- * flood guard ({@code DialogFlood}). They reach the item through the
+ * flood guard ({@code DialogFlood}). {@link dev.jasper.browser.dialogs.SignInDialog} is Jasper's dialog for an HTTP
+ * sign-in, a modal of the same kind, which waits behind the page's prompt and shares its flood guard too; it names no
+ * Chromium type, and the {@code logins} package, which shows it, is never named here. They reach the item through the
  * {@link dev.jasper.browser.page.DialogPlace} its {@link dev.jasper.browser.page.Page} was given, and answer the page
  * once. Depends on {@code engine}, {@code page} and {@code permissions}; it loads only once a page first asks for
  * Chromium.

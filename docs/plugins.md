@@ -46,7 +46,7 @@ and the action's row in Settings › Keymap shows the same text in its tooltip. 
 | Plugin | Id | Version | On by default | Guide |
 |---|---|---|---|---|
 | Remote | `dev.jasper.remote` | 0.19.0 | Yes | [Remote](remote.md) |
-| Credential Vault | `dev.jasper.vault` | 0.8.0 | Yes | [Credential Vault](credential-vault.md) |
+| Credential Vault | `dev.jasper.vault` | 0.9.0 | Yes | [Credential Vault](credential-vault.md) |
 | Editor | `dev.jasper.editor` | 0.19.0 | Yes | [Editor](editor.md) |
 | File Server | `dev.jasper.fileserver` | 0.8.0 | Yes | [File Server](file-server.md) |
 | Project Index | `dev.jasper.indexer` | 0.4.0 | Yes | [Project Index](project-index.md) |
@@ -56,7 +56,7 @@ and the action's row in Settings › Keymap shows the same text in its tooltip. 
 | Enterprise | `dev.jasper.enterprise` | 0.4.0 | No | [The Enterprise look](enterprise.md) |
 | Sample | `dev.jasper.sample` | 0.6.0 | Yes, but inert | [Plugin authoring](plugin-authoring.md) |
 
-Every bundled plugin declares `sdk = ">=0.31.0, <0.32"`. A plugin uses another plugin it lists under "Uses, when
+Every bundled plugin declares `sdk = ">=0.32.0, <0.33"`. A plugin uses another plugin it lists under "Uses, when
 present" only while that plugin is running; without it, the features that need it are missing.
 
 ### Remote
@@ -147,12 +147,15 @@ data in memory only; site permissions for the camera, the microphone and notific
 Jasper's; audio muting, until you allow a site's sound; Clear Cookies and Clear Website Data; ad blocking from a
 content-blocker list; and an HTTP proxy. Downloads go to the Downloads folder with the system's downloaded-file mark,
 listed in a Downloads menu, and its page tools are reader mode, distraction removal, Remove Element and Save Page As.
+With the Credential Vault it fills a page's login fields from the vault, and its dialog for a site's HTTP sign-in can
+sign in with a login from the vault and remember the one you type.
 It is Jasper's web browser: links you click in a terminal and Jasper's own web links can open here, by default after
 asking "Open in Jasper?", and `jasper URL...` opens here without asking. It also draws the Editor's Markdown preview.
 Chromium starts the first time a browser page or a Markdown preview shows.
 
 - **Start with** File › New Browser Tab.
 - **Capabilities** `browser.provide`, `palette.contribute`.
+- **Uses, when present** Credential Vault (`>=0.9.0`) for logins in pages and sign-ins.
 - **Exports** `dev.jasper.browser.api`, which the Editor uses to draw its Markdown preview.
 
 ### Enterprise
@@ -295,7 +298,7 @@ badge when there is one, **Enabled** for a running plugin, and otherwise the sta
 | Active | Running |
 | Disabled | Off: "off by default", "disabled by the user", "marked for removal", "safe mode" or "safe mode uses the standard look" |
 | Needs review | Waiting for your review: "not reviewed yet" or "new capabilities: …" |
-| Skipped | Not started; the reason names the cause, such as "needs SDK >=0.12.0, <0.13.0; this is SDK 0.31.0", "requires dev.example.base, which is not available", "requires dev.example.base >=2.0.0; found 1.4.0", "requires dev.example.base, which failed to start", "dependency cycle" or "the Enterprise look is active" |
+| Skipped | Not started; the reason names the cause, such as "needs SDK >=0.12.0, <0.13.0; this is SDK 0.32.0", "requires dev.example.base, which is not available", "requires dev.example.base >=2.0.0; found 1.4.0", "requires dev.example.base, which failed to start", "dependency cycle" or "the Enterprise look is active" |
 | Failed | Its classes could not be loaded, or its start failed |
 | Not loaded yet | Not present when this launch began, such as a plugin installed since |
 
@@ -314,11 +317,11 @@ checks it before it asks you anything:
 - Jar names use only letters, digits, spaces and `.`, `_`, `+`, `-`; no name may appear twice.
 - At most 4096 entries, 256 jars and 512 MiB once unpacked.
 - Exactly one jar holds a valid `plugin.toml` at its root, and the plugin's SDK range includes this Jasper's SDK,
-  0.31.0.
+  0.32.0.
 
 A zip that fails is refused on the message line with the reason, for example "The zip holds no jar files", "The zip
 must hold the plugin's jars at its root or in one folder", "Not a Jasper plugin: no plugin.toml in any jar" or "Tool
-1.0.0 needs SDK >=0.12.0, <0.13.0; this Jasper has SDK 0.31.0", and nothing is installed.
+1.0.0 needs SDK >=0.12.0, <0.13.0; this Jasper has SDK 0.32.0", and nothing is installed.
 
 A zip that passes opens the **Install *name*** sheet: the plugin's name and version, "From *vendor*", what it
 [asks to do](#capabilities) and the warning that a plugin is not sandboxed. **Install** stages the plugin in
@@ -542,7 +545,7 @@ option applies only when Jasper starts, and a Jasper started with it is never re
 with a higher version of the same id is loaded instead. An id you disabled in Settings › Plugins stays off, from
 `--plugin-dir` too ("disabled by the user"); enable it there first.
 
-Plugins for this Jasper (SDK 0.31.0) declare a range such as `sdk = ">=0.31.0, <0.32"` in `plugin.toml`, raising the
+Plugins for this Jasper (SDK 0.32.0) declare a range such as `sdk = ">=0.32.0, <0.33"` in `plugin.toml`, raising the
 floor to the SDK version that added the newest API they use ([the manifest](plugin-authoring.md#the-manifest));
 [building the in-repo plugins](plugin-authoring.md#building-the-in-repo-plugins) and
 [running a plugin in Jasper](plugin-authoring.md#running-a-plugin-in-jasper) give the build tasks and the source

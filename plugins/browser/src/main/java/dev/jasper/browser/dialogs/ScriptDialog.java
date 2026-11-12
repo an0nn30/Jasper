@@ -102,10 +102,11 @@ final class ScriptDialog {
     }
 
     /**
-     * Ruling V19: a page's script dialog waits while the page has a permission prompt asked, so nothing of the page's
-     * can stack over the prompt, such as an alert sized for its OK to cover Allow.
+     * Ruling V19: a page's script dialog, and its sign-in dialog ({@link SignInDialog}), waits while the page has a
+     * permission prompt asked, so nothing of the page's can stack over the prompt, such as an alert sized for its OK to
+     * cover Allow.
      */
-    private record AfterPrompts(Page page) implements PageModal.Gate {
+    record AfterPrompts(Page page) implements PageModal.Gate {
         @Override public boolean holds() {
             return PermissionPrompt.asking(page);
         }

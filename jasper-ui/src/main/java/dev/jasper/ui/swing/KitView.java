@@ -105,6 +105,17 @@ public final class KitView extends JPanel implements AutoCloseable {
                 || !eligible(spec.root(), id, true)) throw new IllegalArgumentException("Not an eligible attachment control");
         return control.focusTarget();
     }
+    /**
+     * Host attachment seam for an area of specialized content: the registered component of a live (visible, enabled, not
+     * busy, as its containers are) Custom node. Any other node, and a Custom node with no content registered, are refused.
+     */
+    public JComponent customTarget(String id) {
+        requireOpen();
+        var control = reconciler.control(Objects.requireNonNull(id));
+        if (!(control instanceof CustomContents.CustomControl custom) || custom.content() == null || !eligible(spec.root(), id, true))
+            throw new IllegalArgumentException("Not a live Custom node with registered content");
+        return custom.content();
+    }
     private static boolean eligible(Nodes.Node node, String id, boolean parent) {
         boolean live = parent && node.state().visible() && node.state().enabled() && !node.state().busy();
         if (node.id().equals(id)) return live;

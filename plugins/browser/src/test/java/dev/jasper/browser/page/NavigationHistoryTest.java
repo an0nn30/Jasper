@@ -343,7 +343,7 @@ class NavigationHistoryTest {
     /** Without its browser ready, a page has no history to read and goes nowhere. */
     @Test void withoutABrowserThereIsNoHistoryAndNoJump() throws Exception {
         assertThat(NavigationHistory.read(null)).isCompletedWithValue(History.EMPTY);
-        NavigationHistory.goTo(null, 3);
+        NavigationHistory.goTo((PageBrowser) null, 3, () -> { });
         Page page = onUiThread(() -> new Page(EXAMPLE, () -> { }, PageTestAccess.noFavicons(), Runnable::run, PageContext.persistent()));
         onUiThread(() -> PageTestAccess.titleChanged(page, "Example Domain"));
         assertThat(onUiThread(page::history)).isEqualTo(History.EMPTY);
@@ -352,6 +352,61 @@ class NavigationHistoryTest {
             page.goToHistoryEntry(1);
             return null;
         });
+        onUiThread(page::close);
+    }
+
+    /**
+     * Plan 8's L44: a jump that goes nowhere is told refused, so the page drops Jasper's mark: one with no browser or
+     * no DevTools, one DevTools fails, at once or later, as for an entry the history no longer has, and one whose call
+     * throws, which is logged with the exception alone; one DevTools makes is not.
+     */
+    @Test void aJumpThatGoesNowhereIsToldRefused() throws Exception {
+        var refused = new AtomicInteger();
+        NavigationHistory.goTo((PageBrowser) null, 3, refused::incrementAndGet);
+        NavigationHistory.goTo((java.util.function.BiFunction<String, String, CompletableFuture<String>>) null, 3,
+            refused::incrementAndGet);
+        assertThat(refused).as("no browser, no DevTools").hasValue(2);
+        var asked = new ArrayList<String>();
+        NavigationHistory.goTo((method, parameters) -> {
+            asked.add(method + " " + parameters);
+            return CompletableFuture.failedFuture(new IllegalStateException("No entry with passed id"));
+        }, 3, refused::incrementAndGet);
+        assertThat(asked).containsExactly("Page.navigateToHistoryEntry {\"entryId\":3}");
+        assertThat(refused).as("DevTools failed").hasValue(3);
+        NavigationHistory.goTo((method, parameters) -> CompletableFuture.completedFuture("{}"), 4,
+            refused::incrementAndGet);
+        var later = new CompletableFuture<String>();
+        NavigationHistory.goTo((method, parameters) -> later, 5, refused::incrementAndGet);
+        assertThat(refused).as("gone, or not answered yet").hasValue(3);
+        later.completeExceptionally(new IllegalStateException("No entry with passed id"));
+        assertThat(refused).as("failed later").hasValue(4);
+        try (var log = new dev.jasper.browser.store.CapturedLog(NavigationHistory.class.getName())) {
+            NavigationHistory.goTo((method, parameters) -> { throw new IllegalStateException("DevTools has gone"); }, 6,
+                refused::incrementAndGet);
+            assertThat(refused).as("the call threw").hasValue(5);
+            assertThat(log.records()).singleElement()
+                .satisfies(record -> assertThat(record.getThrown()).hasMessage("DevTools has gone"));
+        }
+    }
+
+    /**
+     * Plan 8's L44: a page whose jump to a history entry goes nowhere, as it has no browser ready here, drops the mark
+     * of that navigation, so its next main-frame request is not Jasper's; one Jasper's load marks is.
+     */
+    @Test void aPageWhoseJumpGoesNowhereDropsJaspersMark() throws Exception {
+        Page page = onUiThread(() -> new Page(EXAMPLE, () -> { }, PageTestAccess.noFavicons(), Runnable::run,
+            PageContext.persistent()));
+        assertThat(onUiThread(() -> {
+            page.historyRead(new History(1, List.of(entry(1, "One"), entry(2, "Here"))));
+            page.goToHistoryEntry(1);
+            page.mainFrameRequested("https://example.com/1");
+            return page.latestNavigation().byJasper();
+        })).as("refused").isFalse();
+        assertThat(onUiThread(() -> {
+            page.load(URI.create("https://example.com/2"));
+            page.mainFrameRequested("https://example.com/2");
+            return page.latestNavigation().byJasper();
+        })).as("Jasper's load").isTrue();
         onUiThread(page::close);
     }
 

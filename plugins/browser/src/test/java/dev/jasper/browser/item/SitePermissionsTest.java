@@ -274,7 +274,7 @@ class SitePermissionsTest {
             });
             host.activateTerminalWindow(host.addTerminalWindow());
             var stores = new DataStores(memory.make(), memory::make, () -> PageTestAccess.recordingContext(new AtomicInteger()), () -> false);
-            return new BrowserItems(context.get(), settings.get()::read, stores, page -> { });
+            return new BrowserItems(context.get(), settings.get()::read, stores, Optional.empty(), page -> { });
         });
     }
 

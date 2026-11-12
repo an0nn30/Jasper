@@ -146,6 +146,33 @@ class KitViewTest {
             assertThat(closed.get()).isEqualTo(1);
         });
     }
+    /** Browser plan 8 Task 1b: the host's area anchors attach to a live Custom node's registered content, and to nothing else. */
+    @Test void aCustomTargetIsTheRegisteredContentOfALiveCustomNode() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            java.util.function.Function<ControlState, ViewSpec> page = state -> stack(new Custom("page", state, "content", CustomKind.PREVIEW, "Page"),
+                new Nodes.Button("go", ControlState.READY, "Go", "", ButtonKind.GHOST, "go", ""));
+            try (var view = new KitView(context, page.apply(ControlState.READY), e -> {})) {
+                assertThatThrownBy(() -> view.customTarget("page")).as("no content registered").isInstanceOf(IllegalArgumentException.class);
+                var canvas = new JComponent() {};
+                view.registerContent("content", canvas, () -> {});
+                assertThat(view.customTarget("page")).isSameAs(canvas);
+                assertThatThrownBy(() -> view.customTarget("go")).as("a button").isInstanceOf(IllegalArgumentException.class);
+                assertThatThrownBy(() -> view.customTarget("root")).as("a stack").isInstanceOf(IllegalArgumentException.class);
+                assertThatThrownBy(() -> view.customTarget("missing")).as("an unknown id").isInstanceOf(IllegalArgumentException.class);
+                assertThatThrownBy(() -> view.anchorTarget("page")).as("no control anchor").isInstanceOf(IllegalArgumentException.class);
+                for (var state : java.util.List.of(new ControlState(false, true, false, ""), new ControlState(true, false, false, ""), new ControlState(true, true, true, ""))) {
+                    view.update(page.apply(state));
+                    assertThatThrownBy(() -> view.customTarget("page")).as("%s", state).isInstanceOf(IllegalArgumentException.class);
+                }
+                view.update(new ViewSpec(new Stack("root", new ControlState(true, false, false, ""), LayoutRole.VERTICAL,
+                    java.util.List.of(new Custom("page", ControlState.READY, "content", CustomKind.PREVIEW, "Page")))));
+                assertThatThrownBy(() -> view.customTarget("page")).as("a disabled container").isInstanceOf(IllegalArgumentException.class);
+                view.update(page.apply(ControlState.READY));
+                assertThat(view.customTarget("page")).as("live again, the same content").isSameAs(canvas);
+            } finally { release(context); }
+        });
+    }
     @Test void callbacksAreContainedAndDoNotPreventFurtherEditsOrActions() {
         Edt.run(() -> {
             var context = KitFixtures.context(); var failures = new ArrayList<Throwable>();

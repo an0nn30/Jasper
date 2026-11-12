@@ -18,4 +18,16 @@ public final class DialogsTestAccess {
         PermissionPrompt.useClock(clock);
         return PermissionPrompt::useSystemClock;
     }
+
+    /**
+     * Has the sign-in dialogs shown from now on read {@code clock} until the answer is closed, as their flood guard
+     * does: for tests that answer one sign-in after another as soon as each shows.
+     *
+     * @param clock a monotonic clock's milliseconds
+     * @return puts the system clock back
+     */
+    public static AutoCloseable signInsTimedBy(LongSupplier clock) {
+        SignInDialog.useClock(clock);
+        return SignInDialog::useSystemClock;
+    }
 }

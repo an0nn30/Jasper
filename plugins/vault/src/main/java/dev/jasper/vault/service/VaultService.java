@@ -8,11 +8,14 @@ import dev.jasper.vault.api.CredentialDescriptor;
 import dev.jasper.vault.api.Kind;
 import dev.jasper.vault.api.LockState;
 import dev.jasper.vault.api.VaultApi;
+import dev.jasper.vault.crypto.SecureBytes;
 import dev.jasper.vault.lock.LockManager;
 import dev.jasper.vault.model.Account;
 import dev.jasper.vault.model.Auth;
 import dev.jasper.vault.model.Grant;
 import dev.jasper.vault.model.SshKey;
+import dev.jasper.vault.model.Vault;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -27,6 +30,7 @@ import java.util.function.Supplier;
 
 /** One per plugin instance; {@link #forConsumer} hands each requiring plugin its own view. */
 public final class VaultService {
+    private static final System.Logger LOG = System.getLogger(VaultService.class.getName());
     static final String NO_VAULT_TITLE = "No vault yet";
     static final String NO_VAULT_NOTICE = "Create a vault in Credential Vault first (Open Vault...)";
     static final String NO_WINDOW_NOTICE = "Credential Vault has no window to ask in";
@@ -50,8 +54,17 @@ public final class VaultService {
     private final Set<AnchoredPickPrompt> anchored=new HashSet<>();
     /** Installs the producer and host capability validation before the API is published. */
     public void anchoredPicker(Consumer<AnchoredPickPrompt> show,Consumer<dev.jasper.sdk.ui.UiAnchor> validate){showAnchored=java.util.Objects.requireNonNull(show);validateAnchor=java.util.Objects.requireNonNull(validate);}
+    private Consumer<WindowHandle> openManager;
+    /** Installs how {@link VaultApi#openManager} opens the manager over a window, before the API is published. */
+    public void managerOpener(Consumer<WindowHandle> open) { openManager = java.util.Objects.requireNonNull(open); }
     private final Set<Grant> oneTime = new HashSet<>();
     private final Map<String, WindowHandle> lastOwner = new HashMap<>();
+    /** For tests: sees each copy {@code saveLogin} takes of a password, so a test can check that it is zeroed. */
+    Consumer<char[]> saveCopies = copy -> { };
+    /** For tests: sees the old password of each login {@code saveLogin} replaces, so a test can check that it is zeroed. */
+    Consumer<char[]> replacedPasswords = password -> { };
+    /** Whether the caller is on the UI thread, Swing's; tests whose inline executors make their own thread the UI thread replace it. */
+    java.util.function.BooleanSupplier uiThread = java.awt.EventQueue::isDispatchThread;
 
     public VaultService(LockManager lock, Supplier<Optional<WindowHandle>> fallbackOwner, Consumer<UnlockPrompt> showUnlock,
                         Consumer<GrantPrompt> showGrant, Consumer<PickPrompt> showPick, NotificationGroup notifications) {
@@ -66,7 +79,18 @@ public final class VaultService {
                         Consumer<KeyImportPrompt> showImport, Runnable changed) {
         this(lock, fallbackOwner, showUnlock, showGrant, showPick, notifications);
         this.background = background; this.ui = ui; this.openForImport = openForImport;
-        this.showImport = showImport; this.changed = changed;
+        this.showImport = showImport; this.changed = changed == null ? null : contained(changed);
+    }
+
+    /**
+     * The views' refresh after a save or a key import, at both its callers: a refresh that throws is logged with the
+     * exception alone, and the change it follows still answers (Browser plan 8 L10).
+     */
+    private static Runnable contained(Runnable changed) {
+        return () -> {
+            try { changed.run(); }
+            catch (RuntimeException failure) { LOG.log(System.Logger.Level.WARNING, "Could not refresh Credential Vault after a change", failure); }
+        };
     }
     public void closeImports() { for (KeyImportPrompt prompt : List.copyOf(imports)) prompt.cancel(); }
 
@@ -91,14 +115,28 @@ public final class VaultService {
             default:
         }
         if (unlock == null) {
-            unlock = new UnlockPrompt(owner, presentation, lock, () -> unlock = null);
-            unlock.representWith(showUnlock);
-            CompletableFuture<Boolean> waiter = unlock.attach(owner,presentation);
+            var prompt = new UnlockPrompt(owner, presentation, lock, () -> unlock = null);
+            unlock = prompt;
+            prompt.representWith(this::show);
+            CompletableFuture<Boolean> waiter = prompt.attach(owner,presentation);
             attached.accept(waiter);
-            if(!waiter.isDone())showUnlock.accept(unlock);
+            if(!waiter.isDone())show(prompt);
             return waiter;
         }
         var waiter=unlock.attach(owner,presentation);attached.accept(waiter);return waiter;
+    }
+
+    /**
+     * Shows the unlock prompt, at first and again for a surviving waiter. A prompt that cannot be shown is forgotten and
+     * its waiters answer {@code false}, so the next request makes a fresh one rather than joining a prompt nobody sees
+     * (Browser plan 8 L10).
+     */
+    private void show(UnlockPrompt prompt) {
+        try { showUnlock.accept(prompt); }
+        catch (RuntimeException failure) {
+            LOG.log(System.Logger.Level.WARNING, "Could not show the Unlock Vault prompt", failure);
+            prompt.cancel();
+        }
     }
 
     /** Every account and key without secrets; empty unless unlocked. */
@@ -285,5 +323,104 @@ public final class VaultService {
             });
             return result;
         }
+
+        @Override public CompletableFuture<Optional<CredentialDescriptor>> saveLogin(WindowHandle owner, String name,
+                String username, char[] password) {
+            requireUiThread();
+            if (name == null || name.isBlank()) throw new IllegalArgumentException("A login needs a name");
+            if (username == null || password == null) throw new IllegalArgumentException("A login's username and password must not be null");
+            if (owner == null || !owner.isOpen()) return CompletableFuture.completedFuture(Optional.empty());
+            lastOwner.put(consumer.id(), owner);
+            char[] copy = password.clone();
+            saveCopies.accept(copy);
+            var result = new CompletableFuture<Optional<CredentialDescriptor>>();
+            // However the save ends, this copy goes; a saved login holds its own (Browser plan 8 F10).
+            result.whenComplete((saved, failure) -> SecureBytes.zero(copy));
+            CompletableFuture<Boolean> unlocked;
+            // Should requestUnlock throw (a prompt that cannot show is forgotten instead), the copy goes before the throw.
+            try { unlocked = requestUnlock(owner); }
+            catch (Throwable failure) { result.completeExceptionally(failure); throw failure; }
+            result.whenComplete((saved, failure) -> { if (result.isCancelled()) unlocked.cancel(false); });
+            unlocked.whenComplete((ok, failure) -> {
+                if (result.isDone()) return;
+                if (failure != null || !Boolean.TRUE.equals(ok) || !owner.isOpen() || lock.state() != LockState.UNLOCKED) {
+                    result.complete(Optional.empty()); return;
+                }
+                long session = lock.generation();
+                try {
+                    lock.transact(draft -> save(draft, name, username, copy), result::isCancelled).whenComplete((saved, failed) -> {
+                        if (failed == null) {
+                            // The manager, its grants and the palette show the login before the caller hears of it; the
+                            // hook is contained, and the answer stands whatever it does.
+                            try { if (changed != null) changed.run(); }
+                            finally { result.complete(Optional.of(saved)); }
+                        }
+                        // Locked between the unlock and the commit: as a cancelled unlock, no failure to report.
+                        else if (lock.generation() != session) result.complete(Optional.empty());
+                        else result.completeExceptionally(new IllegalStateException("Could not save the login", unwrapped(failed)));
+                    });
+                } catch (RuntimeException failed) { result.completeExceptionally(new IllegalStateException("Could not save the login", failed)); }
+            });
+            return result;
+        }
+
+        /**
+         * In {@code transact}'s draft: the last password login named exactly {@code name} whose only grant is this
+         * plugin's takes the new username and password, keeping its id, grants and created time (F11); otherwise a new
+         * login with a saved grant for this plugin. The draft gets its own copy of {@code password}.
+         */
+        private CredentialDescriptor save(Vault draft, String name, String username, char[] password) {
+            List<Account> accounts = draft.accounts();
+            int replaced = -1;
+            for (int i = 0; i < accounts.size(); i++) {
+                Account account = accounts.get(i);
+                if (account.auth() instanceof Auth.Password && account.name().equals(name) && onlyGrantIsThisPlugins(draft, account.id())) replaced = i;
+            }
+            Instant now = Instant.now();
+            if (replaced >= 0) {
+                Account old = accounts.get(replaced);
+                Account saved = new Account(old.id(), name, username, new Auth.Password(password.clone()), old.created(), now);
+                accounts.set(replaced, saved);
+                replacedPasswords.accept(((Auth.Password) old.auth()).password());
+                old.auth().zero();
+                return describe(saved);
+            }
+            Account saved = new Account(UUID.randomUUID(), name, username, new Auth.Password(password.clone()), now, now);
+            accounts.add(saved);
+            draft.grants().add(new Grant(consumer.id(), saved.id()));
+            return describe(saved);
+        }
+
+        private boolean onlyGrantIsThisPlugins(Vault vault, UUID id) {
+            boolean ours = false;
+            for (Grant grant : vault.grants()) {
+                if (!grant.credentialId().equals(id)) continue;
+                if (!grant.pluginId().equals(consumer.id())) return false;
+                ours = true;
+            }
+            return ours;
+        }
+
+        @Override public Optional<Credential> credentialIfGranted(UUID id) {
+            requireUiThread();
+            if (id == null || lock.state() != LockState.UNLOCKED || !lock.vault().grants().contains(new Grant(consumer.id(), id))) return Optional.empty();
+            return copyOf(id);
+        }
+
+        @Override public void openManager(WindowHandle owner) {
+            requireUiThread();
+            if (openManager == null || owner == null || !owner.isOpen()) return;
+            lastOwner.put(consumer.id(), owner);
+            openManager.accept(owner);
+        }
+    }
+
+    /** The login members a Chromium callback could reach check their thread (Browser plan 8 L9); the older ones do not. */
+    private void requireUiThread() {
+        if (!uiThread.getAsBoolean()) throw new IllegalStateException("Call Credential Vault on the UI thread");
+    }
+
+    private static Throwable unwrapped(Throwable failure) {
+        return failure instanceof java.util.concurrent.CompletionException wrapped && wrapped.getCause() != null ? wrapped.getCause() : failure;
     }
 }

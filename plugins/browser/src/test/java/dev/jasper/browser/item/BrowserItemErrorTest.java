@@ -369,7 +369,7 @@ class BrowserItemErrorTest {
             context.set(plugin);
             settings.set(BrowserSettings.declare(plugin.settings()));
         });
-        items = new BrowserItems(context.get(), settings.get()::read, new DataStores(memory.make(), () -> false), started -> { });
+        items = new BrowserItems(context.get(), settings.get()::read, new DataStores(memory.make(), () -> false), Optional.empty(), started -> { });
         item = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
         page = item.page();
         view = host.contentView(ID, "example.com").orElseThrow();

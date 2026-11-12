@@ -1,6 +1,7 @@
 /**
  * The Browser plugin: Chromium pages as Jasper items, through the runtime's in-process {@code jcef} module. Depends on
- * the SDK, the JDK, that module and, in the {@code store} package only, the bundled sqlite-jdbc. Only the
+ * the SDK, the JDK, that module, in the {@code store} package only the bundled sqlite-jdbc and, in the {@code logins}
+ * package's {@code VaultLogins} only, the Credential Vault's API, an optional plugin's. Only the
  * {@code engine}, {@code page}, {@code links} and {@code dialogs} packages name a Chromium type, so starting the plugin
  * loads none. The {@code api} package, the one the plugin exports, is the Markdown previews' service, which the
  * {@code preview} package implements. History, bookmarks and the {@code permissions} package's site permissions live

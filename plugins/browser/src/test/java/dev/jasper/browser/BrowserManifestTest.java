@@ -15,7 +15,7 @@ class BrowserManifestTest {
         assertThat(string("name")).isEqualTo("Browser");
         assertThat(string("version")).isEqualTo("0.2.0");
         assertThat(string("entry")).isEqualTo(BrowserPlugin.class.getName());
-        assertThat(string("sdk")).isEqualTo(">=0.31.0, <0.32");
+        assertThat(string("sdk")).isEqualTo(">=0.32.0, <0.33");
         assertThat(raw("enabled_by_default")).isEqualTo("true");
         assertThat(string("icon")).isEqualTo("icons/browser.svg");
     }
@@ -32,6 +32,14 @@ class BrowserManifestTest {
     /** The Markdown preview's API is the one package other plugins may compile against. */
     @Test void theBrowserExportsItsApiPackageOnly() throws IOException {
         assertThat(list("exports")).containsExactly("dev.jasper.browser.api");
+    }
+
+    /**
+     * Plan 8 Task 3: saved logins come from the Credential Vault, whose API the Browser compiles against; optional, so the
+     * Browser starts without it and shows none of its parts then. 0.9.0 is the Vault whose API saves logins.
+     */
+    @Test void theBrowserOptionallyRequiresTheVault() throws IOException {
+        assertThat(raw("requires")).isEqualTo("[{ id = \"dev.jasper.vault\", version = \">=0.9.0\", optional = true }]");
     }
 
     private static String manifest() throws IOException {

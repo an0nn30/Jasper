@@ -368,7 +368,8 @@ public final class Nodes {
         public PickerItem(String id,String label,String caption,String icon,Hue hue){this(id,label,caption,icon,hue,PickerItemKind.VALUE);}
     }
     /** Rich searchable menu: checked value and keyboard-active row are distinct. Edited/Selected name this node;
-     * Enter/pointer acceptance emits the row id or footerAction; Escape emits cancelAction. */
+     * Enter/pointer acceptance emits the row id or footerAction; Escape emits cancelAction. An activeId naming no row
+     * leaves none active, so Enter accepts nothing. */
     public record PickerMenu(String id,ControlState state,String query,String placeholder,List<PickerItem> items,
             String checkedId,String activeId,String noMatches,String footerLabel,String footerAction,String cancelAction) implements Node {
         public PickerMenu { ModelChecks.id(id);Objects.requireNonNull(state);Objects.requireNonNull(query);Objects.requireNonNull(placeholder);
