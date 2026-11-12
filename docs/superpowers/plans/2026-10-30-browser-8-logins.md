@@ -9,10 +9,12 @@ the docs "With fixes", and the fix wave that followed is done; Task 8, the user'
 (branch `claude/browser-logins`, worktree `.claude/worktrees/browser-4b-4c-e6deab`, cut from local `main` `c01d2feec`,
 which has plans 4a, 4b, 4c, 9, 5, 6 and 7 merged; the plan `58962695b`, brought in from `5c42e4a82`, then commits
 `a2b5c118a` to `322bd5793`, and the docs, `fd709d04b` and `479738513`, local `main` `0a4ec9bb9` (the Editor file
-associations' plan 2) merged in as `ebfdc45ac`, and the fix wave, `4c7afdbe7` to `35a622f74`, and its docs; not merged
-into `main` or pushed; see `docs/STATUS.md`). Executed with per-task subagents and reviews, each task's fix rounds until
+associations' plan 2) merged in as `ebfdc45ac`, and the fix wave, `4c7afdbe7` to `35a622f74`, and its docs; merged
+into local `main` as `06b05b729`, with the user's ruling L46 after it; not pushed; see `docs/STATUS.md`). Executed with
+per-task subagents and reviews, each task's fix rounds until
 a re-review found every finding addressed. The pre-flight scan's findings F1-F30 were adopted as rulings (L0, cited
-L-F*n*) except where L1-L3 decide otherwise, and the controller's further rulings are L4-L45; plan 4a's R0-R48 and the
+L-F*n*) except where L1-L3 decide otherwise, and the controller's further rulings are L4-L45, and L46 is the user's;
+plan 4a's R0-R48 and the
 banners of 4b, 4c, 9, 5, 6 and 7 bind. The user's answers (2026-11-09): nothing to download, no licence check and no
 third-party file, and no change to the plan's calls: `saveLogin` replaces the granted login of the same name, a proxy
 challenge gets the plain dialog, the sign-in dialog shows without the Vault, no silent fill in /dev/null, and field
@@ -276,7 +278,7 @@ The controller's rulings, one line each:
 - L34: a pending save belongs to its sign-in's navigation: it saves only at a 2xx of that navigation, and a main-frame
   load failure drops it.
 - L35: the silent fill needs the user's action: its navigation began within the page's user activation, or is Jasper's
-  own; built as option (b), pending the user's choice of (a) Jasper's own only, (b) or (c) the plan's original.
+  own (option (b), which the user chose: L46).
 - L36: a chooser with a starting search activates no row until the user moves to one, so Enter on typed text chooses
   nothing, and its search keeps the caret at its end, unselected; Remote's and File Server's keep the first row active.
 - L37: an area anchor's popover never covers its area, no taller than the larger room beside it; the Browser refuses a
@@ -301,6 +303,9 @@ The controller's rulings, one line each:
   recorded.
 - L45: AGENTS.md's Verified JCEF behaviour keeps only what javap confirmed; the main-frame redirect sentence waits for
   the F6 line.
+- L46: the user's ruling (2026-11-11, "After your click (Recommended)"): L35's option (b) stands: a silent sign-in
+  starts from an address the user types, a bookmark, Back, Forward or a link the user clicks, and a redirect, a meta
+  refresh or a script's navigation without a click shows the prompt.
 
 Known gaps:
 - L-F5 and L30: a page that navigates to an address and fetches that same address, or its origin's root, gets that

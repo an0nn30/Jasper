@@ -4,7 +4,8 @@
 from local `main` `c01d2feec`, which has plans 4a, 4b, 4c, 9, 5, 6 and 7 merged; the plan `58962695b`, brought in from
 `5c42e4a82`, commits `a2b5c118a` to `322bd5793`, the docs, `fd709d04b` and `479738513`, local `main` `0a4ec9bb9` (the
 Editor file associations' plan 2) merged in as `ebfdc45ac`, and the final fix wave, `4c7afdbe7` to `35a622f74`, and its
-docs; not merged into `main` or pushed; [plan](superpowers/plans/2026-10-30-browser-8-logins.md), whose banner lists
+docs; merged into local `main` as `06b05b729`, with the user's ruling L46 after it; not pushed;
+[plan](superpowers/plans/2026-10-30-browser-8-logins.md), whose banner lists
 every deviation by task, [spec](superpowers/specs/2026-10-26-jasper-browser-plugin-design.md) sections 12, 13, 17, 21
 and 23, [guide](browser.md#logins); executed with per-task subagents and reviews, Task 1 as 1a and 1b, Task 4 as 4a and
 4b and Task 5 as 5a and 5b, each task's fix rounds until its re-review found every finding addressed; the final reviews
@@ -45,9 +46,10 @@ the call (L3):
   address as JCEF names no frame (spec section 21), and a framed Basic challenge gets Password Manager without Remember
   (L27); F7 (L2), `SettingsPanelHost.closeThen`, so Settings' modality never blocks the Vault's manager and its unlock
   prompt.
-- **Pending the user's choice (L35):** what may start a silent sign-in: (a) only a navigation Jasper starts for the
-  user, (b) that or a navigation the page begins within 5 s of the user's click or key in it, or (c) any top-level
-  navigation, as the plan had it; (b) is built.
+- **The user's ruling on what may start a silent sign-in (L46, 2026-11-11, "After your click (Recommended)"):** an
+  address the user types, a bookmark, Back or Forward, and a link the user clicks; a redirect, a meta refresh or a
+  script's navigation without a click shows the sign-in prompt instead. Declined: Jasper's own navigations only, with
+  the prompt always shown prefilled as Chrome does, and the plan's any top-level navigation.
 
 SDK 0.32.0 (every bundled range `>=0.32.0, <0.33`): `ContentArea` and `UiView.anchorAt(String, ContentArea)` (L1, an SDK
 value in place of the plan's `java.awt.Rectangle`), `SettingsPanelHost.closeThen(Runnable)` (L2), with the testkit's
@@ -183,7 +185,7 @@ The controller's rulings, one line each (the pre-flight scan's F1-F30 adopted as
 - L34: a pending save belongs to its sign-in's navigation: it saves only at a 2xx of that navigation, and a main-frame
   load failure drops it.
 - L35: the silent fill needs the user's action: its navigation began within the page's user activation, or is Jasper's
-  own; built as option (b), pending the user's choice of (a) Jasper's own only, (b) or (c) the plan's original.
+  own (option (b), which the user chose: L46).
 - L36: a chooser with a starting search activates no row until the user moves to one, so Enter on typed text chooses
   nothing, and its search keeps the caret at its end, unselected; Remote's and File Server's keep the first row active.
 - L37: an area anchor's popover never covers its area, no taller than the larger room beside it; the Browser refuses a
@@ -208,6 +210,9 @@ The controller's rulings, one line each (the pre-flight scan's F1-F30 adopted as
   recorded.
 - L45: AGENTS.md's Verified JCEF behaviour keeps only what javap confirmed; the main-frame redirect sentence waits for
   the F6 line.
+- L46: the user's ruling (2026-11-11, "After your click (Recommended)"): L35's option (b) stands: a silent sign-in
+  starts from an address the user types, a bookmark, Back, Forward or a link the user clicks, and a redirect, a meta
+  refresh or a script's navigation without a click shows the prompt.
 
 Known gaps and follow-ups (the banner has them all, with the deferred minors): a page that navigates to an address and
 fetches that same address, or its origin's root, gets that navigation's top-level standing, a page can move the top
