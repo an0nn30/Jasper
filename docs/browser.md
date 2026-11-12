@@ -629,8 +629,8 @@ vault, and Jasper's dialog for a site's HTTP sign-in can sign in with a login fr
 Without that plugin the fields have no buttons, Settings has no Manage Saved Passwords, and the sign-in dialog shows
 without Password Manager and Remember this password, so pages can still sign in.
 
-In a [/dev/null](#devnull-mode) tab the field buttons fill as elsewhere, and nothing goes into the vault: the sign-in
-dialog has neither Password Manager nor Remember this password, and no sign-in is made without it.
+In a [/dev/null](#devnull-mode) tab the field buttons fill as elsewhere, but the sign-in dialog has neither Password
+Manager nor Remember this password, and no sign-in is made without it.
 
 ### Field buttons
 
@@ -638,24 +638,29 @@ When you focus an enabled, editable field of a page, Jasper shows a button insid
 Manager": 🔑 in a password field, and 🎫 in a field whose `autocomplete` attribute includes `username`. The button
 follows the field as the page scrolls or resizes, and goes when the field loses the focus.
 
-- **Choosing a login:** the button opens the vault's picker under the field, unlocking the vault first if needed, with
-  the page's host, less a leading `www.`, in its search
-  ([Other plugins and grants](credential-vault.md#other-plugins-and-grants)). From 🔑 the chosen login fills the
-  password; from 🎫 it fills the user name, then the first password field after it, in its form when it has one, which
-  takes the focus and the password. Only a login that signs in with a password alone fills: an SSH key, and a login
-  with a key ("Account key" or "Key and password"), fill nothing. The page hears each fill as an `input` and a `change`
-  event.
+- **Choosing a login:** the button opens the vault's picker under the field, or above it when there is not room enough
+  below, and never over it, unlocking the vault first if needed, with the page's host, less a leading `www.`, in its
+  search ([Other plugins and grants](credential-vault.md#other-plugins-and-grants)). On a short screen the picker
+  shortens, its logins scrolling, and with too little room above and below it does not open. No login is highlighted
+  until you move to one with Down or Up, so Enter after typing chooses nothing; a click on a login chooses it. From 🔑
+  the chosen login fills the password; from 🎫 it fills the user name, then the first password field after it, in its
+  form when it has one, which takes the focus and the password. Only a login that signs in with a password alone
+  fills: an SSH key, and a login with a key ("Account key" or "Key and password"), fill nothing. The page hears each
+  fill as an `input` and a `change` event.
 - **The picker closes,** filling nothing, at a click outside it, which reaches the page unless it was on the field; when
   the page scrolls, you zoom it, or the window or the page's pane is resized; when the page loads or goes to another
   address, one within the page included; and when its tab closes. A login fills only while the page still shows the
   site that opened the picker.
 - **Only in a page's top frame,** on `http` and `https` pages: a login form inside a frame, such as an embedded
-  sign-in, and a field inside a web component's shadow root have no button, and nor do Jasper's own pages, files, a
-  challenge provider's page ([Page tools](#page-tools)) or a document a sandbox gave an opaque origin.
+  sign-in, has no button, and nor do a field inside a web component's shadow root, a challenge provider's page
+  ([Page tools](#page-tools)) and a document a sandbox gave an opaque origin.
 - **What a page can do:** the buttons and their script live in the page's own JavaScript world, so the page's scripts
   can see, move or remove them, and can ask for the picker themselves. Jasper decides: the picker opens one at a time,
-  only after a mouse click in the page and only at the place that click was, never for a key. The page can read what a
-  login fills, as it can anything typed into its fields.
+  never for a key, only after a mouse click in the page with no key pressed since, and only at a place no taller than
+  200 CSS pixels that holds the click. An ask for a place that does not hold the click, or for a taller one, spends
+  the click, so each click tells a page at most whether it lay inside a place the page names; an ask from a page the
+  tab has left for another site is refused. The page can read what a login fills, as it can anything typed into its
+  fields.
 
 ### The sign-in dialog
 
@@ -670,12 +675,13 @@ closing the dialog do not, and the request gets the server's refusal, which a pa
   bidi controls and zero-width spaces, and line and paragraph separators become spaces, runs of white space one space,
   and a realm of more than 100 characters shows its first 99 and "…". The host shows as Chromium gives it, an
   international name in its punycode form (`xn--…`).
-- **Password Manager** shows with the vault for a site's Basic sign-in outside /dev/null mode, and opens the vault's
-  picker under the button, with the host, less a leading `www.`, in its search: a login chosen there signs in, and
-  closing the picker keeps the dialog. **Remember this password**, a switch that starts off, shows as well only for the
-  tab's own sign-in ([Frames and the page's requests](#frames-and-the-pages-requests)), and OK with it on saves the
-  login ([Remembered sign-ins](#remembered-sign-ins)). A Digest, NTLM or other sign-in, a proxy's, one in /dev/null mode
-  and one for a host whose name has an underscore get the dialog without either.
+- **Password Manager** shows with the Credential Vault plugin for a site's Basic sign-in outside /dev/null mode, and
+  opens the vault's picker under the button, with the host, less a leading `www.`, in its search and no login
+  highlighted, as a field button's does: a login chosen there signs in, and closing the picker keeps the dialog.
+  **Remember this password**, a switch that starts off, shows as well only for the tab's own sign-in
+  ([Frames and the page's requests](#frames-and-the-pages-requests)), and OK with it on saves the login
+  ([Remembered sign-ins](#remembered-sign-ins)). A Digest, NTLM or other sign-in, a proxy's, one in /dev/null mode and
+  one for a host whose name has an underscore get the dialog without either.
 - **When it shows:** as an alert does ([Page dialogs](#page-dialogs)), once the page is its window's current item, and
   after the page's permission prompt is answered. A page has one sign-in dialog at a time; its other sign-ins wait, in
   order, and while 8 wait the next one is refused at once. When the page starts loading another page, its open sign-in
@@ -685,9 +691,9 @@ closing the dialog do not, and the request gets the server's refusal, which a pa
 - **A flood is refused:** sign-in dialogs count among the page's [dialogs](#page-dialogs), so when they open one
   straight after another, the third and every later one is refused until the page loads again. The sign-in of a page you
   go to from Jasper, such as from the address field, a bookmark, history, Back or Forward, still shows, until you cancel
-  one of its dialogs or its load fails; Reload and a link in the page get no such exception.
-- **A sign-in lasts until Jasper quits:** Chromium keeps it in memory, and [Clear Website Data](#clearing-data) does not
-  end it.
+  one of its dialogs or the address it signs in to fails to load; Reload and a link in the page get no such exception.
+- **A sign-in lasts until Jasper quits,** or a /dev/null tab's until its group's last tab closes: Chromium keeps it in
+  memory, and [Clear Website Data](#clearing-data) does not end it.
 - **Jasper's own prompts dim the window:** the sign-in dialog and the vault's Unlock Vault prompt dim the whole window,
   so a password prompt drawn inside the page, with the window around it undimmed, is the page's own.
 
@@ -703,13 +709,13 @@ that asked, so does every sign-in of the tab's site.
 
 ### Remembered sign-ins
 
-OK with **Remember this password** on signs in, and once the tab's next page arrives and is a success (2xx) from the
-same site, after any redirect, Jasper saves the user name and password in the vault, unlocking it first if
+OK with **Remember this password** on signs in, and once the navigation it signed in to arrives as a success (2xx)
+from the same site, after any redirect, Jasper saves the user name and password in the vault, unlocking it first if
 needed, as a login named after the site and the realm, such as `https://intranet.example (Corp)`: the scheme, the host,
 the port when it is not the scheme's usual one, and the cleaned realm in parentheses when there is one. Any other
-response, another sign-in of the page, the page starting to load another page or its tab closing before that response
-saves nothing, and so does cancelling the unlock. When the vault cannot save it, Jasper posts "Could not save the
-password for *host*" with the reason.
+response, one to a later navigation, another sign-in of the page, a failed load, the page starting to load another
+page or its tab closing before that response saves nothing, and so does cancelling the unlock. When the vault cannot
+save it, Jasper posts "Could not save the password for *host*" with the reason.
 
 - **The Browser's own login:** the saved login comes with a saved grant for the Browser, which Vault Plugin Grants
   lists ([Other plugins and grants](credential-vault.md#other-plugins-and-grants)). Saving again under that name
@@ -719,18 +725,22 @@ password for *host*" with the reason.
   saved.
 - **Signing in without the dialog:** while the vault is unlocked, the tab's own Basic sign-in, outside /dev/null mode,
   is made with no dialog when the Browser has a saved grant for a password login of exactly its name, the newest of
-  them. Jasper does this once for that name in the tab, until a page of that site, in answer to that sign-in, begins to
-  load there; until then the site's next sign-in for the name shows the dialog, so a remembered password the site
-  refuses, and asks for again, is not sent again. When Stop or another navigation interrupts such a sign-in, the dialog
-  shows for that name in that tab until the tab closes. While the vault is locked the dialog shows, and its Password
-  Manager unlocks the vault.
+  them, and you began its navigation: from Jasper in that tab, such as from the address field, a bookmark, history,
+  Back or Forward, when Chromium makes its request within 10 seconds, until you cancel one of its dialogs; or from the
+  page, within 5 seconds of a click or key press of yours in it, as a link you click or a form you submit does, its
+  redirects included. Any other, such as one a page's script makes on its own or the page a new tab opens with, shows
+  the dialog, Password Manager included. Jasper does this once for that name in the tab, until a page of that site, in
+  answer to that sign-in, begins to load there; until then the site's next sign-in for the name shows the dialog, so a
+  remembered password the site refuses, and asks for again, is not sent again. When Stop or another navigation
+  interrupts such a sign-in, the dialog shows for that name in that tab until the tab closes. While the vault is locked
+  the dialog shows, and its Password Manager unlocks the vault.
 
 ### Manage Saved Passwords
 
-With the vault, Settings › Tools › Browser › Privacy & Data has **Manage Saved Passwords** after Manage Site
-Permissions, which a Settings search for "passwords" finds. Its **Manage Passwords** closes Settings, asking first
-whether to discard any unsaved changes, then opens the Credential Vault manager over the window, creating or unlocking
-the vault first as **Open Vault...** does ([The manager](credential-vault.md#the-manager)).
+With the Credential Vault plugin, Settings › Tools › Browser › Privacy & Data has **Manage Saved Passwords** after
+Manage Site Permissions, which a Settings search for "passwords" finds. Its **Manage Passwords** closes Settings, asking
+first whether to discard any unsaved changes, then opens the Credential Vault manager over the window, creating or
+unlocking the vault first as **Open Vault...** does ([The manager](credential-vault.md#the-manager)).
 
 ## Error pages
 

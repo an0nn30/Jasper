@@ -260,7 +260,9 @@ where the look draws one (`TitleInset`).
   (`KitView.customTarget`; an area outside the content's bounds is refused), which `HostedKitView` turns into a
   `Rectangle`; a resize of the content invalidates it too
   (a `ComponentListener` closes it at once), its popover consumes only a press inside the area and sets no picker
-  property on the content.
+  property on the content, and `HostedPopover.fitBeside` places that popover below or above the area, never over it,
+  no taller than the larger of the rooms below and above, closing it when that room is less than the content's minimum
+  height.
   `Windows.popover` attaches non-modal content from the anchor's own plugin; an anchor also owns a `DialogSpec` dialog
   above the surface that shows it. Neither passes view ownership to another plugin.
 - **File pickers.** `WindowSurface.chooseFile`, `Windows.chooseFiles`, `chooseDirectory`, `chooseSaveFile` and

@@ -969,12 +969,13 @@ Alt in place of Option; a window manager may take Alt with a drag.
   `jasper-app/build/dev-home`, holds its own vault: use a test vault there, never the user's everyday one, and line 5's
   relaunch keeps it. The network the lines use, which the user has accepted:
   `https://httpbin.org/basic-auth/user/passwd` and `https://httpbin.org/digest-auth/auth/user/passwd`, a public sign-in
-  page whose user name field has `autocomplete=username` (github.com's), and for F6, F5 and the realm lines a small
-  local server that answers 301 and 401 (a few lines of Python's `http.server`) or an intranet host, and for F22 a local
-  proxy on port 8118 that asks for a password. F12's line needs the logger `dev.jasper.browser.links.PageNavigation` at
-  FINE (a `java.util.logging` configuration file with `dev.jasper.browser.links.PageNavigation.level = FINE`, named by
-  `-Djava.util.logging.config.file`, for `:jasper-app:run` in `JAVA_TOOL_OPTIONS`); its line then lands in
-  `jasper-app/build/dev-home/logs`.
+  page whose user name field has `autocomplete=username` (github.com's), a small local server (a few lines of Python's
+  `http.server`) or an intranet host for F6's 301 and 401 and for every line that needs a page of its own (F5, the
+  realms, a 401 loop, a timer, a meta refresh, a 204, a redirect, a tall field), and for F22 a local proxy on port 8118
+  that asks for a password. F12's line needs the logger `dev.jasper.browser.links.PageNavigation` at FINE (a
+  `java.util.logging` configuration file with `dev.jasper.browser.links.PageNavigation.level = FINE`, named by its
+  absolute path in `-Djava.util.logging.config.file=`, for `:jasper-app:run` in `JAVA_TOOL_OPTIONS`); its line then
+  lands in `jasper-app/build/dev-home/logs`.
 - Each line is recorded pass or fail. Every line is pending.
 
 #### First: what only the GUI can show
@@ -986,7 +987,8 @@ Alt in place of Option; a window manager may take Alt with a drag.
 2. **The router's cancel (F14):** navigating, reloading or closing the tab with the picker open closes the picker and
    fills nothing. Pending.
 3. **A redirect before the sign-in (F6):** an `http://` address that answers 301 to `https://`, which answers 401 (an
-   intranet host, or a local server), offers Remember this password. Pending.
+   intranet host, or a local server), offers Remember this password. AGENTS.md's Verified JCEF behaviour states this
+   redirect from CEF's documented behaviour, which this line confirms. Pending.
 4. **The field script runs first (F13):** as a rule `login-fields.js` runs before the page's own scripts: a page that
    replaces `HTMLInputElement.prototype.value`'s setter early still gets the native fill. Pending.
 5. **Settings and the manager (F7, L2):** Manage Saved Passwords closes Settings first, and the manager and its unlock
@@ -1032,12 +1034,12 @@ Alt in place of Option; a window manager may take Alt with a drag.
        same click is refused too; a double-click whose second press lands where a page-placed field's picker opens
        chooses nothing;
      - L20: in every anchored picker (the Browser's, Remote's host editor and File Server's server editor), a row
-       pressed or entered within half a second of the picker opening does nothing, and works after it; Cancel and
-       typing in the search work at once;
+       pressed or entered within half a second of the picker opening does nothing, and works after it (in the
+       Browser's, Enter once Down or Up has highlighted a row, L36); Cancel and typing in the search work at once;
      - L20 (per-host zoom): with two items on one host at different zooms, the picker either opens under the field or
        the pick is refused; it never opens elsewhere;
-     - L21 (record, the Vault's follow-up): whether the picker's starting search is selected as it opens, so that typing
-       replaces it.
+     - L21 and L36: the picker's starting search is not selected as it opens, so typing adds to it (the fix wave's
+       lines below).
 3. **Leaving:** navigating away with the picker open fills nothing. Pending.
 
    From the task reviews: F14's line above; F15, closing the tab with the picker open closes it and fills nothing; L19,
@@ -1062,8 +1064,8 @@ Alt in place of Option; a window manager may take Alt with a drag.
      requests;
    - **Task 5a:** a Basic-protected download (`Content-Disposition: attachment` behind a 401) still gets the sign-in.
 5. **Remember:** ticked, the Vault then holds "https://httpbin.org (Fake Realm)"; after a relaunch with the Vault
-   unlocked the page signs in with no dialog; locked, the dialog shows; a remembered wrong password shows the dialog on
-   the second try, with no loop. Pending.
+   unlocked, the address typed in signs in with no dialog, while the restored tab's first page shows the dialog (L44);
+   locked, the dialog shows; a remembered wrong password shows the dialog on the second try, with no loop. Pending.
 
    From the task reviews:
    - **Task 2:** the saved login shows in the manager under its name, and in Vault Plugin Grants as the Browser's
@@ -1074,19 +1076,20 @@ Alt in place of Option; a window manager may take Alt with a drag.
      of that name that another plugin also has a grant for is left alone, and a second entry appears;
    - **Task 6:**
      - a site that redirects after the sign-in (`/basic-auth` to another path, or the local server) still saves, and
-       its next visit in the same tab fills silently again, as a redirect is the same navigation;
+       its next visit in the same tab, from the address field, fills silently again, as a redirect is the same
+       navigation;
      - F10: closing the tab while the save's unlock prompt shows saves nothing, and the prompt closes;
      - L24 (record): whether Chromium reports the main-frame 401 before it challenges again after a wrong remembered
        password; either way the second try shows the dialog;
      - two quick navigations to a remembered site (Enter twice in the address field) give at most one dialog, and no
        loop;
      - a remembered password changed on the server: one silent try, then the dialog; OK with Remember replaces the
-       Browser's login, and the next visit fills silently again;
+       Browser's login, and the next visit from the address field fills silently again;
      - L30: after a wrong remembered password, each later sign-in shows the dialog until the site answers a page and
-       that page commits; after a correct one, the next visit fills silently again; Remember saving on httpbin shows the
-       response is told before its commit, which the save and the re-arm rely on;
+       that page commits; after a correct one, the next visit from the address field fills silently again; Remember
+       saving on httpbin shows the response is told before its commit, which the save and the re-arm rely on;
      - L31: after a silent fill, Stop (or a navigation at once) before the page loads makes the next sign-in to that
-       site in that tab show the dialog, and a new tab fills silently again;
+       site in that tab show the dialog, and in a new tab the address typed in fills silently again;
    - **Task 5a (L23, record):** after a sign-in, Back to a page of another origin and Forward again: whether CEF
      restores the page from its back/forward cache without a request; either way the restored page's commit is the top
      address.
@@ -1105,7 +1108,8 @@ Alt in place of Option; a window manager may take Alt with a drag.
        address in the address field: its sign-in dialog shows; a link clicked inside the tripped page shows the 401
        page instead (the known gap); cancel the typed address's sign-in: the 401 page shows, and a second protected
        address typed in asks again;
-     - L29 (record): a first navigation's late `ERR_ABORTED` ending a quick second navigation's bypass;
+     - L29: a first navigation's late `ERR_ABORTED` leaves a quick second navigation's bypass, as only a failure of
+       the address its sign-in is for ends it (the fix wave's lines below);
      - F22: a proxy on port 8118 that asks for a password shows "The proxy “127.0.0.1:8118” requires a user name and
        password…", and each tab it challenges asks on its own (the known gap);
    - **Task 5a (L13):** a host whose name has an underscore, such as an intranet name, gets the dialog without either
@@ -1133,9 +1137,64 @@ Alt in place of Option; a window manager may take Alt with a drag.
 
 Each is pending.
 
-- **The HTTP auth cache (F23):** after a sign-in, Clear Website Data leaves the site signed in until Jasper quits.
+- **The HTTP auth cache (F23):** after a sign-in, Clear Website Data leaves the site signed in until Jasper quits; a
+  /dev/null tab's sign-in ends when its group's last tab closes, so a new /dev/null tab asks again.
 - **The realm (F9):** a realm with a right-to-left override (U+202E), a line break or more than 100 characters, sent by
   the local server, shows cleaned and cut, and the saved login's name has the same realm.
+
+#### Lines the final review's fix wave added
+
+Each is pending.
+
+- **The picker's rows (L36, L40):** on a sign-in page, press 🎫: the picker opens with the host in its search, the
+  caret after it and the text not selected, and no login highlighted; typing adds to the search, and Enter does
+  nothing, the picker staying open; Down highlights the first match and Enter fills it; Up from no highlight goes to
+  New Credential…; a click on a login, with no arrow key first, after the half second, fills it. The sign-in dialog's
+  Password Manager picker does the same.
+- **A page's picker under your typing (L36):** a page that opens the picker from its own user name field's handler as
+  you type: your keys go into the search, and Enter chooses nothing.
+- **Remote's and File Server's pickers (L39):** the credential pickers of Remote's host editor and File Server's server
+  editor open with the first row highlighted, and Enter chooses it; after Down, typing a character that keeps the same
+  rows moves the highlight back to the first row; their placement, the clamp on a short screen included, is as
+  before.
+- **Beside the field (L37, L40):** a field near the bottom of the screen opens the picker above it; a field in the
+  middle of a short window or screen, or a field nearly 200 CSS pixels tall, shrinks the picker to the larger room
+  above or below the field, its rows scrolling, never over the field, at HiDPI too; with no room above or below for the search box, the picker does not
+  open and the page is told nothing was chosen.
+- **A tall field (L37):** a user name `input` styled taller than 200 CSS pixels: a click on its 🎫 opens no picker; a
+  normal field's opens it.
+- **A key after the click (L38):** press 🎫 and type a key before the picker opens, or a page that sends `login.pick`
+  from a key handler after your click: no picker.
+- **The silent fill's navigations (L35, L42-L44),** with a remembered Basic login for the local server's protected
+  address and the vault unlocked:
+  - it signs in without the dialog, redirects included, from the address field, from a bookmark opened in the same
+    tab, from Back to it, and from a link you click or a form you submit with Enter;
+  - the dialog shows, with Password Manager and Remember, and nothing is sent: for a page's script that sends the tab
+    there from a timer, or posts a form there, with no click or key in the page for more than 5 seconds; for a link to
+    a page whose meta refresh goes there within 5 seconds of its load, though a link clicked in that page then signs
+    in without it; and for a new tab's first page: a bookmark or link opened in a new tab, a link from a terminal, a
+    tab restored after a relaunch;
+  - Back to an entry within the same page, Stop before a page arrives, or a 204, then the page's script sending the
+    tab to the protected address a few seconds or minutes later: the dialog shows;
+  - from the address field, a page with two realms, one of them remembered: cancel the first dialog, and the
+    remembered realm's sign-in then shows the dialog;
+  - a link clicked on a slow page, then the protected address typed before the link's page answers: the typed
+    navigation signs in without the dialog;
+  - Back's hold menu, an entry chosen while the page removes entries from its history, so that Chromium refuses it:
+    a script's navigation right after shows the dialog; record how DevTools refuses the entry;
+  - (record) the protected address typed while Chromium still starts, which can take more than 10 seconds at a first
+    start: whether the first sign-in shows the dialog.
+- **Remember and its navigation (L34):** sign in with Remember on, then press Stop, or click another link, before the
+  page arrives: nothing is saved; a site that redirects after the sign-in still saves.
+- **The bypass's end (L29):** from the address field, go somewhere while the current page has a slow navigation of its
+  own pending: the new navigation's sign-in still shows past a tripped guard; Stop a sign-in's load: its bypass ends;
+  record the address Chromium reports for the failure of a stopped load that had redirected, as only a failure of the
+  sign-in's own address ends the bypass.
+- **From the docs review (L33):** the sign-in dialog and the vault's Unlock Vault prompt dim the whole window; an
+  international host's heading shows its punycode form (`xn--…`); a login field inside a web component's shadow root
+  shows no button; Reload in a page whose dialog guard has tripped shows the 401 page, with no dialog; with the HTTP
+  proxy asking for a password (407), pages get the sign-in dialog, and Jasper's own requests (a favicon, the search
+  suggestions, View Source's copy, the filter list) fail.
 
 ### Batch 2: start-up and memory
 

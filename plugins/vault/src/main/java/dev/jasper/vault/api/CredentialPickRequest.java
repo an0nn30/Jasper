@@ -5,8 +5,10 @@ import java.util.*;
  * Where {@link VaultApi#pick(dev.jasper.sdk.terminal.WindowHandle, CredentialPickRequest)} shows its chooser and what
  * it shows. The request grants nothing, whatever it names; only the user's choice does.
  *
- * @param anchor the control the chooser's popover attaches to, from {@link dev.jasper.sdk.ui.UiView#anchor(String)};
- *     when it closes, the pick answers {@link CredentialPickResult.Cancelled}
+ * @param anchor the control or area the chooser's popover attaches to, from
+ *     {@link dev.jasper.sdk.ui.UiView#anchor(String)} or
+ *     {@link dev.jasper.sdk.ui.UiView#anchorAt(String, dev.jasper.sdk.ui.ContentArea)}; when it closes, the pick answers
+ *     {@link CredentialPickResult.Cancelled}
  * @param current the credential chosen now, drawn with a check mark; empty for none
  * @param allowClear whether the chooser offers a None row while its search is empty; choosing it answers
  *     {@link CredentialPickResult.Cleared}
@@ -17,7 +19,7 @@ public record CredentialPickRequest(UiAnchor anchor,Optional<UUID> current,boole
     /**
      * A request whose chooser starts with an empty search.
      *
-     * @param anchor the control the chooser's popover attaches to
+     * @param anchor the control or area the chooser's popover attaches to
      * @param current the credential chosen now; empty for none
      * @param allowClear whether the chooser offers a None row while its search is empty
      */

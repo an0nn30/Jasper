@@ -413,11 +413,13 @@ description and a colour preview. The label is the accessible name.
   The owner keeps the face describing the selected option.
 - [`PickerMenu`](sdk-reference.html#dev.jasper.sdk.ui.Nodes.PickerMenu) is a searchable menu: a `query` and its
   `placeholder`, [`PickerItem`](sdk-reference.html#dev.jasper.sdk.ui.Nodes.PickerItem)s (a label, a caption, an icon,
-  a hue, and a kind, `VALUE` or `UTILITY`), the checked value (`checkedId`) and the keyboard-active row (`activeId`),
-  which are distinct, a `noMatches` line, a footer (`footerLabel`, `footerAction`) and a `cancelAction`. It reports
-  `Edited` for the query and `Selected` as the active row moves; Enter or a click reports `Action` with the row's id or
-  `footerAction`, and Escape reports `cancelAction`. Credential Vault's credential picker is one, in a popover over the
-  requesting plugin's control.
+  a hue, and a kind, `VALUE` or `UTILITY`), the checked value (`checkedId`) and the keyboard-active row (`activeId`,
+  none when it names no row), which are distinct, a `noMatches` line, a footer (`footerLabel`, `footerAction`) and a
+  `cancelAction`. The search keeps the query unselected, with the caret at its end. It reports `Edited` for the query
+  and `Selected` as the active row moves (from none, Down goes to the first row and Up to the last); Enter or a click
+  reports `Action` with the row's id or `footerAction`, Enter nothing while no row is active, and Escape reports
+  `cancelAction`. Credential Vault's credential picker is one, in a popover over the requesting plugin's control or
+  area.
 
 ### Toggles
 

@@ -247,7 +247,8 @@ The credential fields of Remote's host editor and File Server's server editor op
 then in the list to choose. Choosing a credential lets that plugin read it once without asking. A choice in the
 first half second after the picker opens is ignored, so a click meant for what was under it chooses nothing. The
 Browser's 🔑 and 🎫 buttons on a page's login fields, and **Password Manager** in its sign-in dialog, open the picker
-too, without **None** and with the site's host in the search; only a login captioned "Password" fills
+too, without **None**, with the site's host in the search and no row highlighted until you move to one with Down or
+Up, so Enter after typing chooses nothing; a click on a row chooses it. Only a login captioned "Password" fills
 ([Logins](browser.md#logins)).
 
 Remote's **Import from ~/.ssh/config...** hands the selected private keys to the vault, which creates or unlocks the
@@ -261,11 +262,11 @@ keys stay in the vault and a notice asks you to re-import the hosts.
 
 A plugin can also save a login, as the Browser does when its sign-in dialog's **Remember this password** is on, naming
 it after the site and the realm, such as `https://intranet.example (Corp)`. The vault unlocks first if needed, and the
-login comes with a saved grant for that plugin, with which the Browser later signs in to that site without asking while
-the vault is unlocked ([Remembered sign-ins](browser.md#remembered-sign-ins)). Saving again under the same name replaces
-the username and password of the plugin's own login of that name, the one whose only saved grant is that plugin's; a
-login of that name that another plugin may also read, or that the plugin has no grant for, is left alone, and a new one
-is added beside it.
+login comes with a saved grant for that plugin, with which the Browser later signs in to that site without asking, on
+a navigation you begin, while the vault is unlocked ([Remembered sign-ins](browser.md#remembered-sign-ins)). Saving
+again under the same name replaces the username and password of the plugin's own login of that name, the one whose only
+saved grant is that plugin's; a login of that name that another plugin may also read, or that the plugin has no grant
+for, is left alone, and a new one is added beside it.
 
 **Vault Plugin Grants...** shows the saved grants as "*plugin id* — *entry name*", a saved login's grant among them;
 select one and press **Revoke** to make that plugin ask again, or **Back to entries**. One-time permissions end when the

@@ -11555,11 +11555,11 @@ for good) or removed one (Backspace with nothing typed, or a token's remove butt
 registered content, in the content component's coordinates, such as a field on a page. A popover opens below the
 area, or above it when the screen has no room below, at least as wide as the area, and never over it: it is no
 taller than the larger room the screen leaves below or above the area (a picker menu's rows scroll), and it closes
-when neither side has room. A dialog may take the anchor as its owner. A press inside the area closes the popover
-and goes no further; a press elsewhere closes it and reaches the content. Hiding, disabling, removing or moving the
-node closes the anchor, and so does resizing the content: a page laid out again has moved what was in the area. The
-host sees where the content is, not what it draws there: a content that moves what it draws, by scrolling or
-zooming, closes the anchor itself.</p></div>
+when neither side has room for the content's minimum height, such as a picker menu's search box. A dialog may take
+the anchor as its owner. A press inside the area closes the popover and goes no further; a press elsewhere closes it
+and reaches the content. Hiding, disabling, removing or moving the node closes the anchor, and so does resizing the
+content: a page laid out again has moved what was in the area. The host sees where the content is, not what it
+draws there: a content that moves what it draws, by scrolling or zooming, closes the anchor itself.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>customId</code> a Custom node's id</dd><dd><code>area</code> the area of its content, inside the content's bounds</dd><dt>Returns</dt><dd>scoped capability</dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalArgumentException.html">IllegalArgumentException</a> when the id names no such node, the view is not mounted, or the area does not lie
     inside the content's bounds now (an empty area on its edge does)</dd><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/UnsupportedOperationException.html">UnsupportedOperationException</a> if the host predates area anchors</dd></dl>
 </div>
@@ -14506,8 +14506,10 @@ Closing again does nothing.</p></div>
 it shows. The request grants nothing, whatever it names; only the user's choice does.</p></div>
 <h5>Components</h5>
 <div class="table-wrap"><table class="components"><tbody>
-<tr id="dev.jasper.vault.api.CredentialPickRequest.anchor()"><td class="ct"><code><a class="tl" href="#dev.jasper.sdk.ui.UiAnchor">UiAnchor</a></code></td><td class="cn"><code><b>anchor</b></code></td><td>the control the chooser's popover attaches to, from <a href="#dev.jasper.sdk.ui.UiView.anchor(String)"><code>UiView.anchor(String)</code></a>;
-    when it closes, the pick answers <a href="#dev.jasper.vault.api.CredentialPickResult.Cancelled"><code>CredentialPickResult.Cancelled</code></a></td></tr>
+<tr id="dev.jasper.vault.api.CredentialPickRequest.anchor()"><td class="ct"><code><a class="tl" href="#dev.jasper.sdk.ui.UiAnchor">UiAnchor</a></code></td><td class="cn"><code><b>anchor</b></code></td><td>the control or area the chooser's popover attaches to, from
+    <a href="#dev.jasper.sdk.ui.UiView.anchor(String)"><code>UiView.anchor(String)</code></a> or
+    <a href="#dev.jasper.sdk.ui.UiView.anchorAt(String,ContentArea)"><code>UiView.anchorAt(String, ContentArea)</code></a>; when it closes, the pick answers
+    <a href="#dev.jasper.vault.api.CredentialPickResult.Cancelled"><code>CredentialPickResult.Cancelled</code></a></td></tr>
 <tr id="dev.jasper.vault.api.CredentialPickRequest.current()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/UUID.html" title="java.util.UUID">UUID</a>&gt;</code></td><td class="cn"><code><b>current</b></code></td><td>the credential chosen now, drawn with a check mark; empty for none</td></tr>
 <tr id="dev.jasper.vault.api.CredentialPickRequest.allowClear()"><td class="ct"><code><span class="kw">boolean</span></code></td><td class="cn"><code><b>allowClear</b></code></td><td>whether the chooser offers a None row while its search is empty; choosing it answers
     <a href="#dev.jasper.vault.api.CredentialPickResult.Cleared"><code>CredentialPickResult.Cleared</code></a></td></tr>
@@ -14521,7 +14523,7 @@ it shows. The request grants nothing, whatever it names; only the user's choice 
         <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/UUID.html" title="java.util.UUID">UUID</a>&gt; current,
         <span class="kw">boolean</span> allowClear)</code></pre>
 <div class="doc"><p>A request whose chooser starts with an empty search.</p></div>
-<dl class="tags"><dt>Parameters</dt><dd><code>anchor</code> the control the chooser's popover attaches to</dd><dd><code>current</code> the credential chosen now; empty for none</dd><dd><code>allowClear</code> whether the chooser offers a None row while its search is empty</dd></dl>
+<dl class="tags"><dt>Parameters</dt><dd><code>anchor</code> the control or area the chooser's popover attaches to</dd><dd><code>current</code> the credential chosen now; empty for none</dd><dd><code>allowClear</code> whether the chooser offers a None row while its search is empty</dd></dl>
 </div>
 <div class="member" id="dev.jasper.vault.api.CredentialPickRequest.CredentialPickRequest(UiAnchor,Optional,boolean,String)">
 <pre class="sig"><a class="self" href="#dev.jasper.vault.api.CredentialPickRequest.CredentialPickRequest(UiAnchor,Optional,boolean,String)" aria-label="Link to this member">#</a><code><b>CredentialPickRequest</b>(

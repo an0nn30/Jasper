@@ -586,10 +586,10 @@ Since 0.32.0 `view.anchorAt(customId, area)` mints one on a
 [`ContentArea`](sdk-reference.html#dev.jasper.sdk.ui.ContentArea) of a `Custom` node's registered content, in the
 content component's coordinates, such as a field on a page; the area must lie inside the content. The popover opens
 below the area (above when there is no room), at least as wide as it, and never over it: it is no taller than the
-larger room above or below the area, and closes when neither side has any. A press inside the area closes the popover
-and goes no further; a press elsewhere closes it and reaches the content. The node's rules are a control's, and
-resizing the content closes the anchor too. Jasper sees where the content is, not what it draws, so a content that
-scrolls or zooms what it draws closes the anchor itself.
+larger room above or below the area, and closes when neither side has room for its content's minimum height. A press
+inside the area closes the popover and goes no further; a press elsewhere closes it and reaches the content. The node's
+rules are a control's, and resizing the content closes the anchor too. Jasper sees where the content is, not what it
+draws, so a content that scrolls or zooms what it draws closes the anchor itself.
 Credential Vault's credential picker opens over another plugin's anchor this way ([plugin APIs](plugin-apis.md)).
 
 ### Quit guards
