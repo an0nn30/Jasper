@@ -223,6 +223,7 @@ public final class EditorPlugin implements Plugin {
     private void forgetRemovedExtensions(PluginContext context, EditorSettings.Declared settings, FileAssociations associations) {
         var saved = new java.util.concurrent.atomic.AtomicReference<>(settings.fileAssociationExtensions());
         context.settings().onChanged(() -> ui.execute(() -> {
+            // The saved list moves on even while unavailable, so an extension removed then is never forgotten.
             List<String> now = settings.fileAssociationExtensions(), before = saved.getAndSet(now);
             if (associations.unavailable().isPresent()) return;
             before.stream().filter(extension -> !now.contains(extension)).forEach(associations::forget);

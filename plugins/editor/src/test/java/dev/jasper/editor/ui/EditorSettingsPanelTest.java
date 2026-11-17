@@ -64,6 +64,7 @@ class EditorSettingsPanelTest {
         associating = true;
         host.setFileType(".py", List.of("public.python-script"));
         host.setFileTypeHandler("public.python-script", new dev.jasper.sdk.ui.FileAssociations.Handler.Other("Xcode"));
+        host.setFileType(".foo", List.of("public.foo"));
         FakeKitView view = page(Map.of());
         var page = (Nodes.Stack) view.spec().root();
         assertThat(page.children()).extracting(node -> ((Nodes.Section) node).title())
@@ -80,8 +81,11 @@ class EditorSettingsPanelTest {
         view.emit(new UiEvent.Action(FileAssociationsSection.ADD));
         assertThat(host.pendingSettings(ID)).containsEntry("file_association_extensions", List.of(".foo"));
         assertThat(host.settingsPanelChanges(ID)).isPositive();
+        assertThat(subtitle(view, "user:.foo")).isEqualTo(".foo · Apply Settings to choose Jasper for .foo");
+        host.applySettingsPanel(ID);
+        assertThat(subtitle(view, "user:.foo")).as("saved, so claimable").isEqualTo(".foo · No default app");
         host.closeSettingsPanel(ID);
-        assertThat(host.savedSettings(ID)).doesNotContainKey("file_association_extensions");
+        assertThat(host.savedSettings(ID)).containsEntry("file_association_extensions", List.of(".foo"));
         host.fileTypesChanged();
         assertThat(host.failures()).as("the closed page's subscription ended").isEmpty();
     }
@@ -306,6 +310,11 @@ class EditorSettingsPanelTest {
         assertThat(node(view, "editor.followed.font_size", Nodes.Field.class)).isNotNull();
         view.emit(new UiEvent.Toggled("settings:follow_terminal_font", false));
         assertThat(node(view, "settings:font_size", Nodes.Field.class).value()).isEqualTo("15.5");
+    }
+
+    private static String subtitle(FakeKitView view, String rowId) {
+        return node(view, FileAssociationsSection.LIST, Nodes.ItemList.class).items().stream().filter(item -> item.id().equals(rowId))
+            .map(item -> ((Nodes.Text) item.subtitle().getFirst()).text()).findFirst().orElseThrow();
     }
 
     private static List<String> rows(FakeKitView view, String section) {

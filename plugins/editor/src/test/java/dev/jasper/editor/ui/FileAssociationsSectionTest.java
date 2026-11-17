@@ -2,6 +2,7 @@ package dev.jasper.editor.ui;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.jasper.editor.associations.FileTypeRows;
 import dev.jasper.editor.testsupport.EdtTests;
 import dev.jasper.sdk.Capabilities;
 import dev.jasper.sdk.PluginInfo;
@@ -19,6 +20,7 @@ import dev.jasper.sdk.ui.UiEvent;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -37,7 +39,7 @@ class FileAssociationsSectionTest {
     @TempDir Path home;
     private FakePluginHost host;
     private FileAssociations associations;
-    private List<String> user = List.of();
+    private List<String> user = List.of(), saved = List.of();
     private int staged, renders;
 
     @BeforeEach void start() {
@@ -51,7 +53,7 @@ class FileAssociationsSectionTest {
     private FileAssociationsSection section(String os) { return section(os, associations); }
 
     private FileAssociationsSection section(String os, FileAssociations over) {
-        return new FileAssociationsSection(over, os, () -> user, list -> { user = List.copyOf(list); staged++; }, () -> renders++);
+        return new FileAssociationsSection(over, os, () -> user, () -> saved, list -> { user = List.copyOf(list); staged++; }, () -> renders++);
     }
 
     private FileAssociationsSection opened(String os) {
@@ -219,6 +221,8 @@ class FileAssociationsSectionTest {
         assertThat(section.handle(new UiEvent.Action(FileAssociationsSection.ADD))).isTrue();
         assertThat(user).containsExactly(".foo");
         assertThat(field(section).value()).as("cleared").isEmpty();
+        assertThat(subtitle(section, "user:.foo")).as("not saved yet").isEqualTo(".foo · Apply Settings to choose Jasper for .foo");
+        saved = user;
         assertThat(subtitle(section, "user:.foo")).isEqualTo(".foo · TextEdit");
         assertThat(item(section, "user:.foo").contextActions().orElseThrow()).extracting(MenuItem::label).containsExactly("Remove");
         assertThat(item(section, "python").contextActions()).as("built-in rows").hasValueSatisfying(menu -> assertThat(menu).isEmpty());
@@ -256,6 +260,7 @@ class FileAssociationsSectionTest {
     @Test void aUserRowThatCannotBeClaimedStaysRemovable() {
         host.setFileType(".foo", List.of("public.foo"));
         user = List.of(".foo");
+        saved = user;
         var section = opened(MAC);
         assertThat(tick(section, "user:.foo").checked()).isTrue();
         host.setFileTypeRefused(".foo", Refusal.NOT_TEXT);
@@ -320,12 +325,103 @@ class FileAssociationsSectionTest {
         section.close();
     }
 
+    /** Plan ruling: a claim saves what it hands back, so only a saved extension, whose removal Apply forgets, is claimed. */
+    @Test void anAddedExtensionCanBeClaimedOnlyOnceItIsSaved() {
+        host.setFileType(".foo", List.of("public.foo"));
+        var section = opened(MAC);
+        section.handle(new UiEvent.Edited(FileAssociationsSection.FIELD, ".foo"));
+        section.handle(new UiEvent.Action(FileAssociationsSection.ADD));
+        assertThat(tick(section, "user:.foo").state().enabled()).isFalse();
+        assertThat(tick(section, "user:.foo").checked()).isFalse();
+        assertThat(subtitle(section, "user:.foo")).isEqualTo(".foo · Apply Settings to choose Jasper for .foo");
+        section.handle(new UiEvent.Toggled(FileAssociationsSection.TICK + "user:.foo", true));
+        assertThat(button(section, FileAssociationsSection.CLAIM).state().enabled()).isFalse();
+        section.handle(new UiEvent.Action(FileAssociationsSection.CLAIM));
+        assertThat(host.fileAssociationCalls()).as("a stray Claim").isEmpty();
+
+        saved = user;
+        assertThat(tick(section, "user:.foo").state().enabled()).as("applied").isTrue();
+        assertThat(button(section, FileAssociationsSection.CLAIM).state().enabled()).isTrue();
+        section.handle(new UiEvent.Action(FileAssociationsSection.CLAIM));
+        assertThat(host.fileAssociationCalls()).containsExactly("claim:.foo");
+        section.close();
+    }
+
+    @Test void aReopenedPageStartsAfresh() {
+        host.setFileType(".py", List.of(PY));
+        host.setFileType(".go", List.of(GO));
+        host.failFileTypeClaims(GO, "Not allowed");
+        var section = opened(MAC);
+        section.handle(new UiEvent.Action(FileAssociationsSection.CLAIM));
+        assertThat(subtitle(section, "go")).isEqualTo(".go · macOS refused: Not allowed");
+        section.handle(new UiEvent.Toggled(FileAssociationsSection.TICK + "go", false));
+        section.handle(new UiEvent.Edited(FileAssociationsSection.FIELD, "half"));
+        section.close();
+        assertThat(subtitle(section, "go")).as("closed: the answers are gone").isEqualTo(".go · Checking…");
+        assertThat(field(section).value()).isEmpty();
+        section.open();
+        assertThat(subtitle(section, "go")).as("no old result").isEqualTo(".go · No default app");
+        assertThat(tick(section, "go").checked()).as("the old tick is gone").isTrue();
+        section.close();
+    }
+
+    @Test void aClaimFromAnEarlierOpeningIsDropped() {
+        host.setFileType(".py", List.of(PY));
+        var manual = new Manual(associations);
+        var section = section(MAC, manual);
+        section.open();
+        manual.answerAll();
+        section.handle(new UiEvent.Action(FileAssociationsSection.CLAIM));
+        assertThat(button(section, FileAssociationsSection.CLAIM).state().enabled()).as("in flight").isFalse();
+        section.close();
+        section.open();
+        manual.answerAll();
+        int asked = manual.asked.size();
+        assertThat(button(section, FileAssociationsSection.CLAIM).state().enabled()).as("not stuck busy").isTrue();
+        manual.claims.getFirst().complete(List.of(new FileAssociations.TypeResult(".py", PY, new Outcome.Failed("late"))));
+        assertThat(subtitle(section, "python")).as("the old answer goes nowhere").isEqualTo(".py · No default app");
+        assertThat(manual.asked).as("and asks for nothing").hasSize(asked);
+        assertThat(button(section, FileAssociationsSection.CLAIM).state().enabled()).isTrue();
+        assertThat(button(section, FileAssociationsSection.RESTORE).state().enabled()).isFalse();
+        section.close();
+    }
+
+    @Test void aStaleClaimabilityAnswerNeverOverwritesANewerOne() {
+        host.setFileType(".foo", List.of("public.foo"));
+        user = List.of(".foo");
+        saved = user;
+        var manual = new Manual(associations);
+        manual.holdClaimability = true;
+        var section = section(MAC, manual);
+        section.open();
+        var stale = manual.claimabilityNow();
+        host.setFileTypeRefused(".foo", Refusal.NOT_TEXT);
+        host.fileTypesChanged();
+        manual.answerAll();
+        manual.answerClaimability(1, manual.claimabilityNow());
+        assertThat(subtitle(section, "user:.foo")).isEqualTo(".foo · macOS treats .foo as another kind of file");
+        manual.answerClaimability(0, stale);
+        assertThat(subtitle(section, "user:.foo")).as("the older round is dropped").isEqualTo(".foo · macOS treats .foo as another kind of file");
+        section.close();
+    }
+
+    @Test void openingRendersOncePerRoundOfAnswers() {
+        var section = section(MAC);
+        section.open();
+        assertThat(renders).as("the claimabilities, then the statuses").isEqualTo(2);
+        section.close();
+    }
+
     /** The fake's associations, with status and claim answered by the test. */
     private static final class Manual implements FileAssociations {
         private final FileAssociations real;
         final List<List<String>> asked = new ArrayList<>();
         final List<CompletableFuture<List<FileTypeStatus>>> pending = new ArrayList<>();
         final List<CompletableFuture<List<TypeResult>>> claims = new ArrayList<>();
+        /** Each round of held claimability requests: the extension and its future, in order. */
+        final List<List<Map.Entry<String, CompletableFuture<Claimability>>>> claimabilities = new ArrayList<>();
+        boolean holdClaimability;
+        private int heldRound = -1;
 
         Manual(FileAssociations real) { this.real = real; }
 
@@ -341,7 +437,25 @@ class FileAssociationsSectionTest {
             pending.add(future);
             return future;
         }
-        @Override public CompletableFuture<Claimability> claimability(String extension) { return real.claimability(extension); }
+        @Override public CompletableFuture<Claimability> claimability(String extension) {
+            if (!holdClaimability) return real.claimability(extension);
+            // A round starts with the first extension the section lists.
+            if (extension.equals(FileTypeRows.BUILT_IN.getFirst().extensions().getFirst())) { claimabilities.add(new ArrayList<>()); heldRound++; }
+            var future = new CompletableFuture<Claimability>();
+            claimabilities.get(heldRound).add(Map.entry(extension, future));
+            return future;
+        }
+
+        /** What the fake would answer to each extension of the first round now. */
+        Map<String, Claimability> claimabilityNow() {
+            var now = new java.util.HashMap<String, Claimability>();
+            for (var entry : claimabilities.getFirst()) now.put(entry.getKey(), real.claimability(entry.getKey()).join());
+            return now;
+        }
+
+        void answerClaimability(int round, Map<String, Claimability> answers) {
+            for (var entry : claimabilities.get(round)) entry.getValue().complete(answers.get(entry.getKey()));
+        }
         @Override public CompletableFuture<List<TypeResult>> claim(List<String> extensions) {
             var future = new CompletableFuture<List<TypeResult>>();
             claims.add(future);

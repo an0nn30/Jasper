@@ -52,6 +52,7 @@ public final class EditorSettingsPanel implements SettingsPanel {
     private Subscription detecting = () -> { };
     private Subscription typography = () -> { };
     private Subscription schemes = () -> { };
+    private Subscription savedExtensions = () -> { };
     private String query = "";
 
     /**
@@ -72,7 +73,7 @@ public final class EditorSettingsPanel implements SettingsPanel {
         this.defaults = Objects.requireNonNull(defaults, "defaults");
         this.environment = Map.copyOf(environment);
         this.associations = associations.map(over -> new FileAssociationsSection(over, osName, () -> host.pending(settings.fileAssociationExtensions),
-            list -> stage(settings.fileAssociationExtensions, list), this::render));
+            settings::fileAssociationExtensions, list -> stage(settings.fileAssociationExtensions, list), this::render));
     }
 
     @Override public UiView create(SettingsPanelHost host) {
@@ -82,7 +83,11 @@ public final class EditorSettingsPanel implements SettingsPanel {
         typography = appearance.onTerminalTypographyChanged(value -> render());
         schemes = appearance.onWorkspaceChanged(value -> render());
         defaults.detect();
-        associations.ifPresent(FileAssociationsSection::open);
+        associations.ifPresent(section -> {
+            // A user row becomes claimable once Apply saves its extension.
+            savedExtensions = settings.fileAssociationExtensions.onChanged(value -> render());
+            section.open();
+        });
         return view;
     }
 
@@ -100,6 +105,8 @@ public final class EditorSettingsPanel implements SettingsPanel {
 
     @Override public void dispose() {
         associations.ifPresent(FileAssociationsSection::close);
+        savedExtensions.close();
+        savedExtensions = () -> { };
         typography.close();
         typography = () -> { };
         schemes.close();

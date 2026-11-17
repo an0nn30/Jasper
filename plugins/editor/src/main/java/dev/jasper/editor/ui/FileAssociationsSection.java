@@ -33,8 +33,9 @@ import java.util.stream.Stream;
 /**
  * The Editor settings page's File associations section: the file-type rows with a tick each, Make Jasper the Default
  * (Choose in Windows Settings… on Windows), Restore Previous, and a field that adds an extension. Ticks last while the page
- * is open; the user's extensions are staged as {@code file_association_extensions}. Every status answer carries a
- * generation, and only the newest request's answer is shown; after {@link #close()} answers go nowhere. UI thread.
+ * is open; the user's extensions are staged as {@code file_association_extensions}, and a user row can be claimed only
+ * once its extension is saved. Every status and claimability answer carries its opening and its request's round, and only
+ * the newest round of the current opening is shown; after {@link #close()} answers go nowhere. UI thread.
  */
 final class FileAssociationsSection {
     static final String INTRO = "editor.associations.intro", UNAVAILABLE = "editor.associations.unavailable", LIST = "editor.associations.list",
@@ -52,32 +53,46 @@ final class FileAssociationsSection {
         }
     }
 
+    /** A row as one render shows it: its state is folded once. */
+    private record Line(Row row, FileTypeRowState state, boolean unsaved) {
+        boolean tickable() {
+            return !unsaved && !(state instanceof FileTypeRowState.NotClaimable || state instanceof FileTypeRowState.Checking
+                || state instanceof FileTypeRowState.Unavailable);
+        }
+    }
+
     private final FileAssociations associations;
     private final Os os;
-    private final Supplier<List<String>> userExtensions;
+    private final Supplier<List<String>> userExtensions, savedExtensions;
     private final Consumer<List<String>> stageUserExtensions;
     private final Runnable render;
     private final Map<String, FileTypeStatus> statuses = new HashMap<>();
-    private final Map<String, Refusal> refusals = new HashMap<>();
     private final Map<String, Boolean> touched = new HashMap<>();
+    private Map<String, Refusal> refusals = Map.of();
     private Map<String, String> results = Map.of();
     private Subscription changes = () -> { };
     private boolean open, busy;
-    private long generation;
+    /** Moves on each open and close, so an answer from an earlier opening is dropped. */
+    private long session;
+    /** The newest status request and the newest round of claimability requests; older answers are dropped. */
+    private long statusRound, claimRound;
     private String typed = "";
 
     /**
      * @param associations the plugin's file associations
      * @param osName the {@code os.name} the copy follows
      * @param userExtensions the pending user extensions
+     * @param savedExtensions the saved user extensions; a user row is claimable only once its extension is saved, so
+     *     removing it later is applied and forgets what a claim saved
      * @param stageUserExtensions stages a new list of user extensions
      * @param render re-renders the page
      */
     FileAssociationsSection(FileAssociations associations, String osName, Supplier<List<String>> userExtensions,
-                            Consumer<List<String>> stageUserExtensions, Runnable render) {
+                            Supplier<List<String>> savedExtensions, Consumer<List<String>> stageUserExtensions, Runnable render) {
         this.associations = Objects.requireNonNull(associations, "associations");
         this.os = Os.of(Objects.requireNonNull(osName, "osName"));
         this.userExtensions = Objects.requireNonNull(userExtensions, "userExtensions");
+        this.savedExtensions = Objects.requireNonNull(savedExtensions, "savedExtensions");
         this.stageUserExtensions = Objects.requireNonNull(stageUserExtensions, "stageUserExtensions");
         this.render = Objects.requireNonNull(render, "render");
     }
@@ -86,16 +101,27 @@ final class FileAssociationsSection {
     void open() {
         if (open) return;
         open = true;
+        session++;
         changes = associations.onChanged(this::changed);
         changed();
     }
 
-    /** Ends the subscription and the background re-checks; answers that arrive later are dropped. */
+    /**
+     * Ends the subscription and the background re-checks and forgets the opening's ticks, typed text, results and
+     * answers, so the next opening starts from Checking…; answers that arrive later are dropped.
+     */
     void close() {
         if (!open) return;
         open = false;
+        session++;
         changes.close();
         changes = () -> { };
+        touched.clear();
+        statuses.clear();
+        refusals = Map.of();
+        results = Map.of();
+        typed = "";
+        busy = false;
         try {
             associations.status(List.of());
         } catch (IllegalStateException stopped) {
@@ -103,9 +129,20 @@ final class FileAssociationsSection {
         }
     }
 
+    /** Asks for every listed extension's claimability, then its status. */
     private void changed() {
         if (!open || associations.unavailable().isPresent()) return;
-        extensions().forEach(this::askClaimability);
+        long mine = session, round = ++claimRound;
+        List<String> extensions = extensions();
+        List<CompletableFuture<Claimability>> answers = extensions.stream().map(associations::claimability).toList();
+        CompletableFuture.allOf(answers.toArray(CompletableFuture[]::new)).thenRun(() -> {
+            if (mine != session || round != claimRound) return;
+            var refused = new HashMap<String, Refusal>();
+            for (int i = 0; i < extensions.size(); i++)
+                if (answers.get(i).join() instanceof Claimability.NotClaimable not) refused.put(extensions.get(i), not.refusal());
+            refusals = Map.copyOf(refused);
+            render.run();
+        });
         refresh();
     }
 
@@ -113,20 +150,11 @@ final class FileAssociationsSection {
 
     private List<Row> rows() { return FileTypeRows.withUser(userExtensions.get()); }
 
-    private void askClaimability(String extension) {
-        associations.claimability(extension).thenAccept(answer -> {
-            if (!open) return;
-            if (answer instanceof Claimability.NotClaimable not) refusals.put(extension, not.refusal());
-            else refusals.remove(extension);
-            render.run();
-        });
-    }
-
     /** Asks for every listed extension's status; only the newest request's answer is kept. */
     private void refresh() {
-        long asked = ++generation;
+        long mine = session, asked = ++statusRound;
         associations.status(extensions()).thenAccept(answer -> {
-            if (!open || asked != generation) return;
+            if (mine != session || asked != statusRound) return;
             answer.forEach(status -> statuses.put(status.extension(), status));
             render.run();
         });
@@ -144,8 +172,8 @@ final class FileAssociationsSection {
                 touched.put(toggled.id().substring(TICK.length()), toggled.checked());
                 render.run();
             }
-            case UiEvent.Action action when action.id().equals(CLAIM) -> { if (claimEnabled()) perform(claimable(), associations::claim); }
-            case UiEvent.Action action when action.id().equals(RESTORE) -> { if (restoreEnabled()) perform(restorable(), associations::restore); }
+            case UiEvent.Action action when action.id().equals(CLAIM) -> perform(claimable(lines()), associations::claim);
+            case UiEvent.Action action when action.id().equals(RESTORE) -> perform(restorable(lines()), associations::restore);
             case UiEvent.Edited edited when edited.id().equals(FIELD) -> {
                 typed = edited.text();
                 render.run();
@@ -160,11 +188,12 @@ final class FileAssociationsSection {
     /** Claims or restores, then shows each row's first outcome that is not Done until the next claim or restore. */
     private void perform(List<String> extensions, Function<List<String>, CompletableFuture<List<TypeResult>>> call) {
         if (!open || busy || extensions.isEmpty()) return;
+        long mine = session;
         busy = true;
         results = Map.of();
         render.run();
         call.apply(extensions).thenAccept(answer -> {
-            if (!open) return;
+            if (mine != session) return;
             busy = false;
             var texts = new HashMap<String, String>();
             for (Row row : rows()) {
@@ -184,10 +213,7 @@ final class FileAssociationsSection {
         String extension = FileTypeRows.normalised(typed);
         typed = "";
         stageUserExtensions.accept(Stream.concat(current.stream(), Stream.of(extension)).toList());
-        if (open) {
-            askClaimability(extension);
-            refresh();
-        }
+        changed();
     }
 
     private void remove(String rowId) {
@@ -198,43 +224,36 @@ final class FileAssociationsSection {
 
     // ---- state
 
-    private FileTypeRowState state(Row row) {
-        if (associations.unavailable().isPresent()) return new FileTypeRowState.Unavailable();
+    private List<Line> lines() {
+        boolean unavailable = associations.unavailable().isPresent();
+        List<String> saved = savedExtensions.get();
+        return rows().stream().map(row -> new Line(row, state(row, unavailable),
+            row.user() && !saved.containsAll(row.extensions()))).toList();
+    }
+
+    private FileTypeRowState state(Row row, boolean unavailable) {
+        if (unavailable) return new FileTypeRowState.Unavailable();
         List<FileTypeStatus> answered = row.extensions().stream().map(statuses::get).filter(Objects::nonNull).toList();
         if (answered.size() < row.extensions().size()) return new FileTypeRowState.Checking();
         return FileTypeRowState.of(answered, refusals, os == Os.LINUX);
     }
 
-    private static boolean tickable(FileTypeRowState state) {
-        return !(state instanceof FileTypeRowState.NotClaimable || state instanceof FileTypeRowState.Checking
-            || state instanceof FileTypeRowState.Unavailable);
-    }
-
-    private boolean ticked(Row row, FileTypeRowState state) {
-        if (!tickable(state)) return false;
-        return touched.getOrDefault(row.id(), !(state instanceof FileTypeRowState.Jasper));
+    private boolean ticked(Line line) {
+        return line.tickable() && touched.getOrDefault(line.row().id(), !(line.state() instanceof FileTypeRowState.Jasper));
     }
 
     /** The ticked rows that are not wholly Jasper's: their extensions that have system types. */
-    private List<String> claimable() {
-        return rows().stream().filter(row -> {
-            FileTypeRowState state = state(row);
-            return ticked(row, state) && !(state instanceof FileTypeRowState.Jasper);
-        }).flatMap(row -> row.extensions().stream())
+    private List<String> claimable(List<Line> lines) {
+        return lines.stream().filter(line -> ticked(line) && !(line.state() instanceof FileTypeRowState.Jasper))
+            .flatMap(line -> line.row().extensions().stream())
             .filter(extension -> statuses.containsKey(extension) && !statuses.get(extension).types().isEmpty()).toList();
     }
 
-    private List<String> restorable() {
-        return rows().stream().filter(row -> {
-            FileTypeRowState state = state(row);
-            return ticked(row, state) && (state instanceof FileTypeRowState.Jasper(boolean back) && back
-                || state instanceof FileTypeRowState.Partly(boolean partly) && partly);
-        }).flatMap(row -> row.extensions().stream()).toList();
+    private List<String> restorable(List<Line> lines) {
+        return lines.stream().filter(line -> ticked(line) && (line.state() instanceof FileTypeRowState.Jasper(boolean back) && back
+                || line.state() instanceof FileTypeRowState.Partly(boolean partly) && partly))
+            .flatMap(line -> line.row().extensions().stream()).toList();
     }
-
-    private boolean claimEnabled() { return !busy && !claimable().isEmpty(); }
-
-    private boolean restoreEnabled() { return !busy && !restorable().isEmpty(); }
 
     // ---- nodes
 
@@ -251,15 +270,17 @@ final class FileAssociationsSection {
         Optional<Unavailable> unavailable = associations.unavailable();
         if (unavailable.isPresent())
             return List.of(intro, new Nodes.Text(UNAVAILABLE, ControlState.READY, unavailableText(unavailable.get()), Nodes.TextRole.BODY));
-        var items = rows().stream().map(this::item).toList();
+        List<Line> lines = lines();
+        var items = lines.stream().map(this::item).toList();
         var list = new Nodes.ItemList(LIST, ControlState.READY, Nodes.ListKind.DOUBLE, items, Set.of(), "", List.of(), Nodes.SelectionMode.NONE,
             Optional.empty(), OptionalInt.empty(), "", "");
         Stream<Nodes.Node> note = os == Os.WINDOWS ? Stream.of(new Nodes.Text(NOTE, ControlState.READY,
             "Windows asks you to pick Jasper for each type in Settings › Default apps.", Nodes.TextRole.SUPPORTING)) : Stream.empty();
         List<Nodes.Node> buttons = Stream.concat(Stream.<Nodes.Node>of(
-            new Nodes.Button(CLAIM, enabled(claimEnabled()), os == Os.WINDOWS ? "Choose in Windows Settings…" : "Make Jasper the Default", "",
+            new Nodes.Button(CLAIM, enabled(!busy && !claimable(lines).isEmpty()), os == Os.WINDOWS ? "Choose in Windows Settings…" : "Make Jasper the Default", "",
                 Nodes.ButtonKind.PRIMARY, CLAIM, ""),
-            new Nodes.Button(RESTORE, enabled(restoreEnabled()), "Restore Previous", "", Nodes.ButtonKind.SECONDARY, RESTORE, "")), note).toList();
+            new Nodes.Button(RESTORE, enabled(!busy && !restorable(lines).isEmpty()), "Restore Previous", "", Nodes.ButtonKind.SECONDARY, RESTORE, "")),
+            note).toList();
         String error = typed.isBlank() ? "" : FileTypeRows.addError(typed, userExtensions.get()).orElse("");
         var field = new Nodes.Field(FIELD, new ControlState(true, true, false, error), Nodes.FieldKind.TEXT, typed, ".ext", "Extension", ADD);
         var addButton = new Nodes.Button(ADD, enabled(!typed.isBlank() && error.isEmpty()), "Add Extension", "", Nodes.ButtonKind.SECONDARY, ADD, "");
@@ -267,14 +288,15 @@ final class FileAssociationsSection {
         return List.of(intro, list, new Nodes.Stack(BUTTONS, ControlState.READY, Nodes.LayoutRole.INLINE, buttons), addRow);
     }
 
-    private ListItem item(Row row) {
-        FileTypeRowState state = state(row);
+    private ListItem item(Line line) {
+        Row row = line.row();
         String prefix = "editor.associations.row:" + row.id();
-        String text = Optional.ofNullable(results.get(row.id())).orElseGet(() -> stateText(state, row.extensions().getFirst()));
+        String text = line.unsaved() ? "Apply Settings to choose Jasper for " + row.extensions().getFirst()
+            : Optional.ofNullable(results.get(row.id())).orElseGet(() -> stateText(line.state(), row.extensions().getFirst()));
         var title = new Nodes.Text(prefix + ".title", ControlState.READY, row.name(), Nodes.TextRole.BODY);
         var subtitle = new Nodes.Text(prefix + ".subtitle", ControlState.READY, String.join(", ", row.extensions()) + " · " + text,
             Nodes.TextRole.DESCRIPTION);
-        var tick = new Nodes.Toggle(TICK + row.id(), enabled(tickable(state)), "Choose Jasper for " + row.name(), ticked(row, state),
+        var tick = new Nodes.Toggle(TICK + row.id(), enabled(line.tickable()), "Choose Jasper for " + row.name(), ticked(line),
             TICK + row.id(), true);
         List<MenuItem> menu = row.user()
             ? List.of(new MenuItem("editor.associations.remove.item:" + row.id(), "Remove", "", REMOVE + row.id(), true, false))
