@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+  <!-- maintainer-needed -->
+  <use>
+    <flag name="gtk">Build the GTK 3 desktop integration helper</flag>
+    <flag name="gtk4">Build the GTK 4/libadwaita desktop integration helper</flag>
+    <flag name="qt6">Build the Qt 6 desktop integration helper</flag>
+    <flag name="kde">Build the KDE Frameworks 6 desktop integration helper</flag>
+  </use>
+  <upstream><remote-id type="github">an0nn30/Jasper</remote-id></upstream>
+</pkgmetadata>

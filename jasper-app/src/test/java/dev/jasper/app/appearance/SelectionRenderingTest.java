@@ -55,9 +55,14 @@ class SelectionRenderingTest {
                     int rowTop = component == tree ? tree.getRowBounds(0).y : 0;
                     assertThat(new Color(image.getRGB(140, rowTop), true)).as((themeDark ? "dark" : "light") + " " + key + " top edge").isEqualTo(selection);
                     if (component == composite) {
+                        // Keep the native-size geometry checks above, then inspect opaque text interiors at 4x.
+                        // A small antialiased host font need not contain enough fully covered pixels at 1x.
+                        var textImage = new BufferedImage(4 * composite.getWidth(), 4 * composite.getHeight(), BufferedImage.TYPE_INT_ARGB);
+                        var textGraphics = textImage.createGraphics();
+                        try { textGraphics.scale(4, 4); composite.paint(textGraphics); } finally { textGraphics.dispose(); }
                         int textPixels = 0;
-                        for (int px = 12; px < 100; px++) for (int py = 4; py < 24; py++)
-                            if (image.getRGB(px, py) == composite.getSelectionForeground().getRGB()) textPixels++;
+                        for (int px = 4 * 12; px < 4 * 100; px++) for (int py = 4 * 4; py < 4 * 24; py++)
+                            if (textImage.getRGB(px, py) == composite.getSelectionForeground().getRGB()) textPixels++;
                         assertThat(textPixels).as("composite renderer retains its text").isGreaterThan(10);
                     }
                     g.drawImage(image, 12, y, null); y += component.getHeight() + 12;
