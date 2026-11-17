@@ -155,7 +155,7 @@ class FileAssociationsSectionTest {
         assertThat(host.fileAssociationCalls()).containsExactly("claim:.py", "claim:.go", "claim:.rs");
         assertThat(subtitle(section, "python")).isEqualTo(".py · Jasper");
         assertThat(subtitle(section, "go")).isEqualTo(".go · macOS refused: Not allowed");
-        assertThat(subtitle(section, "rust")).isEqualTo(".rs · Jasper");
+        assertThat(subtitle(section, "rust")).isEqualTo(".rs · Jasper · No app had this type before Jasper; choose one in Finder's Get Info");
 
         section.handle(new UiEvent.Toggled(FileAssociationsSection.TICK + "python", true));
         section.handle(new UiEvent.Toggled(FileAssociationsSection.TICK + "rust", true));
@@ -165,7 +165,7 @@ class FileAssociationsSectionTest {
         section.handle(new UiEvent.Action(FileAssociationsSection.RESTORE));
         assertThat(host.fileAssociationCalls()).as("only rows with something to hand back").endsWith("claim:.rs", "restore:.py");
         assertThat(subtitle(section, "python")).isEqualTo(".py · Xcode");
-        assertThat(subtitle(section, "rust")).isEqualTo(".rs · Jasper");
+        assertThat(subtitle(section, "rust")).isEqualTo(".rs · Jasper · No app had this type before Jasper; choose one in Finder's Get Info");
         assertThat(subtitle(section, "go")).as("results last until the next claim or restore").isEqualTo(".go · No default app");
         section.close();
 
@@ -180,10 +180,102 @@ class FileAssociationsSectionTest {
         var linux = opened(LINUX);
         linux.handle(new UiEvent.Toggled(FileAssociationsSection.TICK + "rust", true));
         assertThat(button(linux, FileAssociationsSection.RESTORE).state().enabled()).as("no app counts as something to hand back").isTrue();
+        assertThat(subtitle(linux, "rust")).as("Linux hands back no app").isEqualTo(".rs · Jasper");
         linux.handle(new UiEvent.Action(FileAssociationsSection.RESTORE));
         assertThat(host.fileAssociationCalls()).endsWith("restore:.rs");
-        assertThat(subtitle(linux, "rust")).isEqualTo(".rs · No app had this type before Jasper; choose one in your file manager");
         linux.close();
+    }
+
+    /** Final review 12: on macOS a row with one type to hand back and one no app had shows the second's NoPrevious. */
+    @Test void aRestoreOfARowWithATypeNoAppHadSaysSo() {
+        host.setFileType(".kt", List.of("t.kt"));
+        host.setFileTypeHandler("t.kt", new Handler.Other("IntelliJ IDEA"));
+        host.setFileType(".kts", List.of("t.kts"));
+        var section = opened(MAC);
+        section.handle(new UiEvent.Action(FileAssociationsSection.CLAIM));
+        assertThat(subtitle(section, "kotlin")).isEqualTo(".kt, .kts · Jasper");
+        section.handle(new UiEvent.Toggled(FileAssociationsSection.TICK + "kotlin", true));
+        section.handle(new UiEvent.Action(FileAssociationsSection.RESTORE));
+        assertThat(host.fileAssociationCalls()).endsWith("restore:.kt", "restore:.kts");
+        assertThat(subtitle(section, "kotlin")).isEqualTo(".kt, .kts · No app had this type before Jasper; choose one in Finder's Get Info");
+        section.close();
+    }
+
+    /** Final review 1: a Windows restore names the app to pick again, from what the claim saved. */
+    @Test void aWindowsRestoreNamesTheAppToPickAgain() {
+        host.setFileType(".py", List.of(PY));
+        host.setFileTypeHandler(PY, new Handler.Other("Notepad"));
+        var windows = opened(WINDOWS);
+        windows.handle(new UiEvent.Action(FileAssociationsSection.CLAIM));
+        assertThat(subtitle(windows, "python")).isEqualTo(".py · Jasper");
+        host.setFileAssociationsInSettings(true);
+        windows.handle(new UiEvent.Toggled(FileAssociationsSection.TICK + "python", true));
+        windows.handle(new UiEvent.Action(FileAssociationsSection.RESTORE));
+        assertThat(host.fileAssociationCalls()).endsWith("restore:.py");
+        assertThat(subtitle(windows, "python")).isEqualTo(".py · Pick Notepad for .py in Windows Settings");
+        windows.close();
+    }
+
+    /** Final review 2: once the row's state changes, its result gives way to the state. */
+    @Test void aResultGivesWayWhenTheRowsStateChanges() {
+        host.setFileType(".py", List.of(PY));
+        host.setFileTypeHandler(PY, new Handler.Other("Notepad"));
+        host.setFileType(".go", List.of(GO));
+        host.setFileTypeHandler(GO, new Handler.Other("Notepad"));
+        host.setFileAssociationsInSettings(true);
+        var windows = opened(WINDOWS);
+        windows.handle(new UiEvent.Action(FileAssociationsSection.CLAIM));
+        assertThat(subtitle(windows, "python")).isEqualTo(".py · Pick Jasper for .py in Windows Settings");
+        host.fileTypesChanged();
+        assertThat(subtitle(windows, "python")).as("nothing changed").isEqualTo(".py · Pick Jasper for .py in Windows Settings");
+        host.setFileTypeHandler(PY, new Handler.Jasper());
+        host.fileTypesChanged();
+        assertThat(subtitle(windows, "python")).as("picked in Settings").isEqualTo(".py · Jasper");
+        assertThat(subtitle(windows, "go")).as("still waiting").isEqualTo(".go · Pick Jasper for .go in Windows Settings");
+        windows.close();
+    }
+
+    /** Final review 4: on macOS and Windows a Jasper row no app had before says why Restore is off. */
+    @Test void aJasperRowNoAppHadBeforeSaysWhyRestoreIsOff() {
+        host.setFileType(".rs", List.of(RS));
+        for (var os : List.of(MAC, WINDOWS, LINUX)) {
+            host.setFileTypeHandler(RS, new Handler.None());
+            var section = opened(os);
+            section.handle(new UiEvent.Action(FileAssociationsSection.CLAIM));
+            section.handle(new UiEvent.Toggled(FileAssociationsSection.TICK + "rust", true));
+            assertThat(button(section, FileAssociationsSection.RESTORE).state().enabled()).as(os).isEqualTo(os.equals(LINUX));
+            section.close();
+            section.open();
+            assertThat(subtitle(section, "rust")).as(os).isEqualTo(switch (os) {
+                case MAC -> ".rs · Jasper · No app had this type before Jasper; choose one in Finder's Get Info";
+                case WINDOWS -> ".rs · Jasper · No app had this type before Jasper; choose one in Windows Settings › Default apps";
+                default -> ".rs · Jasper";
+            });
+            section.close();
+        }
+    }
+
+    /** Final review 7: an unsaved row the system refuses says why, not Apply Settings. */
+    @Test void anUnsavedRowTheSystemRefusesSaysWhy() {
+        host.setFileTypeRefused(".foo", Refusal.NOT_TEXT);
+        var section = opened(MAC);
+        section.handle(new UiEvent.Edited(FileAssociationsSection.FIELD, ".foo"));
+        section.handle(new UiEvent.Action(FileAssociationsSection.ADD));
+        assertThat(subtitle(section, "user:.foo")).isEqualTo(".foo · macOS treats .foo as another kind of file");
+        section.close();
+    }
+
+    /** Final review 9: a tick that asked for a claim that was done is dropped, so Restore stays off for that row. */
+    @Test void aDoneClaimDropsItsTick() {
+        host.setFileType(".py", List.of(PY));
+        host.setFileTypeHandler(PY, new Handler.Other("Xcode"));
+        var section = opened(MAC);
+        section.handle(new UiEvent.Toggled(FileAssociationsSection.TICK + "python", true));
+        section.handle(new UiEvent.Action(FileAssociationsSection.CLAIM));
+        assertThat(subtitle(section, "python")).isEqualTo(".py · Jasper");
+        assertThat(tick(section, "python").checked()).isFalse();
+        assertThat(button(section, FileAssociationsSection.RESTORE).state().enabled()).isFalse();
+        section.close();
     }
 
     @Test void everyOutcomeHasItsPlatformsText() {

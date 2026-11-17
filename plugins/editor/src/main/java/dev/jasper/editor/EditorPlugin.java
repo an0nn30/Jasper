@@ -218,7 +218,7 @@ public final class EditorPlugin implements Plugin {
 
     /**
      * File associations plan 3: an extension the user removed from {@code file_association_extensions}, once that is
-     * applied, has what Jasper saved for it forgotten. Cancelling Settings saves nothing, so it forgets nothing.
+     * applied, has any declaration Jasper made for it dropped. Cancelling Settings saves nothing, so it forgets nothing.
      */
     private void forgetRemovedExtensions(PluginContext context, EditorSettings.Declared settings, FileAssociations associations) {
         var saved = new java.util.concurrent.atomic.AtomicReference<>(settings.fileAssociationExtensions());

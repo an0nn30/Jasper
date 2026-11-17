@@ -655,16 +655,17 @@ says so: "macOS has no file type for <ext>", or "<system> treats <ext> as anothe
 until you choose it: installing Jasper makes it the default for no file type.
 
 Tick the types to choose, then press **Make Jasper the Default** (**Choose in Windows Settings…** on Windows).
-**Restore Previous** hands the ticked types that are still Jasper's, wholly or partly, back to the app each had before. Ticks last while
-the page is open and are not saved. A type the system refuses shows "<system> refused: <detail>" in its row.
-On macOS and Windows, when no app had the type before Jasper, Restore says so and points to Finder's Get Info or to
-Windows Settings › Default apps.
+**Restore Previous** hands the ticked types that are still Jasper's, wholly or partly, back to the app each had before.
+Ticks last while the page is open and are not saved. A type the system refuses shows "<system> refused: <detail>" in its
+row. On macOS and Windows, a type no app had before Jasper cannot be restored: its row says so and points to Finder's
+Get Info or to Windows Settings › Default apps.
 
 To add a type, type an extension such as `.toml` in the field (a dot and up to 16 letters, digits, `_`, `+` or `-`) and
 press **Add Extension**; `.html`, `.htm` and the built-in types' extensions are refused. Your extensions are saved as
 `file_association_extensions` ([Settings](#settings)), and a new one can be chosen only after you apply Settings: its row
 says "Apply Settings to choose Jasper for <ext>". **Remove** in a row's context menu takes an extension of yours off the
-list; applying Settings then stops listing it.
+list; applying Settings then stops listing it. Jasper stays the app for that type, so use Restore Previous first to hand
+it back.
 
 When the section cannot work it shows one line instead of the controls: on macOS, "File associations work in an
 installed Jasper." in a run from a source checkout; on Windows, "Install Jasper with its installer to choose it for file
@@ -683,9 +684,9 @@ Jasper claims types that conform to text, so an extension macOS has no file type
 
 **Choose in Windows Settings…** registers Jasper for the ticked types and opens Windows Settings at Jasper's page,
 where you pick Jasper for each type: Jasper never changes Windows' own record of your choice. The rows update when a
-Jasper window becomes active again. Row results read "Pick Jasper for <ext> in Windows Settings". **Restore Previous**
-also opens Windows Settings, where you pick the app each type had before; a type no app had before Jasper says so
-instead. An upgrade keeps the types you chose.
+Jasper window or Settings becomes active again. Row results read "Pick Jasper for <ext> in Windows Settings".
+**Restore Previous** also opens Windows Settings, where you pick the app each type had before; its rows read "Pick <app>
+for <ext> in Windows Settings". An upgrade keeps the types you chose.
 
 ### On Linux
 
@@ -697,8 +698,9 @@ after you remove an extension of yours also drops the file type Jasper declared 
 ## Settings
 
 The settings live in `plugins/dev.jasper.editor/dev.jasper.editor.toml` in [Jasper home](getting-started.md#jasper-home)
-and on Settings › Tools › Editor, in the sections Font, Colors, Editing, Markdown, Files, Default editor and File associations. Jasper creates
-the file, with every setting commented out, when it is missing; changes in the file or on the page apply without a restart.
+and on Settings › Tools › Editor, in the sections Font, Colors, Editing, Markdown, Files, Default editor and File
+associations. Jasper creates the file, with every setting commented out, when it is missing; changes in the file or on
+the page apply without a restart.
 A bad value is reported and its default used ([Plugin settings](plugins.md#plugin-settings)).
 
 | Key | Default | Values | On the page | Applies to |

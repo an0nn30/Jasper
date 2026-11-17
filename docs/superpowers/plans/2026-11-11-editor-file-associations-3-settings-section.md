@@ -18,6 +18,14 @@ Planned deviations, recorded as AGENTS.md asks:
   for <ext>"), so a claimed-then-cancelled extension cannot leak a declaration; strings added beyond the Copy table:
   Linux NoPrevious ("…choose one in your file manager"), macOS NOT_INSTALLED (the Windows line), accessible labels
   "Choose Jasper for <name>" and "Extension"; the NO_SYSTEM_TYPE text names the system.
+- (g) Final review fixes: a Windows Restore Previous reads "Pick <app> for <ext> in Windows Settings", naming the app
+  the claim saved (beyond the Copy table); a Jasper row whose type no app had before shows the platform NoPrevious text
+  after its state on macOS and Windows; a row's result gives way once a later status changes the row's state; a done
+  claim drops the row's tick; an unsaved row the system refuses shows the refusal; Settings' dialog becoming active
+  refreshes the rows too (`AuxiliaryWindows.onActivated`); `forget` drops only a declaration (SDK Javadoc and fake);
+  the facade's fallback for work that is not run answers every extension (in `platform.FileAssociations.run`, not
+  `HostedFileAssociations`, since a restore legitimately omits extensions); the fake's restore ends in Settings while
+  its claims do, and its `Platform.fileAssociations()` requires the UI thread.
 
 **Goal:** The Editor's settings page gets a **File associations** section. It lists file types with their current
 app, has ticks and **Make Jasper the Default** (**Choose in Windows Settings…** on Windows), **Restore Previous**, and
@@ -460,4 +468,6 @@ list", "Custom extensions", "SDK surface", "Docs", "Tests".
 Plan 2's list, plus these:
 - The section's layout in the three themes.
 - Add, remove and claim round trips on each platform.
-- The Windows flow from the button to Settings and back. The rows update when the window becomes active again.
+- The Windows flow from the button to Settings and back. The rows update when the window or the Settings dialog
+  becomes active again.
+- Remove is in the row's context menu.

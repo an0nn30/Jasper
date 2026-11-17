@@ -8,6 +8,7 @@ import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.FileAssociations;
 import dev.jasper.sdk.ui.FileAssociations.Claimability;
 import dev.jasper.sdk.ui.FileAssociations.FileTypeStatus;
+import dev.jasper.sdk.ui.FileAssociations.Handler;
 import dev.jasper.sdk.ui.FileAssociations.Outcome;
 import dev.jasper.sdk.ui.FileAssociations.Refusal;
 import dev.jasper.sdk.ui.FileAssociations.TypeResult;
@@ -25,7 +26,6 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Function;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -69,13 +69,17 @@ final class FileAssociationsSection {
     private final Map<String, FileTypeStatus> statuses = new HashMap<>();
     private final Map<String, Boolean> touched = new HashMap<>();
     private Map<String, Refusal> refusals = Map.of();
-    private Map<String, String> results = Map.of();
+    /** Each row's result text, and the row's state when the call's own status answer came, which a change ends. */
+    private final Map<String, String> results = new HashMap<>();
+    private final Map<String, FileTypeRowState> resultStates = new HashMap<>();
     private Subscription changes = () -> { };
     private boolean open, busy;
     /** Moves on each open and close, so an answer from an earlier opening is dropped. */
     private long session;
     /** The newest status request and the newest round of claimability requests; older answers are dropped. */
     private long statusRound, claimRound;
+    /** The status request a claim or restore made after its answer; that answer and later ones settle its results. */
+    private long resultsRound = Long.MAX_VALUE;
     private String typed = "";
 
     /**
@@ -83,7 +87,7 @@ final class FileAssociationsSection {
      * @param osName the {@code os.name} the copy follows
      * @param userExtensions the pending user extensions
      * @param savedExtensions the saved user extensions; a user row is claimable only once its extension is saved, so
-     *     removing it later is applied and forgets what a claim saved
+     *     removing it later is applied and drops any declaration Jasper made for it
      * @param stageUserExtensions stages a new list of user extensions
      * @param render re-renders the page
      */
@@ -119,7 +123,8 @@ final class FileAssociationsSection {
         touched.clear();
         statuses.clear();
         refusals = Map.of();
-        results = Map.of();
+        results.clear();
+        resultStates.clear();
         typed = "";
         busy = false;
         try {
@@ -156,8 +161,23 @@ final class FileAssociationsSection {
         associations.status(extensions()).thenAccept(answer -> {
             if (mine != session || asked != statusRound) return;
             answer.forEach(status -> statuses.put(status.extension(), status));
+            if (asked >= resultsRound) settleResults();
             render.run();
         });
+    }
+
+    /** Notes each result's row state at the first answer after its call, and drops a result whose row state changed since. */
+    private void settleResults() {
+        boolean unavailable = associations.unavailable().isPresent();
+        for (Row row : rows()) {
+            if (!results.containsKey(row.id())) continue;
+            FileTypeRowState now = state(row, unavailable);
+            FileTypeRowState then = resultStates.putIfAbsent(row.id(), now);
+            if (then != null && !then.equals(now)) {
+                results.remove(row.id());
+                resultStates.remove(row.id());
+            }
+        }
     }
 
     // ---- events
@@ -172,8 +192,8 @@ final class FileAssociationsSection {
                 touched.put(toggled.id().substring(TICK.length()), toggled.checked());
                 render.run();
             }
-            case UiEvent.Action action when action.id().equals(CLAIM) -> perform(claimable(lines()), associations::claim);
-            case UiEvent.Action action when action.id().equals(RESTORE) -> perform(restorable(lines()), associations::restore);
+            case UiEvent.Action action when action.id().equals(CLAIM) -> perform(claimable(lines()), false);
+            case UiEvent.Action action when action.id().equals(RESTORE) -> perform(restorable(lines()), true);
             case UiEvent.Edited edited when edited.id().equals(FIELD) -> {
                 typed = edited.text();
                 render.run();
@@ -185,23 +205,35 @@ final class FileAssociationsSection {
         return true;
     }
 
-    /** Claims or restores, then shows each row's first outcome that is not Done until the next claim or restore. */
-    private void perform(List<String> extensions, Function<List<String>, CompletableFuture<List<TypeResult>>> call) {
+    /**
+     * Claims or restores, then shows each row's first outcome that is not Done until the next claim or restore, or until
+     * a later status answer changes the row's state. A claim that was done for every type of a row drops its tick.
+     */
+    private void perform(List<String> extensions, boolean restore) {
         if (!open || busy || extensions.isEmpty()) return;
         long mine = session;
+        // Who each type had before, as the claim saved it: a restore in Windows Settings names that app.
+        Map<String, String> previous = new HashMap<>();
+        for (String extension : extensions)
+            Optional.ofNullable(statuses.get(extension)).ifPresent(status -> status.types().forEach(type ->
+                type.previous().ifPresent(handler -> { if (handler instanceof Handler.Other other) previous.put(type.type(), other.name()); })));
         busy = true;
-        results = Map.of();
+        results.clear();
+        resultStates.clear();
         render.run();
-        call.apply(extensions).thenAccept(answer -> {
+        (restore ? associations.restore(extensions) : associations.claim(extensions)).thenAccept(answer -> {
             if (mine != session) return;
             busy = false;
-            var texts = new HashMap<String, String>();
             for (Row row : rows()) {
-                answer.stream().filter(result -> row.extensions().contains(result.extension()))
-                    .map(result -> outcomeText(result.outcome(), result.extension(), os)).filter(text -> !text.isEmpty())
-                    .findFirst().ifPresent(text -> texts.put(row.id(), text));
+                List<TypeResult> own = answer.stream().filter(result -> row.extensions().contains(result.extension())).toList();
+                own.stream().map(result -> restore && result.outcome() instanceof Outcome.InSettings && previous.containsKey(result.type())
+                        ? "Pick " + previous.get(result.type()) + " for " + result.extension() + " in Windows Settings"
+                        : outcomeText(result.outcome(), result.extension(), os))
+                    .filter(text -> !text.isEmpty()).findFirst().ifPresent(text -> results.put(row.id(), text));
+                if (!restore && !own.isEmpty() && own.stream().allMatch(result -> result.outcome() instanceof Outcome.Done))
+                    touched.remove(row.id());
             }
-            results = Map.copyOf(texts);
+            resultsRound = statusRound + 1;
             refresh();
             render.run();
         });
@@ -291,8 +323,11 @@ final class FileAssociationsSection {
     private ListItem item(Line line) {
         Row row = line.row();
         String prefix = "editor.associations.row:" + row.id();
-        String text = line.unsaved() ? "Apply Settings to choose Jasper for " + row.extensions().getFirst()
-            : Optional.ofNullable(results.get(row.id())).orElseGet(() -> stateText(line.state(), row.extensions().getFirst()));
+        String extension = row.extensions().getFirst();
+        String text = line.unsaved() && !(line.state() instanceof FileTypeRowState.NotClaimable)
+            ? "Apply Settings to choose Jasper for " + extension
+            : Optional.ofNullable(results.get(row.id())).orElseGet(() -> stateText(line.state(), extension)
+                + (noPrevious(line) ? " · " + outcomeText(new Outcome.NoPrevious(), extension, os) : ""));
         var title = new Nodes.Text(prefix + ".title", ControlState.READY, row.name(), Nodes.TextRole.BODY);
         var subtitle = new Nodes.Text(prefix + ".subtitle", ControlState.READY, String.join(", ", row.extensions()) + " · " + text,
             Nodes.TextRole.DESCRIPTION);
@@ -302,6 +337,21 @@ final class FileAssociationsSection {
             ? List.of(new MenuItem("editor.associations.remove.item:" + row.id(), "Remove", "", REMOVE + row.id(), true, false))
             : List.of();
         return new ListItem(row.id(), Optional.empty(), List.of(title), List.of(subtitle), List.of(tick), false, Optional.of(menu));
+    }
+
+    /**
+     * Whether a Jasper row has nothing to hand back because no app had one of its types before Jasper, which only Linux
+     * can hand back: Restore is off for it, and its row says why.
+     */
+    private boolean noPrevious(Line line) {
+        boolean restorable = switch (line.state()) {
+            case FileTypeRowState.Jasper jasper -> jasper.restorable();
+            case FileTypeRowState.Partly partly -> partly.restorable();
+            default -> true;
+        };
+        return os != Os.LINUX && !restorable && line.row().extensions().stream().map(statuses::get).filter(Objects::nonNull)
+            .flatMap(status -> status.types().stream())
+            .anyMatch(type -> type.handler() instanceof Handler.Jasper && type.previous().filter(Handler.None.class::isInstance).isPresent());
     }
 
     private String stateText(FileTypeRowState state, String extension) {
