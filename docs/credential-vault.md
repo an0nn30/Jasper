@@ -26,9 +26,10 @@ plugins, such as Remote and File Server, fetch a credential from it only after y
 | **Add Secure Note...** | `dev.jasper.vault.add_note` | none | none | |
 
 Every command is in the command palette. Open Vault, the Add and Generate commands, Change Vault Master Password and
-Vault Plugin Grants create the vault when there is none, or unlock it, then open the manager and go on from
-there. Rebind them in Settings › Keymap, or by quoted id under `[keybindings]` in `config.toml`
-([keyboard shortcuts](keyboard-shortcuts.md)).
+Vault Plugin Grants create the vault when there is none, or unlock it, then open the manager and go on from there; the
+Browser's **Manage Passwords** opens the manager the same way
+([Manage Saved Passwords](browser.md#manage-saved-passwords)). Rebind them in Settings › Keymap, or by quoted id under
+`[keybindings]` in `config.toml` ([keyboard shortcuts](keyboard-shortcuts.md)).
 
 The status bar's right side shows the vault's state: **Vault** with no vault yet (tooltip "No vault — click to create
 one"), **Vault: Locked** ("Vault locked") or **Vault: Unlocked** ("Vault unlocked · locks in N min", or "Vault
@@ -85,10 +86,10 @@ data folder instead, readable by your account only. The manager's footer names t
 
 ## The manager
 
-The manager is one modeless dialog, **Credential Vault**, over the window you open it from. Opening it again brings it to the front, and it closes
-with that window. You can resize it, and Jasper remembers its size and position. Its first row has a lock button
-(tooltip "Lock vault") and the add menu (tooltip "Add entry"): **Login**, **SSH Key**, **Secure Note** and **Generate
-SSH Key...**.
+The manager is one modeless dialog, **Credential Vault**, over the window you open it from. Opening it again, from any
+window, brings it to the front together with the window it opened over, and it closes with that window. You can resize it, and Jasper remembers its size and position. Its first
+row has a lock button (tooltip "Lock vault") and the add menu (tooltip "Add entry"): **Login**, **SSH Key**, **Secure
+Note** and **Generate SSH Key...**.
 
 Below are three columns:
 
@@ -117,12 +118,13 @@ Under a classic look, one whose [kit file starts from the classic base](looks.md
   Linux and Windows, which does not follow a rebinding, and **Search vault** at the trailing edge.
 - A Categories tree, All Items over Logins, SSH Keys and Secure Notes, with counts.
 - A table with **Name**, **Username** ("—" for other entries), **Type** (a login's sign-in method, else the kind) and
-  **Modified** (a key's creation date). Click a header to sort by it, again to reverse. The footer counts what shows,
-  "N of M items".
-- **Details**: the name over its type and its sign-in method, algorithm or "Stored in Vault", a **Fields** box in which every field has
-  **Copy** (Password and Note also **Show**), the Properties **Modified** and **Used by** (the plugins with a saved
-  grant for the entry, such as "Remote", or "Not used"), and **Edit…**, **Delete…** and, for SSH keys, **Copy Public
-  Key**.
+  **Modified** (a key's creation date), sorted by Name. Click a header to sort by it, again to reverse; drag a column
+  boundary to resize a column, or double-click it to fit the column to its content. The sort and widths are
+  remembered. The footer counts what shows, "N of M items".
+- **Details**: the name over its type and its sign-in method, algorithm or "Stored in Vault", a **Fields** box in which
+  every field has **Copy** (Password and Note also **Show**), the Properties **Modified** and **Used by** (the plugins
+  with a saved grant for the entry, such as "Remote", or "Not used"), and **Edit…**, **Delete…** and, for SSH keys,
+  **Copy Public Key**.
 - A status row: "Locked" or "Unlocked · *store*" (such as "Unlocked · Keychain"), "Auto-lock: 15 min" (or "off") and
   the vault's path.
 
@@ -266,7 +268,8 @@ login comes with a saved grant for that plugin, with which the Browser later sig
 a navigation you begin, while the vault is unlocked ([Remembered sign-ins](browser.md#remembered-sign-ins)). Saving
 again under the same name replaces the username and password of the plugin's own login of that name, the one whose only
 saved grant is that plugin's; a login of that name that another plugin may also read, or that the plugin has no grant
-for, is left alone, and a new one is added beside it.
+for, is left alone, and a new one is added beside it. With no vault yet nothing is saved, and a "No vault yet"
+notification says "Create a vault in Credential Vault first (Open Vault...)".
 
 **Vault Plugin Grants...** shows the saved grants as "*plugin id* — *entry name*", a saved login's grant among them;
 select one and press **Revoke** to make that plugin ask again, or **Back to entries**. One-time permissions end when the
@@ -296,6 +299,7 @@ Under `plugins/dev.jasper.vault/` in Jasper home:
 | `data/device.secret` | the device secret, when no keychain tool could keep it |
 | `data/device.dpapi` | the device secret on Windows, protected by DPAPI |
 | `data/keys/` | generated SSH keys, unless `keys_directory` names another folder |
+| `data/columns.properties` | the sort and column widths of the manager's table under a classic look |
 
 Path keys and key-based logins refer to key files wherever they are; the vault never copies them.
 
@@ -341,6 +345,5 @@ and writable by their owner only: `rw-------` with POSIX permissions, otherwise 
 
 Credential Vault exports `dev.jasper.vault.api`; Remote and File Server use it through an optional requirement,
 `{ id = "dev.jasper.vault", version = ">=0.2", optional = true }`, and the Browser through one with
-`version = ">=0.9.0"`.
-[Plugin APIs](plugin-apis.md#credential-vault-api) describes
+`version = ">=0.9.0"`. [Plugin APIs](plugin-apis.md#credential-vault-api) describes
 [`VaultApi`](sdk-reference.html#dev.jasper.vault.api.VaultApi), its grants and the types it returns.

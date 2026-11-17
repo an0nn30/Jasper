@@ -30,7 +30,9 @@ Conventions:
 Test-pinned rules (the build fails otherwise):
 - Never change a `<!-- example:name -->` block: its code is compared with a compiled source.
 - `docs/configuration.md` keeps the literal row `| \`<key>\` |` for every CoreSettings key and none for an alias;
-  `config.example.toml` keys and values equal the defaults (comments may change).
+  `config.example.toml` has every core setting at its default, except the platform-dependent `ui.font.size`,
+  `system.run_in_background`, `ui.workspace.opacity`, `ui.theme.dark` and `ui.theme.light`, which stay commented out
+  (comments may change).
 - Every `sdk = "..."` range in `docs/plugin-authoring.md`, `jasper-sdk/README.md` and `docs/sdk-icons.md` admits
   `JasperSdk.VERSION`, and each of those files keeps at least one.
 - `docs/vim-divergences.md`'s corpus table is pinned; `docs/editor-vim-reference.md` is generated.

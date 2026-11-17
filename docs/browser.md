@@ -11,11 +11,12 @@ the Markdown preview is the Editor's Basic one, and while Jasper is itself the s
 
 ## Opening pages
 
-- **New Browser Tab** (File menu and command palette) opens the [start page](#settings) in a new tab at the end of the
-  strip; **New Browser Window** opens it in a new window. Neither has a default shortcut.
+- **New Browser Tab** (File menu and command palette, `dev.jasper.browser.new_tab`) opens the [start page](#settings) in
+  a new tab at the end of the strip; **New Browser Window** (`dev.jasper.browser.new_window`) opens it in a new window.
+  Neither has a default shortcut; bind one in Settings › Keymap.
 - The **Split** submenus list **Browser Right** and **Browser Down**, which open the start page in a new pane beside the
-  focused one. The command palette calls them **Split Right with Browser** and **Split Down with Browser**; they have no
-  default shortcut.
+  focused one. The command palette calls them **Split Right with Browser** (`dev.jasper.browser.split_right_browser`)
+  and **Split Down with Browser** (`dev.jasper.browser.split_down_browser`); they have no default shortcut.
 - Links you click in a terminal, Jasper's own web links, `jasper URL...`, a launch's web addresses and, while Jasper is
   your [default browser](#making-jasper-your-default-browser), links from other apps can open here, as
   [below](#links-from-terminals-and-jasper).
@@ -39,14 +40,16 @@ without any user name and password in it.
   tab; Chromium lets a page's script do so only while the page's history has a single entry, and a linked popup can
   always close itself ([Popups](#popups)).
 - A page in a tab that is not shown draws one frame a second; its network requests go on.
-- Chromium starts the first time a browser page or a [Markdown preview](#markdown-preview) shows, not when Jasper
-  starts, and runs until Jasper quits. When it cannot start, Jasper posts "The browser could not start" with the
+- Chromium starts the first time a browser page or a Chromium [Markdown preview](#markdown-preview) shows, not when
+  Jasper starts, and runs until Jasper quits. When it cannot start, Jasper posts "The browser could not start" with the
   reason, such as "Chromium did not start within 90 seconds", and the plugin's log has it too. From then on the links
   Jasper hands the Browser open in the system browser (a local web file in the Default editor; while Jasper is itself
   the system's default browser, a web link opens nothing), and New Browser Tab, New Browser Window and the Browser split
   item post the notification again instead of opening a page.
 - All pages but those in [/dev/null mode](#devnull-mode) share one Chromium profile, kept across runs: cookies, session
   cookies included, the cache and other site data ([Files](#files)).
+- Chromium runs with its sandbox off, as in JetBrains' own JCEF configuration, so its page processes have your user
+  account's access: a page that exploited a flaw in Chromium would not be held in a sandbox.
 
 ## The toolbar
 
@@ -73,11 +76,12 @@ page has no favicon Jasper can show ([Jasper's own requests](#jaspers-own-reques
 drag to copy URL": dragging it drags the page's address, as a link and as text, and for a `file:` page as the file.
 
 The address field shows the page's address until you type in it, or on a search engine's results page the search
-terms ([Search and suggestions](#search-and-suggestions)). A click that brings the keyboard into the field selects its
-text, as **Open Location…** does; a click while the field has the keyboard places the caret. While you type, a list
-under the field suggests what to load, the first suggestion selected: **Enter** or **Tab** loads the selected one and
-moves the keyboard to the page, and **Escape** gives up what you typed, shows what the field showed before and selects
-it. With no list showing, Enter loads what the field holds. The field reads its text, without its surrounding spaces:
+terms ([Search and suggestions](#search-and-suggestions)); emptied, it reads "Search or enter website name". A click
+that brings the keyboard into the field selects its text, as **Open Location…** does; a click while the field has the
+keyboard places the caret. While you type, a list under the field suggests what to load, the first suggestion
+selected: **Enter** or **Tab** loads the selected one and moves the keyboard to the page, and **Escape** gives up what
+you typed, shows what the field showed before and selects it. With no list showing, Enter loads what the field holds.
+The field reads its text, without its surrounding spaces:
 
 - an address that starts with `http:`, `https:`, `file:`, `about:` or `jasper-about:` loads as typed, with the
   characters an address cannot hold, such as spaces, escaped;
@@ -205,7 +209,8 @@ pause typing for 300 ms, and lists the entries whose title or address holds any 
 page's title, and opens **Edit Bookmark** below the button, unless the page began another load meanwhile. It is dimmed
 for an address that history does not record ([History](#history)), such as a `jasper-about:` page. On an
 [error page](#error-pages) it bookmarks the address that failed, without a title. While the page's address is
-bookmarked, the item reads **Remove Bookmark**, which removes the bookmark and posts "Bookmark Removed".
+bookmarked, the item reads **Remove Bookmark**, which removes the bookmark and posts "Bookmark Removed" in the
+Bookmarks group ([Notifications](notifications.md#groups)).
 
 **Edit Bookmark** shows the bookmark's **Title** and **URL**, which cannot be changed, and its **Tags**, which take the
 keyboard:
@@ -362,7 +367,7 @@ A right-click on a page (Control-click on macOS) opens Jasper's menu for what is
 - in a text field, **Cut**, **Copy** and **Paste**, Cut and Copy dimmed without a selection; elsewhere, with a
   selection, **Copy** and **Search with** *engine*;
 - **Select All**, always;
-- the pane items of a terminal's right-click menu: **Split ▸**, **Move Pane to Tab ▸** and **Close Pane**;
+- the pane items **Split ▸**, **Move Pane to Tab ▸** and **Close Pane**, as in a terminal's right-click menu;
 - **Save Page As…**, **Print…**, and **Copy Page Title**, which is dimmed while the page has no title;
 - **View Source**, **Remove Element** and **Inspect Element** ([View Source](#view-source), [Page tools](#page-tools),
   [Inspect Element](#inspect-element)).
@@ -381,14 +386,14 @@ provider's, such as Cloudflare Turnstile's.
 ## View Source
 
 **View Source**, in the page's right-click menu, shows the page's source in its pane, at
-`jasper-about:source?url=…`, in a tab titled "Page Source – *host*": the heading "Page Source", the page's address
-without any user name and password, and the HTML, its tags, attribute names, attribute values and comments in the
-workspace theme's syntax colours, with the `http` and `https` addresses in its attribute values as links. **Back**
-returns to the page.
+`jasper-about:source?url=…`, in a tab titled "Page Source – *host*", or with the address for a page without a host:
+the heading "Page Source", the page's address without any user name and password, and the HTML, its tags, attribute
+names, attribute values and comments in the workspace theme's syntax colours, with the `http` and `https` addresses in
+its attribute values as links. **Back** returns to the page.
 
 - For an `http` or `https` page, Jasper fetches the page again each time the source page loads, after a restore too
   ([Jasper's own requests](#jaspers-own-requests)): the HTML the server sends without your cookies, which can differ
-  from what you see, for example on a page you are signed in to. Only a successful answer (200) of at most 5 MB within
+  from what you see, for example on a page you are signed in to. Only a successful answer (200) of at most 5 MiB within
   10 seconds is shown.
 - For any other page, and when that fetch fails, it shows the page's HTML as Chromium held it when you chose View
   Source. The pane keeps that HTML while it is open, for up to its last 20 View Sources. Without it, as after a restore
@@ -576,14 +581,14 @@ downloads nothing.
   has is kept. Jasper writes the stream itself. When the mark cannot be written, as on a Windows volume without streams
   (FAT32 or exFAT: "This volume cannot keep a downloaded-file mark"), Jasper warns "“NAME” has no downloaded-file
   mark", and on macOS and Windows the download has no Open: open it from the file manager only if you trust it.
-- **The Downloads menu** joins the menu bar with the first download. It lists the 20 newest downloads, and any older one
-  still running, oldest first, each a submenu titled with its name and its progress, such as "report.pdf — 42%", or
-  what has arrived while its size is unknown, such as "1.2 MB"; then Finished, Failed or Stopped. A running download's
-  submenu has **Stop**; a finished one's **Open**, with the application the system opens it with, and **Show in
-  Finder**, which shows it selected in its folder (**Show in Explorer** on Windows; **Show in Folder** on Linux, which
-  opens its folder); one that no longer runs, **Remove from List**. **Clear All** removes every download that no
-  longer runs. While the menu is open, a title changes in place, and a change to its entries waits until it closes.
-  The list lasts until Jasper quits.
+- **The Downloads menu** joins the menu bar with the first download. **Clear All**, at its top, removes every download
+  that no longer runs. Below it the menu lists the 20 newest downloads, and any older one still running, oldest first,
+  each a submenu titled with its name, a name over 60 characters shortened in the middle, and its progress, such as
+  "report.pdf — 42%", or what has arrived while its size is unknown, such as "1.2 MB"; then Finished, Failed or
+  Stopped. A running download's submenu has **Stop**; a finished one's **Open**, with the application the system opens
+  it with, and **Show in Finder**, which shows it selected in its folder (**Show in Explorer** on Windows; **Show in
+  Folder** on Linux, which opens its folder); one that no longer runs, **Remove from List**. While the menu is open, a
+  title changes in place, and a change to its entries waits until it closes. The list lasts until Jasper quits.
 - **Notifications,** in the Downloads group ([Notifications](notifications.md#groups)): "Download finished for “NAME”."
   and "Download failed for “NAME”.", when a download fails or Jasper refuses it, with the reason when Jasper has one; a
   download you stop posts none.
@@ -1028,7 +1033,8 @@ These links come to the Browser:
   ([Terminal](terminal.md#links-and-file-paths));
 - a local web file you Cmd-click in a terminal: HTML, XML, SVG, CSS, JavaScript, PDF, PNG, JPEG, GIF, WebP or HEIC;
 - Jasper's own web links, such as Settings' Help button and the homepages in About › Licenses… and Settings › Plugins,
-  and the links plugins open, such as the Editor's Markdown preview links;
+  and the links plugins open, such as the Editor's Markdown preview links and a tunnel's **Open in Browser** in
+  [Remote](remote.md#the-tunnels-panel);
 - the addresses from outside Jasper: those of `jasper URL...` ([Command line](command-line.md#the-jasper-command)), a
   launch's web addresses ([launch options](command-line.md#launching-jasper-with-options)), `open -a Jasper URL` on
   macOS, and the links other apps open while Jasper is your
@@ -1072,10 +1078,11 @@ setting, Built-in Browser or Default Browser (Default Editor); Cancel saves noth
 dialog, such as Settings, the prompt cannot show, and the link opens in the system browser (the file in the
 Default editor) that once.
 
-**Open URL in Split Right** and **Open URL in Split Down** are in a terminal's right-click menu while the pane's
-selection is one `http` or `https` address and either Open Links From Terminal is not Default Browser or Jasper is the
-system's default web browser. They open the selected address in a browser pane to the right of the pane or below it,
-without asking. Select the address by dragging: a double-click selects only part of it. They are also listed in the
+**Open URL in Split Right** (`dev.jasper.browser.open_url_split_right`) and **Open URL in Split Down**
+(`dev.jasper.browser.open_url_split_down`) are in a terminal's right-click menu while the pane's selection is one
+`http` or `https` address and either Open Links From Terminal is not Default Browser or Jasper is the system's default
+web browser. They open the selected address in a browser pane to the right of the pane or below it, without asking. A
+double-click on an address selects all of it ([Terminal](terminal.md#selecting-text)). They are also listed in the
 command palette and Settings › Keymap, where they have no address and do nothing.
 
 ## Making Jasper your default browser
@@ -1155,7 +1162,9 @@ the file's scripts and goes to no other address. Its links and images are the Ed
 one, goes to the Editor, which follows it as [Links in the preview](editor.md#links-in-the-preview) says, and its images
 are those the Editor loads, web images only after **Load external images**. It has no right-click menu and opens no
 popups or page dialogs. While the Browser plugin is off, and once Chromium could not start or has stopped, the Editor's
-previews are Basic, the Editor's own, which shows Mermaid diagrams as code.
+previews are Basic, the Editor's own, which shows Mermaid diagrams as code; a [view](editor.md#views-of-one-file) whose
+preview page did not load and show its document within 30 seconds, or whose page stopped, previews in Basic for the
+rest of the run.
 
 ## Restore
 
@@ -1163,10 +1172,10 @@ When Jasper restores a window ([Saving and restoring the windows](workspace.md#s
 browser page comes back in its tab and pane, at the address it last showed, at its own [zoom](#zoom) and for the OSC 8
 target it was opened for.
 It loads the first time it shows, so restoring a page starts no Chromium; until then its tab is named after the
-address's host. Chromium starts inside Jasper the first time a page or a Markdown preview shows and runs until Jasper
-quits. If Jasper ends while Chromium starts or runs, for example in a Chromium crash or a force-quit, the pages the next
-launch restores wait instead: each says "Jasper closed while this page was open." and loads when you click **Load
-Page**, press Enter in its address field, click **Reload** or open a link in it.
+address's host. Chromium starts inside Jasper the first time a page or a Chromium Markdown preview shows and runs until
+Jasper quits. If Jasper ends while Chromium starts or runs, for example in a Chromium crash or a force-quit, the pages
+the next launch restores wait instead: each says "Jasper closed while this page was open." and loads when you click
+**Load Page**, press Enter in its address field, click **Reload** or open a link in it.
 
 - An address too long for the saved state (4,096 characters, counted with the target and the zoom) is saved without
   its query and fragment, and when it is still too long, not at all.

@@ -9,11 +9,11 @@ themes, and how to ship themes in a plugin. [Themes](themes.md) covers choosing 
 
 | Term | What it is | Chosen with |
 |---|---|---|
-| Appearance | **Dark**, **Light** or **Match System**. Match System follows the operating system live on macOS; on Linux and Windows, which do not report it, it shows Dark. | `ui.appearance` (`"system"`, `"dark"`, `"light"`) |
+| Appearance | **Dark**, **Light** or **Match System**. Match System follows the operating system live, as macOS reports it or, on Linux, the desktop portal; where neither reports it, as on Windows, it shows Dark. | `ui.appearance` (`"system"`, `"dark"`, `"light"`) |
 | Theme | One file, `<id>.json`, with a name. It holds a Dark UI variant, a Light UI variant or both, one or more terminal schemes, and an editor scheme for each UI variant. A file without UI variants is a terminal-only theme. | `ui.theme.dark`, `ui.theme.light` |
 | UI variant | `ui.dark` or `ui.light`: the colour roles of the whole interface, from window chrome to plugin views. The Dark appearance shows the Dark theme's `ui.dark`, the Light appearance the Light theme's `ui.light`. | (by the theme and the appearance) |
 | Terminal scheme | `terminal.<key>`: 21 colours for the terminal text area. Its id is `<theme id>/<key>`. A UI variant's matching scheme is the one with its key (`dark` or `light`); other keys are extra schemes. | `terminal.scheme`: `"match"` (the shown variant's matching scheme) or a scheme id |
-| Editor scheme | `editor.dark` or `editor.light`: the Editor's surfaces and syntax colours. The Editor always uses the shown variant's editor scheme, whatever `terminal.scheme` says. | (by the shown variant) |
+| Editor scheme | `editor.dark` or `editor.light`: the Editor's surfaces and syntax colours. The Editor uses the shown variant's editor scheme, whatever `terminal.scheme` says, unless its **Color scheme** setting picks another theme's ([Editor](editor.md#theme-colours)). | (by the shown variant), or the Editor's `color_scheme` |
 | Look | The presentation: window chrome, controls, metrics and fonts. The default look, or a plugin's look such as Enterprise ([Looks](looks.md)). A look never carries colours, and every theme works under every look. | Settings › Plugins |
 
 ### How the parts combine
@@ -57,8 +57,8 @@ It cannot change:
    [Slate Cobalt colour reference](design/theme-engine/slate-cobalt.md), and a checkout of Jasper has every built-in
    file in `jasper-ui/src/main/resources/dev/jasper/ui/theme/`.
 2. **Name it.** Change `"name"` (and `"author"`), and save the file as `<id>.json`, the id being the name in lowercase
-   words joined by dashes: "My Theme" is `my-theme.json` ([Ids and names](#ids-and-names)). A built-in theme's id, or
-   one a plugin declares, cannot be used.
+   words joined by dashes: "My Theme" is `my-theme.json` ([Ids and names](#ids-and-names)). A built-in theme's id,
+   `desktop-colors` or one a plugin declares cannot be used.
 3. **Install it.** Copy the file into the `themes` folder in Jasper's home (`~/.config/jasper/themes/` on macOS and
    Linux, `%APPDATA%\jasper\themes\` on Windows; [Configuration](configuration.md#location-and-startup-options) gives
    every location), or use **Import Theme…** ([Installing and trying a theme](#installing-and-trying-a-theme)).
@@ -129,9 +129,9 @@ No other top-level key is allowed.
   without a trailing dash. "Gruvbox Dark" is `gruvbox-dark`; "Frappé Night" is `frappe-night`. A name that leaves
   nothing cannot be imported.
 - **Reserved ids.** The built-in ids `slate-cobalt`, `catppuccin-latte`, `catppuccin-frappe`, `catppuccin-macchiato`,
-  `catppuccin-mocha`, `ubuntu-yaru` and `jasper-meadow`, and every theme id a discovered plugin declares, enabled or
-  not (the bundled Enterprise plugin declares `enterprise`). A themes-folder file with a reserved id is ignored, and
-  Import refuses one.
+  `catppuccin-mocha`, `ubuntu-yaru` and `jasper-meadow`; `desktop-colors` ([Desktop colors](themes.md#desktop-colors));
+  and every theme id a discovered plugin declares, enabled or not (the bundled Enterprise plugin declares
+  `enterprise`). A themes-folder file with a reserved id is ignored, and Import refuses one.
 - **Names.** Names need not be unique. When two installed themes have the same name, ignoring case, Settings shows
   each as `Name (id)`; two schemes with the same name show as `Name (theme/key)`.
 - **Scheme keys.** Lowercase letters and digits in words joined by dashes, at most 32 characters: `dark`, `light`,
@@ -358,8 +358,8 @@ instead of the recipe. The Catppuccin themes override five, Ubuntu Yaru nine.
 | `warning.ground` | `status.warning` at 14% over `surface.card` | Warning notices and warning status cells |
 | `warning.border` | `status.warning` at 40% over `surface.card` | The edge of warning notices |
 | `border.divider` | `border.window`, raised to 1.3:1 on `surface.card`, at 73% over `surface.card` | Classic grid lines and separators, the rules of the classic menu row and status cells, the bottom strip's dividers |
-| `focus.halo`, `error.halo` | `border.focus` and `border.error`, flattened over `surface.app` | Explicit overrides supply the final opaque focus/error ring paint; without overrides, rings retain their kit opacity |
-| `surface.textSelection` | `selection.bg`, flattened over `surface.app` | An explicit override sets inherited text-component selection fills; without it, they use the matching terminal scheme's selection |
+| `focus.halo`, `error.halo` | `border.focus` and `border.error` laid over `surface.app` | Listed, the focus ring and the error ring in exactly this colour; left out, the recipe paints nothing and the rings are `border.focus` and `border.error` at their fixed strengths ([below](#what-jasper-paints-on-top-of-the-roles)) |
+| `surface.textSelection` | `selection.bg` laid over `surface.app` | Listed, the selection behind selected text in text components without Jasper's own styling; left out, the recipe paints nothing and that selection is the matching terminal scheme's `selection` |
 
 The other fourteen are always computed; listing one is an error (`Unknown colour`).
 
@@ -382,11 +382,11 @@ These treatments are fixed; design the roles with them in mind.
 |---|---|
 | Hover on rows, tables and trees | `hover.overlay` at 5% |
 | Hover on icon and toolbar buttons and window chrome | `hover.overlay` at 8% |
-| Focus ring | `border.focus` at 32% in Dark and 25% in Light around the focused control, or the opaque `focus.halo` override |
-| Error ring | `border.error` at 22%, or the opaque `error.halo` override |
+| Focus ring | `border.focus` at 32% in Dark and 25% in Light around the focused control, or `focus.halo` when the variant lists it |
+| Error ring | `border.error` at 22%, or `error.halo` when the variant lists it |
 | Category tiles and chips | The hue at 17% in Dark and 13% in Light |
 | Search field that finds nothing | `border.error` at 16% over `surface.input` |
-| Selected text in text components without Jasper's own styling | `text.primary` over `surface.textSelection` when overridden, otherwise the matching terminal scheme's `selection` (the shown variant's own scheme, not the user's pick) |
+| Selected text in text components without Jasper's own styling | `text.primary` over `surface.textSelection` when the variant lists it, otherwise over the matching terminal scheme's `selection` (the shown variant's own scheme, not the user's pick) |
 | Menu highlight | `accent` with `text.onAccent` |
 | Workspace tabs, default look | The selected tab is `surface.terminal` with its `tab.indicator` line. The others are `surface.tabstrip`; when it is within 9 CIE L\* of `surface.terminal`, it is moved toward black (toward white when `surface.terminal` is darker than 9 L\*) until it is 9 L\* away |
 | Workspace tabs, Enterprise look | The strip is `surface.tabstrip`; the selected tab is `surface.card` with `tab.indicator` along its bottom |
@@ -463,7 +463,9 @@ Saved as `midnight-terminal.json`, its one scheme is `midnight-terminal/dark`, l
 `editor.dark` and `editor.light` each have exactly these 23 entries, written as [editor values](#editor-values). The
 Editor plugin paints with them through RSyntaxTextArea; plugins read them through the SDK
 ([`Appearance.editorPalette()`](sdk-reference.html#dev.jasper.sdk.ui.Appearance.editorPalette()) and
-[`Appearance.syntaxPalette()`](sdk-reference.html#dev.jasper.sdk.ui.Appearance.syntaxPalette())).
+[`Appearance.syntaxPalette()`](sdk-reference.html#dev.jasper.sdk.ui.Appearance.syntaxPalette()), and every installed
+theme's schemes, which the Editor's **Color scheme** setting lists, through
+[`Appearance.editorSchemes()`](sdk-reference.html#dev.jasper.sdk.ui.Appearance.editorSchemes())).
 
 **Surfaces** (no style):
 
@@ -506,10 +508,10 @@ The Editor's [Markdown preview](editor.md#markdown-preview) colours its code blo
 rest of its page with UI roles: `surface.panel` behind it (at the workspace's opacity in Basic), `text.primary` for
 text, `accent` for links, `text.secondary` for block quotes and image placeholders, `surface.card` behind code blocks,
 `border.window` for table borders, `surface.panel.raised` behind table header cells (in Chromium, behind every other
-row), and `selection.bg` with `text.onSelection` for selected text; Find's matches in it are laid on `selection.bg`, but
-for Chromium's current match, which is orange (`#FF9632`) in every theme.
-Chromium's alerts take `accent` (Note), `status.success` (Tip), the `keyword` role's colour (Important),
-`status.warning` (Warning) and `status.danger` (Caution).
+row), and `selection.bg` with `text.onSelection` for selected text; Find's matches in it are laid on `selection.bg`,
+except Chromium's current match, which is orange (`#FF9632`) in every theme. Chromium's alerts take `accent` (Note),
+`status.success` (Tip), the `keyword` syntax role's colour (Important), `status.warning` (Warning) and `status.danger`
+(Caution).
 
 ## Contrast and the token rule
 
@@ -635,12 +637,15 @@ These carry the line number.
 | `A theme file is UTF-8 text.` | The file is not valid UTF-8 |
 | `A theme file is named after its id: lowercase letters, digits and dashes, at most 64 characters.` | A themes-folder file whose name is not an id |
 | `<Name> is built in; this file is ignored.` | A themes-folder file with a built-in id |
+| `Desktop colors is reserved; this file is ignored.` | A themes-folder file named `desktop-colors.json` |
 | `<Name> is provided by the <plugin> plugin; this file is ignored.` | A themes-folder file with an id a plugin declares, even while that plugin is off (then the message starts with the id) |
 | `Could not read this file: permission denied.` (and other reasons), `Could not list the themes folder: <reason>`, `Could not use this file: <reason>` | The file or the folder could not be read |
 | `<Name> is built in and can't be replaced` | Import of a theme whose id is built in |
+| `Desktop colors is reserved and can't be replaced` | Import of a theme whose id is `desktop-colors` |
 | `<Name> is provided by the <plugin> plugin and can't be replaced` | Import of a theme whose id a plugin declares |
 | `The theme's name has no letters or digits Jasper can use for a file name` | Import of a theme whose name gives no id |
 | `<Name> is built in; the <plugin> plugin's file is ignored.` | A plugin theme with a built-in id |
+| `Desktop colors is reserved; the <plugin> plugin's file is ignored.` | A plugin theme whose id is `desktop-colors` |
 | `<Name> is provided by the <winner> plugin; the <plugin> plugin's file is ignored.` | Two plugins ship the same id ([Shipping themes in a plugin](#shipping-themes-in-a-plugin)) |
 | `The <plugin> plugin's theme file <path> is not in its jars.` | A `themes` path that no jar of the plugin holds |
 | `The <plugin> plugin's theme file <path> could not be used: <reason>` | A plugin theme file over 1 MiB (`Theme files are at most 1 MiB.`) or not valid UTF-8 |
@@ -744,6 +749,7 @@ theme that fails does not stop the others, and the exit status is 1 when anythin
 
 - a file that exists, without `--force` (`error: <path> exists; use --force to overwrite it`);
 - a built-in id (`"<id>" is a built-in Jasper theme; choose another name with --name`);
+- the id `desktop-colors` (`"desktop-colors" is reserved for Desktop colors; choose another name with --name`);
 - two themes that would be written to the same file;
 - a name with no letters or digits.
 
@@ -789,8 +795,8 @@ themes = ["themes/harbour.json"]
   installing.
 - **Read once.** Jasper reads the theme files of every plugin that will load when it starts, and keeps them for the
   whole session. Turning the plugin on or off, or installing a new version of it, takes effect after a restart.
-- **Listed** after the built-in themes, by name, captioned "From the *plugin name* plugin" in the Dark theme and Light
-  theme dropdowns. Settings cannot remove or replace them.
+- **Listed** after the built-in themes (and Desktop colors on Linux), by name, captioned "From the *plugin name*
+  plugin" in the Dark theme and Light theme dropdowns. Settings cannot remove or replace them.
 - **Reserved ids.** Every theme id a discovered plugin declares is reserved, whether the plugin is on or not: no
   themes-folder file or import can take it.
 - **While the plugin does not load** (off, waiting for review, or skipped in safe mode, which loads no installed
@@ -925,8 +931,8 @@ title bar is the window chrome and every derived colour follows its recipe.
 
 ## Checklist
 
-- [ ] Valid, comment-free JSON in UTF-8, under 1 MiB, saved as `<id>.json` with an id that is not built in or a
-      plugin's.
+- [ ] Valid, comment-free JSON in UTF-8, under 1 MiB, saved as `<id>.json` with an id that is not built in,
+      `desktop-colors` or a plugin's.
 - [ ] `"jasper-theme": 1`, a non-empty `name`, and no top-level keys but the six.
 - [ ] Each UI variant lists all 60 roles, none of the eight that follow other roles, the title bar roles only for a
       title bar of its own, and overrides only for the twelve overridable derived roles, as `#RRGGBB`.

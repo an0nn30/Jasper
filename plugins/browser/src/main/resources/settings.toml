@@ -1,4 +1,4 @@
-# Settings for the Browser plugin. Change them in Settings > Tools > Browser or here; changes apply to pages and links opened afterwards.
+# Settings for the Browser plugin. Change them in Settings > Tools > Browser or here. Most changes apply to pages and links opened afterwards; ad blocking, the filter list and the proxy apply at once.
 # start_page = "jasper-about:welcome"   # what a new browser tab, window or pane opens: a web address, or Jasper's welcome page
 # page_zoom = 100                       # the zoom web pages show at until you zoom them, and that Reset Font Size returns to: 25 to 500 (%)
 # downloads_folder = ""                 # where downloaded files go, without asking: an absolute folder, ~ or ~/folder; empty uses the system's Downloads folder

@@ -51,7 +51,7 @@ import java.util.regex.Pattern;
  * page two or three times its size; the worst, the shortest tags up to the highlighting's end and ampersands after it,
  * some 20 characters for each highlighted one and 5 for each other, about 41 million in all: large, but bounded.
  *
- * <p>The page is built on the plugin's background executor, at most {@value #BUILDS} at once (plan 4b's P47), never on
+ * <p>The page is built on the plugin's background executor, at most {@value #BUILDS} at once, never on
  * Chromium's IO thread, which only starts the fetch or the look-up, nor on the UI thread, in the theme as it was last
  * read; a page already open shows a theme change when it loads again. Only the short page for an address without a
  * {@code url} is made at once, on the IO thread.
@@ -63,7 +63,7 @@ public final class SourcePage implements AutoCloseable {
     public static final Duration WAIT = Duration.ofSeconds(20);
     /** How long a fetch of a web page's source may take in all. */
     static final Duration TIMEOUT = Duration.ofSeconds(10);
-    /** The most bytes of a fetched source, and the most characters of a source the page shows: 5 MB. */
+    /** The most bytes of a fetched source, and the most characters of a source the page shows: 5 MiB. */
     static final int LIMIT = 5 * 1024 * 1024;
     /** How many of a source's first characters are highlighted and linked. */
     static final int HIGHLIGHTED = 1_000_000;

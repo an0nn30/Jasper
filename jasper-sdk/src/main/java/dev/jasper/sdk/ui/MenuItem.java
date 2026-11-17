@@ -8,7 +8,7 @@ import java.util.Objects;
  * {@link Nodes.Header}'s overflow menu, the context menu of a list, table, row or crumb, or a content tab's right-click
  * menu ({@link ContentTab#showContextMenu}).
  *
- * <p>Since 0.27.0 an item with {@code children} is a submenu: it shows its label and an arrow, and pointing at it, or
+ * <p>An item with {@code children} is a submenu: it shows its label and an arrow, and pointing at it, or
  * Right or Enter on it, opens its children beside it. A submenu reports nothing itself, so its {@code action} is
  * blank and it shows no shortcut; a disabled one does not open.
  *

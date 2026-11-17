@@ -137,7 +137,8 @@ public interface VaultApi {
      * exactly {@code name}, the last such login in the vault takes the new username and password instead, keeping its
      * id, grants and created time; a login of that name another plugin can read, or this plugin cannot, is left alone
      * and a new one is added. Vault keeps its own copy of {@code password}, so the caller still zeroes its array. The
-     * interface default fails with {@link UnsupportedOperationException}; Credential Vault implements it.
+     * interface default fails with {@link UnsupportedOperationException}; Credential Vault implements it. Since Vault
+     * 0.9.0.
      *
      * @param owner the window the unlock prompt opens over
      * @param name the login's name in Vault
@@ -159,7 +160,7 @@ public interface VaultApi {
     /**
      * The secret for {@code id} without any prompt, only while the vault is unlocked and this plugin holds a saved grant
      * for {@code id}. A one-time grant from a pick is neither used nor spent. Close the result. The interface default
-     * answers empty.
+     * answers empty. Since Vault 0.9.0.
      *
      * @param id a credential's {@link CredentialDescriptor#id() id}
      * @return the secret; empty when the vault is locked or there is none, the id is unknown, or this plugin has no
@@ -172,7 +173,7 @@ public interface VaultApi {
      * Opens the Credential Vault manager over {@code owner}, creating a vault or unlocking first as Open Vault... does;
      * Vault reports its failures in its own notifications, and does nothing when {@code owner} is null or closed. A
      * modal dialog over {@code owner}, such as Settings, keeps the manager and its prompts from taking input until it
-     * closes, so close such a dialog first. The interface default does nothing.
+     * closes, so close such a dialog first. The interface default does nothing. Since Vault 0.9.0.
      *
      * @param owner the window the manager opens over
      * @throws IllegalStateException when Credential Vault is called off the UI thread

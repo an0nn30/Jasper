@@ -178,8 +178,10 @@ crash.
    [WordBoundariesTest](../jasper-terminal/src/test/java/dev/jasper/terminal/internal/text/WordBoundariesTest.java) or
    [LogicalLineTest](../jasper-terminal/src/test/java/dev/jasper/terminal/internal/text/LogicalLineTest.java), and the
    live buffer and EDT behaviour in
-   [SelectionSessionTest](../jasper-terminal/src/test/java/dev/jasper/terminal/internal/emulation/SelectionSessionTest.java)
-   or [SelectionControllerTest](../jasper-terminal/src/test/java/dev/jasper/terminal/view/SelectionControllerTest.java).
+   [SelectionSessionTest](../jasper-terminal/src/test/java/dev/jasper/terminal/internal/emulation/SelectionSessionTest.java),
+   [SelectionControllerTest](../jasper-terminal/src/test/java/dev/jasper/terminal/view/SelectionControllerTest.java)
+   or, for a double-click or word drag on a link,
+   [TerminalViewLinkSelectionTest](../jasper-terminal/src/test/java/dev/jasper/terminal/view/TerminalViewLinkSelectionTest.java).
 2. Change [Selection](../jasper-terminal/src/main/java/dev/jasper/terminal/internal/text/Selection.java) (stream or
    block range), [SelectionText](../jasper-terminal/src/main/java/dev/jasper/terminal/internal/text/SelectionText.java)
    (the copied text), [WordBoundaries](../jasper-terminal/src/main/java/dev/jasper/terminal/internal/text/WordBoundaries.java)
@@ -187,7 +189,7 @@ crash.
    `LinkDetector`'s URL instead) or [LogicalLine](../jasper-terminal/src/main/java/dev/jasper/terminal/internal/text/LogicalLine.java)
    (the soft-wrapped line a triple-click selects) for the rules, `BufferQueries` for the locked reads, and
    [SelectionController](../jasper-terminal/src/main/java/dev/jasper/terminal/view/SelectionController.java) for
-   anchors and validation.
+   anchors (a word drag keeps a double-clicked link whole) and validation.
 3. Run these tests and `TerminalLogicalLineTest`, then full check.
 
 Selections use absolute rows. Keep validation and text extraction atomic under one hold of the buffer lock, drop a
@@ -198,7 +200,9 @@ reflow, history reset and alternate-screen switch.
 
 1. Reproduce the whole press/drag/release gesture in
    [TerminalViewInteractionTest](../jasper-terminal/src/test/java/dev/jasper/terminal/view/TerminalViewInteractionTest.java)
-   or a pure decision in `MouseRoutingTest`.
+   or a pure decision in `MouseRoutingTest`; a link click's `OPEN` or `SPLIT` gesture on each platform, with and
+   without mouse reporting, in
+   [MouseControllerLinkGestureTest](../jasper-terminal/src/test/java/dev/jasper/terminal/view/MouseControllerLinkGestureTest.java).
 2. Change [MouseRouting](../jasper-terminal/src/main/java/dev/jasper/terminal/view/MouseRouting.java)
    for route decisions, [MouseController](../jasper-terminal/src/main/java/dev/jasper/terminal/view/MouseController.java)
    for gesture state, then [MouseInput](../jasper-terminal/src/main/java/dev/jasper/terminal/internal/text/MouseInput.java)
@@ -259,12 +263,17 @@ stalled remote never blocks the EDT, and the connection's `close` must keep runn
    (host rules and the path mapper), [SessionLocalPathsTest](../jasper-terminal/src/test/java/dev/jasper/terminal/session/SessionLocalPathsTest.java)
    or [SessionLaunchOptionsNamesTest](../jasper-terminal/src/test/java/dev/jasper/terminal/session/SessionLaunchOptionsNamesTest.java)
    for a session's directories, and [PathDetectorTest](../jasper-terminal/src/test/java/dev/jasper/terminal/internal/text/PathDetectorTest.java),
-   [LinkDetectorTest](../jasper-terminal/src/test/java/dev/jasper/terminal/internal/text/LinkDetectorTest.java) or
-   [FileLinkTest](../jasper-terminal/src/test/java/dev/jasper/terminal/view/FileLinkTest.java) for clicks.
+   [LinkDetectorTest](../jasper-terminal/src/test/java/dev/jasper/terminal/internal/text/LinkDetectorTest.java),
+   [FileLinkTest](../jasper-terminal/src/test/java/dev/jasper/terminal/view/FileLinkTest.java) or
+   [TerminalLinkTest](../jasper-terminal/src/test/java/dev/jasper/terminal/view/TerminalLinkTest.java) for clicks, and
+   [OscEightTargetTest](../jasper-terminal/src/test/java/dev/jasper/terminal/internal/emulation/OscEightTargetTest.java)
+   for an OSC 8 link's `target=`.
 2. Change [DirectoryProvenance](../jasper-terminal/src/main/java/dev/jasper/terminal/internal/shell/DirectoryProvenance.java)
    for local and remote classification, [PathDetector](../jasper-terminal/src/main/java/dev/jasper/terminal/internal/text/PathDetector.java)
    for path syntax, [LinkDetector](../jasper-terminal/src/main/java/dev/jasper/terminal/internal/text/LinkDetector.java)
-   for plain-text URLs, and `BufferQueries.linkAt`/`fileLinkAt` for OSC 8 links and soft-wrap joining.
+   for plain-text URLs and the cells they cover, `BufferQueries.linkAt`/`fileLinkAt` for OSC 8 links and soft-wrap
+   joining, and `ShellIntegrationFilter`'s `link-target` command with the engine's hyperlink filter for an OSC 8 link's
+   target.
 3. Jasper's own rules stay in the app: `launch.LocalHostNames` gives the names passed as
    `localHostNames`, `LaunchSettings.localPaths` (with `WslPaths` and `UncHosts`) maps a local path,
    and `workspace.FileLinks` resolves a `FileLink` against the pane's local directory. Run
@@ -272,7 +281,7 @@ stalled remote never blocks the EDT, and the connection's `close` must keep runn
    full check.
 
 A remote path must never reach the local surface: keep exactly one of the local and remote
-directory, ambiguity resolving to remote, and the OSC 8 browser scheme allowlist (`http`, `https`,
+directory, ambiguity resolving to remote, and the OSC 8 scheme allowlist of the link opener (`http`, `https`,
 `ftp`, `mailto`).
 
 ## Keep these guides checked

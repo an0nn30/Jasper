@@ -12,12 +12,12 @@ import java.util.function.Consumer;
  * on {@code context.background()}. A connector that throws fails that attempt with the exception's message.
  *
  * @param title the pane's title until the remote program sets one
- * @param icon a semantic icon name for the tab (since 0.7.6), drawn in a 16 &times; 16 logical-pixel slot; empty
+ * @param icon a semantic icon name for the tab, drawn in a 16 &times; 16 logical-pixel slot; empty
  *     shows Jasper's terminal icon, and a name the host does not know makes {@code openTab} or {@code split} throw
  *     {@link IllegalArgumentException}
  * @param onExit what happens to the pane when the session ends
  * @param connector starts one connection attempt
- * @param restore how the session's tab comes back when Jasper restores its windows (since 0.21.0); empty, and the tab is
+ * @param restore how the session's tab comes back when Jasper restores its windows; empty, and the tab is
  *     not saved
  */
 public record SessionSpec(String title, Optional<String> icon, ExitPolicy onExit, Consumer<PendingSession> connector,

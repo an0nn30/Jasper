@@ -43,6 +43,15 @@ queued for at most two seconds and releases the lock. When the log folder or fil
 "Jasper diagnostics are unavailable." to standard error and runs without a log file; the first failed write prints
 "Jasper could not write diagnostics."
 
+Chromium, which the bundled [Browser](browser.md) runs, writes its own warnings and errors to
+`plugins/dev.jasper.browser/data/chromium.log` in Jasper home, a file Jasper neither limits nor formats. Its lines can
+name the sites you visited; after the Browser's **Clear All Data**, Jasper empties it the next time Chromium starts
+([Clearing data](browser.md#clearing-data)).
+
+Desktop colors on Linux reports in Settings › Appearance & Behavior › Appearance instead of the log: the line under
+**Desktop color source** names the toolkit and library version supplying the colours, or why they could not be read
+([Desktop colors](themes.md#desktop-colors)).
+
 ### What a log contains
 
 Of an exception, the log writes only its class name and stack frames, never its message. A record's own message is the
@@ -96,11 +105,10 @@ that piece of work took. Phases overlap (`application` includes `plugins`), so d
 Each window a running Jasper opens logs `Window (<trigger>): shown …, first paint …, output painted … after the
 request`. `<trigger>` is `cold` (a launch's first window), `menu`, `reopen` (a Dock click, Spotlight or `open -a` on
 macOS), `handoff` (a second launch or a `jasper` call), `open-file` (a macOS open-file event), `open-uri` (a macOS
-open-URI event: an address the system hands Jasper), `notification` (a click on a system notification), `plugin` (a
-plugin's view opening with no window open) or `restore` (a saved window coming back with the first). A window opened
-after the last one had closed adds `; no window for … before`, and on Windows also `… page faults until shown, working
-set … to … MB`. With `-Djasper.startupTrace=<file>` the same data is also written as JSON; the start-up benchmark uses
-it.
+open-URI event: an address the system hands Jasper), `notification` (a click on a system notification) or
+`plugin` (a plugin's view opening with no window open). A window opened after the last one had closed adds `; no
+window for … before`, and on Windows also `… page faults until shown, working set … to … MB`. With
+`-Djasper.startupTrace=<file>` the same data is also written as JSON; the start-up benchmark uses it.
 
 ## Start-up recovery
 

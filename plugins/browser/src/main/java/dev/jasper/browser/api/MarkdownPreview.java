@@ -31,7 +31,11 @@ public interface MarkdownPreview extends AutoCloseable {
      * revision follows once it is in the page and laid out, unless a later document replaced it first.
      *
      * @param revision the document's revision, greater than the last one given
-     * @param html the document: the Editor's WEB markup, at most 16 MiB in UTF-8
+     * @param html the document's HTML, at most 16 MiB in UTF-8, which goes into the page's {@code main} element of
+     *     class {@code markdown-body}: no script in it runs, a {@code pre} of class {@code mermaid} shows the diagram
+     *     Mermaid draws from its text, and its elements' {@code data-b}, {@code data-link} and {@code data-image}
+     *     numbers are the blocks, links and images that {@link PreviewEvent.Geometry},
+     *     {@link PreviewEvent.LinkActivated} and {@link #image} name
      * @throws IllegalArgumentException for a revision no greater than the last one given, or longer HTML
      */
     void show(long revision, String html);

@@ -47,7 +47,7 @@ Keep ids stable for the life of a control; changing a node's id or kind replaces
   moving the focus; `selectAll(fieldId)`, which selects a field's live text without editing or focusing it;
   `composing(fieldId)`, true while an input method holds uncommitted text; `anchor(id)` for
   [popovers](plugin-authoring.md#dialogs-overlays-and-popovers), and `anchorAt(customId, area)` for one on an area of a
-  `Custom` node's content (since 0.32.0); and the [secret](#secrets) methods.
+  `Custom` node's content; and the [secret](#secrets) methods.
 
 [`ControlState`](sdk-reference.html#dev.jasper.sdk.ui.ControlState)`(visible, enabled, busy, error)` is every node's
 state; `ControlState.READY` is visible, enabled, not busy and without an error. `error` is validation prose the
@@ -118,7 +118,7 @@ state shows its text and one button (its visible PRIMARY action, or else its fir
 is boxed in upper case, a ROUTE stack draws edged cells, an ORDERED list's commands move to a side column that acts
 on the selection, and in a toolbar view a DROPDOWN with a `PickerFace` draws as IntelliJ's run-configuration combo (its
 icon, the name cut with an ellipsis at 240 pixels, an arrow box). A tool window's stripe label starts with its icon,
-and six icon names draw IntelliJ's classic art in the toolbar, toolbar views and tool-window headers
+and six icon names draw IntelliJ's classic art in the toolbar, toolbar views, the status bar and tool-window headers
 ([plugin icons](sdk-icons.md#the-enterprise-looks-classic-art)).
 
 ### A grouped dialog
@@ -224,7 +224,8 @@ static ViewSpec serversPanel(List<String> names, Set<String> running, String que
 ```
 
 Register it with `context.panels().register(new PanelSpec(...), host -> context.kit().create(...))` and keep your model
-outside the view: Jasper builds it in each window the first time it shows there, and again after that window closed and opened anew. Two-line rows in a tool window are compact: the name leads
+outside the view: Jasper builds a view in each window the first time the panel shows there, so several windows show the
+same model. Two-line rows in a tool window are compact: the name leads
 the title line and keeps its width before whatever follows it; a `Chip` and a `MONO_SMALL` endpoint form the second
 line; one compact `Toggle` trails. A row switch is its own control: toggling it never activates the row, and its state
 follows what your domain confirms (set `pending` while a start or stop is in flight). A note above an `Empty` body, such
@@ -296,7 +297,7 @@ that fill in the defaults; the [SDK reference](sdk-reference.html#dev.jasper.sdk
 - An `iconSeverity` tints the button's glyph, as a favourite's warning star; a present `selected` makes a GHOST or
   SECONDARY button a toggle button, such as a search's match-case option: it shows the pressed state while true, and a
   click reports the `Action` for the owner to confirm in its next update.
-- A `holdMenu` of `MenuItem`s (SDK 0.27.0) opens under the button when a press is held on it for half a second, as a
+- A `holdMenu` of `MenuItem`s opens under the button when a press is held on it for half a second, as a
   browser's Back button holds its history; that press's release then reports nothing, while a shorter press reports the
   button's `Action`, and a press that leaves the button, even to come back, opens nothing. A right-click
   (Control-click on macOS), Shift+F10 and the context-menu key open it at once, and choosing an item reports the
@@ -307,9 +308,9 @@ that fill in the defaults; the [SDK reference](sdk-reference.html#dev.jasper.sdk
   [`MenuItem`](sdk-reference.html#dev.jasper.sdk.ui.MenuItem)`(id, label, icon, action, enabled, separator)` reports its
   own `Action`; `withShortcut(actionId)` shows the current binding of one of the plugin's actions, or of a Jasper action
   such as `new_tab`, beside the label, in the platform's notation (symbols on macOS, words such as Ctrl+Shift+P on Linux
-  and Windows), following the user's rebinding, and nothing while it is unbound. An item with `children` (SDK 0.27.0)
-  is a submenu, in any menu: it shows an arrow and opens its children beside it, and it reports nothing itself, so its
-  `action` is blank and it shows no shortcut.
+  and Windows), following the user's rebinding, and nothing while it is unbound. An item with `children` is a submenu,
+  in any menu: it shows an arrow and opens its children beside it, and it reports nothing itself, so its `action` is
+  blank and it shows no shortcut.
 
 ### Fields
 
@@ -353,8 +354,8 @@ that fill in the defaults; the [SDK reference](sdk-reference.html#dev.jasper.sdk
   edit selects the first again. A `TEXTAREA` and a `NUMBER` field take no suggestions, nor does a field with a
   `listId`.
 
-[`TokenField`](sdk-reference.html#dev.jasper.sdk.ui.Nodes.TokenField)`(label, hint, tokens)` (SDK 0.29.0) holds short
-tokens, such as a bookmark's tags. Each token shows as a chip in the look's tag style, in the case the user typed it,
+[`TokenField`](sdk-reference.html#dev.jasper.sdk.ui.Nodes.TokenField)`(label, hint, tokens)` holds short tokens, such
+as a bookmark's tags. Each token shows as a chip in the look's tag style, in the case the user typed it,
 with a remove button inside it named "Remove" and the token, and the user types the next token after the chips, which
 wrap as the field fills. The label shows over the field as a `STANDARD` field's does, except in a `FormRow`, a
 `SettingRow` or a prompt, and is always the accessible name; the hint shows while there are no tokens and nothing is

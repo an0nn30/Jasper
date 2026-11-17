@@ -440,7 +440,7 @@ public final class Nodes {
     }
 
     /**
-     * A field of tokens (SDK 0.29.0): each a chip of the look's tag face, its text as entered, with a "Remove" button
+     * A field of tokens: each a chip of the look's tag face, its text as entered, with a "Remove" button
      * inside it, the typed text after them. Enter (with text typed), a comma, a line break, a tab and a permanent focus
      * loss add the typed text; Enter with nothing typed passes on; Backspace with nothing typed and a chip's button remove
      * a token. Left at the caret's start selects the last chip; Left, Right, Home and End move among the chips, Backspace

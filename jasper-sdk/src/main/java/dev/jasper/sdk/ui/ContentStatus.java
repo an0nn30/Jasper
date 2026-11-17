@@ -7,10 +7,10 @@ import java.util.Objects;
  * @param text literal visible text; empty shows the icon alone
  * @param tooltip literal descriptive text
  * @param run optional UI-thread action, null for plain text; not used while {@code menu} has entries
- * @param icon (since 0.22.0) a registered icon name shown before the text, or empty for none
- * @param dimmed (since 0.22.0) whether the host paints the item's icon and text in its disabled colour; the item stays
+ * @param icon a built-in or registered icon name shown before the text, or empty for none
+ * @param dimmed whether the host paints the item's icon and text in its disabled colour; the item stays
  *     clickable
- * @param menu (since 0.22.0) the entries a click opens in a menu anchored on the item, copied; empty for none
+ * @param menu the entries a click opens in a menu anchored on the item, copied; empty for none
  * @since 0.8.5
  */
 public record ContentStatus(String text,String tooltip,Runnable run,String icon,boolean dimmed,List<ContentStatus.MenuEntry> menu) {

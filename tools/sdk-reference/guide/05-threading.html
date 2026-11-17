@@ -28,7 +28,7 @@ listed per type in the API reference; the main ones:</p>
 <tr><td>{@link CommandCall#out(String)}, {@link CommandCall#err(String)}</td><td>Write to the caller's terminal while the call runs.</td></tr>
 <tr><td>{@link Platform#openInEditor(Path)}, {@link Platform#browse(URI)}, {@link Platform#openInBrowser(URI)}</td><td>They do their work in the background.</td></tr>
 <tr><td>{@link Platform#copyOnSelect()}</td><td>The user's Copy on select setting; a change applies from the next read.</td></tr>
-<tr><td>{@link Platform#downloadsFolder()}</td><td>Found once, at the first call; reading it creates nothing.</td></tr>
+<tr><td>{@link Platform#downloadsFolder()}</td><td>Found once, at the first call, which may block while it reads the system's settings, so make that call off the UI thread; reading it creates nothing.</td></tr>
 <tr><td>{@link Appearance#variant()}, {@link Appearance#workspaceVariant()}</td><td>Whether the chrome or the workspace is dark or light.</td></tr>
 <tr><td>{@link Appearance#presentation()}</td><td>The look Jasper runs with, the same value until it restarts.</td></tr>
 <tr><td>{@link Appearance#terminalTypography()}</td><td>The saved terminal font; it already returns a new value when its change handlers run.</td></tr>
@@ -81,7 +81,7 @@ keeps running, such as a menu entry for a host the user deleted, or rebuild a me
 {@link PluginMenu#clear()} and {@link PluginMenu#add(String)}.</p>
 <p>Some handles end on their own: a {@link PanelHost} when its window closes ({@link PanelHost#onClosed(Runnable)}), a
 {@link ContentTab} when the user closes it ({@link ContentTab#onClosed(Runnable)}), a {@link UiAnchor} when its control
-is hidden, disabled, made busy, removed or closed ({@link UiAnchor#onClosed(Runnable)}), and a dialog when the user or
+is hidden, disabled, made busy, removed or closed, or an area anchor's content is resized ({@link UiAnchor#onClosed(Runnable)}), and a dialog when the user or
 its window closes it ({@link WindowSurface#onClosed(Runnable)}). Pane, tab and window handles keep only an id: a closed target
 is simply absent, queries return the last known value, and commands to it are ignored.</p>
 

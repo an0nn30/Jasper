@@ -1,14 +1,17 @@
 package dev.jasper.sdk.ui;
 
 /**
- * Rebuilds a plugin's saved tabs when Jasper restores its windows: at start, and whenever
- * a window opens while none is open. Registered with {@link Windows#restorer} for one restorer kind; called on
- * the UI thread for a saved tab of that kind:
+ * Rebuilds a plugin's saved tabs when Jasper restores its saved window or opens a layout. Registered with
+ * {@link Windows#restorer} for one restorer kind; called on the UI thread for a saved tab of that kind:
  * <ul>
- *   <li>once for each saved tab while its window is restored, before that window shows;</li>
+ *   <li>once for each saved tab while the saved window is restored, at start and whenever a window opens while none
+ *       is open, before that window shows;</li>
+ *   <li>once for each saved tab of a layout: when a window opens with the saved default layout (New Window, or a
+ *       window opening while none is open that does not restore the saved one), before that window shows, and when
+ *       the user applies a layout to a window (Window &rsaquo; Layouts), while the window shows;</li>
  *   <li>again when the user presses Retry on its placeholder, while the window shows;</li>
- *   <li>when the plugin itself opens a tab while no Jasper window is open, which restores the windows first: inside that
- *       call, before the call's tab opens.</li>
+ *   <li>when the plugin itself opens a tab while no Jasper window is open, which restores the saved window first: inside
+ *       that call, before the call's tab opens.</li>
  * </ul>
  *
  * @since 0.21.0

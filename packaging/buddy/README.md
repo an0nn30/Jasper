@@ -52,8 +52,11 @@ Column order is fixed by [BuddyFrame](../../jasper-buddy/src/main/java/dev/jaspe
 
 Frames 17–19 are the working animation (A, B, A, B, rest at 250 ms per frame), requested
 by the host through `setWorking(true)`. Jasper requests it while a terminal command runs
-past `notifications.long_command_seconds`, or runs out of sight, unless that setting is 0;
-Buddy has no notification threshold. Frames 0–13 and 17–22 are poses. Frames 14–16 are overlays:
+past `notifications.long_command_seconds`, or runs out of sight, unless that setting is 0,
+and while a plugin's activity runs rather than waits for input; Buddy has no notification
+threshold. Frames 20–22 are the transition between standing and working: he lowers through
+`RISE`, `LOWER_LAPTOP`, `CLOSE_LAPTOP` and `TYPE_REST` into the working animation and rises
+back through them in reverse. Frames 0–13 and 17–22 are poses. Frames 14–16 are overlays:
 transparent except for the stars, cycled on top of the body while he fades in at spawn, so they never replace a pose. [BuddyAnimator](../../jasper-buddy/src/main/java/dev/jasper/buddy/internal/animation/BuddyAnimator.java)
 sequences the frames; [Buddy architecture](../../docs/buddy-architecture.md#animation-drawing-and-placement)
 lists the timings.
@@ -126,7 +129,7 @@ python3 packaging/buddy/generate.py --import-strip
 python3 packaging/buddy/generate.py --verify-only
 ```
 
-The historical atlas packer above writes only twenty cells; follow it with this append step before importing.
+The atlas packer above writes only the first twenty cells; follow it with this append step before importing.
 The transition packer uses measured transparent gutters, one shared scale of 0.15, nearest-neighbour sampling,
 binary alpha and the existing foot baseline at row 91. The append step checks opaque bounds and preserves the
 original decoded RGBA pixels exactly. It also accepts a 23-cell strip for reproducible repacking.

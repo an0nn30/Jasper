@@ -11,7 +11,7 @@ application composes the libraries' supported APIs.
 | --- | --- |
 | `config` | Resource-free options, builder and position values; JDK only. |
 | `notice` | Resource-free identity and validated notice values; JDK only. |
-| `internal.model` | EDT live-work notice ordering and bounds; depends on `notice`. |
+| `internal.model` | EDT live-work notice ordering, visibility, grouping and bounds; depends on `notice`. |
 | `internal.animation` | Caller-confined frame selection and spring calculations; JDK only, no Swing timers. |
 | `internal.presentation` | EDT painting, layout, native surfaces and scheduling; depends on `config`, `notice`, model and animation. |
 | `view` | Supported EDT facade over options, notice model and lazy presentation; depends on `config`, `notice`, model and presentation. |
@@ -30,19 +30,25 @@ gives app tests a companion over a model they can inspect from any thread.
 
 [BuddyCompanion](../jasper-buddy/src/main/java/dev/jasper/buddy/view/BuddyCompanion.java)
 owns one [BuddyDeck](../jasper-buddy/src/main/java/dev/jasper/buddy/internal/model/BuddyDeck.java).
-[BuddyGroups](../jasper-buddy/src/main/java/dev/jasper/buddy/internal/model/BuddyGroups.java) projects its visible notices into immutable group or notice entries with distinct identity namespaces.
-The deck retains up to 50 notices (`MAX_NOTICES`) by source-qualified ID, newest first.
-Posts replace and promote; suppression and group/title changes preserve order. A title
-equal to the current one changes nothing. Snapshots are cached immutable lists, invalidated by mutations. The
-deck's `generation()` counter changes only on a post; tests use it to tell a post from a
-title change.
+The deck retains up to 50 notices (`MAX_NOTICES`) by source-qualified ID, newest first,
+suppressed ones included; its snapshot holds only the visible ones. Posts replace and
+promote, setting visibility; context (group and visibility), state and title changes
+preserve order. A title equal to the current one changes nothing. Snapshots are cached
+immutable lists, invalidated by mutations. The deck's `generation()` counter changes only
+on a post; tests use it to tell a post from a title change.
 
-Every retained notice is live work, including suppressed entries. `BuddyGroups` retains bounded
-first-observed ordering and expansion by identity. The summary counts visible tasks and connections,
-prioritizing NEEDS_INPUT, DOWN and DEGRADED with stable ties; the drawer shows all visible groups.
-A producer dismisses its notice when work ends; Buddy keeps no outcomes. Jasper posts how work ended
-as a notification instead ([guide](notifications.md)). The drawer's × and **Dismiss all** dismiss
-visible IDs, including collapsed sections, directly from the deck; no host callback runs.
+[BuddyGroups](../jasper-buddy/src/main/java/dev/jasper/buddy/internal/model/BuddyGroups.java)
+projects the visible notices into immutable entries: one per group, or one per ungrouped
+notice, in distinct identity namespaces. It keeps first-observed order of groups and
+members, and each group's expansion, while any retained notice still has that identity.
+Its summary counts visible tasks and connections, or names the notice wanting attention
+(`NEEDS_INPUT` before `DOWN` before `DEGRADED`, keeping the one already named on a tie);
+the drawer shows every visible entry. `BuddyColumnPanel` and `BuddyDeckPanel` each own one.
+
+Every retained notice is live work. A producer dismisses its notice when work ends; Buddy
+keeps no outcomes. Jasper posts how work ended as a notification instead
+([guide](notifications.md)). The drawer's × and **Dismiss all** dismiss visible IDs,
+including those in collapsed groups, directly from the deck; no host callback runs.
 
 A notice retains its key, detail supplier and activation closure. Avoid UI objects in
 keys and unnecessary captures in callbacks. Replacement, dismissal, capacity eviction
@@ -61,19 +67,25 @@ whether to retry; Jasper remembers unavailable presentation for the application 
 
 [BuddyWindow](../jasper-buddy/src/main/java/dev/jasper/buddy/internal/presentation/BuddyWindow.java)
 owns the sprite window, animator timer, drag-frame owner, look-and-feel listener and
-child surfaces. First realization creates the drawer and column; the right-click menu
-bubble is created on demand. Surfaces are translucent, always-on-top utility windows.
-The drawer becomes focusable only on explicit opening, using a visible Frame/Dialog owner
-(active first) or an undecorated dialog fallback. Refresh and placement retain that owner. Initial coordinates are monitor-clamped once. Later option application updates
-fonts, notice-card colours and callbacks without restoring those initial coordinates.
-The menu bubble keeps its fixed dark material. All four surfaces compose complete frames in reusable
-device-resolution ARGB buffers before copying them to their native windows.
+child surfaces. First realization creates the drawer and column owners; the right-click
+menu bubble is created on demand. Surfaces are translucent, always-on-top utility windows;
+the sprite, column and bubble are never focusable. The drawer's window is made, or
+remade when the owner changes, only on explicit opening: a focusable window owned by the
+first showing, focusable, non-minimised frame or dialog in the active window's owner chain
+(else any such window), or an undecorated ownerless dialog when there is none. Refresh and
+placement keep that owner. Initial coordinates are monitor-clamped once. Later option
+application updates fonts, notice-card colours and callbacks without restoring those
+initial coordinates. The menu bubble keeps its fixed dark material. All four surfaces
+paint complete frames into reusable device-resolution ARGB buffers
+([BuddyFrameBuffer](../jasper-buddy/src/main/java/dev/jasper/buddy/internal/presentation/BuddyFrameBuffer.java))
+before copying them to their native windows, with Swing's double buffering off, since its
+X11 buffer is opaque.
 
 | Surface/owner | Responsibility and lifecycle |
 | --- | --- |
 | `BuddyWindow` | The 105 × 120 sprite window. Pointer entry greets; a single click opens the drawer; a double click runs `activateHost`; the popup trigger (right-click, or Ctrl+click on macOS) opens the menu bubble; a press closes it. A drag starts after 3 pixels and reports `positionChanged` on release. Its one-shot timer follows the animator's next deadline. |
-| `BuddyColumnWindow` / `BuddyColumnPanel` | Zero or one summary, with visible task/connection counts and priority attention. Clicking always opens all activity. Direct placement and immediate hover feedback; hidden when the visible deck is empty. |
-| `BuddyDeckWindow` / `BuddyDeckPanel` | Stable expandable groups, individual ungrouped entries, wheel scrolling, activation, per-notice × and **Dismiss all**. Escape, focus loss, activation, an empty visible deck or host hide closes it; pointer exit keeps it open. Refresh preserves scroll and expansion, clamps shrinking content, and cannot reopen a hidden drawer. Height is capped by the usable screen. |
+| `BuddyColumnWindow` / `BuddyColumnPanel` | The summary: one 330 × 56 capsule painted from `BuddyGroups.summary`, showing state labels rather than live detail. A click opens the drawer. Placed directly beside the sprite, with immediate hover feedback; hidden when the visible deck is empty. |
+| `BuddyDeckWindow` / `BuddyDeckPanel` | Group headings ("▾" or "▸", title and member count) that a click collapses or expands, member and ungrouped capsules, wheel scrolling, activation, per-notice × and a **Dismiss all** row when more than one notice is visible, collapsed members included. Escape, focus loss, activation, an empty visible deck, **Dismiss all** or host hide closes it; pointer exit keeps it open. Refresh preserves expansion and clamps the scroll to shrinking content; closing resets the scroll, and only an explicit opening shows it again (`BuddyDrawerLifetime`). Height is capped by the usable screen. |
 | `BuddyBubble` / `BuddyBubblePanel` | Menu bubble with one entry, **Hide Jasper**, which runs `toggleRequested`; hides on pointer exit, activation or its five-second timeout. |
 | `BuddyDragFrames` | Coalesces pointer positions into roughly 16 ms presentation frames and keeps ticking while the button is held; finish presents the latest position, cancel discards it. |
 
@@ -105,7 +117,7 @@ absolute deadlines in constant time; spawn, greeting and wake catch-up is bounde
 their fixed step counts, as are rising and lowering; working catch-up resolves elapsed typing cycles arithmetically.
 
 [BubbleMotion](../jasper-buddy/src/main/java/dev/jasper/buddy/internal/animation/BubbleMotion.java)
-controls the drawer's 120 ms hover transition and menu animation.
+controls the drawer's 120 ms hover transition.
 [BuddyColumnPlacement](../jasper-buddy/src/main/java/dev/jasper/buddy/internal/presentation/BuddyColumnPlacement.java)
 centres the summary on Buddy, 30 pixels from his window: below him in the upper half of the screen,
 above him in the lower half, with an eight-pixel midpoint dead band. Placement changes directly,
@@ -121,7 +133,7 @@ font family/attributes and explicit dark mode; the painter derives fixed styles 
 (title bold 13 pt, detail plain 13 pt) and caches the rasterized material per size and mode.
 Live detail is read at paint time; null detail results or suppliers throwing a runtime
 exception display empty text, and text is truncated by whole code points with an
-ellipsis. A `RUNNING` notice's detail carries a sweeping highlight; `NEEDS_INPUT` and
+ellipsis. A `RUNNING` capsule paints the same at any time (`BuddyShimmerTest`); `NEEDS_INPUT` and
 `DEGRADED` show a dot, and `DOWN` a cross in the `UIManager` colour
 `Jasper.semantic.status.danger` (fallback `#C45A53`). Hovering a capsule reveals an open
 affordance without moving its text. The sprite is shaded pixel art: `BuddySprite` draws
@@ -141,31 +153,41 @@ Its read is strict (exactly `version = 1` and integer `x` and `y`, at most 4 KiB
 unreadable file is logged and ignored. Its write goes to a temporary file moved into place,
 atomically where the file system allows. BuddyIntegration shows Buddy while he is enabled
 (`buddy.enabled`, or the session toggle flipped by the menu bubble's **Hide Jasper** and
-the **Show Jasper**/**Hide Jasper** command) and the most recently active Jasper window is showing and not
-minimized, as `JasperApplication.windowStateChanged` reports it; auxiliary windows
-do not count. It calls `greet` when a Jasper window (a `workspace.JasperWindow`) becomes
-active, and owns the key listener that pokes on key presses in Jasper windows at most once a
-second. Visibility reasons live in
+the **Show Jasper**/**Hide Jasper** command) and the most recently active Jasper window is
+showing and not minimised: `JasperApplication.followBuddy` hands it that window's state
+whenever a window is shown, minimised, restored, brought to the front or closed, the new
+window before the old one goes, so a switch between showing windows never hides him;
+auxiliary windows do not count. It calls `greet` when a Jasper window (a
+`workspace.JasperWindow`) becomes active, and owns the key listener that pokes on key
+presses in Jasper windows at most once a second. Visibility reasons live in
 [BuddyVisibility](../jasper-app/src/main/java/dev/jasper/app/notifications/BuddyVisibility.java).
 
 Two producers post notices. [CommandNotifier](../jasper-app/src/main/java/dev/jasper/app/notifications/CommandNotifier.java)
-(source `terminal`, keyed by pane) owns thresholds and command completion: a command that
-runs past `notifications.long_command_seconds`, or starts or continues out of sight, gets
-a `RUNNING` task with detail "Running · <elapsed>" (none while the setting is 0).
-`WorkspaceActivity.Presentation` supplies current parent-tab identity, strip title, pane
-display title, watched state and activation. Notices group under source `terminal-tab`;
-all panes in the selected parent tab of an active, showing, non-minimized workspace window
-are suppressed. Settled workspace changes refresh context after moves and title changes;
-activation resolves current ownership. Command lifetime and dismissal remain independent
-of that visible projection, and qualified work keeps Buddy typing while suppressed. A long
-command's outcome reaches the operating system through the notification centre's delivery and
-`application.SystemNotices`, not through CommandNotifier.
+(source `terminal`, keyed by pane) owns thresholds and command completion. Unless
+`notifications.long_command_seconds` is 0, a command qualifies at once when it starts out of
+sight or its pane stops being watched, and after that many seconds while watched; it is
+then posted as a `RUNNING` task with detail "Running · <elapsed>", suppressed while
+watched. Each window publishes a `WorkspaceActivity.Presentation` for every terminal pane
+whenever its settled layout changes (a held move publishes once it settles): the parent
+tab's id and strip title, the pane's tab title, whether it is watched (it is in the active
+parent tab of an active window that is showing and not minimised) and an activation that
+selects its tab, which brings its window forward, and focuses the pane. The notifier
+groups the pane's notice under `Group(BuddyNoticeId("terminal-tab", <parent tab id>), <strip title>)`
+and follows moves, renames and watching in place with `updateTitle` and `updateContext`.
+A command's notice lives from qualifying until the command ends or its pane closes,
+whatever its visibility, and a qualified command keeps Buddy working while suppressed or
+dismissed. A long command's outcome reaches the operating system through the notification
+centre's delivery and `application.SystemNotices`, not through CommandNotifier.
 [ActivityNotifier](../jasper-app/src/main/java/dev/jasper/app/notifications/ActivityNotifier.java)
-(source: the plugin id) turns plugin activities into `RUNNING` tasks, whose detail
-progress updates without a repost, and plugin connections into `CONNECTION` notices that
-repost on each state change; a click raises Jasper, then runs the plugin's named action.
-Workspace and plugin events are translated by application wiring; Buddy imports none of
-those owners. At shutdown Jasper closes both producers before the companion.
+(source: the plugin id) turns plugin activities into tasks, whose detail progress updates
+without a repost: `RUNNING`, switched to `NEEDS_INPUT` and back with `updateState` when the
+activity waits for input and resumes. Plugin connections become `CONNECTION` notices that
+repost on each state change. A click raises the most recently active window, then runs the
+plugin's named action. BuddyIntegration combines the producers' working intent
+(`terminalWorking`, `pluginWorking`): Buddy works while a qualified command runs or a
+plugin task runs without waiting for input; connections never count. Workspace and plugin
+events are translated by application wiring; Buddy imports none of those owners. At
+shutdown Jasper closes both producers before the companion.
 
 [Maintenance recipes](buddy-maintenance.md) name the focused tests for each owner.
 Headless paint previews establish neither native window layering/drag smoothness nor

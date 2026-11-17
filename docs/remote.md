@@ -7,8 +7,9 @@ lists Windows' WSL distributions beside your hosts. Turn it off or on in Setting
 
 Remote works with two other bundled plugins when they are on: [Credential Vault](credential-vault.md) holds the
 passwords and keys hosts sign in with (the SSH agent works without it), and the [Editor](editor.md) edits remote files.
-Remote's tool windows are in every window ([Tool windows and the dock](workspace.md#tool-windows-and-the-dock)). Under a classic look, such as
-[Enterprise](enterprise.md), they take their classic layout ([below](#under-a-classic-look)).
+Every window has its own Remote tool windows ([Tool windows and the dock](workspace.md#tool-windows-and-the-dock)).
+Under a classic look, such as [Enterprise](enterprise.md), they take their classic layout
+([below](#under-a-classic-look)).
 
 ## Commands and shortcuts
 
@@ -42,8 +43,8 @@ Sessions menu, so the palette's Commands scope finds them and Keymap can bind th
 The **Session** menu holds Connect to SSH Host..., Toggle SSH hosts, Split with Same Host, New Host..., Import from
 ~/.ssh/config..., Toggle Tunnels, Start or Stop a Tunnel..., New Tunnel..., Forward a Port... and Stop All Tunnels. The
 **Transfer** menu holds Open SFTP here and Transfers. A terminal's right-click menu offers Forward a Port... and Open
-SFTP here. View › Tool Windows (the Window menu under the Enterprise look) lists Toggle SSH hosts, Toggle SFTP and
-Toggle Tunnels.
+SFTP here. View › Tool Windows lists Toggle SSH hosts, Toggle SFTP and Toggle Tunnels; under the Enterprise look the
+Window menu lists them and Transfers.
 
 ## Opening sessions
 
@@ -69,9 +70,11 @@ hosts and distributions there are, with **New session** (+) and **Import session
 - **Search sessions** filters by name, hostname, username, group and the OS and address Remote learned for a host
   ([Host information](#host-information)).
 - Rows: the [WSL group](#wsl-distributions) first, then your groups in alphabetical order with the default group last
-  (**Other** until you rename it), hosts alphabetical within each. While every host is ungrouped and the default group
-  is still **Other**, the list has no group headers.
-- Hosts sort by name by default; the header's **Sort sessions** menu (default look) or a click on the Name, Host or Port header (Enterprise look) sorts them within each group by that column (both share one sort), and the sort and column widths are remembered.
+  (**Other** until you rename it). While every host is ungrouped and the default group is still **Other**, the list has
+  no group headers.
+- The header's **Sort sessions** menu sorts the hosts within each group by **Name** (the default), **Host** or
+  **Port**; choosing the current one again reverses the order. The sort is remembered and applies to every window's
+  Sessions panel.
 - A click on a group header collapses or expands it, as do Enter and a double click. Collapsed groups are remembered;
   a search shows their hosts.
 - A host row shows a dot (green while one of its SSH panes runs), its name and hostname, and a star: click the star to
@@ -346,8 +349,8 @@ of new panes, choose it there (see [Shell, environment and history](configuratio
 
 ### Opening the browser
 
-There is one SFTP browser, in each window's SFTP tool window (in the lower half of the left side to start with). It
-shows the SSH pane you focus in any window: focusing another SSH pane switches it, and focusing a local pane leaves it
+Each window has its own SFTP browser, in its SFTP tool window (in the lower half of the left side to start with). It
+shows the SSH pane you focus in that window: focusing another SSH pane switches it, and focusing a local pane leaves it
 as it is.
 
 - **Open SFTP here** (Cmd+Shift+O, Ctrl+Alt+Shift+O; the Transfer menu or a terminal's right-click menu) opens the
@@ -369,15 +372,16 @@ crumb to open that folder, or click beside the crumbs to type a path (Enter goes
 retrace the folders you visited in this pane; Option+Left, Option+Right and Option+Up on macOS, Alt+Left, Alt+Right
 and Alt+Up on Linux and Windows (Back, Forward, Parent Folder) work anywhere in the panel.
 
-The list shows Name and Size, sorted by name ignoring case (folders mixed in with files) until you click a header, with each entry's modified time in its tooltip.
-In a window of its own or docked at the bottom it shows Name, Modified (date and time), Permissions (`rwxr-xr-x`) and Size.
-Click a header to sort the whole folder by that column, again to reverse; drag a column boundary to resize it and double-click it to fit. The sort is shared by every SFTP browser and both layouts, and the sort and widths are remembered. A sort by Size counts folders and entries without a size as smaller than any
-file. A sort by Modified or
-Permissions chosen in the wide layout also orders the narrow table, which shows no arrow because it lacks that column.
-Select several rows for the file actions. A folder of more than 200 entries is shown 200 at a time ("1–200 of 950",
-**Previous page**, **Next page**). Names starting with a dot stay hidden until you press **Show hidden items**; the
-choice is remembered and applies to every browser opened afterwards. Enter or a double click opens a folder, opens a
-file in the Editor ([Editing remote files](#editing-remote-files)), and follows a link to where it leads. A line under the list says what
+The list shows Name and Size, with each entry's modified time in its tooltip; in a window of its own or docked at the
+bottom it shows Name, Modified (date and time), Permissions (`rwxr-xr-x`) and Size. It is sorted by name, ignoring
+case, with folders among the files. Click a header to sort the whole folder by that column, and again to reverse it; a
+sort by Size counts folders, and entries without a size, as smaller than any file. Drag a column boundary to resize a
+column, or double-click it to fit the column to its content. Every SFTP browser shares one sort, which orders a table
+without that column too, and the sort and widths are remembered. Select several rows for the file actions. A folder of
+more than 200 entries is shown 200 at a time ("1–200 of 950", **Previous page**, **Next page**). Names starting with a
+dot stay hidden until you press **Show hidden items**; the choice is remembered and applies to every browser opened
+afterwards. Enter or a double click opens a folder, opens a file in the Editor
+([Editing remote files](#editing-remote-files)), and follows a link to where it leads. A line under the list says what
 is loading (with **Cancel**) and how the last action went.
 
 ### Following the terminal
@@ -522,14 +526,17 @@ own: starting one opens no terminal, closing terminals does not stop it, and it 
 
 **Toggle Tunnels**, its rail button or the status bar item shows or hides the Tunnels tool window, which starts on the
 left; **Show Tunnels** shows it without hiding it. It lists saved tunnels by name, then **Quick forwards**, with
-**Filter tunnels** (name, host, addresses, ports and type). A row shows a state dot, the name and "via *host*" (or what is happening or wrong), the mapping and a switch. The
-switch, Enter or Space starts or stops a tunnel; a double click edits a saved one; Delete or Backspace deletes it, after
-asking. The row's tooltip carries its counters: open connections, bytes each way and uptime.
+**Filter tunnels** (name, host, addresses, ports and type). A row shows a state dot, the name and "via *host*" (or what
+is happening or wrong), the mapping and a switch. The switch, Enter or Space starts or stops a tunnel; a double click
+edits a saved one; Delete or Backspace deletes it, after asking. The row's tooltip carries its counters: open
+connections, bytes each way and uptime.
 
 The right-click menu offers **Start** or **Stop**, **Open in Browser** (a running local tunnel, at
-`http://localhost:<port>/`, in the web browser a plugin provides, else your browser), **Copy Address**, and **Edit…**, **Duplicate** and **Delete…** for a saved tunnel or
-**Save as Tunnel…** for a quick forward. Deleting a running tunnel stops it. A tunnel whose host was deleted stays,
-marked "Host missing · Edit to choose a host".
+`http://localhost:<port>/`, which opens as Jasper's own web links do: as the
+[Browser](browser.md#links-from-terminals-and-jasper) decides while it is on, otherwise in your default browser),
+**Copy Address**, and **Edit…**, **Duplicate** and **Delete…** for a saved tunnel or **Save as Tunnel…** for a quick
+forward. Deleting a running tunnel stops it. A tunnel whose host was deleted stays, marked "Host missing · Edit to
+choose a host".
 
 In a window of its own or docked at the bottom, the selected tunnel's details (the first tunnel's while none is
 selected) stand beside the list: its name and state, the route as the tunnel form draws it, Type and Via and,
@@ -643,6 +650,7 @@ Under `plugins/dev.jasper.remote/` in the Jasper home:
 | `data/known_hosts` | The host keys you trusted, in the OpenSSH format |
 | `data/panel-state.toml` | The default group's name (`default_group`), collapsed groups (`collapsed`, `wsl_collapsed`) and `sftp_show_hidden`; written by Jasper, and a broken file reads as defaults |
 | `data/host-info.properties` | The OS and address learned per host; safe to delete |
+| `data/columns.properties` | The sort and column widths of the Sessions, SFTP and Tunnels tables; written by Jasper |
 | `data/transfers/` | The transfer queue (`queue.sqlite` and its journal files, `queue.lock`) |
 | `data/browser-cache/` | Folder listings while the SFTP browser shows them, deleted after use |
 
@@ -669,14 +677,16 @@ when it starts, so it follows a change of look at the next start of Jasper.
   is nothing to run. The combo and the Sessions tree share the chosen row; until you choose, it is the current SSH
   pane's host, else the first.
 - **Sessions** starts on the right, with its count beside the title: **Filter sessions** over a Name, Host and Port tree
-  (favourites marked ★, groups opened and closed with their disclosure triangle, Enter or a double click), and below
-  it the selected host's **Properties** (Host, User, Port, Credentials) with **Edit…** and **Connect** (**Open Shell**
-  while it runs), or a distribution's Distribution, Version and Command with **Open**. In a window of its own or docked
-  at the bottom, the Properties stand beside the tree instead of below it.
-- **Tunnels** starts on the right, under Sessions: a Type, Local, Remote and Via table whose headers sort and resize. Enter or a double click starts
-  or stops a row, the right-click menu holds the rest, and the line below reads "pg-prod — active. Click to toggle." In a
-  window of its own or docked at the bottom, the selected tunnel's **Properties** (Type, Local, Remote, Via, State and,
-  while it is up, Connections, Traffic and Uptime) stand beside the table, with that line under them.
+  (favourites marked ★, groups opened and closed with their disclosure triangle, Enter or a double click), whose headers
+  sort the hosts within each group and resize the columns, both remembered; and below it the selected host's
+  **Properties** (Host, User, Port, Credentials) with **Edit…** and **Connect** (**Open Shell** while it runs), or a
+  distribution's Distribution, Version and Command with **Open**. In a window of its own or docked at the bottom, the
+  Properties stand beside the tree instead of below it.
+- **Tunnels** starts on the right, under Sessions: a Type, Local, Remote and Via table whose headers sort the saved
+  tunnels and the quick forwards, each among themselves, and resize the columns, both remembered. Enter or a double
+  click starts or stops a row, the right-click menu holds the rest, and the line below reads "pg-prod — active. Click
+  to toggle." In a window of its own or docked at the bottom, the selected tunnel's **Properties** (Type, Local, Remote,
+  Via, State and, while it is up, Connections, Traffic and Uptime) stand beside the table, with that line under them.
 - **SFTP** starts on the left: Back, Forward, Refresh, **Hidden files** and **Upload** over the breadcrumbs, and a
   Name, Size and Modified ("Sep 28") table; in a window of its own or docked at the bottom, Modified is the date and time
   and a Permissions column follows. While nothing is connected, a **Choose Session…** dropdown lists your hosts.

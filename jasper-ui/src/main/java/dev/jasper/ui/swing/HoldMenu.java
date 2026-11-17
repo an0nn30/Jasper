@@ -18,7 +18,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 
 /**
- * A button's hold menu (SDK 0.27.0; {@link Nodes.Button#holdMenu()}), as a browser's Back button holds its history: a
+ * A button's hold menu ({@link Nodes.Button#holdMenu()}), as a browser's Back button holds its history: a
  * left press held on the button for {@link #HOLD_NANOS} opens it under the button, and the press's release then reports
  * nothing, while a shorter press is the button's own. A press that ends without its release reaching the button, or
  * whose pointer leaves the button, even to come back, opens nothing, and nothing opens while the button is not on

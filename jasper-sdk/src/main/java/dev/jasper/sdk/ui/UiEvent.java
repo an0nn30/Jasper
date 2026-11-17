@@ -113,8 +113,8 @@ public sealed interface UiEvent {
      */
     record Sorted(String id, String columnId) implements UiEvent { public Sorted { ModelChecks.id(id); ModelChecks.id(columnId); } }
     /**
-     * A drag of a column header's edge ended: id is the table or tree owner. The view's owner stores the widths and
-     * passes them back as {@link Column#width()}.
+     * A drag of a column header's edge ended, or a double-click on it fitted a column to its content: id is the table
+     * or tree owner. The view's owner stores the widths and passes them back as {@link Column#width()}.
      *
      * @param id the {@link Nodes.Table} or {@link Nodes.Tree} node
      * @param widths every column's id to its unscaled width in pixels, each positive; copied

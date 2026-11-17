@@ -59,10 +59,10 @@ wins when the same plugin is also bundled or in {@code --plugin-dir}.</p>
 <h3>The Java runtime</h3>
 <p>Packaged Jasper runs plugins on its own trimmed JetBrains Runtime 25; <a href="plugin-authoring.md#the-java-runtime">the
 Java runtime</a> lists exactly the modules a plugin may rely on. That is all of Java SE plus the charsets, locale data,
-ZIP file system, PKCS#11 and smart-card providers, Kerberos and JAAS login modules, DNS and RMI naming, socket options, the JDK HTTP server, {@code sun.misc.Unsafe}, and JFR, JMX and
-attach. The compiler and the other development tools ({@code jdk.compiler}, so
-{@code ToolProvider.getSystemJavaCompiler()} returns {@code null}), the debugger ({@code jdk.jdi}, {@code jdk.jdwp.agent}), {@code jdk.dynalink},
-{@code jdk.incubator.vector} and the JetBrains Runtime's JCEF are not there. A library that needs a missing module fails
+ZIP file system, PKCS#11 and smart-card providers, Kerberos and JAAS login modules, DNS and RMI naming, socket options, the JDK HTTP server, {@code sun.misc.Unsafe}, JFR, JMX and
+attach, and the JetBrains Runtime's Chromium ({@code jcef}) with the JOGL modules it needs. The compiler and the other development tools ({@code jdk.compiler}, so
+{@code ToolProvider.getSystemJavaCompiler()} returns {@code null}), the debugger ({@code jdk.jdi}, {@code jdk.jdwp.agent}), {@code jdk.dynalink}
+and {@code jdk.incubator.vector} are not there. A library that needs a missing module fails
 with {@code NoClassDefFoundError} in the packaged application, although it works under a development run on a full JDK;
 bundle a jar that provides it instead.</p>
 <p>On macOS and Windows the packaged JVM loads JNA's native library from Jasper's own copy (JNA 5.14.0). A plugin that

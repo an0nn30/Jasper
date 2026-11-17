@@ -1,9 +1,9 @@
 # Buddy maintenance recipes
 
 Read the [embedding contract](../jasper-buddy/README.md) and
-[owner map](buddy-architecture.md) before changing code. Repository builds require JBR 25
-and `./gradlew`. Buddy is a JDK-only library; native windows, persistence and app policy
-must keep their existing ownership. The app's [producer recipe](app-maintenance.md#new-buddy-notice-producer)
+[owner map](buddy-architecture.md) before changing code. Repository builds require the JCEF
+build of JBR 25 and `./gradlew`. Buddy is a JDK-only library; native windows, persistence
+and app policy must keep their existing ownership. The app's [producer recipe](app-maintenance.md#new-buddy-notice-producer)
 covers translating a terminal/workspace event into a notice.
 
 ## Add or change a notice producer
@@ -15,9 +15,11 @@ covers translating a terminal/workspace event into a notice.
 2. Keep the producer outside the library. Post on EDT; detail suppliers read a cheap
    snapshot (Buddy reads them on every paint) and activation requests return quickly.
    Repost an ID for a new state; use `updateTitle` for wording that must not count as a
-   new post, and let the supplier carry changing detail without a repost. Use optional
-   `BuddyNotice.Group` metadata and `post(notice, visible)` for atomic initial visibility;
-   use `updateContext(id, group, visible)` for later grouping/suppression without promotion.
+   new post, and let the supplier carry changing detail without a repost. Give a notice an
+   optional `BuddyNotice.Group` and post it with `post(notice, visible)` to set its first
+   visibility in the same step; use `updateContext(id, group, visible)` for later grouping
+   or suppression and `updateState` for a phase change such as waiting for input, neither
+   of which promotes it.
 3. When the work ends, and on producer close, invalidate identity before cancelling delayed
    callbacks, then `dismiss` the notice. Report how the work ended through the host's
    notifications, never through Buddy. The user can dismiss a notice from the drawer
@@ -33,7 +35,8 @@ that need to inspect posted notices use
 [BuddyTestSupport](../jasper-buddy/src/testFixtures/java/dev/jasper/buddy/view/BuddyTestSupport.java)
 through `testImplementation(testFixtures(project(":jasper-buddy")))`. For model semantics,
 use [BuddyDeckTest](../jasper-buddy/src/test/java/dev/jasper/buddy/internal/model/BuddyDeckTest.java)
-and [BuddyNoticeTest](../jasper-buddy/src/test/java/dev/jasper/buddy/notice/BuddyNoticeTest.java).
+and [BuddyNoticeTest](../jasper-buddy/src/test/java/dev/jasper/buddy/notice/BuddyNoticeTest.java);
+for how Jasper shows Buddy and combines working intent, `BuddyIntegrationTest`.
 
 ```sh
 ./gradlew :jasper-app:test --tests '*CommandNotifierTest' --tests '*ActivityNotifierTest' :jasper-buddy:test --tests '*BuddyDeckTest' --tests '*BuddyNoticeTest' --tests '*BuddyNoticeIdTest'
@@ -73,16 +76,18 @@ how `buddy.toml` saves his position.
 
 Edit [BuddyDeck](../jasper-buddy/src/main/java/dev/jasper/buddy/internal/model/BuddyDeck.java),
 then its model tests. Preserve source-plus-key identity, newest-first replacement, the
-50-notice bound (`MAX_NOTICES`) and immutable snapshots. Every retained notice is live
-work, including suppressed entries. `BuddyGroups` keeps first-observed group/member order,
-expansion and summary priority within retained capacity. Context updates cannot restore
-dismissed IDs. Exercise the panels when a model change affects what is displayed.
+50-notice bound (`MAX_NOTICES`), which counts suppressed notices, and immutable snapshots
+of the visible ones. Every retained notice is live work. For grouping, ordering and the
+summary, edit [BuddyGroups](../jasper-buddy/src/main/java/dev/jasper/buddy/internal/model/BuddyGroups.java):
+it keeps first-observed group and member order, expansion and the attention choice while
+their notices are retained. Context, state and title updates cannot restore dismissed IDs.
+Exercise the panels when a model change affects what is displayed.
 
 ```sh
-./gradlew :jasper-buddy:test --tests '*BuddyDeckTest' --tests '*BuddyDeckLayoutTest' --tests '*BuddyGroupsPresentationTest' --tests '*BuddyColumnPanelTest' --tests '*BuddyDeckPanelTest'
+./gradlew :jasper-buddy:test --tests '*BuddyDeckTest' --tests '*BuddySummaryTest' --tests '*BuddyDeckLayoutTest' --tests '*BuddyGroupsPresentationTest' --tests '*BuddyCompactActivityTest' --tests '*BuddyColumnPanelTest' --tests '*BuddyDeckPanelTest'
 ```
 
-## Change sprite animation or capsule motion
+## Change sprite animation or summary placement
 
 1. For sprite poses and transitions, edit [BuddyAnimator](../jasper-buddy/src/main/java/dev/jasper/buddy/internal/animation/BuddyAnimator.java)
    and [BuddyFrame](../jasper-buddy/src/main/java/dev/jasper/buddy/internal/animation/BuddyFrame.java).
@@ -90,15 +95,16 @@ dismissed IDs. Exercise the panels when a model change affects what is displayed
    when adding artwork. Host working intent is independent of notification thresholds.
 2. For drawer hover timing use `BubbleMotion`; for direct summary placement use
    `BuddyColumnPlacement`. Keep the summary free of idle animation timers.
-3. Extend clock-driven tests for interrupted motion, long clock gaps, hiding, working
-   transitions and retargeting. Verify the exact path being changed: idle postures
-   resolve absolute deadlines in constant time, working resolves elapsed typing cycles
-   arithmetically, and rising or lowering traverses at most four deadlines.
+3. Extend clock-driven tests for interrupted motion, long clock gaps, hiding and working
+   transitions. Verify the exact path being changed: idle postures resolve absolute
+   deadlines in constant time, working resolves elapsed typing cycles arithmetically, and
+   rising or lowering traverses at most four deadlines.
 
 [BuddyAnimatorTest](../jasper-buddy/src/test/java/dev/jasper/buddy/internal/animation/BuddyAnimatorTest.java),
 [BubbleMotionTest](../jasper-buddy/src/test/java/dev/jasper/buddy/internal/animation/BubbleMotionTest.java)
 and [BuddyColumnPlacementTest](../jasper-buddy/src/test/java/dev/jasper/buddy/internal/presentation/BuddyColumnPlacementTest.java)
-are the starting tests. `BuddyColumnPanelTest` covers identity-based interrupted arrival.
+are the starting tests. `BuddyColumnPanelTest` checks that the summary keeps one size and
+place.
 
 ```sh
 ./gradlew :jasper-buddy:test --tests '*BuddyAnimatorTest' --tests '*BubbleMotionTest' --tests '*BuddyColumnPlacementTest' --tests '*BuddyColumnPanelTest'
@@ -107,12 +113,15 @@ are the starting tests. `BuddyColumnPanelTest` covers identity-based interrupted
 ## Change presentation, dragging or native lifetime
 
 Use [BuddyCard](../jasper-buddy/src/main/java/dev/jasper/buddy/internal/presentation/BuddyCard.java)
-for shared text/materials; column, drawer and bubble panels own their input and paint
+for shared text/materials; summary, drawer and bubble panels own their input and paint
 state. Placement helpers (`BuddyPlacement`, `BuddyColumnPlacement`, `BuddyBubblePlacement`)
 own screen geometry; `BuddyDragFrames` coalesces pointer updates. `BuddyWindow` owns
-native acquisition and child disposal. Preserve nonfocusable surfaces, nearest-neighbour
-sprite sampling and the sprite's logical size (a 42 × 48 frame at scale 2.5), screen
-clamps, drag-end position reporting and hidden state retention. Add cleanup when
+native acquisition and child disposal; `BuddySurfaceWindow` and `BuddySurfaceDialog`
+compose each frame in a `BuddyFrameBuffer`. Preserve the nonfocusable sprite, summary and
+menu surfaces, a drawer that takes focus only when explicitly opened
+(`BuddyDrawerLifetime`), offscreen frame composition, nearest-neighbour sprite sampling
+and the sprite's logical size (a 42 × 48 frame at scale 2.5), screen clamps, drag-end
+position reporting and hidden state retention. Add cleanup when
 acquiring a new timer, window or global listener. Check both initialization failure and
 final disposal; no new native acquisition belongs in a facade constructor or a model
 mutation.
@@ -124,12 +133,12 @@ human-run acceptance. Do not claim those checks from image previews.
 
 ```sh
 ./gradlew :jasper-buddy:test --tests '*BuddyCardTest' --tests '*BuddyShimmerTest' --tests '*BuddyColumnPanelTest' --tests '*BuddyDeckPanelTest' --tests '*BuddyBubblePanelTest' --tests '*BuddyDragFramesTest' --tests '*BuddyCompanionTest'
-./gradlew :jasper-buddy:test --tests '*BuddyPlacementTest' --tests '*BuddyBubblePlacementTest' --tests '*BuddyColumnWindowTest' --tests '*BuddyDeckWindowTest' --tests '*BuddySpriteTest'
+./gradlew :jasper-buddy:test --tests '*BuddyPlacementTest' --tests '*BuddyBubblePlacementTest' --tests '*BuddyColumnWindowTest' --tests '*BuddyDeckWindowTest' --tests '*BuddyDrawerLifetimeTest' --tests '*BuddyFrameBufferTest' --tests '*BuddySpriteTest'
 ```
 
 ## Preview and verify
 
-The five tools below use actual components headlessly (`-Djava.awt.headless=true`),
+The six tools below use actual components headlessly (`-Djava.awt.headless=true`),
 open no window and are opt-in, outside `check`:
 
 ```sh
@@ -137,16 +146,17 @@ open no window and are opt-in, outside `check`:
 ./gradlew :jasper-buddy:buddyGroupsPreview
 ./gradlew :jasper-buddy:buddyMotionPreview
 ./gradlew :jasper-buddy:buddyStandUpPreview
+./gradlew :jasper-buddy:buddyOpenLaptopPreview
 ./gradlew :jasper-buddy:buddyPerformanceMeasurement
 ```
 
 The [notification preview](../jasper-buddy/src/test/java/dev/jasper/buddy/internal/presentation/BuddyNotificationPreview.java)
-paints one running capsule beside the typing sprite at 2× density and writes 91 frames
+paints a one-task running summary beside the typing sprite at 2× density and writes 91 frames
 (1.5 seconds at 60 Hz) per theme under `light/` and `dark/`, plus the settled
 `light.png` and `dark.png`, in `jasper-buddy/build/reports/buddy-notifications/`. Its
 optional first argument overrides the directory (`--args='/absolute/output/path'`). The
 [motion preview](../jasper-buddy/src/test/java/dev/jasper/buddy/internal/presentation/BuddyMotionPreview.java)
-moves the sprite up and back down a 600 × 700 screen so the column flips, and writes
+moves the sprite up and back down a 600 × 700 screen so the summary flips, and writes
 420 frames (7 seconds at 60 Hz) per theme under `jasper-buddy/build/reports/buddy-motion/`;
 it takes no output-directory argument and prints the directory; both previews paint the sprite at scale 2
 (84 × 96), smaller than the app's 105 × 120. Relative paths use the

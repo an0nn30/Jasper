@@ -23,6 +23,8 @@ status.setIcon("lock");
 | Notifications | `NotificationSpec.withIcon` | `Optional.empty()` (the severity's icon) |
 | Provided session tabs | `SessionSpec` `icon` | `Optional.empty()` (Jasper's terminal icon) |
 | Content tabs | `ContentPresentation` `icon` | `null` |
+| Split items: their two actions' command palette rows | `SplitItemSpec.withIcon` | `Optional.empty()` |
+| A content tab's status bar items | `ContentStatus` `icon` | `""` |
 | Declarative views | `Nodes.Icon`; the `icon` of `Button`, `MenuButton`, `Choice`, `Option`, `PickerFace`, `PickerItem` and `MenuItem`; `Field`'s `leadingIcon`; `TableRow` and `TreeItem` | `Nodes.Icon`: required (leave the node out); the `icon` components and `leadingIcon`: `""`; `TableRow` and `TreeItem`: `Optional.empty()` |
 
 The one bitmap the SDK takes is a [`PixelImage`](sdk-reference.html#dev.jasper.sdk.ui.PixelImage): a PNG of at most

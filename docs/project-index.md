@@ -191,8 +191,9 @@ Change how a group appears in [Notifications › Groups](notifications.md#groups
 
 **Projects** lists the indexed projects with **Name**, **Location** ("*host*: *folder*" for a remote project),
 **State**, **Last indexed** and **Files**, and the buttons **Add Folder…**, **Reindex** and **Remove** (the last two for
-the selected project). With no projects it shows "No Projects" and **Add Folder…**. These buttons act at once; Remove
-asks first.
+the selected project). Click a column header to sort the projects by it, again to reverse; drag a column boundary to
+resize a column, or double-click it to fit the column to its content. The sort and widths are remembered. With no
+projects it shows "No Projects" and **Add Folder…**. These buttons act at once; Remove asks first.
 
 | State | Means |
 |---|---|
@@ -227,6 +228,7 @@ Under Jasper home, in `plugins/dev.jasper.indexer/`:
 | `data/projects.toml` | the indexed projects: a `[[project]]` table each, with `key` (`local:<folder>` or `remote:<host id>:<folder>`), `name` and `manual` (indexed by hand) |
 | `data/projects.toml.bad` | a project list that could not be read, set aside before the next save |
 | `data/indexes/*.idx` | each project's saved index, one compressed file per project |
+| `data/columns.properties` | the sort and column widths of the Projects table |
 
 Jasper rewrites `projects.toml` itself; change the project list in Settings. A saved index that is damaged or belongs to
 another project is deleted.

@@ -13,7 +13,7 @@ import java.util.*;
  * @param allowClear whether the chooser offers a None row while its search is empty; choosing it answers
  *     {@link CredentialPickResult.Cleared}
  * @param search the chooser's starting search, stripped: it opens listing only the credentials whose name or caption
- *     contains it, ignoring case, until the user edits it; empty for every credential
+ *     contains it, ignoring case, until the user edits it; empty for every credential. Since Vault 0.9.0
  */
 public record CredentialPickRequest(UiAnchor anchor,Optional<UUID> current,boolean allowClear,String search) {
     /**

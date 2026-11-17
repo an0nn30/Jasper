@@ -110,14 +110,14 @@ pane it last came from.
 
 This needs [shell integration](terminal.md#shell-integration): the duration is measured between the command marks
 its scripts emit, so a shell without them produces no notifications. `0` turns these notifications off. The
-[Desk Buddy](#capsules-and-the-drawer), when shown, also shows a long-running command as a capsule while it runs.
+[Desk Buddy](#capsules-and-the-drawer), when shown, also shows a command while it runs out of sight.
 
 ## Plugin notifications
 
 Plugins post notifications in their own groups, so you can tell them apart from Jasper's. When an error a plugin
 reports has an exception behind it, its notification offers **Show more…**, which opens the Errors tab at it. The
-notifications a plugin posted itself expire when it stops. A plugin can also remove one it posted: its card closes and it
-leaves the panel.
+notifications a plugin posted itself expire when it stops: their cards close, and the panel keeps them with their links
+disabled. A plugin can also expire one it posted, or remove it, which also takes it out of the panel.
 
 When a plugin's background work ends, Jasper posts the outcome in the plugin's activities group: information when it
 succeeded, an error when it failed, titled after the work with its details. Clicking it runs the plugin's action for
@@ -133,9 +133,9 @@ Plugins. A plugin that failed while starting is reported once, by its incident's
 When something fails unexpectedly, in Jasper or in a plugin, Jasper records it as an incident and tells you with an
 error notification: "Unexpected error in Jasper", or, for a plugin, "<name> failed to start", "<name> failed to stop"
 or "<name> failed in <operation>". A plugin's offers **Disable Plugin**, and both offer **Show more…**, which opens the
-Errors tab at that incident, in the most recently active window. **Notifications: Show Errors** in the command palette opens the tab
-too. A shell that could not start is recorded as well: each failure is announced as "Could not start the terminal",
-with its folder and cause, and offers **Show more…**.
+Errors tab at that incident in the most recently active window, or selects the tab where it is already open.
+**Notifications: Show Errors** in the command palette opens the tab too. A shell that could not start is recorded as
+well: each failure is announced as "Could not start the terminal", with its folder and cause, and offers **Show more…**.
 
 The **Errors** tab lists this session's incidents, most recently seen first: each row shows the summary, the
 source (Jasper or the plugin's name), "×N" once it happened more than once, and the time. When the same failure
@@ -189,7 +189,7 @@ opens [finished-command notifications](configuration.md#finished-command-notific
 | Setting | Key | Default | Notes |
 |---|---|---|---|
 | Show system notifications | `notifications.system` | `true` | Applies live |
-| Notify after | `notifications.long_command_seconds` | `10` | Seconds, 0–3600; `0` turns long-running-command notifications and Buddy's command capsules off; applies live |
+| Notify after | `notifications.long_command_seconds` | `10` | Seconds, 0–3600; `0` turns long-running-command notifications and Buddy's running commands off; applies live |
 | Groups | `notifications.groups` | none | Group id to `"card"`, `"sticky"`, `"history"` or `"off"`; applies from the next notification |
 
 | Command | Does |
@@ -203,7 +203,7 @@ None has a default shortcut; assign one in Settings › Keymap.
 ## Desk Buddy
 
 The Desk Buddy is Jasper, a small pixel-art turtle who floats above your windows and shows the work still going on:
-long-running commands, plugins' background work and the connections plugins report. He keeps no outcomes; how work
+running commands, plugins' background work and the connections plugins report. He keeps no outcomes; how work
 ended is a notification.
 
 ### Showing him
@@ -226,36 +226,47 @@ windows, he stays off for the session and the log says "Desk buddy disabled".
 
 He fades in with sparkles and a wave when he appears, and greets you when you come back to a Jasper window. Left
 alone he blinks every few seconds, sits down after 20 seconds, and after a minute tucks into his shell and sleeps;
-typing in a Jasper window wakes him.
+typing in a Jasper window wakes him. While work goes on he sits at his laptop and types, and when it is over he closes
+the laptop and stands up.
 
 ### Capsules and the drawer
 
-Work in progress appears in one compact summary beside him:
+A capsule beside him, the summary, shows the work still going on:
 
-- **A running command** appears immediately when its workspace tab is out of sight. All commands in the selected
-  tab of an active, showing, non-minimised Jasper window stay hidden, including other split panes. Switching tabs
-  or leaving that window reveals work still running, preserving its elapsed time. `notifications.long_command_seconds`
-  set to `0` disables command capsules. Work qualifies for his typing pose immediately out of sight, or after the
-  threshold while visible; hiding or dismissing a capsule does not end that work.
-  The drawer groups panes under their current tab-strip label, including a user rename, with
-  each pane's tab name (the [Tab name](configuration.md#tab-names) pattern, or the name you gave the tab) and
-  "Running · <time>". Clicking an entry brings its current window
-  forward, selects the tab and focuses the pane. Finishing removes the entry, including while hidden.
-- **A plugin's background work**, such as a File Server transfer that takes longer than a second, shows its
-  progress in the drawer until it ends; clicking its entry brings Jasper forward and runs the plugin's action for it.
-  A task waiting for input takes attention priority until the plugin resumes it. Buddy keeps typing while any plugin
-  task or qualifying terminal command is running; waiting tasks and connections do not contribute to that pose.
+- **A running command** shows at once while its workspace tab is out of sight: another tab is selected, its window
+  is not the active one or is minimised, or Jasper is in the background. Commands in the selected tab of the active
+  window, every split pane of that tab included, stay hidden; switching away shows any still running, with the time
+  they have run, and coming back hides them again. With `notifications.long_command_seconds` set to `0` no command
+  shows.
+- **A plugin's background work**, such as a File Server transfer that takes longer than a second, shows with its
+  progress until it ends. Work waiting for your input carries a dot.
 - **A connection a plugin reports** shows its state: a dot while it has a problem, a cross while it is down.
 
-The summary counts visible tasks and connections; work needing input or a connection problem takes
-priority. Clicking it or Buddy opens all visible work. Group headers expand and collapse inline;
-groups and entries keep their first-observed order while retained. Identical pane titles have stable
-numbered labels. The summary follows Buddy above or below, clamped to the screen. Buddy retains up to
-50 notices, including hidden work. × dismisses one entry and **Dismiss all** (with more than one)
-includes collapsed sections while preserving hidden work. Dismissal lasts for that command; switching
-tabs does not restore it, and a new command in the pane can appear again. Dismissing does not stop work.
-The drawer stays open across pointer exit and closes on Escape, focus loss, activation, all visible
-work ending or Buddy hiding. Moving panes or tabs updates their groups and activation targets in place.
+With one piece of work the summary names it (a command by its workspace tab) and says how it stands, such as
+"Running"; with more it counts them, such as "3 tasks · 1 connection". Work waiting for input, a connection that is
+down and one with a problem come first: the summary names that one, such as "Needs input · 2 other activities". It
+sits above him, or below him in the upper half of the screen or when there is no room above, and stays on the screen.
+
+He types while a plugin's work runs, and while a command runs out of sight or, in sight, once it has run
+`notifications.long_command_seconds`. Work waiting for input and connections do not count; a hidden or dismissed
+command still does.
+
+A click on the summary, or on him, opens the drawer, which lists the work the summary counts:
+
+- Commands are grouped under their workspace tab as the tab strip names it, renamed or not, with how many it holds; a
+  click on the heading collapses or expands it. Each command reads its pane's tab name (the
+  [Tab name](configuration.md#tab-names) pattern, or the name you gave the tab) and "Running · <time>"; panes with the
+  same name in one tab are numbered. A pane or tab you move takes its entry along.
+- Plugin work and connections are listed one by one, each with the title and detail its plugin gives it.
+- Groups and entries keep the order in which they first appeared. Jasper keeps up to 50 pieces of work, hidden
+  commands included, and drops the oldest beyond that.
+
+Clicking an entry goes to its work: a command's window comes forward with its tab selected and its pane focused; a
+plugin's entry brings Jasper forward and runs the plugin's action for it. × dismisses one entry, and **Dismiss all**
+(with more than one) every entry the drawer lists, those under a collapsed heading included; hidden commands stay.
+Dismissing stops no work: a dismissed command stays dismissed until it ends, whatever tabs you switch to, and the next
+command in that pane shows again. The drawer stays open when the pointer leaves it and closes on Escape, when it loses
+the focus, after a click on an entry, when the work it lists is over or dismissed, and when he hides.
 
 ### His place
 

@@ -1,7 +1,8 @@
 <section class="guide" id="palette">
 <h2>Palette</h2>
 <p>The command palette searches scopes. Jasper's own Commands scope lists every action, the bundled plugins add theirs
-(SSH hosts, tunnels, files, recent files, shell history, snippets, vault logins, file servers), and a plugin with
+(SSH hosts, tunnels, files, recent files, shell history, snippets, vault logins, file servers, bookmarks and
+visited sites), and a plugin with
 {@code palette.contribute} adds its own through {@link PluginContext#palette()}. A scope answers each query with rows and
 offers up to three verbs on them; a verb can ask for a few values first in a small form, a step. The palette appears as
 the card in the default look and as the Run window in the Enterprise look; both show the same scopes. For the user's

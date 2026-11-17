@@ -39,8 +39,8 @@ Bytecode checks in `check` enforce the boundaries:
 | Check | Enforces |
 | --- | --- |
 | `verifyTerminalArchitecture` | The application uses only the terminal library's supported types: no `internal` package and no `TerminalSession.internalAccess()`. |
-| `verifyApplicationArchitecture` | Only `Main` at the package root; only Buddy's `BuddyCompanion`, `BuddyNotice`, `BuddyNoticeId`, `BuddyOptions` and `BuddyPosition`; SDK types only in `dev.jasper.app.plugins`; `dock` JDK-only (from `java.awt` only `Rectangle` and `Point`, plus `layout`'s values); `layout` JDK-only (nothing from `java.awt`); `vmoptions` JDK-only (plus `com.sun.management`); `MainWindow` made only in `WindowManager.ensureMain`, `WindowManager` only in `JasperApplication`'s constructor and `WindowFrame` only in `JasperApplication.frameOnScreen` and `rehearsalWindow`; Buddy references only the JDK; acyclic application and Buddy package graphs; the supported Buddy types' public signatures carry only JDK and supported Buddy types. |
-| `verifySdkArchitecture`, `verifyPluginArchitecture` | The SDK and testkit reference only the JDK and the SDK; a plugin references only the JDK, the SDK, its own packages, its bundled libraries and the exports of the plugins listed for it. |
+| `verifyApplicationArchitecture` | Only `Main` at the package root; only Buddy's `BuddyCompanion`, `BuddyNotice`, `BuddyNoticeId`, `BuddyOptions` and `BuddyPosition`; SDK types only in `dev.jasper.app.plugins`; `dock` JDK-only (from `java.awt` only `Rectangle` and `Point`, plus `layout`'s values); `layout` JDK-only (nothing from `java.awt`); `vmoptions` JDK-only (plus `com.sun.management`); `JasperWindow` made only in `WindowManager.open`, `WindowManager` only in `JasperApplication`'s constructor and `WindowFrame` only in `JasperApplication.frameOnScreen` and `rehearsalWindow`; Buddy references only the JDK; acyclic application and Buddy package graphs; the supported Buddy types' public signatures carry only JDK and supported Buddy types. |
+| `verifySdkArchitecture`, `verifyPluginArchitecture` | The SDK and testkit reference only the JDK and the SDK; a plugin references only the JDK, the SDK, its own packages, its bundled libraries and the exports of the plugins listed for it. Only the Browser may reference Chromium (`org.cef`, `com.jetbrains.cef`: the runtime's `jcef` module), and `PluginPresentationCheck` refuses presentation code in plugin classes ([SDK architecture](sdk-architecture.md)). |
 | `verifyUiArchitecture` | `jasper-ui` depends on no other Jasper module, and its packages follow their listed edges. |
 
 `AppDocumentationTest` also requires a `package-info.java` with Javadoc in every application, Buddy and SDK package.
@@ -114,17 +114,20 @@ sequenceDiagram
 4. `ConfigService` reads `config.toml` (or the `--config` file) with the look's defaults (`DefaultSource`).
 5. `prepareDesktop` installs the shutdown hook (`jasper-log-shutdown`) and the uncaught-exception handler, commits the
    desktop properties and the title-bar style from the look's `DesktopFlags`, opens the boot splash (`splash`: a branded
-   look's, else the saved interface theme's still illustration) on a start that will open a window, except a `--safe-mode` one, prepares the built-in icons and posts the
-   composition to the EDT.
+   look's, else the saved interface theme's still illustration) on a start that will open a window, except a
+   `--safe-mode` one, prepares the built-in icons and posts the composition to the EDT.
 6. On the EDT the bootstrap composes the application inside `StartupResources`: the palette's command recents
    (`CommandHistory`), then `JasperApplication`, whose constructor registers the bundled fonts and the look's faces,
    installs the theme under the look's kit (falling back to the standard look when the kit is at fault), and builds the
    notification centre, Buddy, the configuration controller, the shell-profile catalog and the desktop's application
-   handlers (quit, reopen, open file, preferences, about). `createApplication` then wires the resident indicator, the system
-   notifier and the macOS Dock control and calls `startPlugins`; a `jasper` call that arrived earlier waits for its
-   handler. `startPlugins` gives the window manager its `WorkspaceStore` (`workspace.toml`) and builds the auxiliary
-   windows, the Errors tab, the About windows, the plugin runtime, the application's own contributions and the Settings
-   dialog, and starts every selected plugin.
+   handlers (quit, reopen, open file, open URI, preferences, about); on Linux, when the Desktop colors helpers are
+   installed, it first opens `platform.DesktopColors` ([themes](#themes)). `createApplication` then wires the resident
+   indicator, the system notifier, the default-browser check, the file associations and the macOS Dock control and calls
+   `startPlugins`; a `jasper` call that arrived earlier waits for its handler. `startPlugins` gives the window manager
+   its `WorkspaceStore` (`workspace.toml`) and `LayoutStore` (`layouts.toml`) and builds the auxiliary windows, the
+   Errors tab, the About windows, the plugin runtime, the application's own contributions and the Settings dialog, and
+   starts every selected plugin. Loading a plugin checks the package names of its classes; it reads the class files
+   themselves (`KitCompatibility`) only for a plugin Jasper does not bundle ([SDK architecture](sdk-architecture.md)).
 7. `compose` then gives the launch its login-item reconciler, lets the owner answer handoffs (once the EDT has taken
    one, within a second, and none while it quits) and presents: the windows `WindowManager.ensureWindow` restores or
    opens, with the launch's paths opened in it (`JasperApplication.openFirstWindow`, `OpenPlan`), the `--background`
@@ -136,12 +139,13 @@ scopes. The splash closes once the first window's first paint has reached the sc
 (`WindowFrame.afterFirstVisiblePaint`, run on the EDT turn after that paint), or earlier when start-up fails, that
 window closes or Jasper quits.
 
-Work that is not needed for the first window waits until start-up settles. The macOS Dock bridge, the menu bar item
-and the Windows notification-area icon arrive when the first output paints, a `--background` warm-up finishes, or 2 s
-after the first paint. Reading `jasper.vmoptions`, the low-memory watch and the memory indicator wait for the first
-output, the end of the warm-up, or 5 s after the first paint; Settings reads the font families at the first output or
-the end of the warm-up. The first window's first paint proves a look's start (`PresentationAttempt`).
-[Diagnostics](diagnostics.md#start-up-timing) describes the start-up and window timing lines.
+Work that is not needed for the first window waits until start-up settles. The macOS Dock bridge, the menu bar item, the
+Windows notification-area icon and the Linux tray icon arrive when the first output paints, a `--background` warm-up
+finishes, or 2 s after the first paint; so does the palette's list of named layouts. Reading `jasper.vmoptions`, the
+low-memory watch and the memory indicator wait for the first output, the end of the warm-up, or 5 s after the first
+paint; Settings reads the font families at the first output or the end of the warm-up. The first window's first paint
+proves a look's start (`PresentationAttempt`). [Diagnostics](diagnostics.md#start-up-timing) describes the start-up and
+window timing lines.
 
 A `--background` launch rehearses one window (`JasperApplication.warmUp`, `application.Rehearsal`): composed with a
 canned terminal session and no shell, painted once into an image and discarded unseen; one explicit collection
@@ -153,10 +157,12 @@ Residency (`system.run_in_background`) is decided once at start-up, and only for
 start-up flags (`AppArguments.residencyAllowed`: a home from `jasper.home` or `JASPER_HOME` is never resident); a reload
 does not change it. The home's owner serves the handoff endpoint (`<home>/daemon/socket`) and the `jasper` command
 socket (`<home>/daemon/commands`), resident or not; a resident owner keeps its plugins, configuration watcher and
-command recents after its last window closes. A handoff opens the request's files and folders, or brings Jasper forward,
-restoring the saved window when none is open. `--config`, `--safe-mode` and `--plugin-dir` apply only to a Jasper that
-starts: a later launch hands off, they are ignored, and the running Jasper says to quit it first; a Jasper started with
-one is never resident. [Command line](command-line.md) describes the client.
+command recents after its last window closes, and shows `platform.ResidentTray`: the macOS menu bar item, the Windows
+notification-area icon, or on Linux a StatusNotifier item, else an XEmbed tray icon (`LinuxTrayRuntime`). A handoff
+opens the request's files and folders, or brings Jasper forward, restoring the saved window when none is open.
+`--config`, `--safe-mode` and `--plugin-dir` apply only to a Jasper that starts: a later launch hands off, they are
+ignored, and the running Jasper says to quit it first; a Jasper started with one is never resident.
+[Command line](command-line.md) describes the client.
 
 A macOS reopen (Dock click, Spotlight, `open -a`) opens or raises a window, and the macOS open-file event opens its
 files and folders as a handoff's paths. The macOS open-URI event raises or opens a window the same way; then a web
@@ -180,24 +186,65 @@ The `TabRegistry` (contributions) owns every item for its whole life: a move det
 `WorkspaceHost` and attaches it to another's, never replacing its content or touching its session. `WindowManager`
 moves a parent tab into a new window or into another window (Move Tab to Window): `WindowContent.receive`
 lands each item through the tab registry, then, once every item has arrived, `WorkspaceView.rearrange` gives the parent
-tab its planned layout. Every outside request and a plugin's item opened with no owner go to the most recently active window, and restore the
-saved window first when none is open; Quit and going to the background close every window together, the most recently
-active last. `verifyApplicationArchitecture` pins where the windows are made: a `JasperWindow` only in
+tab its planned layout. Every outside request and a plugin's item opened with no owner go to the most recently active
+window, and restore the saved window first when none is open; Quit and going to the background close every window
+together, the most recently active last. New Window (`WindowManager.openWindow`) opens the default layout 30 pixels
+below and right of the most recently active window, and a tab or pane dragged outside every window opens a window of
+its own; a window opened while another is open starts out of Zen, with its Float and Window tool windows hidden.
+`verifyApplicationArchitecture` pins where the windows are made: a `JasperWindow` only in
 `WindowManager.open`, the `WindowManager` only in `JasperApplication`'s constructor, and `WindowFrame`, a window's
 native frame, only in `JasperApplication.frameOnScreen` and `rehearsalWindow`.
 
 `WorkspaceStore` (workspace) keeps one window in `workspace.toml` (`persistence.WorkspaceFile`: the window's
 bounds and maximised state, its tabs in strip order with the one it shows, each tab's panes and the item each holds,
 and its tool windows; in the user's words: window, tab, pane, item). `WindowManager.snapshot()` builds what is saved
-from the most recently active window, within a second of each change (a non-sliding timer on the EDT, the write on a
-virtual thread) and at once, from that window, when you close one, leaving items out until the file fits
-`WorkspaceFile.MAX_BYTES` (256 KiB); closing every window saves first and holds saving until the window comes back.
-`ensureWindow` restores the saved window when none is open (`system.reopen`: the saved window, or the default layout
-at its place), with its place, tabs, items and tool windows; a restored terminal's shell starts when its tab first
-shows, and until then its pane reports
-`NOT_STARTED`; a plugin's item comes back through its plugin's restorer or as a placeholder (`PlaceholderContent`; see
-[SDK architecture](sdk-architecture.md)). The reader drops a bad window, tab or item entry alone; whenever the saved window
-does not all come back, the file is kept as `workspace.toml.bad` and a notice says where.
+from the most recently active window, within a second of each change and of a window coming to the front (a
+non-sliding timer on the EDT, the write on a virtual thread), and at once from the window you close, leaving items out
+until the file fits `WorkspaceFile.MAX_BYTES` (256 KiB); closing every window saves first and holds saving until the
+window comes back. `ensureWindow` restores the saved window when none is open (`system.reopen`: the saved window, or
+the default layout at its place), with its place, tabs, items and tool windows; a restored terminal's shell starts
+when its tab first shows, and until then its pane reports `NOT_STARTED`; a plugin's item comes back through its
+plugin's restorer or as a placeholder (`PlaceholderContent`; see [SDK architecture](sdk-architecture.md)). The reader
+drops a bad window, tab or item entry alone; whenever the saved window does not all come back, the file is kept as
+`workspace.toml.bad` and a notice says where.
+
+`LayoutStore` (workspace) keeps `layouts.toml` beside it (`persistence.LayoutsFile`, at most 256 KiB): an optional
+default layout and named layouts, each a window's tabs, panes, items and tool windows without its bounds. The default
+layout is what New Window, Empty State, a first start with nothing saved and a window that cannot be restored open; with
+none saved it is the built-in layout, one terminal tab and the built-in tool windows (`ToolWindows.BUILT_IN`).
+Window › Layouts (`LayoutCommands`) applies, saves, renames and deletes layouts, and the palette's Apply Layout entries
+(`LayoutPalette`) list the named ones once start-up has settled. Applying asks every tab's closing guard first, then
+replaces the window's tabs and tool windows under fresh ids. The store reads the file once, when first asked, and writes
+each change on a `jasper-layouts-save` virtual thread after the one before; an unreadable file is kept as
+`layouts.toml.bad` and read as empty.
+
+## Web addresses and files
+
+A web address opens in the web browser a plugin provides (`Platform.browser`, held by `plugins.WebBrowsers`: one at a
+time, a bundled plugin's replacing a non-bundled one's), else in the system browser. A Cmd-click or Cmd+Shift-click
+(Ctrl-click or Ctrl+Shift-click elsewhere) on a link in a terminal reaches `JasperApplication.openLink` as a
+`workspace.LinkClick`, the link with its gesture and OSC 8 target and the shape of its pane: an http or https address
+goes to `PluginRuntime.openLink` as a click from that window, in a tab, or for a Cmd+Shift-click (Ctrl+Shift-click)
+beside the pane (to the right of a pane wider than it is tall, else below); any other link, such as an `ftp` URL or an
+OSC 8 `mailto` link, goes to the system browser. A clicked local file a browser can show (`application.LocalWebFiles`:
+HTML, XML, SVG, CSS, JavaScript, PDF and common images) is offered to the provided browser before the editor.
+
+Web addresses from outside Jasper (launch arguments, `jasper <url>`, a second launch, the macOS open-URI event) go
+through `application.ExternalAddresses`: they wait, at most 32, until the plugins run and the first answer to whether
+Jasper is the system's default browser has come (taken as no after 3 s), and the browser hears them as external
+addresses. That answer comes from `platform.DefaultBrowser` (Launch Services on macOS, the user's choice for `https` on
+Windows, `xdg-settings` on Linux), asked at start-up and again when a window activates, at most once every 5 seconds.
+While Jasper is the default, an http or https address never goes to the system browser, which would hand it back: a
+notification offers Copy Link, and Turn On Browser while no plugin provides one. System browser opens run on
+`jasper-open-link` virtual threads, which shutdown waits for.
+
+A file another program hands Jasper (a launch, `jasper <file>`, the open-file event, a `file:` URL, a second launch)
+opens on a `jasper-open-file` virtual thread through the editor a plugin provides, as `PluginRuntime.Origin.OUTSIDE`
+(the SDK's `FileOrigin.OUTSIDE`), else is revealed in the file manager; it never reaches the desktop's open action.
+`platform.FileAssociations` reports and changes which application opens each file type in `file-types.tsv` (Launch
+Services on macOS, Settings' default apps on Windows, `xdg-mime` on Linux), keeping the handlers it replaced in
+`file-associations.toml`; `JasperApplication` holds it and refreshes it when a window activates, at most once every 5
+seconds. It is the platform layer only: no command or Settings section uses it.
 
 ## Quit and shutdown
 
@@ -208,9 +255,10 @@ window is composed, through the injected `DockControl` (`platform.MacDock`). Eve
 settled, it calls `quit()`.
 
 `quit()` asks the content tabs' and plugin quit guards; any refusal leaves everything running. It is reached by Quit
-Jasper Completely in the macOS menu bar item, Quit Jasper in the Windows notification-area icon, the Plugins page's Quit
-Jasper button, an auxiliary window's File › Quit, and macOS logging out, restarting or shutting down. Closing the last
-window of a process that is not resident shuts it down unless an auxiliary window is still open.
+Jasper Completely in the macOS menu bar item, Quit Jasper in the Windows notification-area icon and the Linux tray
+icon, the Plugins page's Quit Jasper button, an auxiliary window's File › Quit, and macOS logging out, restarting or
+shutting down. Closing the last window of a process that is not resident shuts it down unless an auxiliary window is
+still open.
 
 `restart(mode)` asks the same guards as `quit()` and then quits through `quitNow()`. `RestartCommand` plans the
 replacement from this process's own command line without `--background`, `--no-window` or the launch's paths, adding
@@ -223,16 +271,17 @@ the operating system does not report the command line.
 
 1. It arms the exit deadline (4 s, the 2 s grace doubled), which needs no EDT to fire: a plugin callback that blocks
    the EDT cannot be abandoned, so then only the deadline ends the process.
-2. It stops session admission and shell-profile detection, stops reporting Cygwin package management (its supervisor
-   process runs on), closes the command recents, the heap watch and the memory indicator, then stops the plugins in
-   reverse start order; their drained background work joins the wait.
+2. It drops the web addresses from outside still waiting for the browser, stops session admission and shell-profile
+   detection, stops reporting Cygwin package management (its supervisor process runs on), closes the command recents,
+   the heap watch and the memory indicator, then stops the plugins in reverse start order; their drained background
+   work joins the wait.
 3. It clears pending clipboard secrets, closes the auxiliary windows, saves `ui-state.toml` (the window was saved to
-   `workspace.toml` as it closed), and closes the
-   notifiers, the themes, Buddy, the notification views and the configuration, then removes the desktop's application
-   handlers.
+   `workspace.toml` as it closed), and closes the notifiers, the system appearance and Desktop colors observers, the
+   themes, Buddy, the notification views and the configuration, then removes the desktop's application handlers.
 4. Cleanups registered with `JasperApplication.onShutdown` (the handoff endpoint, the command listener) run on daemon
    workers. `ApplicationShutdown.await` waits up to 2 s for them, accepted launch workers and their late child exits,
-   plugin work, the command recents' flush and the last `workspace.toml` write, then exits from `jasper-exit`.
+   plugin work, the command recents' flush, the last `workspace.toml` and `layouts.toml` writes and the system browser
+   opens, then exits from `jasper-exit`.
 
 A pane owns its admitted session. The launch coordinator stops admission and closes sessions that arrive late; it
 never force-closes a session before its pane has cleaned up. The 2 s bound covers the application's wait, not a
@@ -256,6 +305,13 @@ the log. Residency does not keep pane sessions; child cleanup may briefly contin
 | The log, system notifications | `jasper-log-writer`; `jasper-system-notifications` |
 | The handoff endpoint, the command socket | `jasper-handoff-accept`; `jasper-command-accept` with a reader and a writer virtual thread per call; requests that arrive before the application is composed run in order on `jasper-early-requests` |
 | `workspace.toml` saves | the snapshot on the EDT; each write on a `jasper-workspace-save` virtual thread, after the one before it |
+| `layouts.toml` saves | each write on a `jasper-layouts-save` virtual thread, after the one before it |
+| Opening a file from a click or from outside; the system browser's opens | `jasper-open-file` and `jasper-open-link` virtual threads; a provided browser is asked on the EDT |
+| Whether Jasper is the default browser | a `jasper-default-browser` virtual thread per check, answering on the EDT |
+| File associations | `jasper-file-associations` virtual threads, one call at a time under one lock |
+| Linux Desktop colors | `DesktopColors`' `desktop-colors` and `desktop-colors-timeout` daemons supervise the helper processes; `DesktopAppearance` builds the palette on `jasper-desktop-palette` and publishes it on the EDT |
+| The Linux tray | `jasper-tray-controller`; the StatusNotifier item on `jasper-tray-dbus` and `jasper-tray-deadline`, the XEmbed icon on `jasper-tray-xcb` and `jasper-xcb-deadline`; menu actions on the EDT |
+| Login item registration | `jasper-login-item`, one write at a time, coalesced to the latest saved choice |
 | Process cleanup and the exit | `jasper-process-cleanup` daemons, `jasper-exit-deadline`, `jasper-exit` |
 
 The terminal library keeps its own reader-thread and buffer-lock contract. Never call Swing synchronously while
@@ -303,33 +359,33 @@ bootstrap builds the login-item reconciler and hands it over. Plugin settings li
 | Package | Owner and thread/lifetime contract |
 | --- | --- |
 | `root` | `Main` only; delegates to bootstrap. No owned resources. |
-| `bootstrap` | Pre-AWT arguments, the home's instance lock and the handoff, the pre-pass and EDT composition. `StartupResources` owns rollback until explicit transfer; the owner's `Instance` keeps its lock for the life of the process. |
-| `application` | EDT application composition and feature lifetimes (notifications, incidents, VM options, memory warnings, About, the Errors tab, Settings appearance wiring); the launch coordinator synchronises admission and shutdown waits off the EDT. `JasperApplication` closes its children. |
-| `workspace` | EDT windows (`WindowManager`, `JasperWindow`, their `WindowFrame`s), their parent tabs (`ParentTabsView`, with the window's strip `ParentTabBar`), each a workspace of groups, its panes, each showing one item (`WorkspaceView`, `GroupView`, `SplitContainer`), each window's `EmptyWorkspace`, the saved workspace (`WorkspaceStore`) and a plugin item's placeholder (`PlaceholderContent`), terminal items (`TerminalContent`, one `TerminalPane` each), the tab and pane drag (`TabDrag`, the window manager's one, shared by its windows), the tool window area, stripes, headers and dock drag (`DockDrag`, whose Detach target, outside the window or over another of Jasper's windows in front of it, opens the tool window's own window where it is released), each window's detached tool windows (`DetachedToolWindows`, which keeps one native window per shown Float or Window tool window in line with the dock through `Shell`s, and `DetachedFrame`, the native Float dialog and Window frame that `JasperApplication` gives it), action and configuration adapters, activity events, each window's presence in the terminal registry, the pending and disconnected states of provided sessions, and the palette's homes (`PaletteHome`: `TitleFieldHome`, `UpperHome`, chosen by `WorkspaceChrome.of` from the look's `PaletteLook`). `WindowContent` closes subscriptions and panes, its `WindowContributions` the detached tool windows' windows; each pane closes its session. |
+| `bootstrap` | Pre-AWT arguments, the home's instance lock and the handoff, the pre-pass and EDT composition, the splash's theme (`SplashSelection`) and the login item's writes (`LoginItemUpdates`, one at a time, coalesced to the latest saved choice). `StartupResources` owns rollback until explicit transfer; the owner's `Instance` keeps its lock for the life of the process. |
+| `application` | EDT application composition and feature lifetimes (notifications, incidents, VM options, memory warnings, About, the Errors tab, Settings appearance wiring, web addresses from outside (`ExternalAddresses`), the local files offered to the browser (`LocalWebFiles`), Linux Desktop colors (`DesktopAppearance`)); the launch coordinator synchronises admission and shutdown waits off the EDT. `JasperApplication` closes its children. |
+| `workspace` | EDT windows (`WindowManager`, `JasperWindow`, their `WindowFrame`s), their parent tabs (`ParentTabsView`, with the window's strip `ParentTabBar`), each a workspace of groups, its panes, each showing one item (`WorkspaceView`, `GroupView`, `SplitContainer`), each window's `EmptyWorkspace`, the saved workspace (`WorkspaceStore`) and a plugin item's placeholder (`PlaceholderContent`), the saved layouts (`LayoutStore`, with Window › Layouts' `LayoutCommands` and the palette's `LayoutPalette`), terminal items (`TerminalContent`, one `TerminalPane` each), the tab and pane drag (`TabDrag`, the window manager's one, shared by its windows), the tool window area, stripes, headers and dock drag (`DockDrag`, whose Detach target, outside the window or over another of Jasper's windows in front of it, opens the tool window's own window where it is released), each window's detached tool windows (`DetachedToolWindows`, which keeps one native window per shown Float or Window tool window in line with the dock through `Shell`s, and `DetachedFrame`, the native Float dialog and Window frame that `JasperApplication` gives it), action and configuration adapters, activity events, the link clicks panes hand the application (`LinkClick`), each window's presence in the terminal registry, the pending and disconnected states of provided sessions, and the palette's homes (`PaletteHome`: `TitleFieldHome`, `UpperHome`, chosen by `WorkspaceChrome.of` from the look's `PaletteLook`). `WindowContent` closes subscriptions and panes, its `WindowContributions` the detached tool windows' windows; each pane closes its session. |
 | `dock` | Pure tool window dock model: the six slots, each window's `DockState` (also each tool window's `ToolWindowMode`, docked or detached as Float or Window, and the bounds of its own window), `DockGeometry` and the drag's `DockDropResolver`; and the tab and pane drag's `WorkspaceDropResolver`. JDK-only (no Swing; `java.awt.Rectangle` and `Point` only, and the layout's group ids and sides); each window owns its state on the EDT. |
-| `layout` | Pure workspace layout model: a window's parent tabs (`ParentTabs`, with the shown one and their order of use), parent tab, tab and group ids, a workspace's groups (its panes, one item each) in nested weighted splits (`Layout`, `Split`, `Group`), its active and maximised group and the groups' order of use, the operations that return a new layout, each group's region of the unit square with its directional neighbours, and what a plugin's item needs to come back (`TabRestore`). JDK-only (nothing from Swing or AWT); immutable values, safe on any thread; whoever holds a layout replaces it. `persistence.WorkspaceFile` reads and writes each window's `ParentTabs` as `workspace.toml`. |
+| `layout` | Pure workspace layout model: a window's parent tabs (`ParentTabs`, with the shown one and their order of use), parent tab, tab and group ids, a workspace's groups (its panes, one item each) in nested weighted splits (`Layout`, `Split`, `Group`), its active and maximised group and the groups' order of use, the operations that return a new layout, each group's region of the unit square with its directional neighbours, and what a plugin's item needs to come back (`TabRestore`). JDK-only (nothing from Swing or AWT); immutable values, safe on any thread; whoever holds a layout replaces it. `persistence.WorkspaceFile` reads and writes the saved window's `ParentTabs` (`workspace.toml`), and `persistence.LayoutsFile` each layout's (`layouts.toml`). |
 | `commands` | EDT action registry, `ActionId` and `KeyContext`, pure command ranking and metadata, and the palette's command recents (`command-history.toml`). The registry owns listeners until registration or registry close; the application flushes the recents at shutdown. |
 | `palette` | EDT scope, query and step state, keyboard routing, the palette's two views behind `PaletteView` (the card, `CardView`, and the Run window, `RunWindowView`, built by `PaletteViews.of` from the look's `PaletteLook`) and the built-in Commands scope. The controller owns scope listeners and invalidates asynchronous completions on close. |
-| `config` | Immutable values and pure parsing through `CoreSettings.SCHEMA`; `ConfigService` owns background watch and reload, the save transactions (settings, shortcuts) and Migrate Config, and marshals delivery to the EDT. The application closes the service. |
+| `config` | Immutable values and pure parsing through `CoreSettings.SCHEMA`, among them the title template (`TitleTemplate`) that `terminal.tab_name` (`TabNames`) and a look's window title are written in; `ConfigService` owns background watch and reload, the save transactions (settings, shortcuts) and Migrate Config, and marshals delivery to the EDT. The application closes the service. |
 | `settings` | Pure declarative settings machinery: setting kinds, descriptors, the schema, loaded values and the comment-preserving `TomlDocument` editor. No Jasper dependencies; the caller chooses the thread. `SchemaReader` reads any settings file against its schema. |
 | `settingsui` | EDT Settings dialog: the shell, the draft of pending core-setting edits, schema-generated and group pages, editors and the core page tree; the application supplies the Keymap, Plugins and plugin pages (`CorePages.Pages`). `SettingsDialog` owns each opening's pages and disposes them on close. The look's `presentation.SettingsChrome` sets the frame (a native title, the collapsible navigation), Reset inline or in the row's menu, the rows the look implies and the font row's copy; every page's `PageContext` carries it with the `Composition`. |
-| `contributions` | EDT model of what extensions and the application contribute to the chrome (actions, toolbar entries, menu sections, status entries, panels, rail buttons, palette scopes, file-chooser sources, content tabs, quit guards), in app-native types, the split items plugins offer (`SplitItem`), and the `TabRegistry` of every window's items (`Tab`, terminal or plugin), which outlive the windows that show them. The application owns the single instance; the plugin runtime writes it, every window renders it and registers its items in it. |
-| `appearance` | EDT theme resolution and look-and-feel installation (`ThemeController`, `ThemeManager`), the theme library (`ThemeLibrary`, `PluginThemes`) and the themes folder's imports and removals (`ThemeFolder`). Subscribers own returned cancellation handles. |
+| `contributions` | EDT model of what extensions and the application contribute to the chrome (actions, toolbar entries, menu sections, status entries, panels, rail buttons, palette scopes, file-chooser sources, content tabs, quit guards, Terminal tab name pieces (`TabNamePieces`), a plugin's right-click menu over its content (`ContentMenu`)), in app-native types, the split items plugins offer (`SplitItem`), and the `TabRegistry` of every window's items (`Tab`, terminal or plugin), which outlive the windows that show them. The application owns the single instance; the plugin runtime writes it, every window renders it and registers its items in it. |
+| `appearance` | EDT theme resolution and look-and-feel installation (`ThemeController`, `ThemeManager`), `ui.appearance`'s resolution (`AppearancePolicy`), the theme library (`ThemeLibrary`, `PluginThemes`), a theme pick (`ThemePick`: an authored theme or Desktop colors), the pure mapping of a desktop palette to interface colours (`DesktopPalette`, `DesktopContrast`, `DesktopPaintPairs`) and the themes folder's imports and removals (`ThemeFolder`). Subscribers own returned cancellation handles. |
 | `launch` | Immutable launch capture, shell profiles (PowerShell, PowerShell 7, Command Prompt, Cygwin Bash, WSL distributions, the login shell, Custom), Cygwin Bash's launch preparation (`CygwinLaunch`, off the EDT) and shell-integration extraction; `ShellLauncher` starts off the EDT and delivers on the EDT; the EDT-confined `ShellProfileCatalog` detects off the EDT and is closed by the application. The receiving pane owns the session. |
-| `terminals` | App-native registry of Jasper windows (`WindowEntry`, main or child) and their items, which it calls tabs (`TabEntry`: a terminal tab, whose one pane is its `PaneEntry`, or a content tab): pull-based entries, id-only events, the derived active pane, and the session request and attempt state machine. It backs the SDK's terminals service. The application owns the `TerminalRegistry`; each window closes its own registration. |
-| `windows` | Application-built auxiliary windows, dialogs and in-window overlays: the headless `AuxiliarySurface` core and `NativeShells`, the only class besides `WindowFrame` that creates native frames. The application owns `AuxiliaryWindows` and closes it at shutdown. |
+| `terminals` | App-native registry of Jasper windows (`WindowEntry`) and their items, which it calls tabs (`TabEntry`: a terminal tab, whose one pane is its `PaneEntry`, or a content tab): pull-based entries, id-only events, the derived active pane, and the session request and attempt state machine. It backs the SDK's terminals service. The application owns the `TerminalRegistry`; each window closes its own registration. |
+| `windows` | Application-built auxiliary windows, dialogs and in-window overlays: the headless `AuxiliarySurface` core and `NativeShells`, which makes their native frames and dialogs. The application owns `AuxiliaryWindows` and closes it at shutdown. |
 | `files` | Jasper's file chooser: the headless `ChooserModel` over `Location`s, `Browser`s and `ChooserSource`s (the local disk is `LocalSource`/`LocalBrowser`; plugin sources are adapted in `plugins`) and the Swing `FileChooserPanel`. `NativeShells` shows it in a dialog and owns that dialog's worker; the model applies worker results on the EDT, drops stale ones and closes the browsers it opened. |
-| `notifications` | EDT notification centre (groups, the in-memory history, read and expired state, delivery routing) and its values, the incident store with its captures and reports, and terminal and activity notice production for Buddy. The application owns the center and the incidents and closes notifiers before the companion. |
+| `notifications` | EDT notification centre (groups, the in-memory history, read and expired state, delivery routing) and its values, the incident store with its captures and reports, and terminal and activity notice production for Buddy. The application owns the centre and the incidents and closes notifiers before the companion. |
 | `notificationui` | EDT views of the centre: a window's `CardLayer`, the history panel, the Errors tab's `ErrorsView`, and their text, style and focus helpers. The application mounts each layer through `WindowContent` and closes it with its window; the Errors tab closes its view when it closes. |
 | `about` | The About and Licenses windows' views and the third-party notices index read from resources. The application's `AboutWindows` owns both windows and closes each view with its window. |
 | `splash` | The boot splash: `SplashPainter` draws a bundled still illustration selected from the validated startup interface theme (`ThemeSplash`), the original Meadow fallback (`MeadowSplash`: `meadow.svg` and the Desk Buddy sprite strip), or a branded look's own files, and `Splash` is its undecorated window, which every paint reaches as one copy from `SplashBuffer`. The bootstrap decodes the files off the EDT, opens the window on the EDT and closes it through `StartupSteps` after the first window's first visible paint or when start-up stops. `SplashAnimation`'s `jasper-splash-animation` daemon paints the fallback Meadow turtle's next frame every 220 ms, so it moves while start-up holds the EDT, under a lock it shares with step painting and closing; it does not start when `ui.animations.enabled` is false. |
 | `cygwin` | Jasper's own Cygwin on Windows (`%LOCALAPPDATA%\Jasper\cygwin`): its layout, ownership and state, the seed manifest, provisioning, launch reservations and the package-management supervisor. JDK and JNA Platform only, because the same sources also build `cygwin-tool.jar`, the helper the installers, `provision-cygwin.cmd` and package management run. `launch.CygwinLaunch` prepares the verified relay and the Bash environment off the EDT; `application.CygwinFeature`, owned and closed by the application, runs one management request at a time and reports it as a notification. See [bundled Cygwin](../packaging/windows/cygwin/README.md). |
 | `residency` | The home's instance lock (`InstanceLock`), the bounded handoff protocol (`LaunchRequest`) and its endpoint (`HandoffSocket`). The lock lives as long as the process; the bootstrap transfers endpoint close to application shutdown and the process hook. |
 | `commandline` | The `jasper` command's side: the command socket's wire format (shared with `packaging/cli`) and listener, the calls it dispatches, the subcommand list `jasper --help` reads, and putting the command on `PATH`. The home's owner binds the listener before AWT and holds its calls until the application is composed; the application closes it at shutdown. |
-| `platform` | OS adapters (title bars, the Dock, the menu bar item and notification-area icon, login items, Windows process tuning, glass), icons, fonts, logging and system notifications. `FileAssociations` (with its three backends, `file-types.tsv` and `file-associations.toml`) is held by `JasperApplication` beside `DefaultBrowser`, built by `ApplicationBootstrap`, refreshed when a window activates, and what the Editor's File associations section will use; it never writes `UserChoice`. Callers own registrations and native handles; Swing operations run on the EDT, logging and system notifications each have their own worker, and the macOS title band reads the double-click setting once on a short-lived virtual thread. |
-| `persistence` | Bounded TOML reads and atomic writes (`UiState` for `ui-state.toml`, `WorkspaceFile` for `workspace.toml`, `BuddyStateFile`); synchronous helpers own short-lived file handles. The caller chooses thread and lifecycle. |
+| `platform` | OS adapters (title bars, the Dock, the menu bar item, notification-area icon and Linux tray (`ResidentTray`, `LinuxTrayRuntime`), login items, Windows process tuning, glass, the system appearance (`SystemAppearance`), Linux Desktop colors' helper processes (`DesktopColors`), the Downloads folder and the downloaded-file mark), icons, fonts, logging and system notifications. `DefaultBrowser` and `FileAssociations` (a backend per system, `file-types.tsv` and `file-associations.toml`; on Windows it never writes `UserChoice`, which only Windows may write) are built by `ApplicationBootstrap`, held by `JasperApplication` and refreshed when a window activates. Callers own registrations and native handles; Swing operations run on the EDT, logging and system notifications each have their own worker, and the macOS title band reads the double-click setting once on a short-lived virtual thread. |
+| `persistence` | Bounded TOML reads and atomic writes (`UiState` for `ui-state.toml`, `WorkspaceFile` for `workspace.toml`, the saved window with its tool windows (`ToolWindows`; each open window keeps its own live in a `ToolWindowState`), `LayoutsFile` for `layouts.toml`, `BuddyStateFile`); synchronous helpers own short-lived file handles. The caller chooses thread and lifecycle. |
 | `presentation` | The presentation a process runs with, chosen once before Swing: the kit file parser (`KitParser`, `ChromeSpec`, `FontFile`), each provider's `PresentationFacts`, the attempt record (`AttemptStore`, `PresentationAttempt`), the `Projections` (among them `PluginLook`, what plugins learn of the look) and `Presentation`. Values and bounded file stores, no Swing; `PluginSelection` builds it and the application hands each consumer its kit or projection. `Branding` holds a look's product name, icons (none for `icons = "@jasper"`, which keeps Jasper's) and splash art as bytes. |
-| `plugins` | The plugin runtime: descriptors, the locked consent state, resolution, per-plugin class loaders, the queued EDT event bus, activities, the service registry, declared plugin settings with the look's defaults for them, the look plugins read (`HostedPresentation`), the saved terminal font they read (`HostedTypography`: published and subscribed on the EDT, read from any thread) and plugin lifetimes. The only package that references the SDK. The application owns and stops `PluginRuntime`; `PluginRuntime.settingsPages` gives Settings a page per plugin under Tools. |
+| `plugins` | The plugin runtime: descriptors, the locked consent state, resolution, per-plugin class loaders, the queued EDT event bus, activities, the service registry, declared plugin settings with the look's defaults for them, the look plugins read (`HostedPresentation`), the saved terminal font they read (`HostedTypography`: published and subscribed on the EDT, read from any thread), the web browser a plugin provides (`WebBrowsers`, asked on the EDT) and plugin lifetimes. The only package that references the SDK. The application owns and stops `PluginRuntime`; `PluginRuntime.settingsPages` gives Settings a page per plugin under Tools. |
 | `pluginmanager` | The Settings dialog's Plugins page: the plugin list, consent and confirm sheets over Settings, and an EDT controller over `PluginRuntime`'s records that drives the restart conversation; `PluginsPage` maps the look's composition to a `PluginShape`. The application owns the `PluginManager`; `SettingsDialog` owns each `PluginsPage`. |
 | `shortcuthelp` | The Settings dialog's Keymap page: the effective shortcut catalog, the grouped searchable tree, staged binding edits saved on Apply and a window-scoped key recorder; `KeymapPage` maps the look's composition to a `KeymapShape`. `SettingsDialog` owns each `KeymapPage`; disposing it closes its subscription and recorder. |
 | `restart` | Planning the replacement's command line (`RestartCommand`, `RestartMode`; the replacement waits for the lock with `--replacing`) and the Plugins page's restart banner state (`RestartFlow`). No owner. |
@@ -443,9 +499,11 @@ The built-in themes are Slate Cobalt, Catppuccin's four flavours, Ubuntu Yaru an
 are Jasper theme files in `<home>/themes/`, and plugins can bundle more ([themes](themes.md)).
 
 `JasperTheme` (jasper-ui) reads a theme file into one `GeneratedTheme` per variant and its terminal schemes;
-`DARK_DEFAULT_ID` and `LIGHT_DEFAULT_ID` are both `jasper-meadow`, the Dark and Light defaults, `bundled()` is Slate
-Cobalt, which `ThemeController` installs in Dark at start-up when the chosen theme cannot be installed, and
-`builtIns()` every built-in theme. `appearance.ThemeLibrary` holds the built-in themes, the plugin themes
+`DARK_DEFAULT_ID` and `LIGHT_DEFAULT_ID` are both `jasper-meadow`, the Dark and Light defaults except on Linux, where
+`CoreSettings.interfaceThemeByDefault` makes both `desktop-colors` unless the look sets its own
+(`config.DefaultSource`; the Enterprise look's are `jasper-meadow`); `bundled()` is Slate Cobalt, which
+`ThemeController` installs in Dark at start-up when the chosen theme cannot be installed, and `builtIns()` every
+built-in theme. `appearance.ThemeLibrary` holds the built-in themes, the plugin themes
 (`PluginThemes`) and every valid `<home>/themes/*.json`, reusing the parsed theme of an unchanged file and keeping a
 problem for each file it skips. `appearance.ThemeSelection` is the Dark and Light theme
 picks and the scheme choice from one library; its `of` replaces a pick the library cannot honour by its default and
@@ -465,14 +523,25 @@ text area. Tool windows paint `surface.panel` through `ToolWindowSurface`, their
 chrome.
 
 `ConfigurationController` resolves `ui.appearance` with `AppearancePolicy` against the live `SystemAppearance`
-observation. Only macOS reports an appearance (`platform.MacAppearance` over `libjasper-appearance.dylib`, tested by
-`testMacAppearance`); elsewhere, and headless, the observation is unavailable and `system` means Dark. The controller
-builds the selection from `ui.theme.dark`, `ui.theme.light` and `terminal.scheme`. It reads the themes folder again
-through `ConfigService.watchWith` on the configuration worker before each forced or changed state is published, so
+observation. macOS reports an appearance through `platform.MacAppearance` over `libjasper-appearance.dylib` (tested by
+`testMacAppearance`), and Linux through the XDG desktop portal's colour scheme, which `platform.DesktopColors` observes;
+on Windows, headless, or without the Linux helpers, the observation is unavailable and `system` means Dark. The
+controller builds the selection from `ui.theme.dark`, `ui.theme.light` and `terminal.scheme`. It reads the themes folder
+again through `ConfigService.watchWith` on the configuration worker before each forced or changed state is published, so
 Reload Config, a Settings save or a `config.toml` change picks up theme files. Skipped files, unusable picks and an
 installation failure are its theme problems, shown with the configuration's diagnostics; an installation failure keeps
-the current appearance. Each window's `WindowCommands` rebuilds the "Terminal Scheme: …" commands when the library changes.
-Plugins receive the roles and the editor scheme through `plugins.HostedPalettes`.
+the current appearance. Each window's `WindowCommands` rebuilds the "Terminal Scheme: …" commands when the library
+changes. Plugins receive the workspace roles, the shown theme's editor and syntax palettes, and every installed
+theme's editor schemes (`Appearance.editorSchemes()`) through `plugins.HostedPalettes`.
+
+On Linux both theme picks default to `desktop-colors` unless the look sets its own, Desktop colors
+(`appearance.ThemePick.Desktop`): the interface takes the desktop's palette, and terminal, editor and syntax colours
+stay Slate Cobalt's. `platform.DesktopColors`
+runs the helper processes beside the application jar (`desktop-colors/`): the XDG desktop portal's, and the GTK, Qt
+or KDE one `ui.theme.desktop_source` and the desktop choose. `application.DesktopAppearance` turns what they observe
+into interface colours (`appearance.DesktopPalette`) on its worker and publishes them on the EDT through the theme
+controller, falling back to the last good colours or the bundled ones
+([diagnostics](app-maintenance.md#linux-desktop-colors-diagnostics)).
 
 ## Hosted workspace styling
 

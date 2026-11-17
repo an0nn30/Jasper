@@ -1,8 +1,9 @@
 # Keyboard shortcuts
 
-Every built-in action, and every action Jasper or a plugin registers, can have a shortcut; the View › Show/Hide ›
-Toolbar items cannot. Built-in actions have one default for macOS and one for Linux and Windows; plugins suggest their
-own. Menus, toolbar tooltips and the command palette always show the shortcut in effect. Change any of them in
+Every built-in action, and every action Jasper or a plugin registers, can have a shortcut; the palette's view commands
+(such as **Themes…**), the View › Show/Hide › Toolbar items and the palette's **Apply Layout: …** entries cannot.
+Built-in actions have one default for macOS and one for Linux and Windows; plugins suggest their own. Menus, toolbar
+tooltips and the command palette always show the shortcut in effect. Change any of them in
 [Settings › Keymap](#settings--keymap) or in [`config.toml`](#in-configtoml).
 
 macOS shortcuts are written with Cmd (Command), Ctrl (Control), Option and Shift. The Linux and Windows defaults use
@@ -128,7 +129,8 @@ Under the [Enterprise look](enterprise.md#windows-and-menus) a tool window's tog
 window; pressed while the window shows but is not the active one, it activates the window instead of hiding it.
 
 The palette's view commands (**Toolbar: Icons and Labels**, **Themes…**, **Terminal Scheme: …** and the like) and the
-View › Show/Hide › Toolbar items are not in the keymap and take no shortcut.
+View › Show/Hide › Toolbar items are not in the keymap and take no shortcut. The palette's **Apply Layout: …** entries
+for the [saved layouts](workspace.md#layouts) are listed under Application in Settings › Keymap but take no shortcut.
 
 ## Bundled plugins
 
@@ -176,8 +178,11 @@ fields, searchable drop-downs, the search field of a picker menu, an edited brea
 
 While an Editor file's pane is active, the Editor's own commands take their keys, for example Cmd+S (Ctrl+S) to save.
 They are listed in the Editor tab's right-click menu and in [Editor](editor.md#commands-and-shortcuts), and are not part
-of the keymap. The window's Increase, Decrease and Reset Font Size change that pane's own font size
-([Editor](editor.md#tabs)), and its Close Pane, Cmd+W (Ctrl+Shift+W), closes the pane.
+of the keymap. While the text has the focus, its editing keys take precedence over the window's shortcuts (on macOS,
+Cmd+D and Cmd+J act in the text instead of running Split Right and Snippets…), and in Vim mode Vim takes the keys it
+has a meaning for first ([Which keys Vim takes](editor.md#which-keys-vim-takes)). The window's Increase, Decrease and
+Reset Font Size change that pane's own font size ([Editor](editor.md#tabs)), and its Close Pane, Cmd+W
+(Ctrl+Shift+W), closes the pane.
 
 ## Fixed keys
 

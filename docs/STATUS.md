@@ -1,5 +1,145 @@
 # Jasper — Status and Handoff
 
+## Current state — 2026-11-17
+
+Jasper is a pluggable DevOps workstation for macOS, Linux and Windows. Its core is the workspace (full windows, each
+with its tabs, panes and tool windows), the terminal (with the bundled Cygwin environment's Cygwin Bash on Windows),
+the command palette, notifications, Settings, themes and looks; most features, the Editor and the Browser among them,
+are bundled plugins on the public plugin SDK. The [documentation index](README.md) lists every current guide.
+
+- **Branches.** `main` and `origin/main` are at `7e3e0ca64` (pushed 2026-11-17), the merge of `origin/main` (the
+  Gentoo source overlay and the optional Linux integrations, pushed from Linux on 2026-10-31 and 2026-11-01) into local
+  `main`. Since `06746d3c2` they add Browser plans 2 to 9 (the JCEF runtime; link routing with plan 3b; the core; page
+  features; registering as the default browser; the Chromium Markdown preview, with Mermaid; history, bookmarks and the
+  Jasper integrations; privacy; downloads and page tools; logins), full windows plans 1 to 5, floating tool windows
+  plans 1 to 3, wide tool window layouts, resizable and sortable table columns, the terminal tab names, Vim's IdeaVim
+  keys, the Editor's Color scheme setting and Move Pane to Tab's tab names, the Editor file associations' plans 1 and
+  2, the terminal's double-click on a link, PR #3 (Linux residency: autostart and the tray), Linux Desktop colors with
+  its Qt and KDE sources and as Linux's default interface theme, shared display scaling, theme-selected splash artwork,
+  the Buddy's stand-up, laptop opening, tab awareness, compact activity, plugin input and translucent Linux rendering,
+  the Linux package identity and format selection, the JDK-8376576 workarounds' retirement, the AOT training and
+  launcher image fixes, the cold start, memory benchmark and plugins-phase fixes and the test temp folders' cleanup.
+  Entries below that end "not merged" or "not pushed" were written before their merge or the push. `claude/v1-docs`
+  has brought the guides up to `7e3e0ca64`. Not on `main`: `claude/test-isolation-leaks` (the Swing test-isolation
+  guard, 3 commits) and the Editor file associations' plan 3 (the SDK surface, the testkit and the Editor's File
+  associations section, on `claude/editor-file-associations-3`); until it lands, nothing in Jasper's interface claims
+  file types.
+- **Modules.** `jasper-ui`, `jasper-terminal`, `jasper-app`, `jasper-buddy`, `jasper-sdk` and `jasper-sdk-testkit`, plus
+  one `:jasper-plugin-<dir>` for each directory under `plugins/`.
+- **Runtime.** `check` and `packageApp` refuse any runtime but JBR 25.0.4.1 b635.75 with JCEF
+  (`verifyJcefToolchain`), so every package carries Chromium; Chromium runs with its sandbox off (the user's choice,
+  2026-10-30).
+- **SDK** `0.32.0` (`JasperSdk.VERSION`; no release carries it yet, `v1.0.0` has 0.18.1); every bundled plugin and the
+  external plugin example declare `sdk = ">=0.32.0, <0.33"`.
+- **Themes.** Built in: Jasper Meadow (`jasper-meadow`, Dark and Light; the default theme of both appearances, except
+  that the default look on Linux uses Desktop colors, the desktop's own palette read from GTK, Qt or KDE), Slate Cobalt
+  (Dark and Light; start-up falls back to its Dark variant when a theme cannot be applied), Catppuccin Latte, Frappé,
+  Macchiato and Mocha, and Ubuntu Yaru; the Enterprise plugin adds the Enterprise theme. The boot splash's artwork
+  follows the saved interface theme. **Looks:** the default look, and the Enterprise look while its plugin is on
+  (Settings › Plugins, then restart; safe mode starts with the default look).
+- **Releases.** `v1.0.0` is tagged at `9d58fe73e` (2026-10-19, the merge of PR #1) and published on GitHub as the
+  prerelease Jasper 1.0.0; no entry below records that run.
+- **Last recorded checks.** `./gradlew check --continue` on the docs sync over `7e3e0ca64` (macOS, 2026-11-17; the
+  sync changes only documentation, comments and Javadoc): 16,355 tests, 0 failures, 0 errors, 109 skipped (jasper-app
+  5,475, Editor 5,392, Browser 1,883, jasper-ui 1,024, Remote 660, jasper-terminal 512, jasper-sdk-testkit 334, File
+  Server 303, Vault 279, jasper-buddy 176, jasper-sdk 139, and 178 in Shell History, Snippets, Project Index, Sample
+  and Enterprise), and the example external plugin's `check pluginZip` against `build/sdk-release` passed; the same
+  counts as at `35a622f74` (Browser plan 8's fix wave, 2026-11-11). The optional Linux integrations' full build and
+  check is pending (2026-11-01). Earlier: 15,911 after Browser plan 7 (2026-11-10) and 15,546 after plan 6
+  (2026-11-09). `FilterListTest.theHourlyCheckRunsByItself` has twice failed to delete its
+  temporary folder and passed when re-run. The theme converter's tests need Python 3.11 to 3.13 (`-Pjasper.python`).
+  Hosted CI ran on PR #3 (2026-10-28 and 2026-10-29); its entries record test-portability and Windows watchdog fixes
+  whose hosted reruns are pending, and no later hosted run is recorded.
+
+Bundled plugins, all enabled by default except Enterprise:
+
+| Plugin | Id | Version | Exports | Provides |
+| --- | --- | --- | --- | --- |
+| Browser | `dev.jasper.browser` | 0.2.0 | `dev.jasper.browser.api` | Chromium web pages in tabs and panes, history and bookmarks, /dev/null mode, downloads, Vault logins, the default browser; the Editor's Chromium Markdown preview |
+| Credential Vault | `dev.jasper.vault` | 0.9.0 | `dev.jasper.vault.api` | Logins, SSH keys and secure notes in one encrypted file; per-plugin grants |
+| Editor | `dev.jasper.editor` | 0.19.0 | `dev.jasper.editor.api` | Local and remote text files in panes, several views of one file, Markdown preview; `jasper editor` |
+| Enterprise | `dev.jasper.enterprise` | 0.4.0 | — | The Enterprise look and theme, as descriptor data |
+| File Server | `dev.jasper.fileserver` | 0.8.0 | — | Sharing a folder over HTTP, HTTPS, FTP, FTPS, SFTP or TFTP |
+| Project Index | `dev.jasper.indexer` | 0.4.0 | — | Indexing projects, local or on saved hosts, and finding their files from the palette |
+| Remote | `dev.jasper.remote` | 0.19.0 | `dev.jasper.remote.api` | SSH, SFTP, transfers, tunnels, saved hosts and the Sessions tool window |
+| Sample | `dev.jasper.sample` | 0.6.0 | — | Exercises the plugin runtime; inert unless a `demo_*` setting is set |
+| Shell History | `dev.jasper.history` | 0.4.0 | — | Searching every shell's history from the palette |
+| Snippets | `dev.jasper.snippets` | 0.5.0 | `dev.jasper.snippets.api` | Saved commands in the palette |
+
+Open items, as the entries below record them:
+
+- **GUI checks.** No entry from 2026-10-13 on records its "GUI checks for the user" as done, except the first macOS
+  check of Browser plan 4a (2026-10-30), which passed once Chromium's sandbox was off, and the user's Ubuntu GNOME
+  Wayland check of the Buddy's translucent rendering (2026-10-24). The Browser's
+  [verification record](browser-verification.md) lists the rest: plan 4a's check after a crash, its memory run and its
+  AOT check, and the user's macOS checks of plans 4b, 4c, 9 (with Mermaid), 5, 6, 7 and 8. Full windows plans 1 to 5,
+  floating tool windows plans 1 to 3, wide tool window layouts, the terminal tab names, Vim's IdeaVim keys, the Editor's
+  Color scheme setting and Move Pane to Tab, the Buddy's stand-up, laptop opening, tab awareness and compact activity,
+  theme-selected splash artwork and the Editor file associations' plan 2 await the checks their entries list. Older
+  lists remain: the Enterprise look's, in the series entry (2026-10-18, spec 16.2), with the side stripes entry's and
+  plans 13, 14, 15a and 15b's (plan 14's starting with the classic title band in the packaged macOS app); the Editor's
+  fonts and Markdown preview ([Editor verification](editor-verification.md#fonts-and-markdown-preview)); the Meadow
+  splash, the Rail and Status Bar shortcuts (2026-10-20) and the Editor font size shortcuts (2026-10-21); the workspace
+  tabs series and its merge entries (2026-10-19 to 2026-10-22). One AOT training run should confirm the seeded
+  `workspace.toml` (2026-10-21).
+- **Windows and Linux.** The Browser has run only on macOS: its Windows and Linux checks, the Windows installer's web
+  browser registration (`packageInstaller`, `Verify-Installer.ps1`, `InstallerAcceptanceTest`) and the Linux packages'
+  (`check-install.sh`) are not run. The Editor file associations' plan 2 waits for its Windows-only tests and a Linux
+  check against a real MIME database. Linux residency waits for acceptance on real desktops (Ubuntu 24.04 GNOME, Debian
+  XFCE or LXDE, Fedora 44 GNOME and Plasma) and for x86_64 and Ubuntu 22.04 CI; Desktop colors for native desktop
+  acceptance and Qt and KDE's x86_64 matrix; shared display scaling for GNOME Wayland and KDE; the Gentoo package for
+  its graphical acceptance. PR #3's Windows check sharding and watchdog fixes, and the `SingleInstance` timeout they
+  diagnose, wait for hosted Windows runs. From before: the only Windows `check` recorded as passing since the CI fixes
+  (2026-10-14) is PR #1's hosted one; native Windows runs of `installWindowsUser` and `uninstallWindowsUser`
+  (2026-10-20), plan 14's Windows classic title bar, the boot splash on Windows and Linux (2026-10-19), the Windows
+  network-share checks (2026-10-14), the Enterprise look's Windows and Linux checks (series entry) and Ubuntu Yaru's
+  native appearance and window checks (2026-10-17) need those machines. The bundled Cygwin's native x64 Windows
+  acceptance and its interactive checks in the app on both architectures (2026-10-20) are still to run and block
+  release publication ([verification](superpowers/plans/2026-10-20-jasper-cygwin-verification.md)).
+- **Code problems the 2026-11-17 docs sync found** (not fixed; a docs sync changes no code):
+  - `.github/workflows/release.yml`'s Linux step runs `verifyDesktopHelpersRelease`, which requires all seven Desktop
+    colors helpers, but the job installs no `cmake`, `pkg-config` or `libglib2.0-dev` and has neither the Qt and KDE
+    SDKs nor `jasper.desktop.<qt5|qt6|kde5|kde6>=required`, as `linux-packages.yml` does, so a Linux release job
+    cannot pass as written.
+  - `packaging/linux/check-install.sh` matches the desktop entry's whole `MimeType=` line against the two web types
+    only (`grep -qsx`), while the packaged entry appends the file-type catalogue's MIME types to that line
+    (`linuxDesktopMimeTypes` in `gradle/packaging-support.gradle`), so the install check fails on every package.
+  - The `terminal.on_exit` description in `CoreSettings` (the generated `config.toml`'s comment) says the tab or window
+    closes when empty; a window now keeps its empty workspace once its last tab closes.
+  - File Server's `activity_entries` description says it applies to servers started afterwards; the limit is fixed
+    when a server's slot is made, so it applies to servers added afterwards and to saved servers at the next start
+    (the plugin's `settings.toml` comment says so).
+- **Benchmarks.** The start-up benchmark has not run on an image with the cold start fixes (2026-10-27); the Browser
+  plans leave their start-up and memory runs for one benchmark sitting.
+- **Chromium's sandbox.** Turning it back on is a follow-up (2026-10-30).
+- **Theme converter.** `checkThemeTool`'s `test_deeply_nested_input_is_a_message` fails under Python 3.14 (2026-10-17,
+  and again on 2026-10-20); that test last changed on 2026-10-13.
+- **Website.** The Shell Prompt and Meadow website changes are not deployed: the Pages workflow runs only by hand and
+  has not been run (2026-10-20).
+- **Questions for the user.** Browser plan 6 asks whether Manage Permissions may open its tab behind Settings; plan 4a
+  asks about the "Open in Jasper?" prompt, which does not show the address, restored tabs that never showed, which show
+  their host rather than their saved title, and its copy's departure from iTerm2's (R43); plan 9 leaves serving the
+  bundled fonts to the Chromium preview to the user (N17). From before: plan 12's Rulings 17 (the focused header's
+  guard) and its question on the Run window's row count, plan 13's comparison of the iconed stripes with their icon
+  slices cut out, and plan 9b's Ruling 14: one find bar per Editor window, in its selected view, where IntelliJ and VS
+  Code give each view its own.
+- **Deferred.** From workspace tabs plan 2's entry: `workspace.toml`'s writer has no depth cap while its reader drops a
+  tab whose splits nest deeper than 64; and a split to the left or up, then closing the new pane or dragging it back
+  (plan 5), does not give the sizes back exactly, so the pane that was split halves on each round trip. The Browser
+  entries list their known gaps and follow-ups, with the deferred minors in each plan's banner.
+- **Test temp folders.** pty4j extracts its natives into a `pty4j-darwin-*` folder of `java.io.tmpdir` and registers it with
+  `deleteOnExit` (`ExtractedNative`), yet `check` leaves two, each holding its two native files; about 2,300 sit in the dev
+  Mac's user temp folder (2026-10-27), empty once macOS has removed their files. `pty4j.tmpdir` names a folder it uses
+  instead. The tests' own leaks are fixed (the entry of 2026-10-27).
+- **Enterprise residuals.** The differences from the mocks that the series entry and plans 13 to 15b list; the splash's
+  fixed colours and "Workstation…" step text for other branded looks; the external THD plugin's rebuild against SDK
+  0.32.0 (plan 6b's entry asked for one from its `jasper-sdk-0.18.3` branch); the default look's macOS menu bar, which
+  still folds against the window's width (plan 14).
+
+## Handoff log
+
+Newest first. Each entry describes its change as it stood when the entry was written.
+
 **Browser plan 8: logins — 2026-11-11** (`claude/browser-logins`, worktree `.claude/worktrees/browser-4b-4c-e6deab`,
 from local `main` `c01d2feec`, which has plans 4a, 4b, 4c, 9, 5, 6 and 7 merged; the plan `58962695b`, brought in from
 `5c42e4a82`, commits `a2b5c118a` to `322bd5793`, the docs, `fd709d04b` and `479738513`, local `main` `0a4ec9bb9` (the
@@ -1756,118 +1896,6 @@ The pre-final-fix native Ubuntu 26.04 aarch64 full check completed **13,013 test
 
 
 The final review fixes close the application owner’s initial subscription race, add bounded portal acquisition/resnapshot recovery, accept readable translucent foregrounds over opaque windows, and preserve implementation/version/failure status. Final focused verification passes 109 Java tests on each Mac/Linux host, architecture checks, 409 protocol checks, 19 portal tests/60 assertions, 35 modern GTK tests and 27 Ubuntu 24 GTK tests. Portal ASan/UBSan and Ubuntu 22 baseline/unsupported-GTK checks pass. An extra PRoot24 portal run fails credential emulation before observer startup and is not runtime evidence. The final plain Mac full check and package verification ran after these fixes, without diagnostic instrumentation or AOT. Work remains unmerged and unpushed; native desktop acceptance remains user-run.
-
-## Current state — 2026-10-22
-
-Jasper is a pluggable DevOps workstation for macOS, Linux and Windows. Its core is the workspace (windows, tabs, panes
-and tool windows), the terminal (with the bundled Cygwin environment's Cygwin Bash on Windows), the command palette,
-notifications, Settings, themes and looks; most features, the Editor and its Markdown preview among them, are bundled
-plugins on the public plugin SDK. The [documentation index](README.md) lists every current guide.
-
-- **Branches.** `main` and `origin/main` are at `06746d3c2` (pushed 2026-10-22): `claude/workspace-tabs` (the
-  workspace tabs and the single instance: plans 1 to 5, 7a to 8c, 6a, 6b, 9a and 9b, and the side branches
-  `claude/html-disable-sweep`, `claude/priceless-curie-c36f2d` and `claude/hopeful-newton-94a051`), which merged
-  `origin/main` at `8c8776e7e` on 2026-10-21 and at `132dcac3e` on 2026-10-22, then `claude/staged-remote-sessions-flake`
-  (the merge entries below); the series' entries, which end "not merged" or "not pushed", were written before the push.
-  `origin/main` at `132dcac3e` is
-  `8c8776e7e`, the Editor font size shortcuts (`f77c41c94`) and the documentation commit that brings the guides up to
-  them; `origin/main` at `8c8776e7e` is `427321de4` and the two documentation commits that bring the guides up to it.
-  `origin/main` at `427321de4` adds, since the V1 documentation merge (`bee2c9f28`), the Rail and Status Bar Keymap
-  actions, the animated Meadow splash and the Shell Prompt application icon (both shared by Enterprise mode),
-  the Editor's own typography and Markdown preview (SDK 0.18.3, Editor 0.11.0, Remote 0.15.1), the bundled Cygwin on
-  Windows, Jasper Meadow as the default theme of both appearances in both looks, with a new Dark variant (`73c2b8f61`),
-  and the website without its demo fixtures and preview pages (`375615bbf`); the Cygwin entry below, which says "merged
-  into local `main`", was written before the push. `c6bb59fdd` has the V1 code fixes (`claude/v1-code-fixes`, the code
-  problems the V1 documentation audit found: the package description and Linux menu categories, setting descriptions,
-  Option key as Meta shown only on macOS, the Sample's Greetings… shortcut (Cmd+Option+Y; Ctrl+Alt+Shift+Y), the
-  Editor's F3 and Shift+F3 off macOS and one Close Tab in its tab menu, Vault's classic Lock Vault caption, the
-  `shellHistorySearchMeasurement` task's removal and the vimrc byte order mark written as a Java escape), Enterprise
-  plans 13 (stripe icons), 14 (IntelliJ Classic's title bar), 15a (the look query) and 15b (look polish), Jasper
-  Meadow's Light variant, the Windows user installation, Desk Buddy's shaded pixel sprites, the boot splash fix and
-  PR #1's CI, Windows and Linux fixes; entries below that end "merged to local `main`, not pushed" were written before
-  the push, and the Ubuntu Yaru, plan 10b, series and side-stripes entries, which end "Not merged", before their merge
-  (the side stripes as the rebased `e8ecfdcf2` to `faeec76f3`, which plan 15a's E15 leaves to confirm). The V1
-  documentation overhaul (`claude/v1-docs`, with `origin/main` at `c6bb59fdd` merged in) is merged into `main`; its entry below, which
-  ends "Not merged into `main`", was written before the merge. Since then `claude/v1-docs` has brought the guides up to
-  `427321de4`, then to `132dcac3e` (the Editor font size shortcuts) and then to `06746d3c2`. Unmerged into `main`:
-  `claude/test-isolation-leaks` (the Swing test-isolation guard, 3 commits).
-- **Modules.** `jasper-ui`, `jasper-terminal`, `jasper-app`, `jasper-buddy`, `jasper-sdk` and `jasper-sdk-testkit`, plus
-  one `:jasper-plugin-<dir>` for each directory under `plugins/`.
-- **SDK** `0.32.0` (`JasperSdk.VERSION`; no release carries it yet, `v1.0.0` has 0.18.1); every bundled plugin declares
-  `sdk = ">=0.32.0, <0.33"`.
-- **Themes.** Built in: Jasper Meadow (`jasper-meadow`, Dark and Light; the default theme of both appearances under
-  either look), Slate Cobalt (Dark and Light; start-up falls back to its Dark variant when a theme cannot be applied),
-  Catppuccin Latte, Frappé, Macchiato and Mocha, and Ubuntu Yaru; the Enterprise plugin adds the Enterprise theme.
-  **Looks:** the default look, and the Enterprise look while its plugin is on (Settings › Plugins, then restart;
-  safe mode starts with the default look).
-- **Releases.** `v1.0.0` is tagged at `9d58fe73e` (2026-10-19, the merge of PR #1) and published on GitHub as the
-  prerelease Jasper 1.0.0; no entry below records that run.
-- **Last recorded checks.** `./gradlew check --continue` on `claude/staged-remote-sessions-flake` and on
-  `claude/workspace-tabs` after the third sync (both 2026-10-22): 12,823 tests, 0 failures, 0 errors, 29 skipped (25
-  platform skips and four opt-in Editor performance tests); no check is recorded for their merge, `06746d3c2`, which
-  conflicted in this file only. Earlier on the branch: 12,802 after plan 9b's final fix wave and its residual round
-  (2026-10-22) and 12,706 after plan 9a's (2026-10-21). `claude/editor-font-zoom` (`427321de4` with the Editor font size
-  shortcuts, 2026-10-21) had 11,893 tests, 0 failures, 0 errors, 29 skipped. These ran with Python 3.13
-  (`-Pjasper.python`), because `checkThemeTool`'s `test_deeply_nested_input_is_a_message` fails under Python 3.14.
-  Hosted CI on PR #1 (2026-10-19): macOS, Ubuntu and every Linux packaging and install check passed, and so did the
-  single-worker Windows check; no later hosted CI run is recorded.
-
-Bundled plugins, all enabled by default except Enterprise:
-
-| Plugin | Id | Version | Exports | Provides |
-| --- | --- | --- | --- | --- |
-| Credential Vault | `dev.jasper.vault` | 0.7.0 | `dev.jasper.vault.api` | Logins, SSH keys and secure notes in one encrypted file; per-plugin grants |
-| Editor | `dev.jasper.editor` | 0.17.0 | `dev.jasper.editor.api` | Local and remote text files in panes, several views of one file, Markdown preview; `jasper editor` |
-| Enterprise | `dev.jasper.enterprise` | 0.3.0 | — | The Enterprise look and theme, as descriptor data |
-| File Server | `dev.jasper.fileserver` | 0.7.0 | — | Sharing a folder over HTTP, HTTPS, FTP, FTPS, SFTP or TFTP |
-| Project Index | `dev.jasper.indexer` | 0.3.0 | — | Indexing projects, local or on saved hosts, and finding their files from the palette |
-| Remote | `dev.jasper.remote` | 0.18.0 | `dev.jasper.remote.api` | SSH, SFTP, transfers, tunnels, saved hosts and the Sessions tool window |
-| Sample | `dev.jasper.sample` | 0.5.0 | — | Exercises the plugin runtime; inert unless a `demo_*` setting is set |
-| Shell History | `dev.jasper.history` | 0.3.0 | — | Searching every shell's history from the palette |
-| Snippets | `dev.jasper.snippets` | 0.3.0 | `dev.jasper.snippets.api` | Saved commands in the palette |
-
-Open items, as the entries below record them:
-
-- **GUI checks.** No entry from 2026-10-13 on records its "GUI checks for the user" as done. The longest list is the
-  Enterprise look's, in the series entry (2026-10-18, spec 16.2); the side stripes entry and plans 13, 14, 15a and 15b
-  add their own, plan 14's starting with the classic title band in the packaged macOS app. The Editor's fonts and
-  Markdown preview list theirs in [Editor verification](editor-verification.md#fonts-and-markdown-preview), and the
-  Meadow splash, the Rail and Status Bar shortcuts (2026-10-20) and the Editor font size shortcuts (2026-10-21) await
-  theirs. The workspace tabs series awaits the checks its entries list (plans 1, 3a, 3b, 4a, 4b and 5, a window's only
-  tab, plans 7a to 8c, 6a, 6b, 9a and 9b; plan 2 had none), and so do its merge entries ("local main merged in",
-  2026-10-19, the second sync, 2026-10-21, and the side branches with the third sync, 2026-10-22). One AOT training run
-  should confirm the seeded `workspace.toml` (2026-10-21). Floating tool windows plans 1 to 3 await the checks their
-  entries list (2026-10-23, 2026-10-26).
-- **Windows and Linux.** The only Windows `check` recorded as passing since the CI fixes (2026-10-14) is PR #1's hosted
-  one; the local `check --continue` in the Windows installer build entry (2026-10-18) failed before PR #1's Windows
-  fixes. Native Windows runs of `installWindowsUser` and `uninstallWindowsUser` (2026-10-20), plan 14's Windows
-  classic title bar, the boot splash on Windows and Linux (2026-10-19), the Windows network-share checks (2026-10-14),
-  the Enterprise look's Windows and Linux checks (series entry) and Ubuntu Yaru's native appearance and window checks
-  (2026-10-17) need those machines. The bundled Cygwin's native x64 Windows acceptance and its interactive checks in
-  the app on both architectures (2026-10-20) are still to run and block release publication
-  ([verification](superpowers/plans/2026-10-20-jasper-cygwin-verification.md)).
-- **Theme converter.** `checkThemeTool`'s `test_deeply_nested_input_is_a_message` fails under Python 3.14 (2026-10-17,
-  and again on 2026-10-20); that test last changed on 2026-10-13.
-- **Website.** The Shell Prompt and Meadow website changes are not deployed: the Pages workflow runs only by hand and
-  has not been run (2026-10-20).
-- **Rulings awaited.** Plan 12's Rulings 17 (the focused header's guard) and its question on the Run window's row
-  count, plan 13's comparison of the iconed stripes with their icon slices cut out, and plan 9b's Ruling 14: one find
-  bar per Editor window, in its selected view, where IntelliJ and VS Code give each view its own.
-- **Deferred.** From plan 2's entry: `workspace.toml`'s writer has no depth cap while its reader drops a tab whose
-  splits nest deeper than 64; and a split to the left or up, then closing the new pane or dragging it back (plan 5),
-  does not give the sizes back exactly, so the pane that was split halves on each round trip.
-- **Test temp folders.** pty4j extracts its natives into a `pty4j-darwin-*` folder of `java.io.tmpdir` and registers it with
-  `deleteOnExit` (`ExtractedNative`), yet `check` leaves two, each holding its two native files; about 2,300 sit in the dev
-  Mac's user temp folder (2026-10-27), empty once macOS has removed their files. `pty4j.tmpdir` names a folder it uses
-  instead. The tests' own leaks are fixed (the entry of 2026-10-27).
-- **Enterprise residuals.** The differences from the mocks that the series entry and plans 13 to 15b list; the splash's
-  fixed colours and "Workstation…" step text for other branded looks; the external THD plugin's rebuild against SDK
-  0.21.0, from its `jasper-sdk-0.18.3` branch (plan 6b's entry); the default look's macOS menu bar, which still folds
-  against the window's width (plan 14).
-
-## Handoff log
-
-Newest first. Each entry describes its change as it stood when the entry was written.
 
 **Vim mode mirrors IdeaVim — 2026-10-23** (`claude/vim-ideavim-keys`, worktree `.claude/worktrees/vim-ideavim-keys`,
 from local `main` at `5db3524b4`; `main` at `d771ee10c` merged in, then merged into `main` and pushed 2026-10-26): in Visual mode Copy, Cut, Paste, Delete and Paste from a list

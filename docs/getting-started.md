@@ -57,7 +57,13 @@ sudo zypper install --allow-unsigned-rpm ./Jasper-<version>-linux-x86_64.rpm  # 
 ```
 
 Both packages install Jasper to `/opt/jasper-workstation`, with the launcher at `/opt/jasper-workstation/bin/Jasper` and an entry in the
-desktop menu. The package is named `jasper-workstation`. The packages are unsigned.
+desktop menu. The package is named `jasper-workstation`. The packages are unsigned. On Gentoo, the
+[source overlay](../packaging/gentoo/README.md) builds and installs `app-misc/jasper-workstation` from a pinned
+source commit that predates the Browser plugin.
+
+The macOS app, the Windows setup wizard and the `.deb` and `.rpm` packages let you make Jasper your default web browser
+([Making Jasper your default browser](browser.md#making-jasper-your-default-browser)); the portable ZIP and the Gentoo
+overlay's package do not.
 
 ## First launch
 
@@ -65,19 +71,21 @@ Jasper opens a window with one tab running your shell: your login shell on macOS
 Windows (Settings › Terminal › Shell chooses another, such as [Cygwin Bash](terminal.md#cygwin-bash)). The first window
 is sized for 100 columns by 35 rows of the terminal font, bundled Cousine Nerd Font Mono at 12 points; after that,
 Jasper [restores its window, tabs and panes](workspace.md#saving-and-restoring-the-windows) as you left them at each
-start. On macOS Jasper follows the system's dark or light appearance; on Linux and Windows it shows Dark until you
-choose Light. The default theme is Jasper Meadow in both Dark and Light.
+start. Jasper follows the system's dark or light appearance on macOS, and the desktop portal's on Linux; on Windows it
+shows Dark until you choose Light. The default theme is Jasper Meadow in both Dark and Light, except on Linux, where it
+is [Desktop colors](themes.md#desktop-colors), the colours of your GTK, Qt
+or KDE desktop.
 
-While Jasper starts, a splash shows a meadow with the [Desk Buddy](notifications.md#desk-buddy), Jasper's version,
-each start-up step and a progress bar, until the window has painted. A look with its own [branding](looks.md#branding)
-shows its own splash instead. With **Enable animations** (`ui.animations.enabled`) off, the Desk Buddy stands still. A
-start with `--safe-mode`, `--background` or `--no-window` shows no splash.
+While Jasper starts, a splash shows a picture for the interface theme it starts with (Jasper Meadow's meadow for a
+theme that has none of its own, Desktop colors among them), Jasper's version, each start-up step and a progress bar,
+until the window has painted. A look with its own [branding](looks.md#branding) shows its own splash instead. A start
+with `--safe-mode`, `--background` or `--no-window` shows no splash.
 
 Under the default look the window has:
 
 - a **header** with a search field in the middle, which shows where the current pane is (`user@~/path` locally,
   `host:path` over SSH) and opens the [command palette](command-palette.md) when you click it, and a toolbar: New
-  tab, New window, Split, Maximize pane, the plugins' buttons (the Editor's New Editor Window, Remote's
+  Tab, New Window, Split, Maximize Pane, the plugins' buttons (the Editor's New Editor Window, Remote's
   Sessions menu), Find, Settings and the window's ⋮ menu. On macOS the header shares the title bar with the window
   controls and the menus are in the menu bar; on Linux and Windows the menus sit in Jasper's own title bar;
 - the **terminal**, with a row of tabs above it once the window has more than one tab;
@@ -103,7 +111,8 @@ Setting the `JASPER_HOME` environment variable moves it; a Jasper in another hom
 never stays in the background ([one Jasper per home](command-line.md#one-jasper-per-home)). The home holds
 `config.toml` (written the first time you save a change in Settings), `logs/`, `themes/` for imported themes, `plugins/`
 with each plugin's settings file and data, `plugins.toml` with each plugin's enabled state and your consent,
-`ui-state.toml` with where dialogs were, and `workspace.toml` with the window, tabs, panes and tool windows Jasper restores. The
+`ui-state.toml` with where dialogs were, `workspace.toml` with the window, tabs, panes and tool windows Jasper restores,
+and `layouts.toml` with the [layouts](workspace.md#layouts) you save. The
 home is separate from the installed application, so removing or upgrading Jasper keeps your settings and data.
 [Configuration](configuration.md) lists every setting and file.
 
@@ -114,13 +123,13 @@ keeps Jasper running with no windows open, so a new window opens at once. It tak
 
 | | macOS | Windows | Linux |
 | --- | --- | --- | --- |
-| Default | On | On | Off |
-| Closing the last window | Jasper keeps running in its menu bar item: **New Window**, **Settings…**, **Quit Jasper Completely** | Jasper keeps running in its notification-area icon: **Open Jasper**, **Quit Jasper** | Jasper quits. With the setting on, it keeps running with no icon; launch Jasper again for a window |
+| Default | On | On | On |
+| Closing the last window | Jasper keeps running in its menu bar item: **New Window**, **Settings…**, **Quit Jasper Completely** | Jasper keeps running in its notification-area icon: **Open Jasper**, **Quit Jasper** | Jasper keeps running in its tray icon: **Open Jasper**, **New Window**, **Settings…**, **Quit Jasper**. Without a compatible tray (GNOME needs an indicator extension) it runs with no icon; launch Jasper again for a window |
 | Quit | Cmd+Q closes every window and keeps Jasper in the menu bar; **Quit Jasper Completely** ends it | Quit (Ctrl+Alt+Shift+Q) ends Jasper | Quit (Ctrl+Alt+Shift+Q) ends Jasper |
-| At login | An installed Jasper starts in the background, with no Dock icon | An installed Jasper starts in the background | Not started |
+| At login | An installed Jasper starts in the background, with no Dock icon | An installed Jasper starts in the background | An installed Jasper starts in the background |
 
 One Jasper runs per home, with the setting on or off: launching it again brings the running Jasper's most recently active window
-forward, restoring its window first when none is open, and opens the files and folders you named. On macOS a file or
+forward, restoring its window first when none is open, and opens the files, folders and web addresses you named. On macOS a file or
 folder you open with Jasper in Finder (Open With), or drop on its Dock icon, opens the same way, and the Dock icon shows
 only while one of Jasper's windows is open. Turning the setting off also removes the login item when you save.
 
@@ -129,8 +138,9 @@ only while one of Jasper's windows is open. Turning the setting off also removes
 ### Tabs and splits
 
 - **New Tab** (Cmd+T on macOS, Ctrl+Shift+T on Linux and Windows) opens a tab; **New Window** (Cmd+N,
-  Ctrl+Shift+N) a new window. New tabs, windows and splits start in the
-  current pane's folder once its shell has reported it, as shell integration does.
+  Ctrl+Shift+N) a new window with the [default layout](workspace.md#layouts), which Window › Layouts lets you save.
+  New tabs, splits and, until you save a default layout, new windows start in the current pane's folder once its shell
+  has reported it, as shell integration does.
 - **Split Right** (Cmd+D, Ctrl+Shift+D) and **Split Down** (Cmd+Shift+D, Ctrl+Alt+Shift+D) split the current pane;
   drag the divider to resize. **Focus Pane Left / Right / Up / Down** (Cmd+Option+Arrow, Ctrl+Alt+Shift+Arrow) moves
   between panes, and **Maximize Pane** (Cmd+Shift+Enter, Ctrl+Alt+Shift+Enter) shows only the current pane until you
@@ -168,11 +178,11 @@ Everywhere** button open. See [the command palette](command-palette.md).
 Settings) opens the Settings dialog. Its pages are:
 
 - **Appearance & Behavior**: Appearance (Dark, Light or Match System, the theme for each, the terminal scheme, the
-  interface font), Window, Notifications, Command Palette, Desk Buddy and System Settings (Run in background, memory,
-  the `jasper` command, the configuration file);
+  interface font), Window, Notifications, Command Palette, Desk Buddy and System Settings (Run in background, Reopen
+  with, memory, the `jasper` command, the configuration file);
 - **Keymap**: every action and its shortcut, where you can record a new one;
 - **Plugins**: the installed and bundled plugins;
-- **Terminal**: scrollback, bell and exit behaviour, then Font & Colors, Cursor and Shell;
+- **Terminal**: the tab name, scrollback, bell and exit behaviour, then Font & Colors, Cursor and Shell;
 - **Tools**: a page for each plugin that has settings.
 
 Type in **Search settings** to find a setting by name. Changes wait until you click **Apply** or **OK**, which writes
@@ -187,7 +197,9 @@ the left, and Notifications on the right; Remote's file transfers show at the fo
 button to show or hide one; View › Tool Windows lists them too, and some have shortcuts, such as **Toggle SSH hosts**
 (Cmd+Option+1, Alt+1) and **Toggle SFTP** (Cmd+Option+2, Alt+2). Drag a rail button or a tool window's header to
 another edge, or right-click the button and choose **Move to**. Each side, and the bottom, has two slots, and each slot
-shows one tool window at a time; Jasper remembers the layout. Under the Enterprise look the rails are labelled stripes,
+shows one tool window at a time; Jasper remembers the layout. **View Mode** › **Float** or **Window** on the same menu
+gives a tool window a window of its own, as dragging its button or header out of the Jasper window does. Under the
+Enterprise look the rails are labelled stripes,
 each label starting with its tool window's icon, and the tool windows are in the Window menu. See
 [the workspace](workspace.md#tool-windows-and-the-dock).
 
@@ -262,10 +274,10 @@ Before you remove Jasper:
 
 - turn off **Run in background** in Settings › Appearance & Behavior › System Settings and click **OK**, which removes
   the login item (on macOS `~/Library/LaunchAgents/dev.jasper.background.plist`, on Windows the `Jasper` value under
-  `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`);
+  `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, on Linux `dev.jasper.background.desktop` in `$XDG_CONFIG_HOME/autostart`, by default `~/.config/autostart`);
 - if you installed the `jasper` command, click **Uninstall** under Command line on the same page;
 - quit Jasper completely: **Quit Jasper Completely** in its menu bar item on macOS, **Quit Jasper** in its
-  notification-area icon on Windows.
+  notification-area icon on Windows or its tray icon on Linux, or Quit in a Jasper window on Linux and Windows.
 
 Then remove the application:
 
@@ -276,6 +288,7 @@ Then remove the application:
 | Windows portable | Delete the `Jasper` folder |
 | Linux `.deb` | `sudo apt remove jasper-workstation` |
 | Linux `.rpm` | `sudo dnf remove jasper-workstation` or `sudo zypper remove jasper-workstation` |
+| Gentoo | `sudo emerge --ask --depclean app-misc/jasper-workstation` |
 
 Removing the application leaves [Jasper home](#jasper-home) in place, with your settings, plugins and Vault. Delete that
 folder to remove them too. On Windows it also leaves the Cygwin environment in `%LOCALAPPDATA%\Jasper\cygwin`; close

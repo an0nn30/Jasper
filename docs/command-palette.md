@@ -81,14 +81,15 @@ new snippet.
 
 ## The card
 
-Under the default look the card drops from the window header's search field: it covers the field, centred on it
-and at least 560 px wide, and moves or narrows to stay clear of the window controls. In Compact view mode, or when the window has no room for the field, it opens centred across the window with its
-top one fifth of the way down.
+Under the default look the card drops from the window header's search field: it covers the field, centred on it and
+at least 560 px wide, and moves or narrows to stay clear of the window controls. In Compact view mode, or when the
+window has no room for the field, it opens centred across the window with its top one fifth of the way down.
 
 - A fresh opening unrolls the card downward over 300 ms while animations are on (`ui.animations.enabled`).
 - While the card is open it holds the window's input: Jasper's other shortcuts and actions do nothing, except Copy
   and Paste in its fields, the palette shortcut and the scope openers.
-- Rows run in the pane that was focused when the card opened.
+- Rows run in the pane that was focused when the card opened. Opened over a tab that takes text, such as a
+  [browser page](browser.md#snippets-in-page-fields), with no terminal pane, a snippet goes into that tab.
 - It closes on Escape, a click outside it (which goes no further), running a verb, completing a step, switching tab and
   the window losing focus. The keyboard returns where it was.
 - Drag it by an empty area: the padding around the field, the hint bar or an empty list. Near the window's vertical
@@ -110,8 +111,8 @@ a ▼ menu, "Choose what to open", which lists All and every scope with its shor
   While it is open they give it the keyboard back and refresh its list; a click anywhere on it also gives it the
   keyboard.
 - It stays open while you work. Clicks outside it reach the window, a click in a pane gives that pane the keyboard,
-  and a row runs in the pane that is current when you run it. Switching tab refreshes the list; the window losing focus
-  leaves it open.
+  and a row runs in the pane that is current when you run it, or, with none, a snippet goes into the current tab when
+  it takes text. Switching tab refreshes the list; the window losing focus leaves it open.
 - It closes on Escape (with the keyboard in it), ×, **Cancel**, running a row or completing a step.
 - The list keeps the height of `palette.visible_rows` rows, fewer when the window is too short, under **Recent** and
   **Most used** (or **Suggested**), under a chip's own heading, or under one **Matches** heading while you type, with
@@ -225,7 +226,9 @@ waits up to two seconds for the last write.
 A plugin adds a scope with [`Palette.register`](sdk-reference.html#dev.jasper.sdk.palette.Palette) and needs the
 `palette.contribute` capability. Every window shows it after Commands; its id starts with the plugin's id, and it goes
 when the plugin stops. A scope's calls run on the UI thread and must do no I/O; a call that fails is contained, so the
-scope shows no rows or does nothing, and the failure is the plugin's problem.
+scope shows no rows or does nothing, and the failure is the plugin's problem. Each call's
+[`PaletteQuery`](sdk-reference.html#dev.jasper.sdk.palette.PaletteQuery) names the window, the pane the palette runs
+in and, with no pane, the [tab that takes text](sdk-reference.html#dev.jasper.sdk.ui.TextTarget) there.
 
 The two views use a scope's [`ScopeSpec`](sdk-reference.html#dev.jasper.sdk.palette.ScopeSpec) differently:
 

@@ -142,7 +142,7 @@ public final class FakeKitView implements UiView {
   if(event instanceof UiEvent.SuggestionChosen chosen && mounted(spec.root()).get(chosen.fieldId()) instanceof Nodes.Field)suggestionsHidden.add(chosen.fieldId());
   if(event instanceof UiEvent.TokensChanged change && mounted(spec.root()).get(change.id()) instanceof Nodes.TokenField){tokenLists.put(change.id(),change.tokens());keepSelection(change.id());}try{if(hostEvents.test(event))return;events.accept(Objects.requireNonNull(event));}catch(Throwable failure){owner.failed();}}
  /** Simulate a person typing {@code text} into a field, replacing its text: it reports {@link UiEvent.Edited} as the host's field does, while a read-only field, or one that is hidden, disabled or busy (itself or a container above it), takes nothing.
- * Typed into a {@link Nodes.TokenField} (since 0.29.0), which takes the focus, it replaces the text typed there
+ * Typed into a {@link Nodes.TokenField}, which takes the focus, it replaces the text typed there
  * ({@link #tokenText(String)}) and reports no edit, but each separator in it (a comma, a line break or a tab) adds the
  * text before it, and the changed list is
  * reported once as {@link UiEvent.TokensChanged}, as the host's token field does.
@@ -181,7 +181,7 @@ public final class FakeKitView implements UiView {
  * while it only loads), ESCAPE hides it and reports the field's {@code cancelAction} when that is not blank. Otherwise
  * ENTER reports the {@code trailingAction} of a single-line field other than PATH, and ESCAPE the {@code cancelAction},
  * when not blank. A field that is hidden, disabled or busy (itself or a container above it) takes no key.
- * <p>In a {@link Nodes.TokenField} (since 0.29.0), as the host's: ENTER adds the typed text as a token while text other
+ * <p>In a {@link Nodes.TokenField}, as the host's: ENTER adds the typed text as a token while text other
  * than white space is typed, and reports nothing otherwise; BACK_SPACE deletes the typed text's last character, or with
  * nothing typed removes the last token; LEFT with nothing typed selects the last token's chip
  * ({@link #selectedToken(String)}). While a chip is selected, LEFT, RIGHT, HOME and END move among the chips (RIGHT past

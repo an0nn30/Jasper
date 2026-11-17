@@ -23,7 +23,8 @@ status_bar = true
 status_bar_height = 24
 # Live across open windows.
 memory_indicator = false
-# Initial grid for a window Jasper does not restore from workspace.toml. Columns: 5-500; lines: 2-200.
+# Initial grid for a new window that is not restored from workspace.toml, not sized like the active window (as New
+# Window's is) and not dragged out of another window (sized like the workspace it left). Columns: 5-500; lines: 2-200.
 columns = 100
 lines = 35
 # Restart required. Windows and Linux only: true uses the operating system's title bar, with the menus and
@@ -91,15 +92,15 @@ scrollback = 10000
 option_as_meta = "left"
 # Live. Range: 0.0-1.0; zero disables inactive dimming and one fully dims.
 dim_inactive_panes = 0.3
-# Live. Completed local selections copy when true.
+# Live. When true, a finished selection is copied to the clipboard, in terminals and in browser pages.
 copy_on_select = false
 # Live. Options: "visual", "sound", or "none".
 bell = "visual"
 # Shell process exit: "keep_open" retains the stopped terminal and output (the default).
 # Use "close_on_success" for code 0 only, or "close" for any exit.
-# Only the exited pane closes; a tab closes with its last pane, and a window with its last tab, except the main
-# window, which shows its empty workspace. Live for future exits;
-# reloading never closes previously retained output. A program returning to the shell is not a shell exit.
+# Only the exited pane closes; a tab closes with its last pane, and a window shows its empty workspace once its last
+# tab closes. Live for future exits; reloading never closes previously retained output. A program returning to the
+# shell is not a shell exit.
 on_exit = "keep_open"
 # New panes only. "auto" loads Jasper's shell integration script into zsh and bash after your startup files, into
 # fish before config.fish, and into a zsh or fish $SHELL inside tmux; "manual" only exports JASPER_SHELL_INTEGRATION
@@ -154,11 +155,12 @@ appearance = "system"
 # "ubuntu-yaru" for either, "catppuccin-latte" for Light, "catppuccin-frappe", "catppuccin-macchiato" or
 # "catppuccin-mocha" for Dark), a plugin's theme such as "enterprise", or an imported theme's id (its file name in the
 # themes folder without .json). A theme without that variant is reported and the appearance's default is used:
-# Jasper Meadow for Dark and Light. Omitted picks use Desktop colors on Linux and Jasper Meadow elsewhere,
-# unless the look sets its own defaults (Enterprise uses Jasper Meadow). Uncomment to save an explicit choice.
+# Jasper Meadow for Dark and Light. Left out, both are "desktop-colors" (the Linux desktop's own colours) on Linux and
+# "jasper-meadow" elsewhere, unless the look sets its own (Enterprise: Jasper Meadow). Uncomment to choose.
 # dark = "jasper-meadow"
 # light = "jasper-meadow"
-# Desktop colors source on Linux: auto, qt (Qt / KDE), gtk3 or gtk4; retained on every platform.
+# Live, Linux: where Desktop colors takes its colours from: "auto" (chosen by the desktop session), "qt" (Qt and KDE),
+# "gtk3" or "gtk4". Other platforms keep the value and ignore it.
 desktop_source = "auto"
 
 [ui.font]

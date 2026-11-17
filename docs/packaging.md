@@ -3,7 +3,8 @@
 Jasper ships as a native application image that bundles a trimmed JetBrains Runtime, so users need no Java: a
 `Jasper.app` and DMG on macOS, a portable ZIP and a per-user setup wizard on Windows, and `.deb` and `.rpm` packages on
 Linux. A [Gentoo source overlay](../packaging/gentoo/README.md) builds the application with optional GTK/Qt/KDE USE
-flags. Every package carries the application, all ten bundled plugins, Jasper's own launcher with its start-up recovery
+flags, from a pinned commit that predates the Browser plugin. Every package carries the application, all ten bundled
+plugins (nine in the Gentoo package, which has no Browser), Jasper's own launcher with its start-up recovery
 helper `jasper-watch`, and the native [`jasper` command](command-line.md); the Windows packages also carry the offline
 [Cygwin starter environment](#bundled-cygwin). jpackage builds only for the machine it runs on, so each package is built
 on the operating system and architecture it is for (aarch64 or x64). Installing and using a package on the desktop is
@@ -29,15 +30,17 @@ checked by hand with the [native acceptance checklist](#native-acceptance-checkl
   [user installation](#user-installation-without-a-compiler) needs none.
 - **macOS**: Xcode 26 or later for the [macOS 26 window controls](#macos-26-window-controls); an older SDK builds an app
   with the earlier controls and `verifyPackage` warns.
-- **Linux**: `readelf` (binutils) for both formats; `dpkg-deb` and `fakeroot` for the `.deb`; `rpmbuild` (the `rpm`
-  package on Debian and Ubuntu), `rpm2cpio` and `cpio` for the `.rpm`.
+- **Linux**: `readelf` (binutils) and Python 3 for both formats; `dpkg-deb` and `fakeroot` for the `.deb`; `rpmbuild`
+  (the `rpm` package on Debian and Ubuntu), `rpm2cpio` and `cpio` for the `.rpm`; `pkg-config` and the GLib/GIO
+  development headers for the [Desktop colors helpers](#desktop-colors-helpers), and CMake 3.21 or later with the Qt
+  and KDE Frameworks SDKs for their Qt and KDE helpers.
 - **Windows setup wizard**: WiX 3 (`candle.exe` and `light.exe`) on `PATH`. The portable ZIP needs no WiX.
 - **Windows Cygwin seed**: the first Windows build downloads about 500 MB of pinned Cygwin packages from
   `mirrors.kernel.org` into `jasper-app/build/cygwin/downloads`, unless `-Pjasper.cygwinSnapshot=<folder>` names a
   complete retained seed ([bundled Cygwin](#bundled-cygwin)).
 
-`./gradlew check` also needs Python 3.11 or later ([building from source](../README.md#building-from-source)); the
-packaging tasks do not.
+`./gradlew check` also needs Python 3.11 to 3.13 ([building from source](../README.md#building-from-source)); of the
+packaging tasks, only the Linux ones and `refreshCygwinSeed` need Python.
 
 ## Tasks
 
@@ -45,7 +48,7 @@ All tasks belong to `:jasper-app`. Only those marked in the last column start Ja
 
 | Task | Hosts | What it does | Starts Jasper |
 |---|---|---|---|
-| `stagePackage` | all | Stages the application jar, its runtime libraries, `config.example.toml`, `packaging/README.txt` and the bundled plugins in `jasper-app/build/packaging/input/` (on macOS also the three native bridges, on Windows the Cygwin seed and its helper) | no |
+| `stagePackage` | all | Stages the application jar, its runtime libraries, `config.example.toml`, `packaging/README.txt` and the bundled plugins in `jasper-app/build/packaging/input/` (on macOS also the three native bridges, on Windows the Cygwin seed and its helper, on Linux the Desktop colors helpers) | no |
 | `packageApp` | all | Builds the application image in `jasper-app/build/packaging/image/` with jpackage and Jasper's launcher | no, unless `-Pjasper.aot=true` |
 | `verifyPackage` | all | Checks the image ([what it checks](#what-verifypackage-checks)); never up to date | no, unless `-Pjasper.aot=true` |
 | `trainAotCache` | macOS | Trains the image's [start-up cache](#training-the-aot-cache) | yes, a window for a few seconds |
@@ -78,8 +81,8 @@ training). On Windows and Linux it fails at configuration with "-Pjasper.aot=tru
 
 `installDist` writes `jasper-app/build/install/jasper-app/`: start scripts `bin/jasper-app` and `bin/jasper-app.bat`
 that run the Java found through `JAVA_HOME` or `PATH`, the jars in `lib/`, the bundled plugins in `lib/plugins/<id>/`,
-the Linux icon tree in `share/icons/hicolor/`, `LICENSE.md`, and on macOS `lib/libjasper-appearance.dylib`. `distZip`
-and `distTar` archive the same tree.
+the Linux icon tree in `share/icons/hicolor/`, `LICENSE.md`, on macOS `lib/libjasper-appearance.dylib` and on Linux
+the Desktop colors helpers in `lib/desktop-colors/`. `distZip` and `distTar` archive the same tree.
 
 ## Versions
 
@@ -122,12 +125,16 @@ or `rpm-work/` under `jasper-app/build/packaging/`) for diagnosis and publishes 
 | Native libraries | `Contents/app/native/`, and the bridges `Contents/app/libjasper-macos.dylib`, `libjasper-glass.dylib`, `libjasper-appearance.dylib` | `app\native\` | none; the libraries extract themselves at run time |
 | Java runtime | `Contents/runtime/Contents/Home` | `runtime` | `lib/runtime` |
 | Chromium (JCEF) | `Contents/runtime/Contents/Frameworks` | in `runtime`: the files of `packaging/jcef/windows-<x64\|aarch64>.txt` | in `lib/runtime`: the files of `packaging/jcef/linux-<x64\|aarch64>.txt` |
+| Desktop colors helpers | none | none | `lib/app/desktop-colors/` ([which](#desktop-colors-helpers)) |
 | AOT start-up cache | `Contents/app/jasper.aot` | none | none |
 | Cygwin seed and its helper | none | `app\cygwin-seed\`, `app\cygwin-tool.jar` and `provision-cygwin.cmd` | none |
 | Icon | `Contents/Resources/Jasper.icns` and `Assets.car` | inside `Jasper.exe` | `lib/Jasper.png` |
 
 On macOS aarch64 an untrained `Jasper.app` (`packageApp`, no `jasper.aot`) takes 644 MB on disk: `Contents/runtime` is
-547 MB, of which `Contents/Home` is 228 MB and Chromium's `Contents/Frameworks` 319 MB.
+547 MB, of which `Contents/Home` is 228 MB and Chromium's `Contents/Frameworks` 319 MB. The
+[Licenses window](workspace.md#about-and-licenses) credits what the runtime's JCEF brings: Chromium, the Chromium
+Embedded Framework and JCEF, with Apache Thrift, Boost, JOGL and GlueGen, and on Windows Microsoft's Direct3D HLSL
+Compiler and, on x64, DirectX IL.
 
 The `jasper` command has a `bin` folder of its own because the macOS and Windows file systems ignore case, so it
 cannot sit beside the `Jasper` launcher. `README.txt` is the package guide (`packaging/README.txt`);
@@ -181,8 +188,8 @@ without the cache and then without the user's options ([start-up recovery](diagn
 - **Launcher and helpers**: the launcher is Jasper's (on Linux, `lib/libapplauncher.so` too); the `jasper` command and
   `jasper-watch` are present, executable (macOS, Linux) and signed (macOS), and `jasper --help` prints
   `Usage: jasper`.
-- **Contents**: every staged file and every bundled plugin file is byte-identical in the image; no jar is sealed; the
-  main class, the class path (every runtime jar, no `plugins/` entry) and the exact JVM options above.
+- **Contents**: every staged file and every bundled plugin file is byte-identical in the image; the main class, the
+  class path (every runtime jar, no `plugins/` entry) and the exact JVM options above.
 - **Runtime**: Java 25 from JetBrains (`jbr-`) of the host architecture; exactly the modules of `runtimeModules`; a
   default CDS archive that `java -Xshare:on` uses; `jdeps` finds no module that the application or a bundled plugin
   needs and the runtime lacks. It logs the runtime's module count and size; on macOS the size is that of
@@ -190,7 +197,8 @@ without the cache and then without the user's options ([start-up recovery](diagn
 - **Native libraries** (macOS, Windows): each is byte-identical to its jar entry and (macOS) validly signed, and a
   headless probe with the image's runtime, options and class path loads them from `native/` and extracts nothing.
 - **macOS**: the three bridges (architecture, signature, exported JNI symbols); `Info.plist` identifier
-  `dev.jasper.app`, version, the Local Network, [camera and microphone](#macos-camera-and-microphone) texts,
+  `dev.jasper.app`, version, the Local Network, [camera and microphone](#macos-camera-and-microphone) and
+  [Downloads, Desktop and Documents folder](#macos-downloads-desktop-and-documents-folders) texts,
   [document types](#macos-open-with) and [URL types](#macos-web-links); the icon file and catalog;
   the launcher's app-specific UUID; Chromium's framework and `jcef Helper` apps in
   `Contents/runtime/Contents/Frameworks/cef_server.app`, the renderer helper signed by JetBrains (team `2ZEFAR8TH3`);
@@ -198,9 +206,11 @@ without the cache and then without the user's options ([start-up recovery](diagn
   `java -XX:AOTMode=on`; the SDK the launcher was linked against.
 - **Windows**: the PE machine type of `Jasper.exe`, `jasper-watch.exe`, `java.exe` and `jvm.dll`, every frame of
   `Jasper.ico` embedded in the launcher, and every Chromium file that `packaging/jcef/windows-<arch>.txt` lists.
-- **Linux**: the ELF machine type of the launcher, `jasper-watch` and `java`, `lib/Jasper.png`, and every Chromium file
-  that `packaging/jcef/linux-<arch>.txt` lists, of which the runtime's `lib/jcef_helper` and `lib/cef_server` must be
-  executable.
+- **Linux**: the ELF machine type of the launcher, `jasper-watch`, `java` and the Desktop colors helpers,
+  `lib/Jasper.png`, and every Chromium file that `packaging/jcef/linux-<arch>.txt` lists, of which the runtime's
+  `lib/jcef_helper` and `lib/cef_server` must be executable; `lib/app/desktop-colors/` holds exactly the helpers the
+  build selected, each executable and byte-identical to its staged copy, after `verifyDesktopHelpers` has checked
+  them ([Desktop colors helpers](#desktop-colors-helpers)).
 
 ## Signing
 
@@ -341,7 +351,9 @@ opens in the [Jasper Editor](editor.md#opening-files), or is revealed in the fil
 and each folder as a terminal tab, in the most recently active window
 ([one Jasper per home](command-line.md#one-jasper-per-home)). `verifyPackage` checks the key.
 
-The app also declares the source and text types of its file-type catalogue (`file-types.tsv`) in a third document type, ranked `Alternate`, with `UTImportedTypeDeclarations` for the types macOS lacks (Kotlin, Go, Rust and TOML); installing Jasper makes it the default for none of them.
+The app also declares the source and text types of its file-type catalogue (`file-types.tsv`) in a third document type,
+"Source and text", ranked `Alternate`, with `UTImportedTypeDeclarations` for the types macOS lacks (Kotlin, Go, Rust
+and TOML); installing Jasper makes it the default for none of them. `verifyPackage` checks the imported types too.
 
 ### macOS web links
 
@@ -388,8 +400,8 @@ JCEF (the `MODULES` line of its `release` file names `jcef`) of the target archi
 | `-JavaHome`, `-WixPath` | Name the SDK and the WiX folder instead of finding them |
 
 The setup wizard installs the [Cygwin environment](#bundled-cygwin) too. `packageInstaller` writes the selected JBR's
-own WiX template (`main.wxs`) with one added custom action, `JasperProvisionCygwin`, and the web browser registration
-below, and passes it to jpackage with `--resource-dir`: after the files are installed, on every installation, repair
+own WiX template (`main.wxs`) with one added custom action, `JasperProvisionCygwin`, and the registry entries below,
+and passes it to jpackage with `--resource-dir`: after the files are installed, on every installation, repair
 and upgrade (not on removal), and in silent installations too, Windows Installer runs
 `runtime\bin\java.exe … CygwinTool ensure --seed app\cygwin-seed` as the installing user, and a failure fails the
 installation. A JBR whose template has another shape fails the build with
@@ -397,8 +409,9 @@ installation. A JBR whose template has another shape fails the build with
 the task first copies the image into a new `jpi…` folder in `%TEMP%`, and fails with "WiX 3 requires a shorter TEMP
 directory for: *path*" when a copied path still reaches that length.
 
-The setup registers Jasper as a web browser for the installing user, in the component `JasperWebBrowser` of the
-template's one feature ([Browser](browser.md#making-jasper-your-default-browser)), all under `HKEY_CURRENT_USER`:
+The setup registers Jasper as a web browser for the installing user ([Browser](browser.md#making-jasper-your-default-browser)),
+and the `JasperFile` ProgId that Jasper's file associations name, in the component `JasperWebBrowser` of the
+template's one feature, all under `HKEY_CURRENT_USER`:
 
 | Key | Values |
 |---|---|
@@ -408,10 +421,12 @@ template's one feature ([Browser](browser.md#making-jasper-your-default-browser)
 | `Software\Classes\JasperURL` | (Default) = `Jasper URL` |
 | `Software\Classes\JasperURL\DefaultIcon` | (Default) = `"[INSTALLDIR]Jasper.exe",0` |
 | `Software\Classes\JasperURL\shell\open\command` | (Default) = `"[INSTALLDIR]Jasper.exe" --url "%1"` ([`--url`](command-line.md#launching-jasper-with-options)) |
+| `Software\Classes\JasperFile` | (Default) = `Jasper document` |
+| `Software\Classes\JasperFile\DefaultIcon` | (Default) = `"[INSTALLDIR]Jasper.exe",0` |
+| `Software\Classes\JasperFile\shell\open\command` | (Default) = `"[INSTALLDIR]Jasper.exe" "%1"` |
 
-The uninstall, and so an upgrade before it writes the new version's, removes the `Jasper` value and deletes the
-`Capabilities`, `JasperURL` and `JasperFile` keys. The setup also registers the `JasperFile` ProgId under `Software\Classes` (the Editor's File associations use it; its
-open command is `"[INSTALLDIR]Jasper.exe" "%1"`) and sets no default. The portable ZIP and
+The setup makes Jasper the default for nothing. The uninstall, and so an upgrade before it writes the new version's,
+removes the `Jasper` value and deletes the `Capabilities`, `JasperURL` and `JasperFile` keys. The portable ZIP and
 `installWindowsUser` register nothing.
 
 The package's architecture is that of the selected JBR SDK, which must match the host's. On Windows on Arm, build the
@@ -431,8 +446,8 @@ Before it publishes the setup, the task inspects the MSI it embeds with `packagi
 without installing it: product name `Jasper`, version and upgrade code, no `ALLUSERS` (per-user), the x64 Windows
 Installer platform (jpackage's template declares x64 for an ARM64 payload too; `verifyPackage` checks the binaries'
 own architecture), the folder and shortcut dialogs, at least two shortcuts, the upgrade rows and removal action, and
-exactly the web browser registration's `Registry` rows, the two key deletions included, in a feature component that is
-not permanent. The task never installs or opens Jasper.
+exactly the `Registry` rows of the registration above, the three key deletions included, in a feature component that
+is not permanent. The task never installs or opens Jasper.
 
 ### User installation without a compiler
 
@@ -501,45 +516,49 @@ A missing or mismatched file fails the build. Apart from `refreshCygwinSeed`, no
 PowerShell, a native compiler or a separately installed Cygwin. `check` runs the portable Cygwin checks on every host:
 `verifyCygwinManifest`, `verifyCygwinLifecycle`, `verifyCygwinProvisioning`, `verifyCygwinProbes`,
 `verifyCygwinProbeRuntime` and `verifyInstallerTemplate`, which checks the setup wizard's template: the custom action
-and the web browser registration. The [Cygwin README](../packaging/windows/cygwin/README.md) describes the helper, the
+and the registry entries. The [Cygwin README](../packaging/windows/cygwin/README.md) describes the helper, the
 seed and its refresh, the relay, the native probes and the acceptance harnesses.
 
 ## Linux packages
 
-The Linux tray resolves system `libxcb.so.1`, `libxcb-render.so.0` and `libXau.so.6`; its XCB code is carried by the
-existing JNA dependency. Ubuntu 22.04 x64/aarch64 CI requires wire, native ABI/cancellation and exact packaged-runtime
-tray gates before release. Executed desktop rows and pending physical/session acceptance are recorded in the
-[Linux tray verification](superpowers/plans/2026-10-27-linux-residency-2-verification.md).
-
-`packageDist` on recognized RPM-family hosts (Fedora, RHEL and SUSE families) runs `packageRpm`; other Linux hosts,
-including Debian/Ubuntu, run both `packageDeb` and `packageRpm`. Both tasks remain individually callable and build
-their format from the verified image.
-Each format names the architecture its own way: Debian's `amd64` and `arm64` are RPM's `x86_64` and `aarch64`. An x64
-machine builds x64 packages and an aarch64 machine aarch64 packages; JetBrains ships no 32-bit Linux runtime.
+`packageDist` runs `packageRpm` on an RPM-family host (one whose `/etc/os-release` `ID` or `ID_LIKE` names Fedora,
+RHEL, CentOS, Rocky, AlmaLinux, Oracle Linux, Amazon Linux or a SUSE distribution), and both `packageDeb` and
+`packageRpm` on any other, Debian and Ubuntu included. Each task also runs on its own and builds its format from the
+verified image. Each format names the architecture its own way: Debian's `amd64` and `arm64` are RPM's `x86_64` and
+`aarch64`. An x64 machine builds x64 packages and an aarch64 machine aarch64 packages; JetBrains ships no 32-bit Linux
+runtime.
 
 ```bash
-sudo apt-get install fakeroot rpm cpio binutils g++
+sudo apt-get install fakeroot rpm cpio binutils g++ pkg-config libglib2.0-dev
 ./gradlew :jasper-app:packageDist -PjasperVersion=1.0.1
 ./gradlew :jasper-app:packageDeb    # or packageRpm, for one format only
 ```
 
-Both packages are named `jasper-workstation` and install the image to `/opt/jasper-workstation`, with the launcher at `/opt/jasper-workstation/bin/Jasper`
-and a desktop menu entry (`/opt/jasper-workstation/lib/jasper-workstation-Jasper.desktop`, categories
-`System;TerminalEmulator;Network;RemoteAccess;`, icon `/opt/jasper-workstation/lib/Jasper.png`) registered through
-`xdg-desktop-menu`. The package tasks write the entry from the selected JBR's own `template.desktop`, changing two
-lines: `Exec=/opt/jasper-workstation/bin/Jasper --url %u` and `MimeType=x-scheme-handler/http;x-scheme-handler/https;` followed by the MIME types of the source and text types in the file-type catalogue (`file-types.tsv`),
-so that desktops offer Jasper as a web browser ([Browser](browser.md#making-jasper-your-default-browser)) and under Open With for those files, and installing makes it the default for none of them. The package
-description, which is also the menu entry's comment, is "Jasper DevOps workstation" and the home page
-`https://github.com/an0nn30/Jasper`. DEB builds require `fakeroot`, `dpkg-deb` and a Debian-family host
-whose package database resolves the runtime's mandatory shared libraries to Debian packages. The `.rpm` requires,
-by soname, every shared library the image needs but does not bundle (for example `libX11.so.6()(64bit)`), which every
-RPM distribution resolves: jpackage's own
-RPM lookup asks the build machine's RPM database, which is empty on a Debian-family host. Before publishing either package,
-the task checks its name, version and architecture, unpacks it without installing it, compares every file with the
-verified image byte for byte (jpackage rewrites only `lib/app/.jpackage.xml`), checks the executable bits and the
-desktop entry (jpackage's name, icon, categories, `Type=Application` and `Terminal=false`, the `Exec` and `MimeType`
-lines above, and each key once), and checks the install scripts.
-jpackage appends the package name beneath `--install-dir /opt` to form the installation root.
+Both packages are named `jasper-workstation` (Fedora's JasPer image library owns the name `jasper`) and install the
+image to `/opt/jasper-workstation` (jpackage adds the package name to `--install-dir /opt`), with the launcher at
+`/opt/jasper-workstation/bin/Jasper` and a desktop menu entry
+(`/opt/jasper-workstation/lib/jasper-workstation-Jasper.desktop`, categories `System;TerminalEmulator;Network;RemoteAccess;`,
+icon `/opt/jasper-workstation/lib/Jasper.png`) registered through `xdg-desktop-menu`. The package tasks write the entry
+from the selected JBR's own `template.desktop`, changing two lines: `Exec=/opt/jasper-workstation/bin/Jasper --url %u`
+and `MimeType=x-scheme-handler/http;x-scheme-handler/https;` followed by the MIME types of the source and text types in
+the file-type catalogue (`file-types.tsv`). Desktops therefore offer Jasper as a web browser
+([Browser](browser.md#making-jasper-your-default-browser)) and under Open With for those files, and installing makes it
+the default for none of them; a file opened this way reaches Jasper as a `file:` URL after `--url` and opens as that
+file. The package description, which is also the menu entry's comment, is "Jasper DevOps workstation" and the home page
+`https://github.com/an0nn30/Jasper`.
+
+Both packages depend on the shared libraries that each ELF file of the image links directly, except the four Qt and
+KDE [helpers](#desktop-colors-helpers), and on `xdg-utils` for the menu entry (`packaging/linux/dependencies.py`). The
+`.deb` names the Debian packages that own those libraries on the build machine (`dpkg-query --search` on the files
+`ldd` resolves), so it is built on a Debian-family host that has them installed. The `.rpm` requires each library that
+the image does not bundle by soname (for example `libX11.so.6()(64bit)`), which every RPM distribution resolves. The
+package tasks put that list in place of the dependency placeholders of the selected JBR's `control` and `.spec`
+templates, and a template without the expected line fails the build. Before publishing either package, the task checks
+its name, version and architecture and that its `Depends` (with no `Pre-Depends`) or `Requires` are exactly that list,
+unpacks it without installing it, compares every file with the verified image byte for byte (jpackage rewrites only
+`lib/app/.jpackage.xml`), checks the executable bits and the desktop entry (jpackage's name, icon, categories,
+`Type=Application` and `Terminal=false`, the `Exec` and `MimeType` lines above, and each key once), and checks the
+install scripts.
 
 jpackage's install scripts register the menu entry under `set -e`, and `xdg-desktop-menu` fails unless
 `/usr/share/applications` (or `/usr/local/share/applications`) and `/usr/share/desktop-directories` exist, which would
@@ -559,16 +578,38 @@ or, where none is, as the default, and its uninstall never takes it out. The ins
 the menu install, then writes back each that changed and deletes each that it created, so that the packages make Jasper
 no default. When the copies cannot be made, it prints "jasper: the system's default applications were not saved" and
 the menu install's change stays. Removing the package leaves the user's own MIME package
-(`~/.local/share/mime/packages/jasper-workstation.xml`) and `mimeapps.list` entries, which the Editor's File
-associations write, as they are.
+(`~/.local/share/mime/packages/jasper-workstation.xml`) and `mimeapps.list` entries, which Jasper's file associations
+write, as they are.
 
 With the default `system.run_in_background`, the first eligible installed launch registers the current user's
 `$XDG_CONFIG_HOME/autostart/dev.jasper.background.desktop` (normally under `~/.config`) to run Jasper with
-`--background` at login. Package installation does not register every user's login startup.
+`--background` at login. Package installation does not register every user's login startup. The tray icon of a
+resident Jasper uses the desktop's StatusNotifier host over D-Bus or, without one, an X11 system tray through the
+system's `libxcb.so.1`, `libxcb-render.so.0` and `libXau.so.6`, which JNA loads at run time
+([background residency](configuration.md#background-residency)).
 
 Settings installs the `jasper` command as `~/.local/bin/jasper`
 ([installing the jasper command](command-line.md#installing-the-jasper-command)). The packages do not install the
 hicolor icon tree that the portable distributions carry.
+
+### Desktop colors helpers
+
+On Linux the image carries the programs that read the desktop's colours for
+[Desktop colors](themes.md#desktop-colors), in `lib/app/desktop-colors/`
+(`lib/desktop-colors/` in `installDist`): `jasper-desktop-portal`, which every Linux build compiles, and the toolkit
+helpers `jasper-desktop-gtk3`, `jasper-desktop-gtk4`, `jasper-desktop-qt5`, `jasper-desktop-qt6`,
+`jasper-desktop-kde5` and `jasper-desktop-kde6`. Each toolkit integration is chosen with
+`-Pjasper.desktop.<gtk3|gtk4|qt5|qt6|kde5|kde6>=auto|off|required`: `auto`, the default, builds the helper when its
+prerequisites are there and otherwise warns and leaves it out, `off` leaves it out, and `required` fails the build
+without them. `-Pjasper.desktop.strict=true` requires every integration and its native tests, and refuses `off`. The
+portal and GTK helpers build against GIO alone, and the GTK helpers open GTK at run time; the Qt and KDE helpers need
+CMake 3.21 or later and their Qt or KDE Frameworks SDK, and link it.
+
+`verifyDesktopHelpers`, part of `check` and of `verifyPackage` on Linux, checks the selected helpers' modes, ELF
+architecture and linkage; `verifyDesktopHelpersRelease` requires all seven and the symbol versions of the Ubuntu 22.04
+baseline (glibc 2.35). GTK, Qt and KDE Frameworks are never package dependencies: on a desktop without Qt or KDE
+Frameworks only those helpers fail to start. The [helpers' README](../packaging/desktop-colors/README.md) describes
+their protocol, the SDK baselines and the tests.
 
 ## The jasper command
 
@@ -595,8 +636,9 @@ the tag and resolves its commit, then builds that commit on five runners, each w
 | Linux ARM64 | `ubuntu-22.04-arm` | `.deb` and `.rpm` |
 | macOS Apple silicon | `macos-15`, Xcode 26.3 | the trained DMG |
 
-There is no Intel macOS build. The jobs run `packageDist` with `-PjasperVersion`, the Windows jobs
-`verifyCygwinDistribution`, `cygwinSourcesZip`, `packageDist` and `packageInstaller`, skipping the launcher's native
+There is no Intel macOS build. The jobs run `packageDist` with `-PjasperVersion`, the Linux jobs with
+`verifyDesktopHelpersRelease`, the Windows jobs `verifyCygwinDistribution`, `cygwinSourcesZip`, `packageDist` and
+`packageInstaller`, skipping the launcher's native
 suites (`testLauncherCore`, `testLauncherWatch`, `testWatcher`) that CI runs; the workflow does not run `check`. A
 Windows job fails while [`validation.json`](#bundled-cygwin) lacks native and interactive acceptance of the seed for its
 architecture. The publish job refuses to continue if the tag moved during the build, requires exactly the nine packages,
@@ -611,30 +653,51 @@ a rerun finishes; a published release for the tag is never overwritten.
 published by hand. Releases the Release workflow publishes do not trigger it, so that workflow builds the jars itself.
 Run by hand, it keeps the jars as the workflow artifact `jasper-sdk-jars`.
 
+Every workflow job that builds Jasper installs the JCEF build of JBR 25 with `.github/actions/setup-jbr`, which
+downloads the archive for its runner and checks it against `packaging/jcef/checksums.txt`. The Linux jobs that build
+the Qt and KDE helpers take the baseline Qt and KDE Frameworks SDKs that `desktop-qt-sdk.yml` builds on Ubuntu 22.04
+(cached by architecture and by the recipe in `packaging/desktop-colors/toolchains/`).
+
 **linux-packages** ([`linux-packages.yml`](../.github/workflows/linux-packages.yml)) runs on pushes to `main` and pull
-requests that change `gradle/packaging.gradle`, `gradle/packaging-support.gradle`, `packaging/**` or the workflow. It
-builds both packages on `ubuntu-22.04` and `ubuntu-22.04-arm`, declares the distro providers of each shipped ELF's
-direct dependencies, and uploads them as the artifacts `jasper-linux-x64` and
-`jasper-linux-aarch64` (with a `-work` artifact on failure). It then installs each package as root in disposable
-`debian:12`, `ubuntu:24.04`, `fedora:latest` and `opensuse/tumbleweed` containers of both architectures with
+requests that change the packaging build (`gradle/packaging.gradle`, `gradle/packaging-support.gradle`,
+`gradle/linux-desktop-colors.gradle`, `jasper-app/build.gradle.kts`, the root build files or `gradle.properties`),
+`packaging/**`, the application's `platform` package, its tests or the tray's native test, `notices.toml`, the JBR
+action, `desktop-qt-sdk.yml` or the workflow. On `ubuntu-22.04` and `ubuntu-22.04-arm` it requires the Linux tray's wire, native ABI and
+cancellation tests (`LinuxTrayTransportTest`, `LinuxTrayWireTest`, `LinuxStatusNotifierTest`, `LinuxTrayXcbTest` and
+`LinuxLegacyTrayTest`, each run with no failure or skip) and the X11 tray probe (`linuxX11TrayProbe`); builds both
+packages with every Qt and KDE helper required and runs `verifyDesktopHelpersRelease`; runs the tray probe again on the
+packaged runtime; and uploads the packages as the artifacts `jasper-linux-x64` and `jasper-linux-aarch64` (with
+`-work` and `-tray-gate` artifacts on failure). It then installs each package as root in disposable `debian:12`,
+`ubuntu:24.04`, `fedora:latest` and `opensuse/tumbleweed` containers of both architectures with
 [`packaging/linux/check-install.sh`](../packaging/linux/check-install.sh), which checks that the launcher,
 `jasper-watch` and the `jasper` command are executable, that `jasper --help` and the bundled `java -version` run,
-that every shared library resolves, that the menu entry exists and takes `http` and `https` links with `--url %u`,
-that the MIME cache lists it when `update-desktop-database` is installed, and that no system `defaults.list` names it
-and one the script seeded is unchanged, then removes the package and checks that the program, the menu entry and its
-MIME cache lines are gone. When distro `jasper-libs` is already installed, its package identity must survive both
-installation and removal; the Fedora equipped-runtime check installs it first. It never opens a window.
+that the seven Desktop colors helpers are executable and link no GTK or libadwaita, that the Qt and KDE helpers fail to
+start for their missing libraries while the GTK helpers answer a request without a display, that every other shared
+library resolves, that the menu entry exists and takes `http` and `https` links with `--url %u`, that the MIME cache
+lists it when `update-desktop-database` is installed, and that no system `defaults.list` names it and one the script
+seeded is unchanged, then removes the package and checks that the program, the menu entry and its MIME cache lines are
+gone. A last job runs the Qt and KDE helpers' tests, as the package job built them, on the system runtimes of
+`ubuntu:22.04` (without `kde6`: Ubuntu 22.04 has no KDE Frameworks 6 or Qt 6.5) and `fedora:44`, where it also installs
+the `.rpm` with Qt, KDE Frameworks and Fedora's `jasper-libs` present, checks that every toolkit helper answers, and checks
+that installing and removing Jasper leaves `jasper-libs` as it was. It opens no desktop window: the helpers' tests use
+private Xvfb displays.
 
-**ci** ([`ci.yml`](../.github/workflows/ci.yml)) runs `./gradlew check --parallel --continue` on `macos-latest`,
-`ubuntu-24.04` and `windows-latest` with the JCEF build of JBR 25 and Python 3.12, for pushes to `main` and pull requests, unless every
-changed file is Markdown or lies under `docs/` outside `docs/examples/`. Independent projects build in parallel with
-two Gradle workers on macOS and Linux and one on Windows, whose subprocess and clean-up tests miss their deadlines
-beside concurrent test JVMs; each project's tests still run one at a time, and a job times out after 30 minutes. On
-Linux it first installs the DejaVu and Noto CJK fonts (`fonts-dejavu-core`, `fonts-noto-cjk`), and afterwards builds
-the [example external plugin](examples/external-plugin) against the SDK jars that `check` wrote to `build/sdk-release/`.
-A failed job uploads its test results and reports, with the renders under `jasper-app/build/enterprise-settings/` and
-`jasper-app/build/chrome-renders/`, as the artifact `test-diagnostics-<runner>`, kept for seven days. A newer push to a
-pull request cancels its running check.
+**ci** ([`ci.yml`](../.github/workflows/ci.yml)) runs for pushes to `main` and pull requests, unless every changed file
+is Markdown or lies under `docs/` outside `docs/examples/`, with Python 3.12. On `macos-latest` and `ubuntu-24.04` it
+runs `./gradlew check --parallel --continue` with two Gradle workers. On Linux it first installs the DejaVu and Noto CJK
+fonts (`fonts-dejavu-core`, `fonts-noto-cjk`) and the Desktop colors helpers' build and test dependencies, requires
+every [Desktop colors integration](#desktop-colors-helpers), runs `verifyDesktopHelpersRelease` with `check`, and
+afterwards builds the [example external plugin](examples/external-plugin) against the SDK jars that `check` wrote to
+`build/sdk-release/`. Two `windows-latest` jobs share Windows' `check`, one Gradle worker each, because its subprocess
+and clean-up tests miss their deadlines beside concurrent test JVMs: one runs `:jasper-app:check`, the other every other
+project's `check` and `verifyJcefToolchain` (`.github/scripts/windows_shards.py`). Each first confirms with dry runs
+that the two task graphs together are exactly `check`'s, and a watchdog takes JVM thread dumps before the deadline; a
+last job requires both to pass and checks the task graphs they ran. A further job runs the GTK helpers' tests with
+GTK 4.16 or later in a pinned Ubuntu 26.04 container. Each project's tests run one at a time, and a job times out after
+30 minutes (the GTK job after 20). A failed job uploads its test results and reports, with the renders under
+`jasper-app/build/enterprise-settings/` and `jasper-app/build/chrome-renders/`, as the artifact
+`test-diagnostics-<runner>` (`test-diagnostics-windows-app` and `test-diagnostics-windows-other` on Windows), kept for
+seven days. A newer push to a pull request cancels its running check.
 
 ## Native acceptance checklist
 
@@ -655,7 +718,9 @@ cannot mask a packaging problem.
 - [ ] From a minimal launch environment, the login shell starts, UTF-8 text renders, and `tmux` (with the mouse), `vim`
   and `htop` work.
 - [ ] **File › Manage Plugins…** lists the bundled plugins, with Enterprise off; Remote, Credential Vault, Editor, File
-  Server, Project Index, Shell History and Snippets work.
+  Server, Project Index, Shell History, Snippets and Browser work, and a browser tab shows a web page.
+- [ ] Choose Jasper in System Settings › Desktop & Dock › Default web browser, then open a link in another app: it opens
+  in a browser tab in Jasper.
 - [ ] Connect a Remote SSH host by Vault key, by agent and on a LAN address. The first LAN connection shows the Local
   Network prompt; after you allow it the host connects, and Jasper appears under System Settings › Privacy & Security ›
   Local Network.
@@ -665,7 +730,7 @@ cannot mask a packaging problem.
   launch. Log out and back in: Jasper is running with no window, no Dock icon at any moment during login, and its menu
   bar item present.
 - [ ] The menu bar glyph follows the menu bar in Light and Dark appearance (and with a tinted menu bar); **New
-  Terminal Window**, **Settings…** and **Quit Jasper Completely** work with Jasper in the background and with windows
+  Window**, **Settings…** and **Quit Jasper Completely** work with Jasper in the background and with windows
   open, and **New Window** and **Settings…** come to the front.
 - [ ] Press Cmd+Q with two windows open: both close, the Dock icon and the Cmd+Tab entry disappear, the menu bar item
   stays, and `pgrep -fl Jasper.app` still lists the process. Repeat with **Jasper › Quit Jasper**, **File › Quit** and
@@ -721,7 +786,9 @@ cannot mask a packaging problem.
   `ssh` and `curl` run (an `https` download included), and the status bar follows `cd`.
 - [ ] **Manage Cygwin packages…** refuses while a Cygwin Bash tab is open and otherwise opens Cygwin Setup. Add a
   package, then upgrade, repair, uninstall and reinstall Jasper: the package, the Cygwin home and `/etc` are unchanged.
-- [ ] **File › Manage Plugins…** lists the bundled plugins, with Enterprise off.
+- [ ] **File › Manage Plugins…** lists the bundled plugins, with Enterprise off, and a browser tab shows a web page.
+- [ ] After the setup wizard, Settings › Apps › Default apps lists Jasper; choose it for `HTTP` and `HTTPS`, then open a
+  link in another app: it opens in a browser tab in Jasper. After uninstalling, Default apps no longer lists Jasper.
 - [ ] Install the `jasper` command from Settings; in a new terminal, `jasper --help` lists the plugin commands.
 - [ ] With the default configuration, a second launch of `Jasper.exe` shows a window in the running Jasper and the
   second process exits.
@@ -764,7 +831,10 @@ cannot mask a packaging problem.
 - [ ] Quit Jasper, remove its installed executable, then log out and in: no Jasper process starts; the stale autostart
   entry causes no desktop prompt.
 - [ ] The clipboard (including the primary selection, where the desktop has one) and links work.
-- [ ] **File › Manage Plugins…** lists the bundled plugins, with Enterprise off; a Remote SSH connection works.
+- [ ] **File › Manage Plugins…** lists the bundled plugins, with Enterprise off; a Remote SSH connection works, and a
+  browser tab shows a web page.
+- [ ] On GNOME, the default applications settings offer Jasper as the web browser; choose it, then open a link in another
+  app: it opens in a browser tab in Jasper.
 - [ ] Install the `jasper` command from Settings: `~/.local/bin/jasper --help` lists the plugin commands.
 - [ ] Upgrade to a package with a higher version: settings, Vault data and plugins are kept. Remove the package:
   `/opt/jasper-workstation` and the menu entry are gone, and `~/.config/jasper` remains.

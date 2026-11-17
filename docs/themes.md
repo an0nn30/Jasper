@@ -3,8 +3,8 @@
 A theme colours Jasper's interface, its terminal panes and the Editor; the shape of the interface is the
 [look](looks.md), and every theme works under every look. You choose one theme for the Dark appearance and one for the
 Light appearance, and the terminal can follow the theme on show or use any installed terminal scheme. Themes are built
-in, come with plugins, or are Jasper theme files you install. [Creating themes](creating-themes.md) describes the theme
-file and how to make one.
+in, come with plugins, or are Jasper theme files you install, and on Linux **Desktop colors** takes the interface's
+colours from the desktop. [Creating themes](creating-themes.md) describes the theme file and how to make one.
 
 ## Built-in themes
 
@@ -59,10 +59,10 @@ scheme = "match" # or a scheme id such as "slate-cobalt/high-contrast"
 
 | Setting | Default | Values |
 |---|---|---|
-| `ui.appearance` | `"system"` | `"system"` follows the operating system's light or dark setting, live; macOS reports it directly and Linux uses the desktop portal. If unavailable, `"system"` shows Dark. `"dark"` and `"light"` choose one. A change of the system's setting never writes `config.toml`. |
-| `ui.theme.dark` | `"desktop-colors"` on Linux, `"jasper-meadow"` elsewhere, or the active look's default | The id of a theme with a Dark variant: built in, from a plugin, or installed |
-| `ui.theme.light` | `"desktop-colors"` on Linux, `"jasper-meadow"` elsewhere, or the active look's default | The id of a theme with a Light variant |
-| `ui.theme.desktop_source` | `"auto"` | Desktop colors source: `"auto"`, `"qt"`, `"gtk3"` or `"gtk4"` |
+| `ui.appearance` | `"system"` | `"system"` follows the operating system's light or dark setting, live, as macOS reports it or, on Linux, the desktop portal; where neither reports it, as on Windows, `"system"` shows Dark. `"dark"` and `"light"` choose one. A change of the system's setting never writes `config.toml`. |
+| `ui.theme.dark` | `"desktop-colors"` on Linux, `"jasper-meadow"` elsewhere, or the active look's default | The id of a theme with a Dark variant: built in, from a plugin, or installed, or `"desktop-colors"` ([Desktop colors](#desktop-colors)) |
+| `ui.theme.light` | `"desktop-colors"` on Linux, `"jasper-meadow"` elsewhere, or the active look's default | The id of a theme with a Light variant, or `"desktop-colors"` |
+| `ui.theme.desktop_source` | `"auto"` | Where Desktop colors reads the desktop's palette: `"auto"`, `"qt"`, `"gtk3"` or `"gtk4"` |
 | `terminal.scheme` | `"match"` | `"match"` uses the shown theme's own scheme, so it follows the appearance; a scheme id, `<theme id>/<scheme key>`, chooses one in either appearance |
 
 These settings apply live in every window.
@@ -72,13 +72,17 @@ These settings apply live in every window.
 - The **Dark**, **Light** and **Match System** tiles choose `ui.appearance`. Each previews the theme picked for it and
   names it; Match System previews both and says "System appearance: Dark" (or Light), or "System appearance
   unavailable; using Dark".
-- **Dark theme** and **Light theme** list the themes that have that variant. A saved pick that is not available shows
-  as *name* (no Dark variant), *name* (no Light variant) or *id* (not installed).
+- **Dark theme** and **Light theme** list the themes that have that variant, and on Linux **Desktop colors** after the
+  built-in themes. A saved pick that is not available shows as *name* (no Dark variant), *name* (no Light variant),
+  *id* (not installed) or Desktop colors (unavailable on this platform).
+- **Desktop color source** and its status line show while **Dark theme** or **Light theme** shows Desktop colors
+  ([Desktop colors](#desktop-colors)).
 - **Terminal scheme** (Colors for terminal panes) lists **Same as UI theme** (`match`) and then every installed
   scheme; a saved scheme that is not installed shows as *id* (not installed).
 - A gear beside each dropdown (a ⋯ under the Enterprise look), tooltip "Import or remove themes", imports and removes
   themes ([below](#importing-and-removing-themes)).
-- **Reset** (Reset to Default under the Enterprise look) returns the appearance and both themes to their defaults.
+- **Reset** (Reset to Default under the Enterprise look) returns the appearance, both themes and the Desktop color
+  source to their defaults.
 - Choices stay staged until **Apply** or **OK**.
 
 Terminal › Font & Colors has **Choose Scheme…**, which opens this page. In the command palette (Cmd+Shift+P on macOS,
@@ -87,23 +91,39 @@ Ctrl+Shift+P on Linux and Windows), **Themes…** opens it too, and **Terminal S
 `terminal.scheme` at once for every window. While `config.toml` has errors they are refused: "config.toml has errors,
 so changes can't be saved until they're fixed."
 
-On Linux, **Desktop colors** (`desktop-colors`) is the default for both appearances unless the look sets its own
-defaults. It derives interface colours from Qt 5/6, KDE Frameworks 5/6, GTK 3.24+ or GTK 4.10+ with optional
-libadwaita. **Desktop source** offers Automatic, Qt / KDE, GTK 3 and GTK 4 / libadwaita. Automatic prefers the session's
-KDE major on KDE, Qt on LXQt, GTK 4 on GNOME and GTK 3 elsewhere. qt5ct/qt6ct hints move Qt first on unknown desktops
-and select its major there or on LXQt. Unavailable candidates fall back within that order. Explicit Qt / KDE stays
-within the Qt family, including KDE sources in KDE sessions; explicit GTK sources keep their selected toolkit. The
-status beneath it identifies the source and library version, or explains unavailable helpers, toolkit/display support
-or the bundled fallback. The selector and status appear when a Desktop colors pick
-is active or staged. Match System follows the portal appearance; explicit Dark or Light takes precedence. Portal
-accent and high contrast influence Desktop colors. Qt / KDE observes the current desktop palette: an opposite
-appearance uses compatible last-good colours or the bundled fallback. **Reload Config** restarts helpers and refreshes
-desktop detection; use it when an integration does not report palette changes.
+## Desktop colors
 
-Desktop colours affect the interface. The Editor keeps its selected colour scheme; terminal **Same as UI theme**
-uses Slate Cobalt's matching appearance, and an explicit terminal scheme stays selected. When extraction is
-unavailable Jasper uses the bundled Slate Cobalt interface for that appearance and preserves the Desktop colors
-pick. A saved pick moved to another operating system remains saved and shows the fallback and unavailable status.
+On Linux, **Desktop colors** (`desktop-colors`) gives the interface your desktop's colours, and it is the default for
+both appearances unless the look sets defaults of its own (the Enterprise look keeps Jasper Meadow). Jasper reads the
+palette with small helper programs it ships beside itself, from whichever toolkit is installed: Qt 5.15 or 6.2 and
+later, KDE Frameworks 5.92 or 6.0 and later, GTK 3.24 and later, or GTK 4.10 and later with libadwaita when it is
+there. None of them is required.
+
+**Desktop color source** (`ui.theme.desktop_source`) chooses the toolkit:
+
+| Source | Value | Reads |
+|---|---|---|
+| Automatic | `auto` | The session's own toolkit first: KDE Frameworks of the session's major version, then Qt, on KDE; Qt on LXQt; GTK 4 on GNOME; GTK 3 elsewhere, unless `QT_QPA_PLATFORMTHEME` names qt5ct or qt6ct, which puts that Qt first (and picks the Qt on LXQt). A toolkit that does not answer gives way to the next. |
+| Qt / KDE | `qt` | Automatic's order without GTK: Qt, and KDE Frameworks in a KDE session |
+| GTK 3 | `gtk3` | GTK 3 only |
+| GTK 4 / libadwaita | `gtk4` | GTK 4 only |
+
+The status line under it names the toolkit and version the colours come from, or says why one is unavailable and that
+Slate Cobalt's colours stand in; with a change staged it reads "Pending Apply: *source*. Applied: *status*".
+
+Jasper lays the toolkit's window, view, sidebar, dialog, popover, header and selection colours on the interface's
+roles, moving any that would be hard to read until they reach the
+[contrast targets](creating-themes.md#contrast-and-the-token-rule). The desktop portal's accent colour becomes the
+accent, and its high-contrast setting raises text to 7:1; under Match System the portal's light or dark preference
+chooses the appearance. Changes on the desktop show live, and the palette is read again every 30 seconds; **Reload
+Config** restarts the helpers. Qt and KDE give only the palette they are
+showing, so the other appearance shows the colours last read in it, else the next toolkit's, else Slate Cobalt's.
+
+Only the interface takes the desktop's colours: terminal **Same as UI theme** and the Editor's **Follow Workspace
+Scheme** use Slate Cobalt's schemes for the appearance, and a terminal or Editor scheme you pick stays. When no toolkit
+answers, the interface shows Slate Cobalt and the pick stays. On macOS and Windows Desktop colors is not listed: a saved
+pick shows as Desktop colors (unavailable on this platform), the interface shows Slate Cobalt, and the pick and
+`ui.theme.desktop_source` stay saved.
 
 ## What the terminal scheme colours
 
@@ -114,7 +134,8 @@ while with High Contrast the text area is black and the tab keeps the theme's co
 tab strip colour, darkened when it is too close to the terminal surface to tell the selected tab apart (lightened when
 the terminal surface is near black). Under the Enterprise look the selected tab takes the theme's card colour instead.
 On macOS, workspace opacity and blur (`ui.workspace.opacity`, `ui.workspace.blur`) apply to the terminal area of every
-window. The Editor always follows the shown theme's own Editor colours.
+window. The terminal scheme never changes the Editor, which uses the shown theme's own Editor colours unless its
+**Color scheme** setting picks another theme's ([Editor](editor.md#theme-colours)).
 
 ## Installed themes
 
@@ -128,12 +149,12 @@ hand.
 - Jasper reads the folder at start-up, on **Reload Config** (File menu, command palette, or **Reload** in Settings ›
   Appearance & Behavior › System Settings), when Settings saves, when `config.toml` changes and after an import or
   removal. A theme file changed on disk shows the next time one of these happens.
-- A file named after a built-in theme, such as `slate-cobalt.json`, or after a theme a plugin ships, such as
-  `enterprise.json` (even while that plugin is off), is ignored with a warning, and so is a file whose name is not an
+- A file named after a built-in theme, such as `slate-cobalt.json`, after Desktop colors (`desktop-colors.json`) or
+  after a theme a plugin ships, such as `enterprise.json` (even while that plugin is off), is ignored with a warning, and so is a file whose name is not an
   id or that cannot be used ([When something is wrong](#when-something-is-wrong)).
 - Dropdowns list the built-in themes first (Slate Cobalt, the Catppuccin flavours, Ubuntu Yaru, Jasper Meadow), then
-  the plugins' themes by name, then the installed themes by name. Two themes with the same name show
-  their ids, as *name* (*id*); two schemes with the same name show theirs.
+  Desktop colors on Linux, then the plugins' themes by name, then the installed themes by name. Two themes with the
+  same name show their ids, as *name* (*id*); two schemes with the same name show theirs.
 
 ## Importing and removing themes
 
@@ -149,15 +170,15 @@ is shown in a sheet.
   "*name* has no Dark variant; pick it under Light theme."). A file Jasper cannot use is not copied, and the sheet,
   titled "Could not import *file*", says why, for example `ui.dark: Missing colour "accent"`
   ([the messages](creating-themes.md#validation-and-error-messages)). Importing a theme with the id of a theme you
-  imported before asks first ("Replace *name*?"); a built-in theme or a plugin's theme cannot be replaced.
+  imported before asks first ("Replace *name*?"); a built-in theme, Desktop colors or a plugin's theme cannot be replaced.
 - Only Jasper theme files import. An IntelliJ theme fails with `Not a Jasper theme: "jasper-theme": 1 is missing`;
   [convert it](creating-themes.md#converting-intellij-and-alacritty-themes), or an Alacritty theme, first.
 - **Remove *theme*** removes the theme the dropdown shows; for the Terminal scheme gear, the theme the scheme belongs
-  to. It is unavailable for a built-in theme, a plugin's theme and Same as UI theme. It asks first and says what will
-  change: the file is deleted, and every setting that names the theme or one of its schemes, saved or staged, returns
-  to its default (Desktop colors on Linux, Jasper Meadow elsewhere, or the look's default; Same as UI theme
-  for the scheme). Saved settings are written at once, and other staged changes stay
-  staged. If the file cannot be deleted, nothing changes and the sheet says why.
+  to. It is unavailable for a built-in theme, a plugin's theme, Desktop colors and Same as UI theme. It asks first and
+  says what will change: the file is deleted, and every setting that names the theme or one of its schemes, saved or
+  staged, returns to its default (Desktop colors on Linux, Jasper Meadow elsewhere, or the look's default; Same as UI
+  theme for the scheme). Saved settings are written at once, and other staged changes stay staged. If the file cannot
+  be deleted, nothing changes and the sheet says why.
 
 ## When something is wrong
 

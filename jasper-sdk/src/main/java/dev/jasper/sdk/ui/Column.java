@@ -9,7 +9,8 @@ import java.util.OptionalInt;
  * {@link UiEvent.Sorted}; the view's owner orders the rows. In a tree the first column titles the items and each later
  * one a {@link TreeItem#trailing()} value. A table column with a {@code width} takes that width and the last column
  * absorbs the rest; a tree's trailing column with a width takes it instead of fitting its values. Dragging a header's
- * edge reports {@link UiEvent.ColumnsResized}; the view's owner stores the widths and passes them back.
+ * edge, or double-clicking it to fit a column, reports {@link UiEvent.ColumnsResized}; the view's owner stores the
+ * widths and passes them back.
  *
  * @param id the column's id, unique among its table's or tree's columns; a table row's cells are keyed by it
  * @param title the header's literal text; not blank
@@ -19,8 +20,7 @@ import java.util.OptionalInt;
  * @param weight the column's share of a table's width relative to the other columns' weights; finite and positive
  * @param sorted present shows the sort indicator on the column the rows are sorted by: true ascending, false
  *     descending
- * @param width present is the column's unscaled width in pixels and positive; empty leaves the width to the view (since
- *     0.25.0)
+ * @param width present is the column's unscaled width in pixels and positive; empty leaves the width to the view
  */
 public record Column(String id, String title, Nodes.TextRole role, boolean numeric, double weight, Optional<Boolean> sorted, OptionalInt width) {
     public Column {

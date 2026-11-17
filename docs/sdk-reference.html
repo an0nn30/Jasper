@@ -765,7 +765,7 @@ pre.sig .self {
 Most of what you use beyond that, from SSH sessions to the credential vault, ships as plugins written against this SDK,
 and a plugin you write uses the same API as the plugins Jasper ships with. Bundled plugins differ in a few rules: they
 need no capability review, only they can be off by default, they load in safe mode unless they provide a look, and they
-take precedence for the editor role and for a subcommand name two loading plugins declare.</p>
+take precedence for the editor and web browser roles and for a subcommand name two loading plugins declare.</p>
 
 <h3>What a plugin can do</h3>
 <ul class="cards">
@@ -776,8 +776,8 @@ take precedence for the editor role and for a subcommand name two loading plugin
 <li><b>Command palette</b><span>Scopes of searchable rows with up to three verbs, an optional form step, recents, and a chip the user reaches by prefix or shortcut.</span></li>
 <li><b>Notifications and activity</b><span>Notification groups the user tunes in Settings, long-running activities and connection states shown on Desk Buddy.</span></li>
 <li><b>Settings</b><span>Typed, validated settings in the plugin's own TOML file, read live, with a generated page in Settings › Tools or a page of the plugin's own.</span></li>
-<li><b>Files and the editor</b><span>Places in Jasper's file chooser, such as saved hosts, and the role of the editor Jasper opens files with.</span></li>
-<li><b>Services for other plugins</b><span>Interfaces in an exported package that other plugins look up, as the Vault, Editor, Remote and Snippets plugins do.</span></li>
+<li><b>Files, the editor and the browser</b><span>Places in Jasper's file chooser, such as saved hosts, and the roles of the editor Jasper opens files with and the web browser it opens links with.</span></li>
+<li><b>Services for other plugins</b><span>Interfaces in an exported package that other plugins look up, as the Vault, Editor, Remote, Snippets and Browser plugins do.</span></li>
 <li><b>The command line</b><span><code>jasper &lt;name&gt;</code> subcommands that run in the running Jasper and report an exit code.</span></li>
 <li><b>Looks and themes</b><span>A look (the presentation of the chrome and controls) and themes, declared as data in the manifest; any plugin can read which look Jasper runs with and compose for it.</span></li>
 </ul>
@@ -797,8 +797,8 @@ requires export; Jasper's own classes and libraries are not visible. Everything 
 is attributed to it and removed when it stops. Nothing loads or unloads while Jasper runs: installing, updating, enabling,
 disabling and removing a plugin take effect at the next launch.</p>
 <p>The SDK depends only on the JDK. A few signatures use AWT and Swing types: colours (<code>java.awt.Color</code>), a
-component's workspace opacity (<code>java.awt.Component</code>), custom content (<code>javax.swing.JComponent</code>) and content-tab shortcuts
-(<code>javax.swing.KeyStroke</code>). Plugins run on Java 25.</p>
+component's workspace opacity (<code>java.awt.Component</code>), custom content (<code>javax.swing.JComponent</code>), content-tab shortcuts
+(<code>javax.swing.KeyStroke</code>) and where a content tab's right-click menu opens (<code>java.awt.Point</code>). Plugins run on Java 25.</p>
 
 <h3>The bundled plugins</h3>
 <p>Each bundled plugin is an ordinary plugin on this SDK: it declares capabilities, requires other plugins and exports
@@ -814,7 +814,7 @@ packages exactly as yours would, and each can be turned off in Settings › Plug
 <tr><td>Project Index</td><td><code>dev.jasper.indexer</code></td><td><code>terminal.observe</code>, <code>terminal.open</code>, <code>palette.contribute</code></td><td></td><td>Editor, Remote</td></tr>
 <tr><td>Shell History</td><td><code>dev.jasper.history</code></td><td><code>palette.contribute</code>, <code>terminal.observe</code>, <code>terminal.inject</code></td><td></td><td>Snippets</td></tr>
 <tr><td>Snippets</td><td><code>dev.jasper.snippets</code></td><td><code>palette.contribute</code>, <code>terminal.inject</code></td><td><code>dev.jasper.snippets.api</code></td><td></td></tr>
-<tr><td>Browser: web pages and the Editor's Markdown preview</td><td><code>dev.jasper.browser</code></td><td><code>browser.provide</code>, <code>palette.contribute</code></td><td><code>dev.jasper.browser.api</code></td><td></td></tr>
+<tr><td>Browser: web pages and the Editor's Markdown preview</td><td><code>dev.jasper.browser</code></td><td><code>browser.provide</code>, <code>palette.contribute</code></td><td><code>dev.jasper.browser.api</code></td><td>Vault</td></tr>
 <tr><td>Enterprise look (off by default)</td><td><code>dev.jasper.enterprise</code></td><td><code>presentation.provide</code></td><td></td><td></td></tr>
 <tr><td>Sample</td><td><code>dev.jasper.sample</code></td><td><code>terminal.observe</code>, <code>terminal.inject</code>, <code>terminal.open</code>, <code>session.provide</code>, <code>palette.contribute</code></td><td></td><td></td></tr>
 </tbody>
@@ -852,7 +852,7 @@ events.</td></tr>
 <tr><td><a href="#package-dev.jasper.browser.api"><code>dev.jasper.browser.api</code></a></td><td>The Browser's exported API: Markdown previews Chromium draws.</td></tr>
 <tr><td><a href="#package-dev.jasper.editor.api"><code>dev.jasper.editor.api</code></a></td><td>The Editor's exported API: open a local file, or a document another plugin reads and writes; make recent documents
 reopenable; answer Open in Editor… and offer a file source's places in Open in Editor… and Save As; add items to the
-right-click menu of its tabs.</td></tr>
+right-click menu of its tabs' text.</td></tr>
 <tr><td><a href="#package-dev.jasper.remote.api"><code>dev.jasper.remote.api</code></a></td><td>Remote's exported API for other plugins: <a href="#dev.jasper.remote.api.RemoteProjects"><code>RemoteProjects</code></a>, published with
 <code>Services.publish</code>, and its values.</td></tr>
 <tr><td><a href="#package-dev.jasper.snippets.api"><code>dev.jasper.snippets.api</code></a></td><td>What other plugins may use: the snippet service and its value.</td></tr>
@@ -1317,7 +1317,7 @@ listed per type in the API reference; the main ones:</p>
 <tr><td><a href="#dev.jasper.sdk.cli.CommandCall.out(String)"><code>CommandCall.out(String)</code></a>, <a href="#dev.jasper.sdk.cli.CommandCall.err(String)"><code>CommandCall.err(String)</code></a></td><td>Write to the caller's terminal while the call runs.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.Platform.openInEditor(Path)"><code>Platform.openInEditor(Path)</code></a>, <a href="#dev.jasper.sdk.ui.Platform.browse(URI)"><code>Platform.browse(URI)</code></a>, <a href="#dev.jasper.sdk.ui.Platform.openInBrowser(URI)"><code>Platform.openInBrowser(URI)</code></a></td><td>They do their work in the background.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.Platform.copyOnSelect()"><code>Platform.copyOnSelect()</code></a></td><td>The user's Copy on select setting; a change applies from the next read.</td></tr>
-<tr><td><a href="#dev.jasper.sdk.ui.Platform.downloadsFolder()"><code>Platform.downloadsFolder()</code></a></td><td>Found once, at the first call; reading it creates nothing.</td></tr>
+<tr><td><a href="#dev.jasper.sdk.ui.Platform.downloadsFolder()"><code>Platform.downloadsFolder()</code></a></td><td>Found once, at the first call, which may block while it reads the system's settings, so make that call off the UI thread; reading it creates nothing.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.Appearance.variant()"><code>Appearance.variant()</code></a>, <a href="#dev.jasper.sdk.ui.Appearance.workspaceVariant()"><code>Appearance.workspaceVariant()</code></a></td><td>Whether the chrome or the workspace is dark or light.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.Appearance.presentation()"><code>Appearance.presentation()</code></a></td><td>The look Jasper runs with, the same value until it restarts.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.Appearance.terminalTypography()"><code>Appearance.terminalTypography()</code></a></td><td>The saved terminal font; it already returns a new value when its change handlers run.</td></tr>
@@ -1370,7 +1370,7 @@ keeps running, such as a menu entry for a host the user deleted, or rebuild a me
 <a href="#dev.jasper.sdk.ui.PluginMenu.clear()"><code>PluginMenu.clear()</code></a> and <a href="#dev.jasper.sdk.ui.PluginMenu.add(String)"><code>PluginMenu.add(String)</code></a>.</p>
 <p>Some handles end on their own: a <a href="#dev.jasper.sdk.ui.PanelHost"><code>PanelHost</code></a> when its window closes (<a href="#dev.jasper.sdk.ui.PanelHost.onClosed(Runnable)"><code>PanelHost.onClosed(Runnable)</code></a>), a
 <a href="#dev.jasper.sdk.ui.ContentTab"><code>ContentTab</code></a> when the user closes it (<a href="#dev.jasper.sdk.ui.ContentTab.onClosed(Runnable)"><code>ContentTab.onClosed(Runnable)</code></a>), a <a href="#dev.jasper.sdk.ui.UiAnchor"><code>UiAnchor</code></a> when its control
-is hidden, disabled, made busy, removed or closed (<a href="#dev.jasper.sdk.ui.UiAnchor.onClosed(Runnable)"><code>UiAnchor.onClosed(Runnable)</code></a>), and a dialog when the user or
+is hidden, disabled, made busy, removed or closed, or an area anchor's content is resized (<a href="#dev.jasper.sdk.ui.UiAnchor.onClosed(Runnable)"><code>UiAnchor.onClosed(Runnable)</code></a>), and a dialog when the user or
 its window closes it (<a href="#dev.jasper.sdk.ui.WindowSurface.onClosed(Runnable)"><code>WindowSurface.onClosed(Runnable)</code></a>). Pane, tab and window handles keep only an id: a closed target
 is simply absent, queries return the last known value, and commands to it are ignored.</p>
 
@@ -1423,7 +1423,7 @@ manifest invalid.</p>
 <tr><td><code class="cap">terminal.observe</code></td><td><a href="#dev.jasper.sdk.Capabilities.TERMINAL_OBSERVE"><code>TERMINAL_OBSERVE</code></a></td><td>Pane metadata, working directories, titles, command text, tab name pieces, and every <code>jasper.terminal.*</code>
 topic.</td><td></td></tr>
 <tr><td><code class="cap">terminal.selection</code></td><td><a href="#dev.jasper.sdk.Capabilities.TERMINAL_SELECTION"><code>TERMINAL_SELECTION</code></a></td><td>Reading the text selected in a pane.</td><td></td></tr>
-<tr><td><code class="cap">terminal.inject</code></td><td><a href="#dev.jasper.sdk.Capabilities.TERMINAL_INJECT"><code>TERMINAL_INJECT</code></a></td><td>Typing and pasting into a pane, and, since 0.29.0, inserting text into another plugin's content tab through a
+<tr><td><code class="cap">terminal.inject</code></td><td><a href="#dev.jasper.sdk.Capabilities.TERMINAL_INJECT"><code>TERMINAL_INJECT</code></a></td><td>Typing and pasting into a pane, and inserting text into another plugin's content tab through a
 palette query's <code>TextTarget</code>.</td><td></td></tr>
 <tr><td><code class="cap">terminal.open</code></td><td><a href="#dev.jasper.sdk.Capabilities.TERMINAL_OPEN"><code>TERMINAL_OPEN</code></a></td><td>Opening local tabs and splits (the shell, a shell profile or a program), and reading the shell profiles with
 <code>Terminals.profiles()</code> and <code>onProfilesChanged</code>.</td><td></td></tr>
@@ -1652,9 +1652,9 @@ A modeless dialog whose content is a <a href="#dev.jasper.sdk.ui.Nodes.FormKind.
 a window's size, can be resized and remembers its bounds.</li>
 <li><a href="#dev.jasper.sdk.ui.Windows.overlay(OverlaySpec)"><code>Windows.overlay(OverlaySpec)</code></a>: progress content centred inside a Jasper window, one per window. Escape and
 outside clicks do not dismiss it, so give it a Cancel action.</li>
-<li><a href="#dev.jasper.sdk.ui.Windows.popover(UiAnchor)"><code>Windows.popover(UiAnchor)</code></a>: a popup below (or above) a button, menu button or picker, from <a href="#dev.jasper.sdk.ui.UiView.anchor(String)"><code>UiView.anchor(String)</code></a>,
-or since 0.32.0 an area of custom content, from <a href="#dev.jasper.sdk.ui.UiView.anchorAt(String,ContentArea)"><code>UiView.anchorAt(String, ContentArea)</code></a>; Escape and clicks outside
-close it.</li>
+<li><a href="#dev.jasper.sdk.ui.Windows.popover(UiAnchor)"><code>Windows.popover(UiAnchor)</code></a>: a popup below (or above) a button, menu button or picker, from
+<a href="#dev.jasper.sdk.ui.UiView.anchor(String)"><code>UiView.anchor(String)</code></a>, or an area of custom content, from <a href="#dev.jasper.sdk.ui.UiView.anchorAt(String,ContentArea)"><code>UiView.anchorAt(String, ContentArea)</code></a>; Escape and
+clicks outside close it.</li>
 </ul>
 <p><a href="#dev.jasper.sdk.ui.Windows.hasModal(WindowOwner)"><code>Windows.hasModal(WindowOwner)</code></a> tells whether a Jasper window shows a modal now: a modal dialog over it,
 Jasper's or any plugin's, or an overlay inside it.</p>
@@ -1666,7 +1666,8 @@ where a <a href="#dev.jasper.sdk.ui.TabPlacement"><code>TabPlacement</code></a> 
 already has open selects that tab and returns its handle. Through the <a href="#dev.jasper.sdk.ui.ContentTab"><code>ContentTab</code></a> the plugin sets the tab's
 title, detail, icon or image, unsaved marker and location (<a href="#dev.jasper.sdk.ui.ContentTab.setPresentation(ContentPresentation)"><code>ContentTab.setPresentation(ContentPresentation)</code></a>), its commands
 (<a href="#dev.jasper.sdk.ui.ContentTab.setCommands(List)"><code>ContentTab.setCommands(List)</code></a>), which its context menu lists and whose shortcuts apply while it is active, and
-its status bar items (<a href="#dev.jasper.sdk.ui.ContentTab.setStatus(List)"><code>ContentTab.setStatus(List)</code></a>), and shows a right-click menu over it with Jasper's pane items
+its status bar items (<a href="#dev.jasper.sdk.ui.ContentTab.setStatus(List)"><code>ContentTab.setStatus(List)</code></a>: a <a href="#dev.jasper.sdk.ui.ContentStatus"><code>ContentStatus</code></a> with text, an icon, a dimmed state, and
+an action or a menu of <a href="#dev.jasper.sdk.ui.ContentStatus.MenuEntry"><code>ContentStatus.MenuEntry</code></a> items), and shows a right-click menu over it with Jasper's pane items
 between its own (<a href="#dev.jasper.sdk.ui.ContentTab.showContextMenu(Point,List,List,Consumer)"><code>ContentTab.showContextMenu(Point, List, List, Consumer)</code></a>). With <a href="#dev.jasper.sdk.ui.ContentTab.setTextInsertion(Optional)"><code>ContentTab.setTextInsertion(Optional)</code></a>
 the tab takes the text other plugins insert, such as a palette scope's snippet: while the tab is its window's current
 item, a palette query with no terminal pane names it as its <a href="#dev.jasper.sdk.ui.TextTarget"><code>TextTarget</code></a>, and each <a href="#dev.jasper.sdk.ui.InsertedText"><code>InsertedText</code></a> reaches
@@ -1752,12 +1753,13 @@ the user clicks the card. A connection (<a href="#dev.jasper.sdk.activity.Activi
 degraded or down, until the plugin closes it; Desk Buddy shows a card per connection. Both are published on
 <a href="#dev.jasper.sdk.activity.Activities.TOPIC"><code>Activities.TOPIC</code></a> and <a href="#dev.jasper.sdk.activity.Activities.CONNECTIONS"><code>Activities.CONNECTIONS</code></a>, which any plugin may follow.</p>
 
-<p><a href="#dev.jasper.sdk.activity.ActivityHandle.needsInput(String)"><code>ActivityHandle.needsInput(String)</code></a> waits for input; <a href="#dev.jasper.sdk.activity.ActivityHandle.resume(String)"><code>ActivityHandle.resume(String)</code></a> explicitly resumes
-work. Both retain the id, fraction and activation action. Progress and detail preserve the phase; repeated phase calls
-coalesce detail. Subscribers handle <a href="#dev.jasper.sdk.activity.ActivityEvent.State.NEEDS_INPUT"><code>ActivityEvent.State.NEEDS_INPUT</code></a> (including waiting detail updates) and
-<a href="#dev.jasper.sdk.activity.ActivityEvent.State.RESUMED"><code>ActivityEvent.State.RESUMED</code></a>. Phase transitions arrive in order; pending progress may be dropped at a transition.
-<a href="#dev.jasper.sdk.activity.Activities.current()"><code>Activities.current()</code></a> includes waiting tasks. Running plugin tasks and qualifying terminal work jointly drive
-Buddy's working animation; waiting tasks remain available for activation without contributing running intent.</p>
+<p>An activity that cannot go on without the user calls <a href="#dev.jasper.sdk.activity.ActivityHandle.needsInput(String)"><code>ActivityHandle.needsInput(String)</code></a>: it keeps its id,
+fraction and action, its card stays and shows that it waits for input, and progress and detail reports keep it waiting
+until <a href="#dev.jasper.sdk.activity.ActivityHandle.resume(String)"><code>ActivityHandle.resume(String)</code></a>. Subscribers see <a href="#dev.jasper.sdk.activity.ActivityEvent.State.NEEDS_INPUT"><code>ActivityEvent.State.NEEDS_INPUT</code></a> for the change and
+for each report while it waits, and <a href="#dev.jasper.sdk.activity.ActivityEvent.State.RESUMED"><code>ActivityEvent.State.RESUMED</code></a> when it goes on. Phase changes arrive in order;
+a progress report still waiting to be delivered when the phase changes is dropped. <a href="#dev.jasper.sdk.activity.Activities.current()"><code>Activities.current()</code></a> includes
+waiting activities. Desk Buddy looks busy while an activity runs or a terminal is busy, so a waiting activity does not
+keep it busy.</p>
 
 <h3 id="contributions-subcommands">Subcommands</h3>
 <p>A plugin declares each <code>jasper</code> subcommand in its manifest and answers it while it runs:</p>
@@ -1783,10 +1785,27 @@ program's settings. See <a href="command-line.md">the command line</a>.</p>
 <h3>The editor role</h3>
 <p><a href="#dev.jasper.sdk.ui.Platform.editor(FileEditor)"><code>Platform.editor(FileEditor)</code></a> makes the plugin the editor Jasper opens files with: its configuration files,
 every <a href="#dev.jasper.sdk.ui.Platform.openInEditor(Path)"><code>Platform.openInEditor(Path)</code></a> and <a href="#dev.jasper.sdk.ui.Platform.openFile(Path)"><code>Platform.openFile(Path)</code></a>, and a Cmd-click (Ctrl-click on Linux and Windows) on a file path in a local
-terminal pane reach the plugin's <a href="#dev.jasper.sdk.ui.FileEditor"><code>FileEditor</code></a> first; returning <code>false</code> hands the file to the desktop. One plugin at a time holds the role: a bundled plugin's registration
-replaces one that is not bundled; otherwise the first stays and a later one throws. The Editor plugin takes it. Shell
+terminal pane reach the plugin's <a href="#dev.jasper.sdk.ui.FileEditor"><code>FileEditor</code></a> first; returning <code>false</code> hands the file to the desktop. Jasper
+calls <a href="#dev.jasper.sdk.ui.FileEditor.edit(Path,OptionalInt,Optional,FileOrigin)"><code>FileEditor.edit(Path, OptionalInt, Optional, FileOrigin)</code></a> with the line, the window and a <a href="#dev.jasper.sdk.ui.FileOrigin"><code>FileOrigin</code></a>:
+<a href="#dev.jasper.sdk.ui.FileOrigin.OUTSIDE"><code>FileOrigin.OUTSIDE</code></a> for a file another program handed to Jasper (the system's open-file event, a launch's files,
+the <code>jasper</code> command), <a href="#dev.jasper.sdk.ui.FileOrigin.JASPER"><code>FileOrigin.JASPER</code></a> for the rest. One plugin at a time holds the role: a bundled
+plugin's registration replaces one that is not bundled; otherwise the first stays and a later one throws. The Editor
+plugin takes it. Shell
 variables (<a href="#dev.jasper.sdk.terminal.Terminals.environment(Function)"><code>Terminals.environment(Function)</code></a>) and program tabs (<a href="#dev.jasper.sdk.terminal.LocalSpec.running(List,Optional)"><code>LocalSpec.running(List, Optional)</code></a>) are
 described in <a href="#terminals">Terminals</a>.</p>
+
+<h3>The web browser role</h3>
+<p><a href="#dev.jasper.sdk.ui.Platform.browser(WebBrowser)"><code>Platform.browser(WebBrowser)</code></a> makes the plugin the web browser Jasper opens web addresses with. Its
+<a href="#dev.jasper.sdk.ui.WebBrowser"><code>WebBrowser</code></a> hears each one first, on the UI thread, as a <a href="#dev.jasper.sdk.ui.WebLink"><code>WebLink</code></a>: the address, who asked
+(<a href="#dev.jasper.sdk.ui.LinkOrigin.CLICK"><code>LinkOrigin.CLICK</code></a> for a link the user Cmd-clicked (Ctrl-clicked on Linux and Windows) in a terminal, Jasper's own
+web links and <a href="#dev.jasper.sdk.ui.Platform.openInBrowser(URI)"><code>Platform.openInBrowser(URI)</code></a>; <a href="#dev.jasper.sdk.ui.LinkOrigin.EXTERNAL"><code>LinkOrigin.EXTERNAL</code></a> for the <code>jasper</code> command's
+addresses and the system's), where it asks to open (<a href="#dev.jasper.sdk.ui.LinkPlacement.TAB"><code>LinkPlacement.TAB</code></a>, or <a href="#dev.jasper.sdk.ui.LinkPlacement.SPLIT_RIGHT"><code>LinkPlacement.SPLIT_RIGHT</code></a> or
+<a href="#dev.jasper.sdk.ui.LinkPlacement.SPLIT_DOWN"><code>LinkPlacement.SPLIT_DOWN</code></a> for the split gesture), the name an OSC 8 link gave its target, and the window it came
+from. A local web file clicked in a terminal arrives as a <code>file:</code> link. A clicked address is program output, so
+show it before acting on it. Returning <code>false</code>, or throwing, hands an <code>http</code> or <code>https</code> address to the
+system browser and a <code>file:</code> one to the editor role; while Jasper is itself the system's default browser, which would
+hand the address back, it opens nothing instead. Other schemes, such as <code>mailto</code>, always go to the system browser.
+One plugin at a time holds the role, by the editor role's rule. The Browser plugin takes it.</p>
 
 <h3>Desktop integration</h3>
 <p><a href="#dev.jasper.sdk.ui.Platform.copy(String)"><code>Platform.copy(String)</code></a> puts text on the clipboard; <a href="#dev.jasper.sdk.ui.Platform.copySecret(String)"><code>Platform.copySecret(String)</code></a> also clears it 30 seconds
@@ -1800,7 +1819,9 @@ browser, except while Jasper is itself the system's default browser, when it ope
 <a href="#dev.jasper.sdk.ui.Platform.isDefaultBrowser()"><code>Platform.isDefaultBrowser()</code></a> tells whether Jasper is the system's default web browser, as Jasper last checked,
 and <a href="#dev.jasper.sdk.ui.Platform.onDefaultBrowserChanged(Consumer)"><code>Platform.onDefaultBrowserChanged(Consumer)</code></a> hears each change of that answer. <a href="#dev.jasper.sdk.ui.Platform.copyOnSelect()"><code>Platform.copyOnSelect()</code></a>
 tells, on any thread, whether the user turned on Copy on select, for a view that copies its own selections as a terminal
-does.</p>
+does. <a href="#dev.jasper.sdk.ui.Platform.downloadsFolder()"><code>Platform.downloadsFolder()</code></a> is the system's Downloads folder, which it does not create, and
+<a href="#dev.jasper.sdk.ui.Platform.markDownloaded(Path,URI,Optional)"><code>Platform.markDownloaded(Path, URI, Optional)</code></a>, off the UI thread, gives a downloaded file the system's downloaded-file
+mark: the quarantine attribute on macOS, the <code>Zone.Identifier</code> stream on Windows, nothing on Linux.</p>
 </section>
 
 <section class="guide" id="ui">
@@ -1880,8 +1901,8 @@ views close when it stops.</p>
 <tr><td><a href="#dev.jasper.sdk.ui.UiView.focus(String)"><code>UiView.focus(String)</code></a>, <a href="#dev.jasper.sdk.ui.UiView.reveal(String)"><code>UiView.reveal(String)</code></a></td><td>Focus a node; scroll one into view without moving focus.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.UiView.selectAll(String)"><code>UiView.selectAll(String)</code></a></td><td>Select a field's text without editing it or moving focus.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.UiView.composing(String)"><code>UiView.composing(String)</code></a></td><td>Whether an input method holds uncommitted text in a field; leave keys to it while true.</td></tr>
-<tr><td><a href="#dev.jasper.sdk.ui.UiView.anchor(String)"><code>UiView.anchor(String)</code></a></td><td>A <a href="#dev.jasper.sdk.ui.UiAnchor"><code>UiAnchor</code></a> on a mounted button, menu button (since 0.29.0) or PICKER choice, for a popover or a dialog attached to it.</td></tr>
-<tr><td><a href="#dev.jasper.sdk.ui.UiView.anchorAt(String,ContentArea)"><code>UiView.anchorAt(String, ContentArea)</code></a></td><td>Since 0.32.0, a <a href="#dev.jasper.sdk.ui.UiAnchor"><code>UiAnchor</code></a> on a <a href="#dev.jasper.sdk.ui.ContentArea"><code>ContentArea</code></a> inside a mounted <a href="#dev.jasper.sdk.ui.Nodes.Custom"><code>Nodes.Custom</code></a> node's content, such as a field on a page; a press inside the area closes its popover and goes no further, and resizing the content closes the anchor. A content that scrolls or zooms what it draws closes the anchor itself.</td></tr>
+<tr><td><a href="#dev.jasper.sdk.ui.UiView.anchor(String)"><code>UiView.anchor(String)</code></a></td><td>A <a href="#dev.jasper.sdk.ui.UiAnchor"><code>UiAnchor</code></a> on a mounted button, menu button or PICKER choice, for a popover or a dialog attached to it.</td></tr>
+<tr><td><a href="#dev.jasper.sdk.ui.UiView.anchorAt(String,ContentArea)"><code>UiView.anchorAt(String, ContentArea)</code></a></td><td>A <a href="#dev.jasper.sdk.ui.UiAnchor"><code>UiAnchor</code></a> on a <a href="#dev.jasper.sdk.ui.ContentArea"><code>ContentArea</code></a> inside a mounted <a href="#dev.jasper.sdk.ui.Nodes.Custom"><code>Nodes.Custom</code></a> node's content, such as a field on a page; a press inside the area closes its popover and goes no further, and resizing the content closes the anchor. A content that scrolls or zooms what it draws closes the anchor itself.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.UiView.withSecret(String,Consumer)"><code>UiView.withSecret(String, Consumer)</code></a>, <a href="#dev.jasper.sdk.ui.UiView.clearSecret(String)"><code>UiView.clearSecret(String)</code></a>, <a href="#dev.jasper.sdk.ui.UiView.replaceSecret(String,char[])"><code>UiView.replaceSecret(String, char[])</code></a></td><td>Read a secret field's characters (erased after the callback), clear it, or set it without an edit event.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.UiView.registerContent(CustomContent)"><code>UiView.registerContent(CustomContent)</code></a></td><td>Fill a <a href="#dev.jasper.sdk.ui.Nodes.Custom"><code>Nodes.Custom</code></a> node with a component; see below.</td></tr>
 </tbody>
@@ -1930,7 +1951,7 @@ they concern; item, option, row and column ids in them are local to that node.</
 <tr><td><a href="#dev.jasper.sdk.ui.UiEvent.SecretChanged"><code>UiEvent.SecretChanged</code></a></td><td>Secret fields; it never carries the value</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.UiEvent.Clicked"><code>UiEvent.Clicked</code></a></td><td>A plain left click on a list, table or tree row, after its <code>Selected</code></td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.UiEvent.Sorted"><code>UiEvent.Sorted</code></a></td><td>A table or tree column header</td></tr>
-<tr><td><a href="#dev.jasper.sdk.ui.UiEvent.ColumnsResized"><code>UiEvent.ColumnsResized</code></a></td><td>A header boundary drag or double-click fit that has ended; carries the widths of the columns</td></tr>
+<tr><td><a href="#dev.jasper.sdk.ui.UiEvent.ColumnsResized"><code>UiEvent.ColumnsResized</code></a></td><td>A header boundary drag or double-click fit that has ended; carries the widths of the columns, which the plugin can keep with <a href="#dev.jasper.sdk.ui.ColumnState"><code>ColumnState</code></a> in a <a href="#dev.jasper.sdk.ui.ColumnStateFile"><code>ColumnStateFile</code></a> and pass back as each <a href="#dev.jasper.sdk.ui.Column"><code>Column</code></a>'s width</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.UiEvent.SuggestionChosen"><code>UiEvent.SuggestionChosen</code></a></td><td>Tab or Enter on a field's selected <a href="#dev.jasper.sdk.ui.Nodes.Suggestion"><code>Nodes.Suggestion</code></a>, or a click on one; carries the field, the suggestion and whether Tab chose it</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.UiEvent.TokensChanged"><code>UiEvent.TokensChanged</code></a></td><td>A token added to or removed from a <a href="#dev.jasper.sdk.ui.Nodes.TokenField"><code>Nodes.TokenField</code></a>; carries its whole list</td></tr>
 </tbody>
@@ -2154,14 +2175,15 @@ declaration order, with its label, control, description and a way to reset it to
 section changes.
 Apply saves the changed values to the file. A plugin the user meant to run but that is not running (waiting for a
 review, skipped, failed or held back by safe mode) gets a page that says "Start <i>name</i> to edit its settings.", gives
-the reason and offers <b>Open in Editor</b> for the file.</p>
+the reason and offers <b>Open in Editor</b> for the file. <a href="#dev.jasper.sdk.settings.PluginSettings.show()"><code>PluginSettings.show()</code></a>, on the UI thread, opens Settings
+at the plugin's page over the active window once the call has returned, for a command or button of the plugin's own.</p>
 <p>A plugin that needs more than rows gives a page of its own with <a href="#dev.jasper.sdk.settings.PluginSettings.page(SettingsPanel)"><code>PluginSettings.page(SettingsPanel)</code></a>, once, while
 it starts. Settings calls <a href="#dev.jasper.sdk.settings.SettingsPanel.create(SettingsPanelHost)"><code>SettingsPanel.create(SettingsPanelHost)</code></a> the first time the page is shown in each
 opening of Settings; the page returns a <a href="#ui">view</a>. <a href="#dev.jasper.sdk.settings.SettingsPanelHost.row(Setting)"><code>SettingsPanelHost.row(Setting)</code></a> gives the standard
 row for a declared setting, bound to the page's unsaved value, and Settings saves those on Apply itself.
 <a href="#dev.jasper.sdk.settings.SettingsPanelHost.stage(Setting,Object)"><code>SettingsPanelHost.stage(Setting, Object)</code></a> sets an unsaved value from a control of the plugin's own and
 <a href="#dev.jasper.sdk.settings.SettingsPanelHost.changed()"><code>SettingsPanelHost.changed()</code></a> says the page's modified state changed. Settings is modal, so a control that opens
-a window of the plugin's own calls <a href="#dev.jasper.sdk.settings.SettingsPanelHost.closeThen(Runnable)"><code>SettingsPanelHost.closeThen(Runnable)</code></a> (since 0.32.0): Settings closes,
+a window of the plugin's own calls <a href="#dev.jasper.sdk.settings.SettingsPanelHost.closeThen(Runnable)"><code>SettingsPanelHost.closeThen(Runnable)</code></a>: Settings closes,
 asking about unsaved changes as Cancel does, and the action runs in a later UI turn. <a href="#dev.jasper.sdk.settings.SettingsPanel.modified()"><code>SettingsPanel.modified()</code></a>,
 <a href="#dev.jasper.sdk.settings.SettingsPanel.apply()"><code>SettingsPanel.apply()</code></a> and <a href="#dev.jasper.sdk.settings.SettingsPanel.reset()"><code>SettingsPanel.reset()</code></a> cover only state of the plugin's own beyond its declared
 settings; <a href="#dev.jasper.sdk.settings.SettingsPanel.dispose()"><code>SettingsPanel.dispose()</code></a> runs when Settings closes the page.</p>
@@ -2267,14 +2289,15 @@ of this reference; how each behaves for its users is in <a href="plugin-apis.md"
 <div class="table-wrap"><table>
 <thead><tr><th>Package</th><th>Service</th><th>What it offers</th><th>Requires line</th></tr></thead>
 <tbody>
-<tr><td><a href="#package-dev.jasper.vault.api"><code>dev.jasper.vault.api</code></a></td><td><a href="#dev.jasper.vault.api.VaultApi"><code>VaultApi</code></a>, one instance per consumer</td><td>The vault's lock state and its topic; unlocking; the credentials' descriptors, without secrets; a credential once the user allows the consumer to use it, once or always; a credential picker anchored on a control; importing SSH keys as managed keys</td><td><code>{ id = "dev.jasper.vault", version = "&gt;=0.2", optional = true }</code></td></tr>
+<tr><td><a href="#package-dev.jasper.vault.api"><code>dev.jasper.vault.api</code></a></td><td><a href="#dev.jasper.vault.api.VaultApi"><code>VaultApi</code></a>, one instance per consumer</td><td>The vault's lock state and its topic; unlocking; the credentials' descriptors, without secrets; a credential once the user allows the consumer to use it, once or always, or without a prompt while a saved grant allows it; a credential picker anchored on a control, opening on a search; saving a password login; opening the Credential Vault manager; importing SSH keys as managed keys</td><td><code>{ id = "dev.jasper.vault", version = "&gt;=0.9.0", optional = true }</code></td></tr>
 <tr><td><a href="#package-dev.jasper.editor.api"><code>dev.jasper.editor.api</code></a></td><td><a href="#dev.jasper.editor.api.Editor"><code>Editor</code></a></td><td>Opening a local file, or a document the consumer reads and writes (<a href="#dev.jasper.editor.api.EditorDocument"><code>EditorDocument</code></a>), in an editor tab; reopening the consumer's documents from Recent Files; answering Open in Editor… first; offering a file source's places in the Editor's chooser; resolving the relative images and links of a Markdown preview through the consumer's document (<a href="#dev.jasper.editor.api.EditorDocument.resolveRelative(String)"><code>EditorDocument.resolveRelative(String)</code></a>)</td><td><code>{ id = "dev.jasper.editor", version = "&gt;=0.7", optional = true }</code></td></tr>
 <tr><td><a href="#package-dev.jasper.remote.api"><code>dev.jasper.remote.api</code></a></td><td><a href="#dev.jasper.remote.api.RemoteProjects"><code>RemoteProjects</code></a></td><td>The saved host and folder of an SSH pane; whether a host is connected; listing a remote work tree; looking for marker files; opening a remote file in the Editor or a terminal in a remote folder</td><td><code>{ id = "dev.jasper.remote", version = "&gt;=0.12", optional = true }</code></td></tr>
 <tr><td><a href="#package-dev.jasper.snippets.api"><code>dev.jasper.snippets.api</code></a></td><td><a href="#dev.jasper.snippets.api.SnippetService"><code>SnippetService</code></a></td><td>Looking a snippet up by name; appending a snippet; the Snippets palette scope's id and row ids, for reopening the palette on a snippet</td><td><code>{ id = "dev.jasper.snippets", version = "&gt;=0.1", optional = true }</code></td></tr>
 <tr><td><a href="#package-dev.jasper.browser.api"><code>dev.jasper.browser.api</code></a></td><td><a href="#dev.jasper.browser.api.MarkdownPreviews"><code>MarkdownPreviews</code></a></td><td>Markdown previews Chromium draws (<a href="#dev.jasper.browser.api.MarkdownPreview"><code>MarkdownPreview</code></a>): a canvas showing the consumer's HTML in its theme, with its images; its links, scrolling and layout reported as events; finding text with JavaScript's regular expressions; copying and selecting</td><td><code>{ id = "dev.jasper.browser", version = "&gt;=0.2.0", optional = true }</code></td></tr>
 </tbody>
 </table></div>
-<p>The ranges shown are the highest a bundled consumer declares; Remote declares <code>&gt;=0.2</code> for the Editor. The SDK release carries no jar for these packages: their
+<p>The ranges shown are the highest a bundled consumer declares; Remote declares <code>&gt;=0.2</code> for the Editor, and Remote
+and File Server <code>&gt;=0.2</code> for the Vault. The SDK release carries no jar for these packages: their
 classes are in each provider's plugin jar, which the application holds in its bundled <code>plugins/&lt;id&gt;/</code> folder
 (on macOS <code>Jasper.app/Contents/app/plugins/&lt;id&gt;/</code>). Compile against that jar as <code>compileOnly</code>, never bundle
 it, and test with a fake of the interface.</p>
@@ -2475,7 +2498,8 @@ its folder and commands, and they arrive as remote folders and command events.</
 <section class="guide" id="palette">
 <h2>Palette</h2>
 <p>The command palette searches scopes. Jasper's own Commands scope lists every action, the bundled plugins add theirs
-(SSH hosts, tunnels, files, recent files, shell history, snippets, vault logins, file servers), and a plugin with
+(SSH hosts, tunnels, files, recent files, shell history, snippets, vault logins, file servers, bookmarks and
+visited sites), and a plugin with
 <code>palette.contribute</code> adds its own through <a href="#dev.jasper.sdk.plugin.PluginContext.palette()"><code>PluginContext.palette()</code></a>. A scope answers each query with rows and
 offers up to three verbs on them; a verb can ask for a few values first in a small form, a step. The palette appears as
 the card in the default look and as the Run window in the Enterprise look; both show the same scopes. For the user's
@@ -2746,11 +2770,11 @@ handlers, factories and background tasks) as a line; assert it is empty.</p>
 <tr><td>Restoring</td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.restoreTab(String,UUID,String,RestoreState)"><code>FakePluginHost.restoreTab(String, UUID, String, RestoreState)</code></a></td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.restoreState(ContentTab)"><code>FakePluginHost.restoreState(ContentTab)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.restoreState(UUID)"><code>FakePluginHost.restoreState(UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.savedTitle(ContentTab)"><code>FakePluginHost.savedTitle(ContentTab)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.declinedRestores()"><code>FakePluginHost.declinedRestores()</code></a></td></tr>
 <tr><td>Provided sessions</td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.cancelSession(UUID)"><code>FakePluginHost.cancelSession(UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.reconnectSession(UUID)"><code>FakePluginHost.reconnectSession(UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.typeIntoSession(UUID,String)"><code>FakePluginHost.typeIntoSession(UUID, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.pumpSessions()"><code>FakePluginHost.pumpSessions()</code></a></td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.sessionState(UUID)"><code>FakePluginHost.sessionState(UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.sessionOutput(UUID)"><code>FakePluginHost.sessionOutput(UUID)</code></a></td></tr>
 <tr><td>Palette</td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.searchScope(String,String,UUID,UUID)"><code>FakePluginHost.searchScope(String, String, UUID, UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.completeStep(String,String,String,UUID,UUID,Map)"><code>FakePluginHost.completeStep(String, String, String, UUID, UUID, Map)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.executeInScope(String,String,String,UUID,UUID)"><code>FakePluginHost.executeInScope(String, String, String, UUID, UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.addTextTarget(UUID)"><code>FakePluginHost.addTextTarget(UUID)</code></a> (a content tab that takes text, which a query with no pane names), <a href="#dev.jasper.sdk.testing.FakePluginHost.insertText(ContentTab,InsertedText)"><code>FakePluginHost.insertText(ContentTab, InsertedText)</code></a> (runs a plugin tab's insertion)</td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.insertedText(UUID)"><code>FakePluginHost.insertedText(UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.scopes()"><code>FakePluginHost.scopes()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.scopePresentation(String)"><code>FakePluginHost.scopePresentation(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.scopesInAll()"><code>FakePluginHost.scopesInAll()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.scopesInRecents()"><code>FakePluginHost.scopesInRecents()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.availableInScope(String,String,String,UUID,UUID)"><code>FakePluginHost.availableInScope(String, String, String, UUID, UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.stepInScope(String,String,String,UUID,UUID)"><code>FakePluginHost.stepInScope(String, String, String, UUID, UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.paletteOpens()"><code>FakePluginHost.paletteOpens()</code></a></td></tr>
-<tr><td>Settings</td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.setSetting(String,String,Object)"><code>FakePluginHost.setSetting(String, String, Object)</code></a> (a <code>String</code>, <code>Long</code>, <code>Double</code>, <code>Boolean</code> or list of strings, as TOML reads them; before the start it is the file the plugin starts with); a page of the plugin's own: <a href="#dev.jasper.sdk.testing.FakePluginHost.settingsPanel(String)"><code>FakePluginHost.settingsPanel(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.highlightSettingsPanel(String,String)"><code>FakePluginHost.highlightSettingsPanel(String, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.applySettingsPanel(String)"><code>FakePluginHost.applySettingsPanel(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.closeSettingsPanel(String)"><code>FakePluginHost.closeSettingsPanel(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.answerDiscard(boolean)"><code>FakePluginHost.answerDiscard(boolean)</code></a> (how Settings answers when the page's <code>closeThen</code> closes it with unsaved changes); a look's default, before any plugin starts: <a href="#dev.jasper.sdk.testing.FakePluginHost.setKitDefault(String,String,Object)"><code>FakePluginHost.setKitDefault(String, String, Object)</code></a></td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.declared(String)"><code>FakePluginHost.declared(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.savedSettings(String)"><code>FakePluginHost.savedSettings(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.settingsReports(String)"><code>FakePluginHost.settingsReports(String)</code></a> (<code>key: message</code>), <a href="#dev.jasper.sdk.testing.FakePluginHost.settingsPanelView(String)"><code>FakePluginHost.settingsPanelView(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.pendingSettings(String)"><code>FakePluginHost.pendingSettings(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.settingsPanelChanges(String)"><code>FakePluginHost.settingsPanelChanges(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.discardQuestions()"><code>FakePluginHost.discardQuestions()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.lookDefaultProblems(String)"><code>FakePluginHost.lookDefaultProblems(String)</code></a></td></tr>
+<tr><td>Settings</td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.setSetting(String,String,Object)"><code>FakePluginHost.setSetting(String, String, Object)</code></a> (a <code>String</code>, <code>Long</code>, <code>Double</code>, <code>Boolean</code> or list of strings, as TOML reads them; before the start it is the file the plugin starts with); a page of the plugin's own: <a href="#dev.jasper.sdk.testing.FakePluginHost.settingsPanel(String)"><code>FakePluginHost.settingsPanel(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.highlightSettingsPanel(String,String)"><code>FakePluginHost.highlightSettingsPanel(String, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.applySettingsPanel(String)"><code>FakePluginHost.applySettingsPanel(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.closeSettingsPanel(String)"><code>FakePluginHost.closeSettingsPanel(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.answerDiscard(boolean)"><code>FakePluginHost.answerDiscard(boolean)</code></a> (how Settings answers when the page's <code>closeThen</code> closes it with unsaved changes); a look's default, before any plugin starts: <a href="#dev.jasper.sdk.testing.FakePluginHost.setKitDefault(String,String,Object)"><code>FakePluginHost.setKitDefault(String, String, Object)</code></a></td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.declared(String)"><code>FakePluginHost.declared(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.savedSettings(String)"><code>FakePluginHost.savedSettings(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.settingsReports(String)"><code>FakePluginHost.settingsReports(String)</code></a> (<code>key: message</code>), <a href="#dev.jasper.sdk.testing.FakePluginHost.settingsPanelView(String)"><code>FakePluginHost.settingsPanelView(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.pendingSettings(String)"><code>FakePluginHost.pendingSettings(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.settingsPanelChanges(String)"><code>FakePluginHost.settingsPanelChanges(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.discardQuestions()"><code>FakePluginHost.discardQuestions()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.settingsShown(String)"><code>FakePluginHost.settingsShown(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.lookDefaultProblems(String)"><code>FakePluginHost.lookDefaultProblems(String)</code></a></td></tr>
 <tr><td>Notifications and activity</td><td><a href="#dev.jasper.sdk.testing.FakeNotifications.runAction(String,String)"><code>FakeNotifications.runAction(String, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakeNotifications.click(String)"><code>FakeNotifications.click(String)</code></a></td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.notifications()"><code>FakePluginHost.notifications()</code></a>: <a href="#dev.jasper.sdk.testing.FakeNotifications.lines()"><code>FakeNotifications.lines()</code></a> (<code>group|SEVERITY|title|content</code>, then the cause's class), <a href="#dev.jasper.sdk.testing.FakeNotifications.posts()"><code>FakeNotifications.posts()</code></a> (with <a href="#dev.jasper.sdk.testing.FakeNotifications.Post.count()"><code>FakeNotifications.Post.count()</code></a>, <a href="#dev.jasper.sdk.testing.FakeNotifications.Post.expired()"><code>FakeNotifications.Post.expired()</code></a> and <a href="#dev.jasper.sdk.testing.FakeNotifications.Post.removed()"><code>FakeNotifications.Post.removed()</code></a>), <a href="#dev.jasper.sdk.testing.FakeNotifications.groups()"><code>FakeNotifications.groups()</code></a>; <a href="#dev.jasper.sdk.testing.FakePluginHost.activityLog()"><code>FakePluginHost.activityLog()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.connectionLog()"><code>FakePluginHost.connectionLog()</code></a></td></tr>
 <tr><td>Command line</td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.declareSubcommand(String,String,String)"><code>FakePluginHost.declareSubcommand(String, String, String)</code></a> before the start, then <a href="#dev.jasper.sdk.testing.FakePluginHost.call(String,List,Path)"><code>FakePluginHost.call(String, List, Path)</code></a></td><td><a href="#dev.jasper.sdk.testing.FakeCommandCall.exit()"><code>FakeCommandCall.exit()</code></a>, <a href="#dev.jasper.sdk.testing.FakeCommandCall.out()"><code>FakeCommandCall.out()</code></a>, <a href="#dev.jasper.sdk.testing.FakeCommandCall.err()"><code>FakeCommandCall.err()</code></a>; <a href="#dev.jasper.sdk.testing.FakeCommandCall.cancel()"><code>FakeCommandCall.cancel()</code></a> plays Ctrl+C</td></tr>
 <tr><td>Files</td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.queueFileChoice(List)"><code>FakePluginHost.queueFileChoice(List)</code></a> (what <a href="#dev.jasper.sdk.ui.Windows.choose(FileChoice)"><code>Windows.choose(FileChoice)</code></a> returns), <a href="#dev.jasper.sdk.testing.FakePluginHost.queuePathSelection(List)"><code>FakePluginHost.queuePathSelection(List)</code></a> (the local <code>choose*</code> calls), <a href="#dev.jasper.sdk.testing.FakePluginHost.queueFileSelection(Optional)"><code>FakePluginHost.queueFileSelection(Optional)</code></a> (<a href="#dev.jasper.sdk.ui.WindowSurface.chooseFile(String,Optional)"><code>WindowSurface.chooseFile(String, Optional)</code></a> and a settings row's Browse), <a href="#dev.jasper.sdk.testing.FakePluginHost.duringPathSelection(Runnable)"><code>FakePluginHost.duringPathSelection(Runnable)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.locateFile(String,UUID)"><code>FakePluginHost.locateFile(String, UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.connectFileSource(String,String,UUID)"><code>FakePluginHost.connectFileSource(String, String, UUID)</code></a></td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.fileChoices()"><code>FakePluginHost.fileChoices()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.fileSources()"><code>FakePluginHost.fileSources()</code></a> (<code>id|heading</code>), <a href="#dev.jasper.sdk.testing.FakePluginHost.fileRoots(String)"><code>FakePluginHost.fileRoots(String)</code></a> (<code>id|label|connected</code>)</td></tr>
-<tr><td>Desktop and appearance</td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.setPresentation(Presentation)"><code>FakePluginHost.setPresentation(Presentation)</code></a> before any plugin starts, with <a href="#dev.jasper.sdk.testing.FakePresentations.STANDARD"><code>FakePresentations.STANDARD</code></a> (the default) or <a href="#dev.jasper.sdk.testing.FakePresentations.CLASSIC"><code>FakePresentations.CLASSIC</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.publishApp(Topic,Object)"><code>FakePluginHost.publishApp(Topic, Object)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setVariant(Variant)"><code>FakePluginHost.setVariant(Variant)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setSemanticColors(Map)"><code>FakePluginHost.setSemanticColors(Map)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setWorkspace(Variant,WorkspacePalette,EditorPalette,SyntaxPalette)"><code>FakePluginHost.setWorkspace(Variant, WorkspacePalette, EditorPalette, SyntaxPalette)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setWorkspaceOpacity(double)"><code>FakePluginHost.setWorkspaceOpacity(double)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setEditorSchemes(List)"><code>FakePluginHost.setEditorSchemes(List)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setTerminalTypography(TerminalTypography)"><code>FakePluginHost.setTerminalTypography(TerminalTypography)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.edit(Path,OptionalInt,Optional)"><code>FakePluginHost.edit(Path, OptionalInt, Optional)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.declareBundled(String)"><code>FakePluginHost.declareBundled(String)</code></a> before the start, <a href="#dev.jasper.sdk.testing.FakePluginHost.setCommandClient(Path)"><code>FakePluginHost.setCommandClient(Path)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setDefaultBrowser(boolean)"><code>FakePluginHost.setDefaultBrowser(boolean)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setCopyOnSelect(boolean)"><code>FakePluginHost.setCopyOnSelect(boolean)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setDownloadsFolder(Path)"><code>FakePluginHost.setDownloadsFolder(Path)</code></a> (by default <code>home/Downloads</code> under the data root), <a href="#dev.jasper.sdk.testing.FakePluginHost.failMarks(IOException)"><code>FakePluginHost.failMarks(IOException)</code></a></td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.clipboard()"><code>FakePluginHost.clipboard()</code></a>: <a href="#dev.jasper.sdk.testing.FakeClipboard.copies()"><code>FakeClipboard.copies()</code></a> (<code>copy|&lt;plugin id&gt;|&lt;text&gt;</code>, <code>secret|…</code>); <a href="#dev.jasper.sdk.testing.FakePluginHost.browsed()"><code>FakePluginHost.browsed()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.openedInEditor()"><code>FakePluginHost.openedInEditor()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.openedFiles()"><code>FakePluginHost.openedFiles()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.markedDownloads()"><code>FakePluginHost.markedDownloads()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.editorPlugin()"><code>FakePluginHost.editorPlugin()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.active(String)"><code>FakePluginHost.active(String)</code></a></td></tr>
+<tr><td>Desktop and appearance</td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.setPresentation(Presentation)"><code>FakePluginHost.setPresentation(Presentation)</code></a> before any plugin starts, with <a href="#dev.jasper.sdk.testing.FakePresentations.STANDARD"><code>FakePresentations.STANDARD</code></a> (the default) or <a href="#dev.jasper.sdk.testing.FakePresentations.CLASSIC"><code>FakePresentations.CLASSIC</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.publishApp(Topic,Object)"><code>FakePluginHost.publishApp(Topic, Object)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setVariant(Variant)"><code>FakePluginHost.setVariant(Variant)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setSemanticColors(Map)"><code>FakePluginHost.setSemanticColors(Map)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setWorkspace(Variant,WorkspacePalette,EditorPalette,SyntaxPalette)"><code>FakePluginHost.setWorkspace(Variant, WorkspacePalette, EditorPalette, SyntaxPalette)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setWorkspaceOpacity(double)"><code>FakePluginHost.setWorkspaceOpacity(double)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setEditorSchemes(List)"><code>FakePluginHost.setEditorSchemes(List)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setTerminalTypography(TerminalTypography)"><code>FakePluginHost.setTerminalTypography(TerminalTypography)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.edit(Path,OptionalInt,Optional)"><code>FakePluginHost.edit(Path, OptionalInt, Optional)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.edit(Path,OptionalInt,Optional,FileOrigin)"><code>FakePluginHost.edit(Path, OptionalInt, Optional, FileOrigin)</code></a> (a file another program handed in: <a href="#dev.jasper.sdk.ui.FileOrigin.OUTSIDE"><code>FileOrigin.OUTSIDE</code></a>), <a href="#dev.jasper.sdk.testing.FakePluginHost.declareBundled(String)"><code>FakePluginHost.declareBundled(String)</code></a> before the start, <a href="#dev.jasper.sdk.testing.FakePluginHost.setCommandClient(Path)"><code>FakePluginHost.setCommandClient(Path)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setDefaultBrowser(boolean)"><code>FakePluginHost.setDefaultBrowser(boolean)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setCopyOnSelect(boolean)"><code>FakePluginHost.setCopyOnSelect(boolean)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setDownloadsFolder(Path)"><code>FakePluginHost.setDownloadsFolder(Path)</code></a> (by default <code>home/Downloads</code> under the data root), <a href="#dev.jasper.sdk.testing.FakePluginHost.failMarks(IOException)"><code>FakePluginHost.failMarks(IOException)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.openLink(URI,LinkOrigin,LinkPlacement,Optional,Optional)"><code>FakePluginHost.openLink(URI, LinkOrigin, LinkPlacement, Optional, Optional)</code></a> (a web link through the provided browser)</td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.clipboard()"><code>FakePluginHost.clipboard()</code></a>: <a href="#dev.jasper.sdk.testing.FakeClipboard.copies()"><code>FakeClipboard.copies()</code></a> (<code>copy|&lt;plugin id&gt;|&lt;text&gt;</code>, <code>secret|…</code>); <a href="#dev.jasper.sdk.testing.FakePluginHost.browsed()"><code>FakePluginHost.browsed()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.openedInEditor()"><code>FakePluginHost.openedInEditor()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.openedFiles()"><code>FakePluginHost.openedFiles()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.markedDownloads()"><code>FakePluginHost.markedDownloads()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.editorPlugin()"><code>FakePluginHost.editorPlugin()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.browserPlugin()"><code>FakePluginHost.browserPlugin()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.active(String)"><code>FakePluginHost.active(String)</code></a></td></tr>
 </tbody>
 </table></div>
 <p><code>new FakeNotifications().group(id)</code> is a <a href="#dev.jasper.sdk.notifications.NotificationGroup"><code>NotificationGroup</code></a> for a class under test that takes one, without
@@ -2764,9 +2788,11 @@ so tasks can overlap.</li>
 <a href="#dev.jasper.sdk.ui.Appearance"><code>Appearance</code></a>'s colours, palettes, workspace opacity and theme subscriptions, which need the thread that made the
 host or the event dispatch thread (<a href="#dev.jasper.sdk.ui.Appearance.variant()"><code>Appearance.variant()</code></a>, <a href="#dev.jasper.sdk.ui.Appearance.workspaceVariant()"><code>Appearance.workspaceVariant()</code></a>,
 <a href="#dev.jasper.sdk.ui.Appearance.presentation()"><code>Appearance.presentation()</code></a> and <a href="#dev.jasper.sdk.ui.Appearance.terminalTypography()"><code>Appearance.terminalTypography()</code></a> answer any thread), and
-<a href="#dev.jasper.sdk.ui.Appearance.onTerminalTypographyChanged(Consumer)"><code>Appearance.onTerminalTypographyChanged(Consumer)</code></a>, which needs the event dispatch thread. Calls Jasper refuses off
-the UI thread with <code>IllegalStateException</code> (registrations, subscribing, publishing services, handling subcommands,
-terminal queries, the clipboard) succeed in the fake from any thread.</li>
+<a href="#dev.jasper.sdk.ui.Appearance.onTerminalTypographyChanged(Consumer)"><code>Appearance.onTerminalTypographyChanged(Consumer)</code></a>, <a href="#dev.jasper.sdk.ui.Platform.onDefaultBrowserChanged(Consumer)"><code>Platform.onDefaultBrowserChanged(Consumer)</code></a>,
+<a href="#dev.jasper.sdk.settings.PluginSettings.show()"><code>PluginSettings.show()</code></a> and <a href="#dev.jasper.sdk.settings.SettingsPanelHost.closeThen(Runnable)"><code>SettingsPanelHost.closeThen(Runnable)</code></a>, which need the event dispatch thread.
+Other calls Jasper refuses off the UI thread with <code>IllegalStateException</code> (registrations, subscribing, publishing
+services, handling subcommands, terminal queries, the clipboard, <a href="#dev.jasper.sdk.ui.Platform.openFile(Path)"><code>Platform.openFile(Path)</code></a>,
+<a href="#dev.jasper.sdk.ui.Platform.isDefaultBrowser()"><code>Platform.isDefaultBrowser()</code></a>, <a href="#dev.jasper.sdk.ui.Windows.hasModal(WindowOwner)"><code>Windows.hasModal(WindowOwner)</code></a>) succeed in the fake from any thread.</li>
 <li>Services: the fake does not check that a service's interface is in one of the provider's exported packages, and an
 absent optional provider's classes are still on the test classpath, so the <code>NoClassDefFoundError</code> path cannot be
 tested with it.</li>
@@ -2785,6 +2811,7 @@ the window's strip; Jasper places it where it was saved, in its tab and pane.</l
 <li>The fake has no active tool window: <a href="#dev.jasper.sdk.ui.Panels.toggle(String,WindowHandle)"><code>Panels.toggle(String, WindowHandle)</code></a> and <a href="#dev.jasper.sdk.ui.PanelHost.show()"><code>PanelHost.show()</code></a> from a
 panel's own toggle action only toggle or show it, also under <a href="#dev.jasper.sdk.testing.FakePresentations.CLASSIC"><code>FakePresentations.CLASSIC</code></a>, where Jasper activates
 a showing panel that is not the active tool window instead of hiding it.</li>
+<li>A panel's window of its own exists only as its <a href="#dev.jasper.sdk.ui.PanelHost.placement()"><code>PanelHost.placement()</code></a>.</li>
 </ul>
 </section>
 
@@ -2849,10 +2876,10 @@ wins when the same plugin is also bundled or in <code>--plugin-dir</code>.</p>
 <h3>The Java runtime</h3>
 <p>Packaged Jasper runs plugins on its own trimmed JetBrains Runtime 25; <a href="plugin-authoring.md#the-java-runtime">the
 Java runtime</a> lists exactly the modules a plugin may rely on. That is all of Java SE plus the charsets, locale data,
-ZIP file system, PKCS#11 and smart-card providers, Kerberos and JAAS login modules, DNS and RMI naming, socket options, the JDK HTTP server, <code>sun.misc.Unsafe</code>, and JFR, JMX and
-attach. The compiler and the other development tools (<code>jdk.compiler</code>, so
-<code>ToolProvider.getSystemJavaCompiler()</code> returns <code>null</code>), the debugger (<code>jdk.jdi</code>, <code>jdk.jdwp.agent</code>), <code>jdk.dynalink</code>,
-<code>jdk.incubator.vector</code> and the JetBrains Runtime's JCEF are not there. A library that needs a missing module fails
+ZIP file system, PKCS#11 and smart-card providers, Kerberos and JAAS login modules, DNS and RMI naming, socket options, the JDK HTTP server, <code>sun.misc.Unsafe</code>, JFR, JMX and
+attach, and the JetBrains Runtime's Chromium (<code>jcef</code>) with the JOGL modules it needs. The compiler and the other development tools (<code>jdk.compiler</code>, so
+<code>ToolProvider.getSystemJavaCompiler()</code> returns <code>null</code>), the debugger (<code>jdk.jdi</code>, <code>jdk.jdwp.agent</code>), <code>jdk.dynalink</code>
+and <code>jdk.incubator.vector</code> are not there. A library that needs a missing module fails
 with <code>NoClassDefFoundError</code> in the packaged application, although it works under a development run on a full JDK;
 bundle a jar that provides it instead.</p>
 <p>On macOS and Windows the packaged JVM loads JNA's native library from Jasper's own copy (JNA 5.14.0). A plugin that
@@ -2947,7 +2974,7 @@ topic.</p></div>
 </div>
 <div class="member" id="dev.jasper.sdk.Capabilities.TERMINAL_INJECT">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.Capabilities.TERMINAL_INJECT" aria-label="Link to this member">#</a><code><span class="kw">static final</span> <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> <b>TERMINAL_INJECT</b> = <span class="lit">&quot;terminal.inject&quot;</span></code></pre>
-<div class="doc"><p>Typing and pasting into a pane, and, since 0.29.0, inserting text into another plugin's content tab through a
+<div class="doc"><p>Typing and pasting into a pane, and inserting text into another plugin's content tab through a
 palette query's <code>TextTarget</code>.</p></div>
 </div>
 <div class="member" id="dev.jasper.sdk.Capabilities.TERMINAL_OPEN">
@@ -4293,7 +4320,9 @@ removing or clearing it, its group dropping it, or the plugin stopping.</p></div
 <tr id="dev.jasper.sdk.notifications.NotificationSpec.activate()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Runnable.html" title="java.lang.Runnable">Runnable</a>&gt;</code></td><td class="cn"><code><b>activate</b></code></td><td>what a click on the body does</td></tr>
 <tr id="dev.jasper.sdk.notifications.NotificationSpec.cause()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Throwable.html" title="java.lang.Throwable">Throwable</a>&gt;</code></td><td class="cn"><code><b>cause</b></code></td><td>the failure behind an error: the host records it as an incident attributed to the plugin and offers
     Show more…, which opens its stack trace</td></tr>
-<tr id="dev.jasper.sdk.notifications.NotificationSpec.window()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl" href="#dev.jasper.sdk.terminal.WindowHandle">WindowHandle</a>&gt;</code></td><td class="cn"><code><b>window</b></code></td><td>the window whose card it is; absent means the window the user used last</td></tr>
+<tr id="dev.jasper.sdk.notifications.NotificationSpec.window()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl" href="#dev.jasper.sdk.terminal.WindowHandle">WindowHandle</a>&gt;</code></td><td class="cn"><code><b>window</b></code></td><td>the window the notification concerns: a click on its card or one of its links, or on its system
+    notification, brings that window forward while it is open; otherwise a click on the card acts in the window
+    clicked, and one on the system notification in the window used last. The card shows in every window</td></tr>
 </tbody></table></div>
 <h5>Constructors</h5>
 <div class="member" id="dev.jasper.sdk.notifications.NotificationSpec.NotificationSpec(Severity,String,String,Optional,List,Optional,Optional,Optional)">
@@ -4344,7 +4373,8 @@ removing or clearing it, its group dropping it, or the plugin stopping.</p></div
 </div>
 <div class="member" id="dev.jasper.sdk.notifications.NotificationSpec.withWindow(WindowHandle)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.notifications.NotificationSpec.withWindow(WindowHandle)" aria-label="Link to this member">#</a><code><a class="tl" href="#dev.jasper.sdk.notifications.NotificationSpec">NotificationSpec</a> <b>withWindow</b>(<a class="tl" href="#dev.jasper.sdk.terminal.WindowHandle">WindowHandle</a> value)</code></pre>
-<div class="doc"><p>A copy whose card shows in this window.</p></div>
+<div class="doc"><p>A copy that concerns this window: a click on the card or one of its links brings the window forward while it is
+open. The card still shows in every window.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>value</code> the window</dd><dt>Returns</dt><dd>the copy</dd></dl>
 </div>
 </article>
@@ -4442,7 +4472,7 @@ closed.</p></div>
                   to learn whether to offer a "More in &lt;label&gt;…" row; finding a recently used row again asks
                   for 50</td></tr>
 <tr id="dev.jasper.sdk.palette.PaletteQuery.macOs()"><td class="ct"><code><span class="kw">boolean</span></code></td><td class="cn"><code><b>macOs</b></code></td><td>whether to show macOS shortcut glyphs and wording</td></tr>
-<tr id="dev.jasper.sdk.palette.PaletteQuery.textTarget()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl" href="#dev.jasper.sdk.ui.TextTarget">TextTarget</a>&gt;</code></td><td class="cn"><code><b>textTarget</b></code></td><td>(since 0.29.0) with no <code>target</code>, the content tab the palette was opened from, or for the
+<tr id="dev.jasper.sdk.palette.PaletteQuery.textTarget()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl" href="#dev.jasper.sdk.ui.TextTarget">TextTarget</a>&gt;</code></td><td class="cn"><code><b>textTarget</b></code></td><td>with no <code>target</code>, the content tab the palette was opened from, or for the
                   Run window that window's current item, while it takes inserted text
                   (<code>ContentTab.setTextInsertion</code>), read again before each search and run; empty otherwise. The
                   handle is bound to the scope's plugin, so inserting into it needs <code>terminal.inject</code></td></tr>
@@ -4716,8 +4746,7 @@ and Windows) and Shift+Enter.</p></div>
 <tr id="dev.jasper.sdk.palette.PaletteVerb.id()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>id</b></code></td><td>lower-case identifier, unique within the scope: <code>[a-z][a-z0-9_.-]{0,127}</code></td></tr>
 <tr id="dev.jasper.sdk.palette.PaletteVerb.label()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>label</b></code></td><td>what the hint bar shows next to this verb's key, such as "Paste and run"</td></tr>
 <tr id="dev.jasper.sdk.palette.PaletteVerb.role()"><td class="ct"><code><a class="tl" href="#dev.jasper.sdk.palette.PaletteVerb.Role">PaletteVerb.Role</a></code></td><td class="cn"><code><b>role</b></code></td><td>STANDARD, or SPLIT for the split-pane variant of the scope's first verb, which a presentation may offer
-             as an option of that verb ("Open in a split pane"); a scope has at most one SPLIT verb, never its first
-             (since 0.18.0)</td></tr>
+             as an option of that verb ("Open in a split pane"); a scope has at most one SPLIT verb, never its first</td></tr>
 </tbody></table></div>
 <h5>Constructors</h5>
 <div class="member" id="dev.jasper.sdk.palette.PaletteVerb.PaletteVerb(String,String,PaletteVerb.Role)">
@@ -4771,13 +4800,13 @@ which searches every scope that takes part, or one scope's chip; the user choose
 <tr id="dev.jasper.sdk.palette.ScopeSpec.shortcutActionId()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a>&gt;</code></td><td class="cn"><code><b>shortcutActionId</b></code></td><td>one of the plugin's own actions: while the palette is open, that action's shortcut chooses
                         this scope instead of running the handler (the command palette dismisses when this scope is
                         already chosen); the Run window shows its shortcut beside the scope in its menu</td></tr>
-<tr id="dev.jasper.sdk.palette.ScopeSpec.inAll()"><td class="ct"><code><span class="kw">boolean</span></code></td><td class="cn"><code><b>inAll</b></code></td><td>whether a query with no scope chosen searches this scope too (since 0.8.0)</td></tr>
+<tr id="dev.jasper.sdk.palette.ScopeSpec.inAll()"><td class="ct"><code><span class="kw">boolean</span></code></td><td class="cn"><code><b>inAll</b></code></td><td>whether a query with no scope chosen searches this scope too</td></tr>
 <tr id="dev.jasper.sdk.palette.ScopeSpec.inRecents()"><td class="ct"><code><span class="kw">boolean</span></code></td><td class="cn"><code><b>inRecents</b></code></td><td>whether the palette may offer this scope's rows before anything is typed, among the
-                        recently and most used items; only a scope in All is offered there (since 0.9.2)</td></tr>
+                        recently and most used items; only a scope in All is offered there</td></tr>
 <tr id="dev.jasper.sdk.palette.ScopeSpec.hue()"><td class="ct"><code><a class="tl" href="#dev.jasper.sdk.ui.Nodes.Hue">Nodes.Hue</a></code></td><td class="cn"><code><b>hue</b></code></td><td>the hue of this scope's row squares where a presentation draws them; NONE takes the plugin's
-                        manifest <code>icon_hue</code>, and NEUTRAL without one (since 0.18.0)</td></tr>
+                        manifest <code>icon_hue</code>, and NEUTRAL without one</td></tr>
 <tr id="dev.jasper.sdk.palette.ScopeSpec.itemNoun()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>itemNoun</b></code></td><td>what one row is, as a lowercase singular noun such as "session", which a presentation shows
-                        capitalised before a row's detail; blank uses the label (since 0.18.0)</td></tr>
+                        capitalised before a row's detail; blank uses the label</td></tr>
 </tbody></table></div>
 <h5>Constructors</h5>
 <div class="member" id="dev.jasper.sdk.palette.ScopeSpec.ScopeSpec(String,String,String,String,List,boolean,Optional,Optional,boolean,boolean,Nodes.Hue,String)">
@@ -5540,10 +5569,10 @@ whose <a href="#dev.jasper.sdk.terminal.TabHandle.terminal()"><code>terminal()</
 <div class="table-wrap"><table class="components"><tbody>
 <tr id="dev.jasper.sdk.terminal.LocalSpec.workingDirectory()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/nio/file/Path.html" title="java.nio.file.Path">Path</a>&gt;</code></td><td class="cn"><code><b>workingDirectory</b></code></td><td>where it starts; empty means where Jasper's own New Tab would start, or for a split, where
     Jasper's own Split would</td></tr>
-<tr id="dev.jasper.sdk.terminal.LocalSpec.profile()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a>&gt;</code></td><td class="cn"><code><b>profile</b></code></td><td>the id of a profile from <a href="#dev.jasper.sdk.terminal.Terminals.profiles()"><code>Terminals.profiles()</code></a> (since 0.9.1); empty starts the shell the user's
+<tr id="dev.jasper.sdk.terminal.LocalSpec.profile()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a>&gt;</code></td><td class="cn"><code><b>profile</b></code></td><td>the id of a profile from <a href="#dev.jasper.sdk.terminal.Terminals.profiles()"><code>Terminals.profiles()</code></a>; empty starts the shell the user's
     settings choose, as Jasper's own New Tab does, also in a split. An id the host does not list opens nothing.</td></tr>
 <tr id="dev.jasper.sdk.terminal.LocalSpec.command()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/List.html" title="java.util.List">List</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a>&gt;&gt;</code></td><td class="cn"><code><b>command</b></code></td><td>a program run instead of the shell, with the shell's environment: the executable, then its arguments,
-    each passed as it is, with no shell parsing them (since 0.17.1). Its tab or pane closes when the program exits with
+    each passed as it is, with no shell parsing them. Its tab or pane closes when the program exits with
     status 0 and stays open otherwise. Empty runs the shell.</td></tr>
 </tbody></table></div>
 <h5>Constructors</h5>
@@ -5858,12 +5887,12 @@ on <code>context.background()</code>. A connector that throws fails that attempt
 <h5>Components</h5>
 <div class="table-wrap"><table class="components"><tbody>
 <tr id="dev.jasper.sdk.terminal.SessionSpec.title()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>title</b></code></td><td>the pane's title until the remote program sets one</td></tr>
-<tr id="dev.jasper.sdk.terminal.SessionSpec.icon()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a>&gt;</code></td><td class="cn"><code><b>icon</b></code></td><td>a semantic icon name for the tab (since 0.7.6), drawn in a 16 &times; 16 logical-pixel slot; empty
+<tr id="dev.jasper.sdk.terminal.SessionSpec.icon()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a>&gt;</code></td><td class="cn"><code><b>icon</b></code></td><td>a semantic icon name for the tab, drawn in a 16 &times; 16 logical-pixel slot; empty
     shows Jasper's terminal icon, and a name the host does not know makes <code>openTab</code> or <code>split</code> throw
     <a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalArgumentException.html"><code>IllegalArgumentException</code></a></td></tr>
 <tr id="dev.jasper.sdk.terminal.SessionSpec.onExit()"><td class="ct"><code><a class="tl" href="#dev.jasper.sdk.terminal.ExitPolicy">ExitPolicy</a></code></td><td class="cn"><code><b>onExit</b></code></td><td>what happens to the pane when the session ends</td></tr>
 <tr id="dev.jasper.sdk.terminal.SessionSpec.connector()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/function/Consumer.html" title="java.util.function.Consumer">Consumer</a>&lt;<a class="tl" href="#dev.jasper.sdk.terminal.PendingSession">PendingSession</a>&gt;</code></td><td class="cn"><code><b>connector</b></code></td><td>starts one connection attempt</td></tr>
-<tr id="dev.jasper.sdk.terminal.SessionSpec.restore()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl" href="#dev.jasper.sdk.RestoreState">RestoreState</a>&gt;</code></td><td class="cn"><code><b>restore</b></code></td><td>how the session's tab comes back when Jasper restores its windows (since 0.21.0); empty, and the tab is
+<tr id="dev.jasper.sdk.terminal.SessionSpec.restore()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl" href="#dev.jasper.sdk.RestoreState">RestoreState</a>&gt;</code></td><td class="cn"><code><b>restore</b></code></td><td>how the session's tab comes back when Jasper restores its windows; empty, and the tab is
     not saved</td></tr>
 </tbody></table></div>
 <h5>Constructors</h5>
@@ -6618,8 +6647,7 @@ open it in a new pane to the right of and below the focused pane.</td></tr>
 Select Tab numbers the window's strip, from 1, and titled after its active pane's item, as the strip titles it, when
 the plugin may read that title.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.TabPlacement"><code>TabPlacement</code></a></td><td><span class="kind kind-enum">enum</span></td><td>Where <a href="#dev.jasper.sdk.ui.Windows.openTab(ContentSpec,WindowOwner,UiView,TabPlacement)"><code>Windows.openTab(ContentSpec, WindowOwner, UiView, TabPlacement)</code></a> puts a new content tab.</td></tr>
-<tr><td><a href="#dev.jasper.sdk.ui.TabRestorer"><code>TabRestorer</code></a></td><td><span class="kind kind-interface">functional interface</span></td><td>Rebuilds a plugin's saved tabs when Jasper restores its windows: at start, and whenever
-a window opens while none is open.</td></tr>
+<tr><td><a href="#dev.jasper.sdk.ui.TabRestorer"><code>TabRestorer</code></a></td><td><span class="kind kind-interface">functional interface</span></td><td>Rebuilds a plugin's saved tabs when Jasper restores its saved window or opens a layout.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.TableRow"><code>TableRow</code></a></td><td><span class="kind kind-record">record</span></td><td>Immutable table row descriptor: one row of a <a href="#dev.jasper.sdk.ui.Nodes.Table"><code>Nodes.Table</code></a>.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.TerminalTypography"><code>TerminalTypography</code></a></td><td><span class="kind kind-record">record</span></td><td>Saved terminal typography, shared by every window and independent of a pane's temporary zoom.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.TextTarget"><code>TextTarget</code></a></td><td><span class="kind kind-interface">interface</span></td><td>A content tab that takes inserted text, as a command palette query names it (<code>PaletteQuery.textTarget()</code>): the
@@ -6629,7 +6657,7 @@ and no terminal pane is the query's origin.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.ToolbarItem"><code>ToolbarItem</code></a></td><td><span class="kind kind-interface">sealed interface</span></td><td>Something a plugin places in every window's toolbar.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.ToolbarViewFactory"><code>ToolbarViewFactory</code></a></td><td><span class="kind kind-interface">functional interface</span></td><td>Builds one window's toolbar view (see <a href="#dev.jasper.sdk.ui.ToolbarItem.View"><code>ToolbarItem.View</code></a>); every window has a toolbar.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.TreeItem"><code>TreeItem</code></a></td><td><span class="kind kind-record">record</span></td><td>Immutable tree item descriptor: one row of a <a href="#dev.jasper.sdk.ui.Nodes.Tree"><code>Nodes.Tree</code></a>, with the items below it.</td></tr>
-<tr><td><a href="#dev.jasper.sdk.ui.UiAnchor"><code>UiAnchor</code></a></td><td><span class="kind kind-interface">interface</span></td><td>Opaque host-issued attachment authority for one live mounted control, or since 0.32.0 an area of a Custom node's
+<tr><td><a href="#dev.jasper.sdk.ui.UiAnchor"><code>UiAnchor</code></a></td><td><span class="kind kind-interface">interface</span></td><td>Opaque host-issued attachment authority for one live mounted control, or an area of a Custom node's
  content (<a href="#dev.jasper.sdk.ui.UiView.anchorAt(String,ContentArea)"><code>UiView.anchorAt(String, ContentArea)</code></a>).</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.UiEvent"><code>UiEvent</code></a></td><td><span class="kind kind-interface">sealed interface</span></td><td>Typed user intent.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.UiKit"><code>UiKit</code></a></td><td><span class="kind kind-interface">interface</span></td><td>Plugin-owned declarative UI factory.</td></tr>
@@ -6684,8 +6712,8 @@ that selection.</p></div>
                       Windows, unless <code>otherDefaultBinding</code> names one, cmd means Ctrl+Shift, and a default
                       naming cmd and shift also gets alt (<code>cmd+shift+x</code> becomes Ctrl+Alt+Shift+X)</td></tr>
 <tr id="dev.jasper.sdk.ui.ActionSpec.otherDefaultBinding()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a>&gt;</code></td><td class="cn"><code><b>otherDefaultBinding</b></code></td><td>the Linux and Windows default when it should differ from <code>defaultBinding</code>, naming
-                           ctrl, alt and shift literally; <code>none</code> for no default there (since 0.11.0)</td></tr>
-<tr id="dev.jasper.sdk.ui.ActionSpec.context()"><td class="ct"><code><a class="tl" href="#dev.jasper.sdk.ui.ShortcutContext">ShortcutContext</a></code></td><td class="cn"><code><b>context</b></code></td><td>where the shortcut applies; <a href="#dev.jasper.sdk.ui.ShortcutContext.global()"><code>ShortcutContext.global()</code></a> unless set (since 0.11.0)</td></tr>
+                           ctrl, alt and shift literally; <code>none</code> for no default there</td></tr>
+<tr id="dev.jasper.sdk.ui.ActionSpec.context()"><td class="ct"><code><a class="tl" href="#dev.jasper.sdk.ui.ShortcutContext">ShortcutContext</a></code></td><td class="cn"><code><b>context</b></code></td><td>where the shortcut applies; <a href="#dev.jasper.sdk.ui.ShortcutContext.global()"><code>ShortcutContext.global()</code></a> unless set</td></tr>
 </tbody></table></div>
 <h5>Constructors</h5>
 <div class="member" id="dev.jasper.sdk.ui.ActionSpec.ActionSpec(String,String,Optional,List,Optional,Optional,ShortcutContext)">
@@ -6875,7 +6903,8 @@ color changes within the same variant. Workspace opacity changes use onWorkspace
 <a href="#dev.jasper.sdk.ui.UiEvent.Sorted"><code>UiEvent.Sorted</code></a>; the view's owner orders the rows. In a tree the first column titles the items and each later
 one a <a href="#dev.jasper.sdk.ui.TreeItem.trailing()"><code>TreeItem.trailing()</code></a> value. A table column with a <code>width</code> takes that width and the last column
 absorbs the rest; a tree's trailing column with a width takes it instead of fitting its values. Dragging a header's
-edge reports <a href="#dev.jasper.sdk.ui.UiEvent.ColumnsResized"><code>UiEvent.ColumnsResized</code></a>; the view's owner stores the widths and passes them back.</p></div>
+edge, or double-clicking it to fit a column, reports <a href="#dev.jasper.sdk.ui.UiEvent.ColumnsResized"><code>UiEvent.ColumnsResized</code></a>; the view's owner stores the
+widths and passes them back.</p></div>
 <h5>Components</h5>
 <div class="table-wrap"><table class="components"><tbody>
 <tr id="dev.jasper.sdk.ui.Column.id()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>id</b></code></td><td>the column's id, unique among its table's or tree's columns; a table row's cells are keyed by it</td></tr>
@@ -6886,8 +6915,7 @@ edge reports <a href="#dev.jasper.sdk.ui.UiEvent.ColumnsResized"><code>UiEvent.C
 <tr id="dev.jasper.sdk.ui.Column.weight()"><td class="ct"><code><span class="kw">double</span></code></td><td class="cn"><code><b>weight</b></code></td><td>the column's share of a table's width relative to the other columns' weights; finite and positive</td></tr>
 <tr id="dev.jasper.sdk.ui.Column.sorted()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Boolean.html" title="java.lang.Boolean">Boolean</a>&gt;</code></td><td class="cn"><code><b>sorted</b></code></td><td>present shows the sort indicator on the column the rows are sorted by: true ascending, false
     descending</td></tr>
-<tr id="dev.jasper.sdk.ui.Column.width()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/OptionalInt.html" title="java.util.OptionalInt">OptionalInt</a></code></td><td class="cn"><code><b>width</b></code></td><td>present is the column's unscaled width in pixels and positive; empty leaves the width to the view (since
-    0.25.0)</td></tr>
+<tr id="dev.jasper.sdk.ui.Column.width()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/OptionalInt.html" title="java.util.OptionalInt">OptionalInt</a></code></td><td class="cn"><code><b>width</b></code></td><td>present is the column's unscaled width in pixels and positive; empty leaves the width to the view</td></tr>
 </tbody></table></div>
 <h5>Constructors</h5>
 <div class="member" id="dev.jasper.sdk.ui.Column.Column(String,String,Nodes.TextRole,boolean,double,Optional)">
@@ -7079,7 +7107,7 @@ what it draws, by scrolling or zooming, closes the anchor itself.</p></div>
 <tr id="dev.jasper.sdk.ui.ContentPresentation.dirty()"><td class="ct"><code><span class="kw">boolean</span></code></td><td class="cn"><code><b>dirty</b></code></td><td>whether the host shows an unsaved marker</td></tr>
 <tr id="dev.jasper.sdk.ui.ContentPresentation.location()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>location</b></code></td><td>full local or remote path, never converted to a local path by the host</td></tr>
 <tr id="dev.jasper.sdk.ui.ContentPresentation.host()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>host</b></code></td><td>remote host label, empty for local content</td></tr>
-<tr id="dev.jasper.sdk.ui.ContentPresentation.image()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl" href="#dev.jasper.sdk.ui.PixelImage">PixelImage</a>&gt;</code></td><td class="cn"><code><b>image</b></code></td><td>(since 0.27.0) the image the tab shows in place of its icon, such as a web page's favicon; empty for none</td></tr>
+<tr id="dev.jasper.sdk.ui.ContentPresentation.image()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl" href="#dev.jasper.sdk.ui.PixelImage">PixelImage</a>&gt;</code></td><td class="cn"><code><b>image</b></code></td><td>the image the tab shows in place of its icon, such as a web page's favicon; empty for none</td></tr>
 </tbody></table></div>
 <h5>Constructors</h5>
 <div class="member" id="dev.jasper.sdk.ui.ContentPresentation.ContentPresentation(String,String,String,boolean,String,String,Optional)">
@@ -7122,7 +7150,7 @@ stays the fallback for an image that does not decode.</p></div>
 <div class="table-wrap"><table class="components"><tbody>
 <tr id="dev.jasper.sdk.ui.ContentSpec.key()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>key</b></code></td><td>stable nonblank identity; reopening selects the existing content</td></tr>
 <tr id="dev.jasper.sdk.ui.ContentSpec.title()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>title</b></code></td><td>initial literal tab title</td></tr>
-<tr id="dev.jasper.sdk.ui.ContentSpec.restore()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl" href="#dev.jasper.sdk.RestoreState">RestoreState</a>&gt;</code></td><td class="cn"><code><b>restore</b></code></td><td>how the tab comes back when Jasper restores its windows (since 0.21.0); empty, and the tab is not saved</td></tr>
+<tr id="dev.jasper.sdk.ui.ContentSpec.restore()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl" href="#dev.jasper.sdk.RestoreState">RestoreState</a>&gt;</code></td><td class="cn"><code><b>restore</b></code></td><td>how the tab comes back when Jasper restores its windows; empty, and the tab is not saved</td></tr>
 </tbody></table></div>
 <h5>Constructors</h5>
 <div class="member" id="dev.jasper.sdk.ui.ContentSpec.ContentSpec(String,String,Optional)">
@@ -7157,10 +7185,10 @@ stays the fallback for an image that does not decode.</p></div>
 <tr id="dev.jasper.sdk.ui.ContentStatus.text()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>text</b></code></td><td>literal visible text; empty shows the icon alone</td></tr>
 <tr id="dev.jasper.sdk.ui.ContentStatus.tooltip()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>tooltip</b></code></td><td>literal descriptive text</td></tr>
 <tr id="dev.jasper.sdk.ui.ContentStatus.run()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Runnable.html" title="java.lang.Runnable">Runnable</a></code></td><td class="cn"><code><b>run</b></code></td><td>optional UI-thread action, null for plain text; not used while <code>menu</code> has entries</td></tr>
-<tr id="dev.jasper.sdk.ui.ContentStatus.icon()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>icon</b></code></td><td>(since 0.22.0) a registered icon name shown before the text, or empty for none</td></tr>
-<tr id="dev.jasper.sdk.ui.ContentStatus.dimmed()"><td class="ct"><code><span class="kw">boolean</span></code></td><td class="cn"><code><b>dimmed</b></code></td><td>(since 0.22.0) whether the host paints the item's icon and text in its disabled colour; the item stays
+<tr id="dev.jasper.sdk.ui.ContentStatus.icon()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>icon</b></code></td><td>a built-in or registered icon name shown before the text, or empty for none</td></tr>
+<tr id="dev.jasper.sdk.ui.ContentStatus.dimmed()"><td class="ct"><code><span class="kw">boolean</span></code></td><td class="cn"><code><b>dimmed</b></code></td><td>whether the host paints the item's icon and text in its disabled colour; the item stays
      clickable</td></tr>
-<tr id="dev.jasper.sdk.ui.ContentStatus.menu()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/List.html" title="java.util.List">List</a>&lt;<a class="tl" href="#dev.jasper.sdk.ui.ContentStatus.MenuEntry">ContentStatus.MenuEntry</a>&gt;</code></td><td class="cn"><code><b>menu</b></code></td><td>(since 0.22.0) the entries a click opens in a menu anchored on the item, copied; empty for none</td></tr>
+<tr id="dev.jasper.sdk.ui.ContentStatus.menu()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/List.html" title="java.util.List">List</a>&lt;<a class="tl" href="#dev.jasper.sdk.ui.ContentStatus.MenuEntry">ContentStatus.MenuEntry</a>&gt;</code></td><td class="cn"><code><b>menu</b></code></td><td>the entries a click opens in a menu anchored on the item, copied; empty for none</td></tr>
 </tbody></table></div>
 <h5>Constructors</h5>
 <div class="member" id="dev.jasper.sdk.ui.ContentStatus.ContentStatus(String,String,Runnable,String,boolean,List)">
@@ -7482,8 +7510,7 @@ busy or has an error.</p></div>
 <tr id="dev.jasper.sdk.ui.DialogSpec.presentation()"><td class="ct"><code><a class="tl" href="#dev.jasper.sdk.ui.DialogSpec.Presentation">DialogSpec.Presentation</a></code></td><td class="cn"><code><b>presentation</b></code></td><td>explicit presentation; attached sheets and overlays require modality, and attached sheets a live
     checked owner at show</td></tr>
 <tr id="dev.jasper.sdk.ui.DialogSpec.swatch()"><td class="ct"><code><a class="tl" href="#dev.jasper.sdk.ui.Nodes.Hue">Nodes.Hue</a></code></td><td class="cn"><code><b>swatch</b></code></td><td>a small square of this hue drawn before the title wherever Jasper draws the dialog's title, as in a
-    login dialog's coloured square; a title bar the system draws shows none, and <a href="#dev.jasper.sdk.ui.Nodes.Hue.NONE"><code>Nodes.Hue.NONE</code></a> draws none
-    (since 0.18.0)</td></tr>
+    login dialog's coloured square; a title bar the system draws shows none, and <a href="#dev.jasper.sdk.ui.Nodes.Hue.NONE"><code>Nodes.Hue.NONE</code></a> draws none</td></tr>
 </tbody></table></div>
 <h5>Constructors</h5>
 <div class="member" id="dev.jasper.sdk.ui.DialogSpec.DialogSpec(String,WindowOwner,boolean)">
@@ -7762,7 +7789,7 @@ whatever is set.</p></div>
 <pre class="sig"><code><span class="kw">record</span> <b>MenuItem</b>(<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> id, <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> label, <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> icon, <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> action, <span class="kw">boolean</span> enabled, <span class="kw">boolean</span> separator, <a class="tl" href="#dev.jasper.sdk.ui.Nodes.Hue">Nodes.Hue</a> hue, <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> shortcut, <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/List.html" title="java.util.List">List</a>&lt;<a class="tl" href="#dev.jasper.sdk.ui.MenuItem">MenuItem</a>&gt; children)</code></pre>
 <div class="doc"><p>Immutable menu item descriptor: one item of a <a href="#dev.jasper.sdk.ui.Nodes.MenuButton"><code>Nodes.MenuButton</code></a>'s menu, a <a href="#dev.jasper.sdk.ui.Nodes.Button"><code>Nodes.Button</code></a>'s hold menu, a
 <a href="#dev.jasper.sdk.ui.Nodes.Header"><code>Nodes.Header</code></a>'s overflow menu, the context menu of a list, table, row or crumb, or a content tab's right-click
-menu (<a href="#dev.jasper.sdk.ui.ContentTab.showContextMenu(Point,List,List,Consumer)"><code>ContentTab.showContextMenu</code></a>).</p><p>Since 0.27.0 an item with <code>children</code> is a submenu: it shows its label and an arrow, and pointing at it, or
+menu (<a href="#dev.jasper.sdk.ui.ContentTab.showContextMenu(Point,List,List,Consumer)"><code>ContentTab.showContextMenu</code></a>).</p><p>An item with <code>children</code> is a submenu: it shows its label and an arrow, and pointing at it, or
 Right or Enter on it, opens its children beside it. A submenu reports nothing itself, so its <code>action</code> is
 blank and it shows no shortcut; a disabled one does not open.</div>
 <h5>Components</h5>
@@ -7881,7 +7908,7 @@ reveal control, following its reveal group.</li><li><a href="#dev.jasper.sdk.ui.
 value) and erase them with <a href="#dev.jasper.sdk.ui.UiView.clearSecret(String)"><code>UiView.clearSecret</code></a>.</li><li><a href="#dev.jasper.sdk.ui.Nodes.ChoiceSearch"><code>Nodes.ChoiceSearch</code></a> <span class="kind kind-record">record</span> Type-to-filter configuration of a SEARCHABLE choice.</li><li><a href="#dev.jasper.sdk.ui.Nodes.PickerDensity"><code>Nodes.PickerDensity</code></a> <span class="kind kind-enum">enum</span> A hint for a <a href="#dev.jasper.sdk.ui.Nodes.PickerFace"><code>PickerFace</code></a>'s size: DEFAULT is a form's face, COMPACT a shorter face with smaller type and
 tile for a picker inline in a row.</li><li><a href="#dev.jasper.sdk.ui.Nodes.PickerFace"><code>Nodes.PickerFace</code></a> <span class="kind kind-record">record</span> The closed face of a PICKER or DROPDOWN <a href="#dev.jasper.sdk.ui.Nodes.Choice"><code>Choice</code></a>, as display data only.</li><li><a href="#dev.jasper.sdk.ui.Nodes.PickerItemKind"><code>Nodes.PickerItemKind</code></a> <span class="kind kind-enum">enum</span> What a <a href="#dev.jasper.sdk.ui.Nodes.PickerItem"><code>PickerItem</code></a> row is.</li><li><a href="#dev.jasper.sdk.ui.Nodes.PickerItem"><code>Nodes.PickerItem</code></a> <span class="kind kind-record">record</span> One selectable row of a <a href="#dev.jasper.sdk.ui.Nodes.PickerMenu"><code>PickerMenu</code></a>; its id is also the Action emitted on explicit acceptance.</li><li><a href="#dev.jasper.sdk.ui.Nodes.PickerMenu"><code>Nodes.PickerMenu</code></a> <span class="kind kind-record">record</span> A searchable menu of rich rows, such as a <a href="#dev.jasper.sdk.ui.PluginPopover"><code>PluginPopover</code></a>'s content for a PICKER choice: a search field over
 <code>items</code>, then a footer row after a hairline.</li><li><a href="#dev.jasper.sdk.ui.Nodes.Choice"><code>Nodes.Choice</code></a> <span class="kind kind-record">record</span> One value from a set of options, drawn as its <code>kind</code> says.</li><li><a href="#dev.jasper.sdk.ui.Nodes.Toggle"><code>Nodes.Toggle</code></a> <span class="kind kind-record">record</span> A boolean, drawn as a switch or a checkbox as the look decides.</li><li><a href="#dev.jasper.sdk.ui.Nodes.Chip"><code>Nodes.Chip</code></a> <span class="kind kind-record">record</span> A passive tag, such as a protocol or a badge: its label in the hue's colour on a tint of that hue (the Enterprise
-look boxes it and draws the label in capitals).</li><li><a href="#dev.jasper.sdk.ui.Nodes.TokenField"><code>Nodes.TokenField</code></a> <span class="kind kind-record">record</span> A field of short tokens, such as a bookmark's tags (since 0.29.0).</li><li><a href="#dev.jasper.sdk.ui.Nodes.Progress"><code>Nodes.Progress</code></a> <span class="kind kind-record">record</span> A passive progress bar in the accent colour, with <code>label</code> as a caption under its trailing end.</li><li><a href="#dev.jasper.sdk.ui.Nodes.Strength"><code>Nodes.Strength</code></a> <span class="kind kind-record">record</span> A passive four-segment meter, such as a password's strength, with <code>label</code> as a caption under its trailing
+look boxes it and draws the label in capitals).</li><li><a href="#dev.jasper.sdk.ui.Nodes.TokenField"><code>Nodes.TokenField</code></a> <span class="kind kind-record">record</span> A field of short tokens, such as a bookmark's tags.</li><li><a href="#dev.jasper.sdk.ui.Nodes.Progress"><code>Nodes.Progress</code></a> <span class="kind kind-record">record</span> A passive progress bar in the accent colour, with <code>label</code> as a caption under its trailing end.</li><li><a href="#dev.jasper.sdk.ui.Nodes.Strength"><code>Nodes.Strength</code></a> <span class="kind kind-record">record</span> A passive four-segment meter, such as a password's strength, with <code>label</code> as a caption under its trailing
 end.</li><li><a href="#dev.jasper.sdk.ui.Nodes.Stack"><code>Nodes.Stack</code></a> <span class="kind kind-record">record</span> Children laid out as <code>role</code> says.</li><li><a href="#dev.jasper.sdk.ui.Nodes.FormRow"><code>Nodes.FormRow</code></a> <span class="kind kind-record">record</span> A labelled form row: the label (with its caption under it) in the form's label column, the control beside it and an
 optional trailing cell after the control, which takes at most half the room beside the label; a row too narrow for
 that stacks them.</li><li><a href="#dev.jasper.sdk.ui.Nodes.SettingRow"><code>Nodes.SettingRow</code></a> <span class="kind kind-record">record</span> A setting: its title and description, with the control at the row's trailing edge; the description wraps beside
@@ -7968,7 +7995,7 @@ row's leading RAIL or PROMPT icon, and a picker row's or face's icon, stands wit
 <div class="doc"><p>An icon's size role. CAPTION stands beside caption text, CONTROL beside a control's or a row's text, RAIL in a rail
 or a list row, and EMPTY in an <a href="#dev.jasper.sdk.ui.Nodes.Empty"><code>Empty</code></a> state; a list row's leading RAIL or PROMPT icon sits on a tile in its
 hue unless the hue is NONE. PROMPT is the large icon: a prompt's header, a detail heading or a sheet's title.
-SWATCH (since 0.18.0) is a solid square of the icon's hue at caption size, such as a protocol's colour beside its
+SWATCH is a solid square of the icon's hue at caption size, such as a protocol's colour beside its
 name; its hue is not NONE and it takes no severity, and its name stays a valid icon name.</p></div>
 <h5>Constants</h5>
 <dl class="constants">
@@ -8035,8 +8062,8 @@ it starts a new line. NUMBER requires a <a href="#dev.jasper.sdk.ui.Nodes.Numeri
 click, Enter or Down reports its action, and the owner shows the options. SEARCHABLE is a dropdown whose open list
 narrows as the user types (see <a href="#dev.jasper.sdk.ui.Nodes.ChoiceSearch"><code>ChoiceSearch</code></a>). PREVIEWS shows its options as tiles, an option with a preview
 as the miniature window it describes. EXCLUSIVE is a choice among two to four options, all of them visible. TABS
-(since 0.18.0) switches among two or more views of one thing (Overview and Details): it reports Selected, and the
-owner composes the chosen content.</p></div>
+switches among two or more views of one thing (Overview and Details): it reports Selected, and the owner composes
+the chosen content.</p></div>
 <h5>Constants</h5>
 <dl class="constants">
 <dt id="dev.jasper.sdk.ui.Nodes.ChoiceKind.DROPDOWN"><code>DROPDOWN</code></dt><dd></dd>
@@ -8289,9 +8316,9 @@ the button's glyph with that severity's colour (as <a href="#dev.jasper.sdk.ui.N
 the kind's text colour; for example a favourite's warning star. The label keeps the kind's colour. A present
 <code>selected</code> makes it a toggle button (a search option such as match case): the kit paints the pressed
 treatment while it is true and reports its pressed state to assistive technology; a click reports the Action and
-the owner confirms the new state in its next update. Only GHOST and SECONDARY buttons take it.</p><p>Since 0.27.0 a button can carry a <code>holdMenu</code>, as a browser's Back button carries its history: a press held
-on the button for at least 500 ms opens the menu under it, and its release then reports nothing, while a shorter
-press reports <code>action</code> as before. A press whose pointer leaves the button, even to come back, or that ends
+the owner confirms the new state in its next update. Only GHOST and SECONDARY buttons take it.</p><p>A button can carry a <code>holdMenu</code>, as a browser's Back button carries its history: a press held on the
+button for at least 500 ms opens the menu under it, and its release then reports nothing, while a shorter press
+reports <code>action</code>. A press whose pointer leaves the button, even to come back, or that ends
 without its release (the window losing the focus), opens nothing. A right-click (a Control-click on macOS),
 Shift+F10 and the context-menu key open the menu at once. Choosing an enabled item closes the menu and reports the
 item's action as a <a href="#dev.jasper.sdk.ui.UiEvent.Action"><code>UiEvent.Action</code></a>.</div>
@@ -8468,9 +8495,9 @@ runs (a find field's Previous); <code>cancelAction</code> is what Escape in the 
 to an enclosing stack or form. A nonblank <code>listId</code> names an ItemList in the same view: Up, Down, Page Up and
 Page Down in the field move that list's selection (reporting its Selected) while the focus stays in the field, and
 Enter keeps its meaning in the field. A TEXTAREA takes neither <code>alternateAction</code> nor <code>listId</code>, and a
-NUMBER field (whose arrows step it) takes no <code>listId</code>. A <code>readOnly</code> field (since 0.18.0) is focusable,
+NUMBER field (whose arrows step it) takes no <code>listId</code>. A <code>readOnly</code> field is focusable,
 selectable and copyable but never edited, so it reports no <a href="#dev.jasper.sdk.ui.UiEvent.Edited"><code>UiEvent.Edited</code></a>; a STEPPER or SLIDER is never
-read-only.</p><p>Since 0.27.0 the field's leading slot, before the text, can show the plugin's own picture in place of the kind's
+read-only.</p><p>The field's leading slot, before the text, can show the plugin's own picture in place of the kind's
 glyph (a SEARCH field's magnifier, a PATH field's folder, a PORT field's colon), in that glyph's box, under every
 look: its <code>leadingImage</code>, such as a web page's favicon, or, while it has none or the image does not decode,
 its <code>leadingIcon</code>, drawn in the glyph's colours. <code>leadingName</code> is the slot's accessible name and
@@ -8481,7 +8508,7 @@ a <code>file:</code> URL names, and as text. The name and the drag text need an 
 drags out a selection of its own; while the field has the focus, a click places the caret. A TEXTAREA, a STEPPER
 and a SLIDER take no leading image or icon and no <code>selectOnClick</code>.
 
-<p>Since 0.27.0 a field can offer <code>suggestions</code> as the user types, such as an address field's addresses and
+<p>A field can offer <code>suggestions</code> as the user types, such as an address field's addresses and
 searches: it shows them in a list under itself, the first selected, with "Loading suggestions…" after them while
 <code>suggestionsLoading</code> is true. The field keeps the keyboard focus, so typing goes on in the field. While the
 list shows suggestions, Up and Down move the selection, and Tab and Enter report <a href="#dev.jasper.sdk.ui.UiEvent.SuggestionChosen"><code>UiEvent.SuggestionChosen</code></a>
@@ -8725,7 +8752,7 @@ tile for a picker inline in a row.</p></div>
 <div class="doc"><p>The closed face of a PICKER or DROPDOWN <a href="#dev.jasper.sdk.ui.Nodes.Choice"><code>Choice</code></a>, as display data only. Empty primary means the placeholder
 face. A PICKER's face is its whole control; a DROPDOWN may carry one too (a rich closed face, such as a saved
 host's tile, name and endpoint) while its popup still lists the options and reports Selected; its owner keeps the
-face describing the selected option. A <code>technicalCaption</code> (since 0.18.0) is a data value, such as a saved
+face describing the selected option. A <code>technicalCaption</code> is a data value, such as a saved
 host's endpoint, drawn in the data face.</p></div>
 <h5>Components</h5>
 <div class="table-wrap"><table class="components"><tbody>
@@ -8956,7 +8983,7 @@ beside it shorten.</p></div>
 <header class="type-head"><span class="kind kind-record">record</span><h4><a class="self" href="#dev.jasper.sdk.ui.Nodes.TokenField">Nodes.TokenField</a></h4><span class="since">since 0.29.0</span><span class="pkg">dev.jasper.sdk.ui</span></header>
 <pre class="sig"><code><span class="kw">record</span> <b>TokenField</b>(<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> id, <a class="tl" href="#dev.jasper.sdk.ui.ControlState">ControlState</a> state, <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> label, <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> hint, <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/List.html" title="java.util.List">List</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a>&gt; tokens)
     <span class="kw">implements</span> <a class="tl" href="#dev.jasper.sdk.ui.Nodes.Node">Nodes.Node</a></code></pre>
-<div class="doc"><p>A field of short tokens, such as a bookmark's tags (since 0.29.0). Each token shows as a chip in the look's tag
+<div class="doc"><p>A field of short tokens, such as a bookmark's tags. Each token shows as a chip in the look's tag
 style, in the case the user typed it in every look, with a remove button inside it named "Remove" and the token;
 the user types the next token after the chips, which wrap onto further lines as the field fills. Enter adds the
 typed text as a token while text other than white space is typed, and so does the focus leaving the field for
@@ -8991,7 +9018,7 @@ being typed.</div>
 only when it is nonblank, at most 64 characters and free of control characters, and when it does not match an
 earlier one ignoring the case of ASCII letters, so "Work" and "work" are one token and "Äpfel" and
 "äpfel" two; the first 100 are kept, in the order given. This is the rule Jasper's Browser keeps bookmark
-tags by (<code>BookmarkStore.keptTags</code> calls it).</p></div>
+tags by.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>given</code> the tokens given</dd><dt>Returns</dt><dd>those kept, in order</dd></dl>
 </div>
 </article>
@@ -9843,7 +9870,7 @@ factory that throws yields an error placeholder instead of breaking the window.<
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.PanelHost.show()" aria-label="Link to this member">#</a><code><span class="kw">void</span> <b>show</b>()</code></pre>
 <div class="doc"><p>Shows the panel: docked, in its slot, hiding whatever else showed there; with a window of its own, in that window.
 Called from the panel's own toggle action as its handler runs, it also makes the panel the active tool window under
-a look with flush tool windows (since 0.18.2).</p></div>
+a look with flush tool windows.</p></div>
 </div>
 <div class="member" id="dev.jasper.sdk.ui.PanelHost.hide()">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.PanelHost.hide()" aria-label="Link to this member">#</a><code><span class="kw">void</span> <b>hide</b>()</code></pre>
@@ -9940,10 +9967,10 @@ with the icon) and, while it shows, a tool window with a header.</p></div>
 <tr id="dev.jasper.sdk.ui.PanelSpec.defaultAnchor()"><td class="ct"><code><a class="tl" href="#dev.jasper.sdk.ui.Anchor">Anchor</a></code></td><td class="cn"><code><b>defaultAnchor</b></code></td><td>the side used until the user moves the panel</td></tr>
 <tr id="dev.jasper.sdk.ui.PanelSpec.toggleActionId()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a>&gt;</code></td><td class="cn"><code><b>toggleActionId</b></code></td><td>one of the plugin's own actions, already registered, that toggles this panel:
                       View &gt; Tool Windows lists it, with its shortcut, instead of an application-made
-                      <code>&lt;id&gt;.toggle</code> (since 0.8.1); under a look with flush tool windows its toggle or show
-                      also activates the panel (since 0.18.2)</td></tr>
+                      <code>&lt;id&gt;.toggle</code>; under a look with flush tool windows its toggle or show
+                      also activates the panel</td></tr>
 <tr id="dev.jasper.sdk.ui.PanelSpec.split()"><td class="ct"><code><span class="kw">boolean</span></code></td><td class="cn"><code><b>split</b></code></td><td>whether the panel starts in its side's secondary half: the lower half of the left or right side, or
-             the right half of the bottom area (since 0.13.0)</td></tr>
+             the right half of the bottom area</td></tr>
 </tbody></table></div>
 <h5>Constructors</h5>
 <div class="member" id="dev.jasper.sdk.ui.PanelSpec.PanelSpec(String,String,String,Anchor,Optional,boolean)">
@@ -10005,8 +10032,7 @@ its own.</p></div>
 from a closed window have no effect.
 Called from the panel's own toggle action (<a href="#dev.jasper.sdk.ui.PanelSpec.withToggleActionId(String)"><code>PanelSpec.withToggleActionId</code></a>), as its handler runs, under a
 look with flush tool windows a toggle that shows the panel also makes it the active tool window, as a stripe click
-does, and a toggle of a showing panel that is not the active tool window activates it instead of hiding it
-(since 0.18.2).</p></div>
+does, and a toggle of a showing panel that is not the active tool window activates it instead of hiding it.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>panelId</code> a registered panel id owned by this plugin</dd><dd><code>window</code> the window whose dock shows or hides the panel</dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalArgumentException.html">IllegalArgumentException</a> when the panel is not registered by this plugin</dd><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalStateException.html">IllegalStateException</a> when the context is closed or the caller is off the UI thread</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.ui.Panels.show(String,WindowHandle)">
@@ -10184,14 +10210,16 @@ UI thread; on the UI thread it throws <code>IllegalStateException</code>.</p></d
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.Platform.editor(FileEditor)" aria-label="Link to this member">#</a><code><span class="kw">default</span> <a class="tl" href="#dev.jasper.sdk.Subscription">Subscription</a> <b>editor</b>(<a class="tl" href="#dev.jasper.sdk.ui.FileEditor">FileEditor</a> editor)</code></pre>
 <p class="badges"><span class="since">since 0.17.1</span></p>
 <div class="doc"><p>Makes this plugin the editor Jasper opens files with: <code>config.toml</code>, the plugin settings files, the custom VM
-options file, every <a href="#dev.jasper.sdk.ui.Platform.openInEditor(Path)"><code>openInEditor</code></a> and <a href="#dev.jasper.sdk.ui.Platform.openFile(Path)"><code>openFile</code></a>, and a Cmd-click (Ctrl-click on Linux and Windows)
-on a file path in a local terminal pane go to <code>editor</code> first, on the UI thread; a click brings the path's line
-and the clicked window. A clicked path comes from program output, and an OSC 8 link's address can differ from the
-text shown, so an editor edits the file and never runs it. One at a time: a bundled plugin's registration replaces
-a plugin's that is not bundled; otherwise the first stays and any later one, this plugin's own included, throws.
-When the editor returns false or throws, when no plugin provides one, and when Jasper waited 30 seconds for the UI
-thread's answer, the desktop opens the file as before; for a click and an <a href="#dev.jasper.sdk.ui.Platform.openFile(Path)"><code>openFile</code></a> it edits the file or
-shows it in the file manager instead, and never opens it. Needs <code>editor.provide</code>. UI thread only. The registration ends with
+options file, every <a href="#dev.jasper.sdk.ui.Platform.openInEditor(Path)"><code>openInEditor</code></a> and <a href="#dev.jasper.sdk.ui.Platform.openFile(Path)"><code>openFile</code></a>, a Cmd-click (Ctrl-click on Linux and Windows) on
+a file path in a local terminal pane, and the files other programs hand to Jasper (<a href="#dev.jasper.sdk.ui.FileOrigin.OUTSIDE"><code>FileOrigin.OUTSIDE</code></a>) go
+to <code>editor</code> first, on the UI thread; a click brings the path's line and the clicked window. A clicked path
+comes from program output, and an OSC 8 link's address can differ from the text shown, so an editor edits the file
+and never runs it. One at a time: a bundled plugin's registration replaces a plugin's that is not bundled;
+otherwise the first stays and any later one, this plugin's own included, throws. When the editor returns false or
+throws, when no plugin provides one, and when Jasper waited 30 seconds for the UI thread's answer, the desktop
+opens the file with its edit action, then its open action, then by showing it in the file manager; for a click
+and an <a href="#dev.jasper.sdk.ui.Platform.openFile(Path)"><code>openFile</code></a> it edits the file or shows it in the file manager instead, and never opens it, and a file
+another program handed in is only shown in the file manager. Needs <code>editor.provide</code>. UI thread only. The registration ends with
 the plugin.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>editor</code> opens a file</dd><dt>Returns</dt><dd>the registration</dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalStateException.html">IllegalStateException</a> when another plugin already provides the editor
     (<code>The editor is already provided by &lt;plugin id&gt;</code>), and off the UI thread</dd><dd><a href="#dev.jasper.sdk.MissingCapabilityException">MissingCapabilityException</a> without <code>editor.provide</code></dd></dl>
@@ -10953,13 +10981,16 @@ tab strip and shown, the window's empty workspace taking it in its place.</dd>
 <header class="type-head"><span class="kind kind-interface">functional interface</span><h4><a class="self" href="#dev.jasper.sdk.ui.TabRestorer">TabRestorer</a></h4><span class="since">since 0.21.0</span><span class="pkg">dev.jasper.sdk.ui</span></header>
 <pre class="sig"><code><span class="an">@<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/FunctionalInterface.html" title="java.lang.FunctionalInterface">FunctionalInterface</a></span>
 <span class="kw">interface</span> <b>TabRestorer</b></code></pre>
-<div class="doc"><p>Rebuilds a plugin's saved tabs when Jasper restores its windows: at start, and whenever
-a window opens while none is open. Registered with <a href="#dev.jasper.sdk.ui.Windows.restorer(String,TabRestorer)"><code>Windows.restorer</code></a> for one restorer kind; called on
-the UI thread for a saved tab of that kind:</p><ul>
-  <li>once for each saved tab while its window is restored, before that window shows;</li>
+<div class="doc"><p>Rebuilds a plugin's saved tabs when Jasper restores its saved window or opens a layout. Registered with
+<a href="#dev.jasper.sdk.ui.Windows.restorer(String,TabRestorer)"><code>Windows.restorer</code></a> for one restorer kind; called on the UI thread for a saved tab of that kind:</p><ul>
+  <li>once for each saved tab while the saved window is restored, at start and whenever a window opens while none
+      is open, before that window shows;</li>
+  <li>once for each saved tab of a layout: when a window opens with the saved default layout (New Window, or a
+      window opening while none is open that does not restore the saved one), before that window shows, and when
+      the user applies a layout to a window (Window &rsaquo; Layouts), while the window shows;</li>
   <li>again when the user presses Retry on its placeholder, while the window shows;</li>
-  <li>when the plugin itself opens a tab while no Jasper window is open, which restores the windows first: inside that
-      call, before the call's tab opens.</li>
+  <li>when the plugin itself opens a tab while no Jasper window is open, which restores the saved window first: inside
+      that call, before the call's tab opens.</li>
 </ul></div>
 <h5>Methods</h5>
 <div class="member" id="dev.jasper.sdk.ui.TabRestorer.restore(RestoreRequest)">
@@ -11209,8 +11240,8 @@ choice with a Connect button. The factory runs when a window opens, and for each
 inside <code>add</code>, never for a window
 nobody sees, and the view closes with its window or with this registration. Its root is an INLINE
 <a href="#dev.jasper.sdk.ui.Nodes.Stack"><code>Nodes.Stack</code></a> of LABEL <a href="#dev.jasper.sdk.ui.Nodes.Text"><code>Nodes.Text</code></a>s, DROPDOWN, SEARCHABLE or PICKER <a href="#dev.jasper.sdk.ui.Nodes.Choice"><code>Nodes.Choice</code></a>s, at most one
-PRIMARY <a href="#dev.jasper.sdk.ui.Nodes.Button"><code>Nodes.Button</code></a> and any number of icon-only GHOST Buttons (a blank label with an icon and a tooltip,
-since 0.18.1), <a href="#dev.jasper.sdk.ui.Nodes.MenuButton"><code>Nodes.MenuButton</code></a>s and <a href="#dev.jasper.sdk.ui.Nodes.Separator"><code>Nodes.Separator</code></a>s. When it mounts the view the host refuses
+PRIMARY <a href="#dev.jasper.sdk.ui.Nodes.Button"><code>Nodes.Button</code></a> and any number of icon-only GHOST Buttons (a blank label with an icon and a tooltip),
+<a href="#dev.jasper.sdk.ui.Nodes.MenuButton"><code>Nodes.MenuButton</code></a>s and <a href="#dev.jasper.sdk.ui.Nodes.Separator"><code>Nodes.Separator</code></a>s. When it mounts the view the host refuses
 any other tree without an exception to the plugin: it records the refusal, naming the node, closes the view and
 that window shows none. <a href="#dev.jasper.sdk.ui.UiView.update(ViewSpec)"><code>UiView.update</code></a> throws <a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalArgumentException.html"><code>IllegalArgumentException</code></a> naming the node and keeps the
 tree. A view never moves into the overflow menu: it hides while the toolbar is too narrow for it.</p></div>
@@ -11293,7 +11324,7 @@ for that window, and that window shows no view.</p></div>
 <header class="type-head"><span class="kind kind-interface">interface</span><h4><a class="self" href="#dev.jasper.sdk.ui.UiAnchor">UiAnchor</a></h4><span class="pkg">dev.jasper.sdk.ui</span></header>
 <pre class="sig"><code><span class="kw">interface</span> <b>UiAnchor</b>
     <span class="kw">extends</span> <a class="tl" href="#dev.jasper.sdk.WindowOwner">WindowOwner</a>, <a class="tl" href="#dev.jasper.sdk.Subscription">Subscription</a></code></pre>
-<div class="doc"><p>Opaque host-issued attachment authority for one live mounted control, or since 0.32.0 an area of a Custom node's
+<div class="doc"><p>Opaque host-issued attachment authority for one live mounted control, or an area of a Custom node's
  content (<a href="#dev.jasper.sdk.ui.UiView.anchorAt(String,ContentArea)"><code>UiView.anchorAt(String, ContentArea)</code></a>). UI thread only.
  Hiding, disabling, removing, retyping, moving or closing its source permanently invalidates it, and so does resizing
  the content an area is on.
@@ -11337,7 +11368,8 @@ gives the list a side column of commands, the column's Remove acting on the sele
 mode is NONE keeps the commands on its rows).</li><li><a href="#dev.jasper.sdk.ui.UiEvent.Reordered"><code>UiEvent.Reordered</code></a> <span class="kind kind-record">record</span> Ordered-list move intent from an ORDERED <a href="#dev.jasper.sdk.ui.Nodes.ItemList"><code>Nodes.ItemList</code></a>'s Move up or Move down command: a row's own or,
 in a look that gives the list a side column of commands, the column's Move Up or Move Down acting on the selected
 row.</li><li><a href="#dev.jasper.sdk.ui.UiEvent.SecretChanged"><code>UiEvent.SecretChanged</code></a> <span class="kind kind-record">record</span> The content of a <a href="#dev.jasper.sdk.ui.Nodes.Secret"><code>Nodes.Secret</code></a> changed.</li><li><a href="#dev.jasper.sdk.ui.UiEvent.Clicked"><code>UiEvent.Clicked</code></a> <span class="kind kind-record">record</span> A plain left single click on a table, tree or item-list row (not a RESULTS list, a list or table whose selection
-mode is NONE, or a heading), reported after its <a href="#dev.jasper.sdk.ui.UiEvent.Selected"><code>Selected</code></a>: id is the owner, itemId the row.</li><li><a href="#dev.jasper.sdk.ui.UiEvent.Sorted"><code>UiEvent.Sorted</code></a> <span class="kind kind-record">record</span> Sort intent from a left click on a column header: id is the table or tree owner, columnId the clicked column.</li><li><a href="#dev.jasper.sdk.ui.UiEvent.ColumnsResized"><code>UiEvent.ColumnsResized</code></a> <span class="kind kind-record">record</span> A drag of a column header's edge ended: id is the table or tree owner.</li><li><a href="#dev.jasper.sdk.ui.UiEvent.SuggestionChosen"><code>UiEvent.SuggestionChosen</code></a> <span class="kind kind-record">record</span> The user chose one of a <a href="#dev.jasper.sdk.ui.Nodes.Field"><code>Nodes.Field</code></a>'s suggestions: Tab or Enter on the selected one, or a click on one.</li><li><a href="#dev.jasper.sdk.ui.UiEvent.TokensChanged"><code>UiEvent.TokensChanged</code></a> <span class="kind kind-record">record</span> The tokens of a <a href="#dev.jasper.sdk.ui.Nodes.TokenField"><code>Nodes.TokenField</code></a> changed: the user added one (Enter, a comma, or the focus leaving the field
+mode is NONE, or a heading), reported after its <a href="#dev.jasper.sdk.ui.UiEvent.Selected"><code>Selected</code></a>: id is the owner, itemId the row.</li><li><a href="#dev.jasper.sdk.ui.UiEvent.Sorted"><code>UiEvent.Sorted</code></a> <span class="kind kind-record">record</span> Sort intent from a left click on a column header: id is the table or tree owner, columnId the clicked column.</li><li><a href="#dev.jasper.sdk.ui.UiEvent.ColumnsResized"><code>UiEvent.ColumnsResized</code></a> <span class="kind kind-record">record</span> A drag of a column header's edge ended, or a double-click on it fitted a column to its content: id is the table
+or tree owner.</li><li><a href="#dev.jasper.sdk.ui.UiEvent.SuggestionChosen"><code>UiEvent.SuggestionChosen</code></a> <span class="kind kind-record">record</span> The user chose one of a <a href="#dev.jasper.sdk.ui.Nodes.Field"><code>Nodes.Field</code></a>'s suggestions: Tab or Enter on the selected one, or a click on one.</li><li><a href="#dev.jasper.sdk.ui.UiEvent.TokensChanged"><code>UiEvent.TokensChanged</code></a> <span class="kind kind-record">record</span> The tokens of a <a href="#dev.jasper.sdk.ui.Nodes.TokenField"><code>Nodes.TokenField</code></a> changed: the user added one (Enter, a comma, or the focus leaving the field
 for good) or removed one (Backspace with nothing typed, or a token's remove button).</li></ul>
 </article>
 <article class="type nested" id="dev.jasper.sdk.ui.UiEvent.Action">
@@ -11471,8 +11503,8 @@ view's owner orders the rows and marks the column with <a href="#dev.jasper.sdk.
 <header class="type-head"><span class="kind kind-record">record</span><h4><a class="self" href="#dev.jasper.sdk.ui.UiEvent.ColumnsResized">UiEvent.ColumnsResized</a></h4><span class="since">since 0.25.0</span><span class="pkg">dev.jasper.sdk.ui</span></header>
 <pre class="sig"><code><span class="kw">record</span> <b>ColumnsResized</b>(<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> id, <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Map.html" title="java.util.Map">Map</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a>, <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Integer.html" title="java.lang.Integer">Integer</a>&gt; widths)
     <span class="kw">implements</span> <a class="tl" href="#dev.jasper.sdk.ui.UiEvent">UiEvent</a></code></pre>
-<div class="doc"><p>A drag of a column header's edge ended: id is the table or tree owner. The view's owner stores the widths and
-passes them back as <a href="#dev.jasper.sdk.ui.Column.width()"><code>Column.width()</code></a>.</p></div>
+<div class="doc"><p>A drag of a column header's edge ended, or a double-click on it fitted a column to its content: id is the table
+or tree owner. The view's owner stores the widths and passes them back as <a href="#dev.jasper.sdk.ui.Column.width()"><code>Column.width()</code></a>.</p></div>
 <h5>Components</h5>
 <div class="table-wrap"><table class="components"><tbody>
 <tr id="dev.jasper.sdk.ui.UiEvent.ColumnsResized.id()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>id</b></code></td><td>the <a href="#dev.jasper.sdk.ui.Nodes.Table"><code>Nodes.Table</code></a> or <a href="#dev.jasper.sdk.ui.Nodes.Tree"><code>Nodes.Tree</code></a> node</td></tr>
@@ -11543,7 +11575,7 @@ for good) or removed one (Backspace with nothing typed, or a token's remove butt
 <div class="member" id="dev.jasper.sdk.ui.UiView.anchor(String)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.UiView.anchor(String)" aria-label="Link to this member">#</a><code><a class="tl" href="#dev.jasper.sdk.ui.UiAnchor">UiAnchor</a> <b>anchor</b>(<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> nodeId)</code></pre>
 <div class="doc"><p>Mint attachment authority from an eligible mounted action or PICKER: a <a href="#dev.jasper.sdk.ui.Nodes.Button"><code>Nodes.Button</code></a>, a PICKER
-<a href="#dev.jasper.sdk.ui.Nodes.Choice"><code>Nodes.Choice</code></a> or, since 0.29.0, a <a href="#dev.jasper.sdk.ui.Nodes.MenuButton"><code>Nodes.MenuButton</code></a>, whose popovers attach to its button.</p></div>
+<a href="#dev.jasper.sdk.ui.Nodes.Choice"><code>Nodes.Choice</code></a> or a <a href="#dev.jasper.sdk.ui.Nodes.MenuButton"><code>Nodes.MenuButton</code></a>, whose popovers attach to its button.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>nodeId</code> control id</dd><dt>Returns</dt><dd>scoped capability</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.ui.UiView.anchorAt(String,ContentArea)">
@@ -11815,10 +11847,12 @@ own menu, as the Editor builds its right-click menu, lists these and runs one be
 <div class="doc"><p>Registers a guard asked when the user quits or restarts Jasper, after content tabs' guards
 and before anything closes. Guards are asked one at a time; one whose future completes with <code>false</code>
 cancels the quit. A guard that throws, returns <code>null</code> or whose future fails allows the quit. The guard
-runs on the UI thread and may show a modal dialog before completing its future.</p><p>It is asked on a real quit or restart only. A resident macOS Jasper answers Cmd+Q, Jasper &rsaquo; Quit, the Dock's
-Quit and a Jasper window's File &rsaquo; Quit by closing its windows through the content tabs'
-closing guards and going to the background. That does not ask this guard, and the plugin keeps running until Jasper
-really quits (Quit Jasper Completely, a log-out or a restart).</div>
+runs on the UI thread and may show a modal dialog before completing its future.</p><p>It is asked on a real quit or restart only. With <code>system.run_in_background</code> on, closing the last window
+leaves Jasper running with no window on macOS, Windows and Linux, and a resident, packaged macOS Jasper also
+answers Cmd+Q, Jasper &rsaquo; Quit, the Dock's Quit and a Jasper window's File &rsaquo; Quit by closing its
+windows through the content tabs' closing guards and going to the background. Neither asks this guard, and the
+plugin keeps running until Jasper really quits (Quit Jasper Completely or a log-out on macOS; Quit, or Quit Jasper
+in the notification-area or tray icon, on Windows and Linux) or restarts.</div>
 <dl class="tags"><dt>Parameters</dt><dd><code>guard</code> returns the decision, possibly after asking the user</dd><dt>Returns</dt><dd>the registration; closing it removes the guard</dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalStateException.html">IllegalStateException</a> when the plugin's context is closed or the caller is off the UI thread</dd><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/UnsupportedOperationException.html">UnsupportedOperationException</a> if the host predates quit guards</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.ui.Windows.dialog(DialogSpec)">
@@ -12103,7 +12137,7 @@ close does nothing.</p></div>
         <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> fieldId,
         <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> text)</code></pre>
 <div class="doc"><p>Simulate a person typing <code>text</code> into a field, replacing its text: it reports <a href="#dev.jasper.sdk.ui.UiEvent.Edited"><code>UiEvent.Edited</code></a> as the host's field does, while a read-only field, or one that is hidden, disabled or busy (itself or a container above it), takes nothing.
- Typed into a <a href="#dev.jasper.sdk.ui.Nodes.TokenField"><code>Nodes.TokenField</code></a> (since 0.29.0), which takes the focus, it replaces the text typed there
+ Typed into a <a href="#dev.jasper.sdk.ui.Nodes.TokenField"><code>Nodes.TokenField</code></a>, which takes the focus, it replaces the text typed there
  (<a href="#dev.jasper.sdk.testing.FakeKitView.tokenText(String)"><code>tokenText(String)</code></a>) and reports no edit, but each separator in it (a comma, a line break or a tab) adds the
  text before it, and the changed list is
  reported once as <a href="#dev.jasper.sdk.ui.UiEvent.TokensChanged"><code>UiEvent.TokensChanged</code></a>, as the host's token field does.</p></div>
@@ -12144,7 +12178,7 @@ key. While the field shows suggestions, UP and DOWN move the selection within th
 report <a href="#dev.jasper.sdk.ui.UiEvent.SuggestionChosen"><code>UiEvent.SuggestionChosen</code></a> for the selected one, <code>byTab</code> for TAB; while its list shows at all (also
 while it only loads), ESCAPE hides it and reports the field's <code>cancelAction</code> when that is not blank. Otherwise
 ENTER reports the <code>trailingAction</code> of a single-line field other than PATH, and ESCAPE the <code>cancelAction</code>,
-when not blank. A field that is hidden, disabled or busy (itself or a container above it) takes no key.</p><p>In a <a href="#dev.jasper.sdk.ui.Nodes.TokenField"><code>Nodes.TokenField</code></a> (since 0.29.0), as the host's: ENTER adds the typed text as a token while text other
+when not blank. A field that is hidden, disabled or busy (itself or a container above it) takes no key.</p><p>In a <a href="#dev.jasper.sdk.ui.Nodes.TokenField"><code>Nodes.TokenField</code></a>, as the host's: ENTER adds the typed text as a token while text other
 than white space is typed, and reports nothing otherwise; BACK_SPACE deletes the typed text's last character, or with
 nothing typed removes the last token; LEFT with nothing typed selects the last token's chip
 (<a href="#dev.jasper.sdk.testing.FakeKitView.selectedToken(String)"><code>selectedToken(String)</code></a>). While a chip is selected, LEFT, RIGHT, HOME and END move among the chips (RIGHT past
@@ -12638,7 +12672,7 @@ its last tab to another window.</p></div>
 <div class="doc"><p>One menu target's contributed entries.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>target</code> <code>FILE</code>, <code>EDIT</code>, <code>VIEW</code>, <code>TAB</code>, <code>TOOLS</code>, <code>SESSION</code>,
     <code>TRANSFER</code>, <code>context</code> or <code>top:&lt;menuId&gt;</code></dd><dt>Returns</dt><dd><code>item:id</code>, <code>web-address:id</code> (an <code>addForWebAddress</code> item), <code>---</code> and
-    <code>submenu:title</code> lines, children indented, sections separated by <code>===</code>; since 0.31.0, menu entries
+    <code>submenu:title</code> lines, children indented, sections separated by <code>===</code>; menu entries
     (<code>addEntries</code>) as <code>entry:id:label</code> lines and <code>entries:label</code> lines for their submenus, each
     followed by <code>:disabled</code> while disabled</dd></dl>
 </div>
@@ -13135,8 +13169,8 @@ its item noun, or its label when it names none; and each verb's role, in order.<
 </div>
 <div class="member" id="dev.jasper.sdk.testing.FakePluginHost.scopesInRecents()">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.testing.FakePluginHost.scopesInRecents()" aria-label="Link to this member">#</a><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/List.html" title="java.util.List">List</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a>&gt; <b>scopesInRecents</b>()</code></pre>
-<div class="doc"><p>The ids of registered scopes whose spec sets <code>inRecents</code>, in registration order (since 0.9.2). The
-application offers a scope's rows before anything is typed only when it is in All too.</p></div>
+<div class="doc"><p>The ids of registered scopes whose spec sets <code>inRecents</code>, in registration order. The application
+offers a scope's rows before anything is typed only when it is in All too.</p></div>
 </div>
 <div class="member" id="dev.jasper.sdk.testing.FakePluginHost.searchScope(String,String,UUID,UUID)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.testing.FakePluginHost.searchScope(String,String,UUID,UUID)" aria-label="Link to this member">#</a><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/List.html" title="java.util.List">List</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a>&gt; <b>searchScope</b>(
@@ -13146,7 +13180,7 @@ application offers a scope's rows before anything is typed only when it is in Al
         <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/UUID.html" title="java.util.UUID">UUID</a> paneIdOrNull)</code></pre>
 <div class="doc"><p>Searches a scope as the palette would, as <code>rowId|title|enabled</code> lines; later row lookups use this
 answer. Every palette call this host makes passes <code>maxResults</code> 5 and <code>macOs</code> true, and with no pane
-the window's current item as the <code>textTarget</code> while it takes inserted text (since 0.29.0).</p></div>
+the window's current item as the <code>textTarget</code> while it takes inserted text.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>scopeId</code></dd><dd><code>query</code></dd><dd><code>windowId</code></dd><dd><code>paneIdOrNull</code></dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.testing.FakePluginHost.availableInScope(String,String,String,UUID,UUID)">
@@ -13593,7 +13627,11 @@ shows.</p></div>
         <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> html)</code></pre>
 <div class="doc"><p>Shows a document in place of the one shown, keeping the scroll position. A <a href="#dev.jasper.browser.api.PreviewEvent.Shown"><code>PreviewEvent.Shown</code></a> with its
 revision follows once it is in the page and laid out, unless a later document replaced it first.</p></div>
-<dl class="tags"><dt>Parameters</dt><dd><code>revision</code> the document's revision, greater than the last one given</dd><dd><code>html</code> the document: the Editor's WEB markup, at most 16 MiB in UTF-8</dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalArgumentException.html">IllegalArgumentException</a> for a revision no greater than the last one given, or longer HTML</dd></dl>
+<dl class="tags"><dt>Parameters</dt><dd><code>revision</code> the document's revision, greater than the last one given</dd><dd><code>html</code> the document's HTML, at most 16 MiB in UTF-8, which goes into the page's <code>main</code> element of
+    class <code>markdown-body</code>: no script in it runs, a <code>pre</code> of class <code>mermaid</code> shows the diagram
+    Mermaid draws from its text, and its elements' <code>data-b</code>, <code>data-link</code> and <code>data-image</code>
+    numbers are the blocks, links and images that <a href="#dev.jasper.browser.api.PreviewEvent.Geometry"><code>PreviewEvent.Geometry</code></a>,
+    <a href="#dev.jasper.browser.api.PreviewEvent.LinkActivated"><code>PreviewEvent.LinkActivated</code></a> and <a href="#dev.jasper.browser.api.MarkdownPreview.image(int,BufferedImage)"><code>image</code></a> name</dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalArgumentException.html">IllegalArgumentException</a> for a revision no greater than the last one given, or longer HTML</dd></dl>
 </div>
 <div class="member" id="dev.jasper.browser.api.MarkdownPreview.image(int,BufferedImage)">
 <pre class="sig"><a class="self" href="#dev.jasper.browser.api.MarkdownPreview.image(int,BufferedImage)" aria-label="Link to this member">#</a><code><span class="kw">void</span> <b>image</b>(
@@ -13695,7 +13733,7 @@ draw it, or stops, it reports <a href="#dev.jasper.browser.api.PreviewEvent.Unav
 versions of the Browser may add kinds of event, so a <code>switch</code> over them needs a <code>default</code> branch.</p></div>
 <h5>Nested types</h5>
 <ul class="nested-list"><li><a href="#dev.jasper.browser.api.PreviewEvent.Shown"><code>PreviewEvent.Shown</code></a> <span class="kind kind-record">record</span> A document is in the page and laid out.</li><li><a href="#dev.jasper.browser.api.PreviewEvent.Geometry"><code>PreviewEvent.Geometry</code></a> <span class="kind kind-class">class</span> Where a document's blocks are laid out: after <a href="#dev.jasper.browser.api.PreviewEvent.Shown"><code>Shown</code></a>, and again whenever the layout changes, as when a
-diagram, an image or a font arrives.</li><li><a href="#dev.jasper.browser.api.PreviewEvent.Scrolled"><code>PreviewEvent.Scrolled</code></a> <span class="kind kind-record">record</span> The page scrolled.</li><li><a href="#dev.jasper.browser.api.PreviewEvent.LinkActivated"><code>PreviewEvent.LinkActivated</code></a> <span class="kind kind-record">record</span> The user clicked a link of the document, or pressed Enter on it.</li><li><a href="#dev.jasper.browser.api.PreviewEvent.Unavailable"><code>PreviewEvent.Unavailable</code></a> <span class="kind kind-record">record</span> Chromium cannot draw the preview, or has stopped: it shows nothing more for the rest of Jasper's run.</li></ul>
+diagram, an image or a font arrives.</li><li><a href="#dev.jasper.browser.api.PreviewEvent.Scrolled"><code>PreviewEvent.Scrolled</code></a> <span class="kind kind-record">record</span> The page scrolled.</li><li><a href="#dev.jasper.browser.api.PreviewEvent.LinkActivated"><code>PreviewEvent.LinkActivated</code></a> <span class="kind kind-record">record</span> The user clicked or middle-clicked a link of the document, or pressed Enter on it.</li><li><a href="#dev.jasper.browser.api.PreviewEvent.Unavailable"><code>PreviewEvent.Unavailable</code></a> <span class="kind kind-record">record</span> Chromium cannot draw the preview, or has stopped: it shows nothing more for the rest of Jasper's run.</li></ul>
 </article>
 <article class="type nested" id="dev.jasper.browser.api.PreviewEvent.Shown">
 <header class="type-head"><span class="kind kind-record">record</span><h4><a class="self" href="#dev.jasper.browser.api.PreviewEvent.Shown">PreviewEvent.Shown</a></h4><span class="pkg">dev.jasper.browser.api</span></header>
@@ -13759,17 +13797,19 @@ diagram, an image or a font arrives.</p></div>
 <h5>Components</h5>
 <div class="table-wrap"><table class="components"><tbody>
 <tr id="dev.jasper.browser.api.PreviewEvent.Scrolled.y()"><td class="ct"><code><span class="kw">double</span></code></td><td class="cn"><code><b>y</b></code></td><td>the top of the view</td></tr>
-<tr id="dev.jasper.browser.api.PreviewEvent.Scrolled.user()"><td class="ct"><code><span class="kw">boolean</span></code></td><td class="cn"><code><b>user</b></code></td><td>whether the user scrolled it; false for the scrolling <a href="#dev.jasper.browser.api.MarkdownPreview.scrollTo(double)"><code>MarkdownPreview.scrollTo</code></a> asked for</td></tr>
+<tr id="dev.jasper.browser.api.PreviewEvent.Scrolled.user()"><td class="ct"><code><span class="kw">boolean</span></code></td><td class="cn"><code><b>user</b></code></td><td>whether the user scrolled it; false for the scrolling <a href="#dev.jasper.browser.api.MarkdownPreview.scrollTo(double)"><code>MarkdownPreview.scrollTo</code></a> asked for, and
+    for a move the layout made: a new document's, or one up to the page's end when a shorter document or a taller
+    view leaves less to scroll</td></tr>
 </tbody></table></div>
 </article>
 <article class="type nested" id="dev.jasper.browser.api.PreviewEvent.LinkActivated">
 <header class="type-head"><span class="kind kind-record">record</span><h4><a class="self" href="#dev.jasper.browser.api.PreviewEvent.LinkActivated">PreviewEvent.LinkActivated</a></h4><span class="pkg">dev.jasper.browser.api</span></header>
 <pre class="sig"><code><span class="kw">record</span> <b>LinkActivated</b>(<span class="kw">int</span> id)
     <span class="kw">implements</span> <a class="tl" href="#dev.jasper.browser.api.PreviewEvent">PreviewEvent</a></code></pre>
-<div class="doc"><p>The user clicked a link of the document, or pressed Enter on it. The page goes nowhere.</p></div>
+<div class="doc"><p>The user clicked or middle-clicked a link of the document, or pressed Enter on it. The page goes nowhere.</p></div>
 <h5>Components</h5>
 <div class="table-wrap"><table class="components"><tbody>
-<tr id="dev.jasper.browser.api.PreviewEvent.LinkActivated.id()"><td class="ct"><code><span class="kw">int</span></code></td><td class="cn"><code><b>id</b></code></td><td>the link's <code>jasper-link:</code> id</td></tr>
+<tr id="dev.jasper.browser.api.PreviewEvent.LinkActivated.id()"><td class="ct"><code><span class="kw">int</span></code></td><td class="cn"><code><b>id</b></code></td><td>the <code>data-link</code> number of the link's element</td></tr>
 </tbody></table></div>
 </article>
 <article class="type nested" id="dev.jasper.browser.api.PreviewEvent.Unavailable">
@@ -13820,7 +13860,7 @@ diagram, an image or a font arrives.</p></div>
 <tr id="dev.jasper.browser.api.PreviewTheme.palette()"><td class="ct"><code><a class="tl" href="#dev.jasper.sdk.ui.WorkspacePalette">WorkspacePalette</a></code></td><td class="cn"><code><b>palette</b></code></td><td>the document's colours</td></tr>
 <tr id="dev.jasper.browser.api.PreviewTheme.syntax()"><td class="ct"><code><a class="tl" href="#dev.jasper.sdk.ui.SyntaxPalette">SyntaxPalette</a></code></td><td class="cn"><code><b>syntax</b></code></td><td>the colours and styles of code's tokens</td></tr>
 <tr id="dev.jasper.browser.api.PreviewTheme.textFamily()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>textFamily</b></code></td><td>the font family of the document's text; not blank</td></tr>
-<tr id="dev.jasper.browser.api.PreviewTheme.typography()"><td class="ct"><code><a class="tl" href="#dev.jasper.sdk.ui.TerminalTypography">TerminalTypography</a></code></td><td class="cn"><code><b>typography</b></code></td><td>the code's font, and the size and line height of the document's text</td></tr>
+<tr id="dev.jasper.browser.api.PreviewTheme.typography()"><td class="ct"><code><a class="tl" href="#dev.jasper.sdk.ui.TerminalTypography">TerminalTypography</a></code></td><td class="cn"><code><b>typography</b></code></td><td>the code's font, with its fallback fonts and ligatures, and the size of the document's text</td></tr>
 </tbody></table></div>
 <h5>Constructors</h5>
 <div class="member" id="dev.jasper.browser.api.PreviewTheme.PreviewTheme(Variant,WorkspacePalette,SyntaxPalette,String,TerminalTypography)">
@@ -13840,10 +13880,10 @@ diagram, an image or a font arrives.</p></div>
 <p class="export">Exported by <b>Editor</b> <code>dev.jasper.editor</code> 0.19.0. Declare it in <code>plugin.toml</code>: <code>requires = [{ id = "dev.jasper.editor", version = "&gt;=0.19.0", optional = true }]</code>.</p>
 <div class="doc"><p>The Editor's exported API: open a local file, or a document another plugin reads and writes; make recent documents
 reopenable; answer Open in Editor… and offer a file source's places in Open in Editor… and Save As; add items to the
-right-click menu of its tabs. May depend on: the JDK and the SDK.</p></div>
+right-click menu of its tabs' text. May depend on: the JDK and the SDK.</p></div>
 <div class="table-wrap"><table class="summary"><thead><tr><th>Type</th><th>Kind</th><th>Summary</th></tr></thead><tbody>
 <tr><td><a href="#dev.jasper.editor.api.Content"><code>Content</code></a></td><td><span class="kind kind-record">record</span></td><td>A file's bytes and the revision they were read at.</td></tr>
-<tr><td><a href="#dev.jasper.editor.api.ContextRequest"><code>ContextRequest</code></a></td><td><span class="kind kind-record">record</span></td><td>What an item <a href="#dev.jasper.editor.api.Editor.contextItem(String,Consumer)"><code>Editor.contextItem</code></a> added was chosen on, from an Editor tab's right-click menu.</td></tr>
+<tr><td><a href="#dev.jasper.editor.api.ContextRequest"><code>ContextRequest</code></a></td><td><span class="kind kind-record">record</span></td><td>What an item <a href="#dev.jasper.editor.api.Editor.contextItem(String,Consumer)"><code>Editor.contextItem</code></a> added was chosen on, from the right-click menu of an Editor tab's text.</td></tr>
 <tr><td><a href="#dev.jasper.editor.api.Editor"><code>Editor</code></a></td><td><span class="kind kind-interface">interface</span></td><td>Published by the Editor plugin with <code>Services.publish</code>; documents open as tabs in Jasper windows.</td></tr>
 <tr><td><a href="#dev.jasper.editor.api.EditorDocument"><code>EditorDocument</code></a></td><td><span class="kind kind-interface">interface</span></td><td>A file the editor reads and writes through whoever provides it.</td></tr>
 <tr><td><a href="#dev.jasper.editor.api.LocationResolver"><code>LocationResolver</code></a></td><td><span class="kind kind-interface">interface</span></td><td>Turns a file picked in Jasper's file chooser from one of a plugin's file sources into a document, and tells the Editor
@@ -13874,7 +13914,8 @@ where one of its documents is.</td></tr>
 <article class="type" id="dev.jasper.editor.api.ContextRequest">
 <header class="type-head"><span class="kind kind-record">record</span><h4><a class="self" href="#dev.jasper.editor.api.ContextRequest">ContextRequest</a></h4><span class="pkg">dev.jasper.editor.api</span></header>
 <pre class="sig"><code><span class="kw">record</span> <b>ContextRequest</b>(<a class="tl" href="#dev.jasper.sdk.terminal.WindowHandle">WindowHandle</a> window, <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> documentKey, <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> selection)</code></pre>
-<div class="doc"><p>What an item <a href="#dev.jasper.editor.api.Editor.contextItem(String,Consumer)"><code>Editor.contextItem</code></a> added was chosen on, from an Editor tab's right-click menu. Since Editor 0.16.0.</p></div>
+<div class="doc"><p>What an item <a href="#dev.jasper.editor.api.Editor.contextItem(String,Consumer)"><code>Editor.contextItem</code></a> added was chosen on, from the right-click menu of an Editor tab's text. Since
+Editor 0.16.0.</p></div>
 <h5>Components</h5>
 <div class="table-wrap"><table class="components"><tbody>
 <tr id="dev.jasper.editor.api.ContextRequest.window()"><td class="ct"><code><a class="tl" href="#dev.jasper.sdk.terminal.WindowHandle">WindowHandle</a></code></td><td class="cn"><code><b>window</b></code></td><td>the Jasper window that holds the tab</td></tr>
@@ -13924,7 +13965,7 @@ window to the front.</p></div>
         <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> keyPrefix,
         <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/function/Function.html" title="java.util.function.Function">Function</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a>, <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/function/Function.html" title="java.util.function.Function">Function</a>&lt;<a class="tl" href="#dev.jasper.sdk.WindowOwner">WindowOwner</a>, <a class="tl" href="#dev.jasper.editor.api.EditorDocument">EditorDocument</a>&gt;&gt;&gt; resolve)</code></pre>
 <div class="doc"><p>Makes recent files under a key prefix reopenable. The resolver also brings the Editor's tabs of such documents
-back when Jasper restores its windows, which at start may be before the plugin's own data has loaded. The
+back when Jasper restores its window, which at start may be before the plugin's own data has loaded. The
 resolver runs on the UI thread and must do no I/O. It returns empty when the key cannot be reopened now, for
 example because its host was deleted, and otherwise a factory that builds the document for the window reopening
 it (null when there is none). A later registration of the same prefix replaces the earlier one; the longest
@@ -13954,10 +13995,10 @@ registered; a later registration for the same source replaces the earlier one.</
 <pre class="sig"><a class="self" href="#dev.jasper.editor.api.Editor.contextItem(String,Consumer)" aria-label="Link to this member">#</a><code><span class="kw">default</span> <a class="tl" href="#dev.jasper.sdk.Subscription">Subscription</a> <b>contextItem</b>(
         <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> title,
         <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/function/Consumer.html" title="java.util.function.Consumer">Consumer</a>&lt;<a class="tl" href="#dev.jasper.editor.api.ContextRequest">ContextRequest</a>&gt; run)</code></pre>
-<div class="doc"><p>Adds an item to the end of every Editor tab's right-click menu, after a rule, in registration order with the other
-plugins' items. The menu shows <code>title</code> as plain text. Choosing the item runs <code>run</code> on the UI thread with
-the tab's window, its document's key and the selected text; the Editor does not change the document. A handler that
-throws is logged. Since Editor 0.16.0.</p></div>
+<div class="doc"><p>Adds an item to the end of the text's right-click menu in every Editor tab, after a rule, in registration order
+with the other plugins' items. The menu shows <code>title</code> as plain text. Choosing the item runs <code>run</code> on
+the UI thread with the tab's window, its document's key and the selected text; the Editor does not change the
+document. A handler that throws is logged. Since Editor 0.16.0.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>title</code> the item's title; not blank (<a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalArgumentException.html"><code>IllegalArgumentException</code></a> otherwise)</dd><dd><code>run</code> told what the item was chosen on</dd><dt>Returns</dt><dd>removes the item</dd></dl>
 </div>
 </article>
@@ -14514,7 +14555,7 @@ it shows. The request grants nothing, whatever it names; only the user's choice 
 <tr id="dev.jasper.vault.api.CredentialPickRequest.allowClear()"><td class="ct"><code><span class="kw">boolean</span></code></td><td class="cn"><code><b>allowClear</b></code></td><td>whether the chooser offers a None row while its search is empty; choosing it answers
     <a href="#dev.jasper.vault.api.CredentialPickResult.Cleared"><code>CredentialPickResult.Cleared</code></a></td></tr>
 <tr id="dev.jasper.vault.api.CredentialPickRequest.search()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>search</b></code></td><td>the chooser's starting search, stripped: it opens listing only the credentials whose name or caption
-    contains it, ignoring case, until the user edits it; empty for every credential</td></tr>
+    contains it, ignoring case, until the user edits it; empty for every credential. Since Vault 0.9.0</td></tr>
 </tbody></table></div>
 <h5>Constructors</h5>
 <div class="member" id="dev.jasper.vault.api.CredentialPickRequest.CredentialPickRequest(UiAnchor,Optional,boolean)">
@@ -14768,7 +14809,8 @@ it, all without a grant prompt. When this plugin's saved grant is the only grant
 exactly <code>name</code>, the last such login in the vault takes the new username and password instead, keeping its
 id, grants and created time; a login of that name another plugin can read, or this plugin cannot, is left alone
 and a new one is added. Vault keeps its own copy of <code>password</code>, so the caller still zeroes its array. The
-interface default fails with <a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/UnsupportedOperationException.html"><code>UnsupportedOperationException</code></a>; Credential Vault implements it.</p></div>
+interface default fails with <a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/UnsupportedOperationException.html"><code>UnsupportedOperationException</code></a>; Credential Vault implements it. Since Vault
+0.9.0.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>owner</code> the window the unlock prompt opens over</dd><dd><code>name</code> the login's name in Vault</dd><dd><code>username</code> the login's username, which may be empty</dd><dd><code>password</code> the login's password, which may be empty</dd><dt>Returns</dt><dd>the saved login; empty when <code>owner</code> is null or closes first, unlocking is cancelled, the vault locks
     before the save finishes (a save the lock interrupts while it writes may still be in the vault when it next
     unlocks) or there is no vault (Vault then posts a notification saying to create one). Fails with
@@ -14779,7 +14821,7 @@ interface default fails with <a class="ext" href="https://docs.oracle.com/en/jav
 <pre class="sig"><a class="self" href="#dev.jasper.vault.api.VaultApi.credentialIfGranted(UUID)" aria-label="Link to this member">#</a><code><span class="kw">default</span> <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl" href="#dev.jasper.vault.api.Credential">Credential</a>&gt; <b>credentialIfGranted</b>(<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/UUID.html" title="java.util.UUID">UUID</a> id)</code></pre>
 <div class="doc"><p>The secret for <code>id</code> without any prompt, only while the vault is unlocked and this plugin holds a saved grant
 for <code>id</code>. A one-time grant from a pick is neither used nor spent. Close the result. The interface default
-answers empty.</p></div>
+answers empty. Since Vault 0.9.0.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>id</code> a credential's <a href="#dev.jasper.vault.api.CredentialDescriptor.id()">id</a></dd><dt>Returns</dt><dd>the secret; empty when the vault is locked or there is none, the id is unknown, or this plugin has no
     saved grant for it</dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalStateException.html">IllegalStateException</a> when Credential Vault is called off the UI thread</dd></dl>
 </div>
@@ -14788,7 +14830,7 @@ answers empty.</p></div>
 <div class="doc"><p>Opens the Credential Vault manager over <code>owner</code>, creating a vault or unlocking first as Open Vault... does;
 Vault reports its failures in its own notifications, and does nothing when <code>owner</code> is null or closed. A
 modal dialog over <code>owner</code>, such as Settings, keeps the manager and its prompts from taking input until it
-closes, so close such a dialog first. The interface default does nothing.</p></div>
+closes, so close such a dialog first. The interface default does nothing. Since Vault 0.9.0.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>owner</code> the window the manager opens over</dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalStateException.html">IllegalStateException</a> when Credential Vault is called off the UI thread</dd></dl>
 </div>
 </article>

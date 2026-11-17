@@ -1,5 +1,6 @@
 # Settings for Remote. Change them in Settings > Tools > Remote or here. Connection settings apply to the next
-# connection; SFTP limits apply at once. Rebind Remote's shortcuts in Settings > Keymap.
+# connection; max_parallel_files applies at once and request_timeout_seconds to SFTP channels opened afterwards.
+# Rebind Remote's shortcuts in Settings > Keymap.
 # connect_timeout_seconds = 10      # 0 to 3600
 # auth_timeout_seconds = 30         # 0 to 3600
 # keepalive_seconds = 30            # server-alive interval, 0 to 3600; 0 disables

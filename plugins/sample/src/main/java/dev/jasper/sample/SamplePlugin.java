@@ -146,7 +146,7 @@ public final class SamplePlugin implements Plugin {
                 dialog.setContent(body);
                 dialog.show();
             });
-            // Jasper saves the tab with its windows, and the "about" restorer below opens it again (SDK 0.21.0).
+            // Jasper saves the tab with its window, and the "about" restorer below opens it again.
             about[0] = context.windows().openTab(new ContentSpec("about", "About Sample")
                 .withRestore(new RestoreState("about", java.util.Map.of())), owner, content);
         };

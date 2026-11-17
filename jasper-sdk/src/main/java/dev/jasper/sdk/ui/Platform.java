@@ -188,14 +188,16 @@ public interface Platform {
 
     /**
      * Makes this plugin the editor Jasper opens files with: {@code config.toml}, the plugin settings files, the custom VM
-     * options file, every {@link #openInEditor} and {@link #openFile}, and a Cmd-click (Ctrl-click on Linux and Windows)
-     * on a file path in a local terminal pane go to {@code editor} first, on the UI thread; a click brings the path's line
-     * and the clicked window. A clicked path comes from program output, and an OSC 8 link's address can differ from the
-     * text shown, so an editor edits the file and never runs it. One at a time: a bundled plugin's registration replaces
-     * a plugin's that is not bundled; otherwise the first stays and any later one, this plugin's own included, throws.
-     * When the editor returns false or throws, when no plugin provides one, and when Jasper waited 30 seconds for the UI
-     * thread's answer, the desktop opens the file as before; for a click and an {@link #openFile} it edits the file or
-     * shows it in the file manager instead, and never opens it. Needs {@code editor.provide}. UI thread only. The registration ends with
+     * options file, every {@link #openInEditor} and {@link #openFile}, a Cmd-click (Ctrl-click on Linux and Windows) on
+     * a file path in a local terminal pane, and the files other programs hand to Jasper ({@link FileOrigin#OUTSIDE}) go
+     * to {@code editor} first, on the UI thread; a click brings the path's line and the clicked window. A clicked path
+     * comes from program output, and an OSC 8 link's address can differ from the text shown, so an editor edits the file
+     * and never runs it. One at a time: a bundled plugin's registration replaces a plugin's that is not bundled;
+     * otherwise the first stays and any later one, this plugin's own included, throws. When the editor returns false or
+     * throws, when no plugin provides one, and when Jasper waited 30 seconds for the UI thread's answer, the desktop
+     * opens the file with its edit action, then its open action, then by showing it in the file manager; for a click
+     * and an {@link #openFile} it edits the file or shows it in the file manager instead, and never opens it, and a file
+     * another program handed in is only shown in the file manager. Needs {@code editor.provide}. UI thread only. The registration ends with
      * the plugin.
      *
      * @param editor opens a file

@@ -2,18 +2,22 @@
 
 `app-misc/jasper-workstation-1.0.0_p20261101` builds source commit
 `be557f600d984232cc9060c8488b563286b3ee28` with Gradle 9.7.0 and the JCEF
-JetBrains Runtime SDK 25.0.4.1-b635.75. The initial keyword is `~arm64` on glibc systems; the upstream private JBR requires glibc.
-The installed image removes the current-directory search entry from two upstream JCEF ELF RPATHs while retaining their private `$ORIGIN` lookup.
-The package installs its image and private runtime in `/opt/jasper-workstation`,
-the `jasper` command in `/usr/bin`, and a desktop entry and icon. It leaves
-system Java selection and user configuration to their existing owners.
+JetBrains Runtime SDK 25.0.4.1-b635.75. That commit predates the Browser plugin, so the package carries nine bundled
+plugins: Shell History, Snippets, Credential Vault, Remote, Editor, File Server, Project Index, Enterprise and Sample.
+The keyword is `~arm64`, on glibc systems only: the private JBR requires glibc. The installed image removes the
+current-directory search entry from the RPATHs of the JCEF runtime's `libjcef.so` and `jcef_helper`, keeping their
+private `$ORIGIN` lookup. The package installs its image and private
+runtime in `/opt/jasper-workstation`, the `jasper` command in `/usr/bin`, and a desktop entry and icon. The desktop
+entry starts `/opt/jasper-workstation/bin/Jasper` and declares no MIME types, so desktops do not offer this
+installation as a web browser or under Open With. It leaves system Java selection and user configuration to their
+existing owners.
 
 ## Install
 
 Keep the checkout at a stable, root-readable path. Read the
 [PolyForm Noncommercial](licenses/PolyForm-Noncommercial-1.0.0),
 [JogAmp](licenses/Jasper-JogAmp) and [Nerd Fonts](licenses/Jasper-Nerd-Fonts)
-license texts before accepting those three package-specific entries below.
+licence texts before accepting those three package-specific entries below.
 
 On a system with no existing `repos.conf`, create `/etc/portage/repos.conf/` and
 write `gentoo.conf` with the existing Gentoo checkout location:
@@ -45,9 +49,9 @@ FEATURES=test emerge --ask --buildpkg=n app-misc/jasper-workstation
 ```
 
 Jasper uses PolyForm Noncommercial 1.0.0. The package preserves third-party
-license notices in its application jars and the private runtime's `legal` tree.
-The overlay carries the compound JogAmp and Nerd Fonts notices as Gentoo license
-entries. If your license policy rejects other declared licenses, review and
+licence notices in its application jars and the private runtime's `legal` tree.
+The overlay carries the compound JogAmp and Nerd Fonts notices as Gentoo licence
+entries. If your licence policy rejects other declared licences, review and
 accept those individually. Binary redistribution is restricted in this recipe;
 installation builds Jasper from source while using pinned upstream Java/native
 dependencies and the private JBR.
@@ -58,15 +62,12 @@ All integration flags default off:
 |---|---|---|
 | `gtk` | GTK 3 | GTK 3.24 or newer |
 | `gtk4` | GTK 4 | GTK 4.10 or newer and libadwaita |
-| `qt6` | Qt 6 | Qt 6 Widgets |
-| `kde` | KDE Frameworks 6 | Qt 6, KConfig and KColorScheme; requires `qt6` |
+| `qt6` | Qt 6 | Qt 6.2 or newer with Widgets; CMake 3.21 or newer to build |
+| `kde` | KDE Frameworks 6 | Qt 6.5 or newer, KConfig 6 and KColorScheme 6; requires `qt6` |
 
 Enabled integrations are required at build time. Disabled integrations are omitted
 even when the SDK is installed; Qt 5 and KDE Frameworks 5 are explicitly off. The
 GIO portal helper and core JBR/X11/Chromium runtime libraries remain dependencies.
-GTK is the verified installed configuration on the initial XFCE ARM64 VM; the
-[verification record](../../docs/superpowers/plans/2026-11-01-gentoo-package-verification.md)
-records the headless acceptance evidence and remaining graphical checks.
 
 `FEATURES=test` runs the upstream headless `verifyPackage` task: it checks the
 packaged jars/runtime/selected helpers and runs the native launcher suites.
@@ -117,7 +118,7 @@ Other repositories require an explicit generator update and review.
 The overlay maintains one source recipe with its matching catalog. For a source-version update, rename the ebuild to its new version, update
 `JASPER_COMMIT` to the full source SHA and update `-PjasperVersion` if the
 application version changes. Keep Gradle/JBR pins aligned with that source's
-wrapper and `packaging/jcef/checksums.txt`. Update license texts/declarations and
+wrapper and `packaging/jcef/checksums.txt`. Update licence texts/declarations and
 runtime dependencies whenever the bundled inputs change. Then, on Gentoo:
 
 ```sh

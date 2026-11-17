@@ -75,13 +75,17 @@ not a request is dropped without a reply, the token is compared in constant time
 255 (anything else is 1).
 
 The arguments reach Jasper as given, with the caller's working directory, and `JasperApplication.commands()` decides
-what the call is. With no arguments it raises the most recently active window, restoring the windows first when none is open, as a
-second launch's handoff does (exit code 0). A first argument a plugin declares as a subcommand goes to the plugins'
-`PluginCommands`, which runs the owning plugin's `CommandLine` handler on the UI thread, after restoring the windows
-when the subcommand will run and no window is open. Otherwise, when every argument names an existing file or
-folder, each file opens in the editor a plugin provides, or is revealed when none runs, and each folder as a terminal tab, in the most recently active window (exit code 0); when the first does but others do not, the call fails with "jasper: no such
-file or folder:" and the missing ones (exit code 1). Anything else goes to `PluginCommands`, which reports an unknown
-or unavailable name.
+what the call is. Arguments that are all `http` or `https` addresses (`webAddresses`) each open as an address from
+outside Jasper (`ExternalAddresses`), from the window of the calling pane; the call is answered once every address has
+been handed on, which waits while Jasper's plugins start, with exit code 1 when one was dropped because 32 were already
+waiting. With no arguments it raises the most recently active window, restoring the saved window first when none is
+open, as a second launch's handoff does (exit code 0). A first argument a plugin declares as a subcommand goes to the
+plugins' `PluginCommands`, which runs the owning plugin's `CommandLine` handler on the UI thread, after restoring the
+saved window when the subcommand will run and no window is open. Otherwise, when every argument names an existing file
+or folder, each file opens in the editor a plugin provides, as a file from outside Jasper (`FileOrigin.OUTSIDE`), or is
+revealed when none runs, and each folder as a terminal tab, in the most recently active window (exit code 0); when the
+first does but others do not, the call fails with "jasper: no such file or folder:" and the missing ones (exit code 1).
+Anything else goes to `PluginCommands`, which reports an unknown or unavailable name.
 `SubcommandList` writes `daemon/subcommands` atomically at plugin start, with the subcommands of the plugins that
 started. The plugin side is under
 [command-line subcommands](../../docs/plugin-authoring.md#command-line-subcommands).

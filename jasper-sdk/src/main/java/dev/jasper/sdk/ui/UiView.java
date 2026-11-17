@@ -8,7 +8,7 @@ public interface UiView extends Subscription {
  void update(ViewSpec spec);
  /**
   * Mint attachment authority from an eligible mounted action or PICKER: a {@link Nodes.Button}, a PICKER
-  * {@link Nodes.Choice} or, since 0.29.0, a {@link Nodes.MenuButton}, whose popovers attach to its button.
+  * {@link Nodes.Choice} or a {@link Nodes.MenuButton}, whose popovers attach to its button.
   *
   * @param nodeId control id
   * @return scoped capability

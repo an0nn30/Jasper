@@ -6,7 +6,7 @@ import java.util.Optional;
 /** Stable document identity, scoped to the calling plugin, initial literal title, and how the tab comes back.
  * @param key stable nonblank identity; reopening selects the existing content
  * @param title initial literal tab title
- * @param restore how the tab comes back when Jasper restores its windows (since 0.21.0); empty, and the tab is not saved
+ * @param restore how the tab comes back when Jasper restores its windows; empty, and the tab is not saved
  * @since 0.8.5
  */
 public record ContentSpec(String key, String title, Optional<RestoreState> restore) {

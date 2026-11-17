@@ -52,7 +52,7 @@ public final class Nodes {
      * An icon's size role. CAPTION stands beside caption text, CONTROL beside a control's or a row's text, RAIL in a rail
      * or a list row, and EMPTY in an {@link Empty} state; a list row's leading RAIL or PROMPT icon sits on a tile in its
      * hue unless the hue is NONE. PROMPT is the large icon: a prompt's header, a detail heading or a sheet's title.
-     * SWATCH (since 0.18.0) is a solid square of the icon's hue at caption size, such as a protocol's colour beside its
+     * SWATCH is a solid square of the icon's hue at caption size, such as a protocol's colour beside its
      * name; its hue is not NONE and it takes no severity, and its name stays a valid icon name.
      */
     public enum IconSize { CAPTION, CONTROL, RAIL, EMPTY, PROMPT, SWATCH }
@@ -82,8 +82,8 @@ public final class Nodes {
      * click, Enter or Down reports its action, and the owner shows the options. SEARCHABLE is a dropdown whose open list
      * narrows as the user types (see {@link ChoiceSearch}). PREVIEWS shows its options as tiles, an option with a preview
      * as the miniature window it describes. EXCLUSIVE is a choice among two to four options, all of them visible. TABS
-     * (since 0.18.0) switches among two or more views of one thing (Overview and Details): it reports Selected, and the
-     * owner composes the chosen content.
+     * switches among two or more views of one thing (Overview and Details): it reports Selected, and the owner composes
+     * the chosen content.
      */
     public enum ChoiceKind { DROPDOWN, PICKER, EXCLUSIVE, SEARCHABLE, PREVIEWS, TABS }
     /**
@@ -240,9 +240,9 @@ public final class Nodes {
      * treatment while it is true and reports its pressed state to assistive technology; a click reports the Action and
      * the owner confirms the new state in its next update. Only GHOST and SECONDARY buttons take it.
      *
-     * <p>Since 0.27.0 a button can carry a {@code holdMenu}, as a browser's Back button carries its history: a press held
-     * on the button for at least 500 ms opens the menu under it, and its release then reports nothing, while a shorter
-     * press reports {@code action} as before. A press whose pointer leaves the button, even to come back, or that ends
+     * <p>A button can carry a {@code holdMenu}, as a browser's Back button carries its history: a press held on the
+     * button for at least 500 ms opens the menu under it, and its release then reports nothing, while a shorter press
+     * reports {@code action}. A press whose pointer leaves the button, even to come back, or that ends
      * without its release (the window losing the focus), opens nothing. A right-click (a Control-click on macOS),
      * Shift+F10 and the context-menu key open the menu at once. Choosing an enabled item closes the menu and reports the
      * item's action as a {@link UiEvent.Action}.
@@ -404,11 +404,11 @@ public final class Nodes {
      * to an enclosing stack or form. A nonblank {@code listId} names an ItemList in the same view: Up, Down, Page Up and
      * Page Down in the field move that list's selection (reporting its Selected) while the focus stays in the field, and
      * Enter keeps its meaning in the field. A TEXTAREA takes neither {@code alternateAction} nor {@code listId}, and a
-     * NUMBER field (whose arrows step it) takes no {@code listId}. A {@code readOnly} field (since 0.18.0) is focusable,
+     * NUMBER field (whose arrows step it) takes no {@code listId}. A {@code readOnly} field is focusable,
      * selectable and copyable but never edited, so it reports no {@link UiEvent.Edited}; a STEPPER or SLIDER is never
      * read-only.
      *
-     * <p>Since 0.27.0 the field's leading slot, before the text, can show the plugin's own picture in place of the kind's
+     * <p>The field's leading slot, before the text, can show the plugin's own picture in place of the kind's
      * glyph (a SEARCH field's magnifier, a PATH field's folder, a PORT field's colon), in that glyph's box, under every
      * look: its {@code leadingImage}, such as a web page's favicon, or, while it has none or the image does not decode,
      * its {@code leadingIcon}, drawn in the glyph's colours. {@code leadingName} is the slot's accessible name and
@@ -419,7 +419,7 @@ public final class Nodes {
      * drags out a selection of its own; while the field has the focus, a click places the caret. A TEXTAREA, a STEPPER
      * and a SLIDER take no leading image or icon and no {@code selectOnClick}.
      *
-     * <p>Since 0.27.0 a field can offer {@code suggestions} as the user types, such as an address field's addresses and
+     * <p>A field can offer {@code suggestions} as the user types, such as an address field's addresses and
      * searches: it shows them in a list under itself, the first selected, with "Loading suggestions…" after them while
      * {@code suggestionsLoading} is true. The field keeps the keyboard focus, so typing goes on in the field. While the
      * list shows suggestions, Up and Down move the selection, and Tab and Enter report {@link UiEvent.SuggestionChosen}
@@ -609,7 +609,7 @@ public final class Nodes {
      * The closed face of a PICKER or DROPDOWN {@link Choice}, as display data only. Empty primary means the placeholder
      * face. A PICKER's face is its whole control; a DROPDOWN may carry one too (a rich closed face, such as a saved
      * host's tile, name and endpoint) while its popup still lists the options and reports Selected; its owner keeps the
-     * face describing the selected option. A {@code technicalCaption} (since 0.18.0) is a data value, such as a saved
+     * face describing the selected option. A {@code technicalCaption} is a data value, such as a saved
      * host's endpoint, drawn in the data face.
      *
      * @param primary the face's main text; empty shows the placeholder face, "Choose…" in the placeholder colour, which
@@ -793,7 +793,7 @@ public final class Nodes {
     }
 
     /**
-     * A field of short tokens, such as a bookmark's tags (since 0.29.0). Each token shows as a chip in the look's tag
+     * A field of short tokens, such as a bookmark's tags. Each token shows as a chip in the look's tag
      * style, in the case the user typed it in every look, with a remove button inside it named "Remove" and the token;
      * the user types the next token after the chips, which wrap onto further lines as the field fills. Enter adds the
      * typed text as a token while text other than white space is typed, and so does the focus leaving the field for
@@ -834,7 +834,7 @@ public final class Nodes {
          * only when it is nonblank, at most 64 characters and free of control characters, and when it does not match an
          * earlier one ignoring the case of ASCII letters, so "Work" and "work" are one token and "\u00C4pfel" and
          * "\u00E4pfel" two; the first 100 are kept, in the order given. This is the rule Jasper's Browser keeps bookmark
-         * tags by ({@code BookmarkStore.keptTags} calls it).
+         * tags by.
          *
          * @param given the tokens given
          * @return those kept, in order

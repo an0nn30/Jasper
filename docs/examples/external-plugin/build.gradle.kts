@@ -29,7 +29,8 @@ version = field("version")
 
 repositories { mavenCentral() }
 
-// Jasper runs plugins on Java 25; any Java 25 compiles them (Jasper itself needs the JetBrains Runtime only to run).
+// Jasper runs plugins on Java 25; any vendor's Java 25 compiles this one (Jasper's own build needs the JetBrains Runtime
+// with JCEF).
 java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
 
 dependencies {

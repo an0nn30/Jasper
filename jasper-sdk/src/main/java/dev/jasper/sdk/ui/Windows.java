@@ -117,10 +117,12 @@ public interface Windows {
      * cancels the quit. A guard that throws, returns {@code null} or whose future fails allows the quit. The guard
      * runs on the UI thread and may show a modal dialog before completing its future.
      *
-     * <p>It is asked on a real quit or restart only. A resident macOS Jasper answers Cmd+Q, Jasper &rsaquo; Quit, the Dock's
-     * Quit and a Jasper window's File &rsaquo; Quit by closing its windows through the content tabs'
-     * closing guards and going to the background. That does not ask this guard, and the plugin keeps running until Jasper
-     * really quits (Quit Jasper Completely, a log-out or a restart).
+     * <p>It is asked on a real quit or restart only. With {@code system.run_in_background} on, closing the last window
+     * leaves Jasper running with no window on macOS, Windows and Linux, and a resident, packaged macOS Jasper also
+     * answers Cmd+Q, Jasper &rsaquo; Quit, the Dock's Quit and a Jasper window's File &rsaquo; Quit by closing its
+     * windows through the content tabs' closing guards and going to the background. Neither asks this guard, and the
+     * plugin keeps running until Jasper really quits (Quit Jasper Completely or a log-out on macOS; Quit, or Quit Jasper
+     * in the notification-area or tray icon, on Windows and Linux) or restarts.
      *
      * @param guard returns the decision, possibly after asking the user
      * @return the registration; closing it removes the guard

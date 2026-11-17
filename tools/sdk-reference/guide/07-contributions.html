@@ -155,9 +155,9 @@ A modeless dialog whose content is a {@link Nodes.FormKind#WINDOW} form, as the 
 a window's size, can be resized and remembers its bounds.</li>
 <li>{@link Windows#overlay(OverlaySpec)}: progress content centred inside a Jasper window, one per window. Escape and
 outside clicks do not dismiss it, so give it a Cancel action.</li>
-<li>{@link Windows#popover(UiAnchor)}: a popup below (or above) a button, menu button or picker, from {@link UiView#anchor(String)},
-or since 0.32.0 an area of custom content, from {@link UiView#anchorAt(String,ContentArea)}; Escape and clicks outside
-close it.</li>
+<li>{@link Windows#popover(UiAnchor)}: a popup below (or above) a button, menu button or picker, from
+{@link UiView#anchor(String)}, or an area of custom content, from {@link UiView#anchorAt(String,ContentArea)}; Escape and
+clicks outside close it.</li>
 </ul>
 <p>{@link Windows#hasModal(WindowOwner)} tells whether a Jasper window shows a modal now: a modal dialog over it,
 Jasper's or any plugin's, or an overlay inside it.</p>
@@ -169,7 +169,8 @@ where a {@link TabPlacement} says: a new tab at the end of the strip or right af
 already has open selects that tab and returns its handle. Through the {@link ContentTab} the plugin sets the tab's
 title, detail, icon or image, unsaved marker and location ({@link ContentTab#setPresentation(ContentPresentation)}), its commands
 ({@link ContentTab#setCommands(List)}), which its context menu lists and whose shortcuts apply while it is active, and
-its status bar items ({@link ContentTab#setStatus(List)}), and shows a right-click menu over it with Jasper's pane items
+its status bar items ({@link ContentTab#setStatus(List)}: a {@link ContentStatus} with text, an icon, a dimmed state, and
+an action or a menu of {@link ContentStatus.MenuEntry} items), and shows a right-click menu over it with Jasper's pane items
 between its own ({@link ContentTab#showContextMenu(Point,List,List,Consumer)}). With {@link ContentTab#setTextInsertion(Optional)}
 the tab takes the text other plugins insert, such as a palette scope's snippet: while the tab is its window's current
 item, a palette query with no terminal pane names it as its {@link TextTarget}, and each {@link InsertedText} reaches
@@ -255,12 +256,13 @@ the user clicks the card. A connection ({@link Activities#connection(ConnectionS
 degraded or down, until the plugin closes it; Desk Buddy shows a card per connection. Both are published on
 {@link Activities#TOPIC} and {@link Activities#CONNECTIONS}, which any plugin may follow.</p>
 
-<p>{@link ActivityHandle#needsInput(String)} waits for input; {@link ActivityHandle#resume(String)} explicitly resumes
-work. Both retain the id, fraction and activation action. Progress and detail preserve the phase; repeated phase calls
-coalesce detail. Subscribers handle {@link ActivityEvent.State#NEEDS_INPUT} (including waiting detail updates) and
-{@link ActivityEvent.State#RESUMED}. Phase transitions arrive in order; pending progress may be dropped at a transition.
-{@link Activities#current()} includes waiting tasks. Running plugin tasks and qualifying terminal work jointly drive
-Buddy's working animation; waiting tasks remain available for activation without contributing running intent.</p>
+<p>An activity that cannot go on without the user calls {@link ActivityHandle#needsInput(String)}: it keeps its id,
+fraction and action, its card stays and shows that it waits for input, and progress and detail reports keep it waiting
+until {@link ActivityHandle#resume(String)}. Subscribers see {@link ActivityEvent.State#NEEDS_INPUT} for the change and
+for each report while it waits, and {@link ActivityEvent.State#RESUMED} when it goes on. Phase changes arrive in order;
+a progress report still waiting to be delivered when the phase changes is dropped. {@link Activities#current()} includes
+waiting activities. Desk Buddy looks busy while an activity runs or a terminal is busy, so a waiting activity does not
+keep it busy.</p>
 
 <h3 id="contributions-subcommands">Subcommands</h3>
 <p>A plugin declares each {@code jasper} subcommand in its manifest and answers it while it runs:</p>
@@ -286,10 +288,27 @@ program's settings. See <a href="command-line.md">the command line</a>.</p>
 <h3>The editor role</h3>
 <p>{@link Platform#editor(FileEditor)} makes the plugin the editor Jasper opens files with: its configuration files,
 every {@link Platform#openInEditor(Path)} and {@link Platform#openFile(Path)}, and a Cmd-click (Ctrl-click on Linux and Windows) on a file path in a local
-terminal pane reach the plugin's {@link FileEditor} first; returning {@code false} hands the file to the desktop. One plugin at a time holds the role: a bundled plugin's registration
-replaces one that is not bundled; otherwise the first stays and a later one throws. The Editor plugin takes it. Shell
+terminal pane reach the plugin's {@link FileEditor} first; returning {@code false} hands the file to the desktop. Jasper
+calls {@link FileEditor#edit(Path,OptionalInt,Optional,FileOrigin)} with the line, the window and a {@link FileOrigin}:
+{@link FileOrigin#OUTSIDE} for a file another program handed to Jasper (the system's open-file event, a launch's files,
+the {@code jasper} command), {@link FileOrigin#JASPER} for the rest. One plugin at a time holds the role: a bundled
+plugin's registration replaces one that is not bundled; otherwise the first stays and a later one throws. The Editor
+plugin takes it. Shell
 variables ({@link Terminals#environment(Function)}) and program tabs ({@link LocalSpec#running(List,Optional)}) are
 described in <a href="#terminals">Terminals</a>.</p>
+
+<h3>The web browser role</h3>
+<p>{@link Platform#browser(WebBrowser)} makes the plugin the web browser Jasper opens web addresses with. Its
+{@link WebBrowser} hears each one first, on the UI thread, as a {@link WebLink}: the address, who asked
+({@link LinkOrigin#CLICK} for a link the user Cmd-clicked (Ctrl-clicked on Linux and Windows) in a terminal, Jasper's own
+web links and {@link Platform#openInBrowser(URI)}; {@link LinkOrigin#EXTERNAL} for the {@code jasper} command's
+addresses and the system's), where it asks to open ({@link LinkPlacement#TAB}, or {@link LinkPlacement#SPLIT_RIGHT} or
+{@link LinkPlacement#SPLIT_DOWN} for the split gesture), the name an OSC 8 link gave its target, and the window it came
+from. A local web file clicked in a terminal arrives as a {@code file:} link. A clicked address is program output, so
+show it before acting on it. Returning {@code false}, or throwing, hands an {@code http} or {@code https} address to the
+system browser and a {@code file:} one to the editor role; while Jasper is itself the system's default browser, which would
+hand the address back, it opens nothing instead. Other schemes, such as {@code mailto}, always go to the system browser.
+One plugin at a time holds the role, by the editor role's rule. The Browser plugin takes it.</p>
 
 <h3>Desktop integration</h3>
 <p>{@link Platform#copy(String)} puts text on the clipboard; {@link Platform#copySecret(String)} also clears it 30 seconds
@@ -303,5 +322,7 @@ browser, except while Jasper is itself the system's default browser, when it ope
 {@link Platform#isDefaultBrowser()} tells whether Jasper is the system's default web browser, as Jasper last checked,
 and {@link Platform#onDefaultBrowserChanged(Consumer)} hears each change of that answer. {@link Platform#copyOnSelect()}
 tells, on any thread, whether the user turned on Copy on select, for a view that copies its own selections as a terminal
-does.</p>
+does. {@link Platform#downloadsFolder()} is the system's Downloads folder, which it does not create, and
+{@link Platform#markDownloaded(Path,URI,Optional)}, off the UI thread, gives a downloaded file the system's downloaded-file
+mark: the quarantine attribute on macOS, the {@code Zone.Identifier} stream on Windows, nothing on Linux.</p>
 </section>

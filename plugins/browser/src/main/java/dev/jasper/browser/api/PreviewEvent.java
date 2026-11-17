@@ -98,14 +98,16 @@ public sealed interface PreviewEvent {
      * The page scrolled.
      *
      * @param y the top of the view
-     * @param user whether the user scrolled it; false for the scrolling {@link MarkdownPreview#scrollTo} asked for
+     * @param user whether the user scrolled it; false for the scrolling {@link MarkdownPreview#scrollTo} asked for, and
+     *     for a move the layout made: a new document's, or one up to the page's end when a shorter document or a taller
+     *     view leaves less to scroll
      */
     record Scrolled(double y, boolean user) implements PreviewEvent { }
 
     /**
-     * The user clicked a link of the document, or pressed Enter on it. The page goes nowhere.
+     * The user clicked or middle-clicked a link of the document, or pressed Enter on it. The page goes nowhere.
      *
-     * @param id the link's {@code jasper-link:} id
+     * @param id the {@code data-link} number of the link's element
      */
     record LinkActivated(int id) implements PreviewEvent { }
 

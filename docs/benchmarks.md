@@ -19,7 +19,8 @@ establish it.
 
 ## Preserve and invoke a packaged image
 
-Build and verify an image with the JBR SDK 25 and the wrapper; these tasks do not start Jasper:
+Build and verify an image with the JCEF build of JBR SDK 25 ([requirements](packaging.md#requirements)) and the
+wrapper; these tasks do not start Jasper:
 
 ```sh
 ./gradlew check :jasper-app:packageApp :jasper-app:verifyPackage

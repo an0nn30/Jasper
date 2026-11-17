@@ -25,9 +25,9 @@ several are enabled. `jasper --safe-mode` always starts with the standard look
 ([command line](command-line.md#launching-jasper-with-options)).
 
 The Enterprise look keeps its own tool window layout in `workspace.toml` (under
-`[window.tool_windows.look."dev.jasper.enterprise"]`), apart from the standard look's, so each comes back as you
-left it. After turning Enterprise off, a theme pick you saved as
-`enterprise` shows the appearance's default theme, Jasper Meadow, without a warning, until Enterprise is on again.
+`[window.tool_windows.look."dev.jasper.enterprise"]`), apart from the standard look's, so each comes back as you left
+it. After turning Enterprise off, a theme pick you saved as `enterprise` shows Jasper Meadow without a warning, until
+Enterprise is on again.
 
 ### If the look does not start
 
@@ -59,9 +59,10 @@ Enterprise as skipped: "did not finish starting with this look last time".
     the system title bar instead, with the menus as a row in the window.
   - On Linux, the system title bar.
 
-  Other windows, such as Settings, About and the Credential Vault manager, keep the
-  system title bar on macOS and Linux and Jasper's on Windows. Settings hides `window.native_decorations` on macOS and
-  Linux. Compact keeps the system title bar, without the band.
+  A tool window in a window of its own ([Float and Window](workspace.md#float-and-window)) has the band on macOS and,
+  on Windows, Jasper's 28-pixel title bar in the toolbar's colour. Other windows, such as Settings, About and the
+  Credential Vault manager, keep the system title bar on macOS and Linux and Jasper's on Windows. Settings hides
+  `window.native_decorations` on macOS and Linux. Compact keeps the system title bar, without the band.
 - **Window title.** A window's is `Workstation — {session} — {directory}`: `{session}` is the session's name
   for a session a plugin provides, such as a Remote host, the host of a pane in a remote directory, or "Local:
   *shell*"; `{directory}` is the remote path, or the local folder with `~` for your home folder. A part with nothing to
@@ -69,9 +70,10 @@ Enterprise as skipped: "did not finish starting with this look last time".
 - **Menus** are in the screen menu bar on macOS, with **About Jasper** and **Settings…** in the application menu; in
   the window's title bar on Windows; and a row in the window on Linux, with **About Jasper** at the end of
   Help on both. The order is File, Edit, View, Session and Transfer (when a plugin fills them), the plugins' own menus,
-  Tools (when a plugin fills it), Window and Help. **Window** holds **Layouts ›**, what the standard look's Tab menu holds, then the
-  tool window toggles, which the standard look keeps under View. On macOS the screen menu bar follows the focused window and its menus act on that window; auxiliary windows, such as About, show a
-  short File menu in the screen menu bar on macOS and have none on Linux and Windows, where Ctrl+W still closes them.
+  Tools (when a plugin fills it), Window and Help. **Window** holds **Layouts ›**, then what the standard look's Tab
+  menu holds, then the tool window toggles, which the standard look keeps under View. On macOS the screen menu bar
+  follows the focused window and its menus act on that window; auxiliary windows, such as About, show a short File
+  menu in the screen menu bar on macOS and have none on Linux and Windows, where Ctrl+W still closes them.
 - **Toolbar row** under the title bar: **New Session**, **Split** (Split Right, Split Down), **Maximize**, the plugins'
   toolbar items (such as Remote's session combo and Run button), then at the trailing edge **Search Everywhere**, an
   icon-only magnifier whose tooltip names the palette's shortcut and which opens the Run window, **Settings…** and the
@@ -148,20 +150,21 @@ Plex Mono too ([defaults](#defaults)). Terminal text keeps `[terminal.font]`.
 ### Branding
 
 The look has no branding of its own: windows, the Dock or taskbar keep Jasper's Shell Prompt icon, and a start that
-opens a window (not `--background`, `--no-window` or `--safe-mode`) shows Jasper's Meadow splash until the first
-Jasper window has painted ([branding](looks.md#branding)). Its turtle is animated unless `config.toml` sets
-`ui.animations.enabled = false`, which Settings hides under this look.
+opens a window (not `--background`, `--no-window` or `--safe-mode`) shows Jasper's splash, its art chosen by the saved
+theme, until the first Jasper window has painted ([branding](looks.md#branding)). When that art cannot be drawn, the
+animated Meadow splash shows instead; its turtle moves unless `config.toml` sets `ui.animations.enabled = false`,
+which Settings hides under this look.
 
 ### Defaults
 
-The look sets five core settings and one Editor setting: both themes stay Jasper Meadow, as in the standard look, and
-the others take values of their own. A value you saved in `config.toml`, the Editor's settings file or Settings wins,
-and **Reset to Default** returns to the look's value.
+The look sets five core settings and one Editor setting: both themes are Jasper Meadow, on Linux too, where the
+standard look's are Desktop colors, and the others take values of their own. A value you saved in `config.toml`, the
+Editor's settings file or Settings wins, and **Reset to Default** returns to the look's value.
 
 | Setting | Under Enterprise | Standard look |
 |---|---|---|
-| `ui.theme.light` | `jasper-meadow` | `jasper-meadow` |
-| `ui.theme.dark` | `jasper-meadow` | `jasper-meadow` |
+| `ui.theme.light` | `jasper-meadow` | `desktop-colors` on Linux, `jasper-meadow` elsewhere |
+| `ui.theme.dark` | `jasper-meadow` | `desktop-colors` on Linux, `jasper-meadow` elsewhere |
 | `palette.visible_rows` | `8` | `5` |
 | `window.toolbar_height` | `28` | `30` |
 | `window.toolbar` | `"icons"` | `"icons_and_labels"` |

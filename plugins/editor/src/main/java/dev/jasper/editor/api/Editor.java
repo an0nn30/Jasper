@@ -47,7 +47,7 @@ public interface Editor {
 
     /**
      * Makes recent files under a key prefix reopenable. The resolver also brings the Editor's tabs of such documents
-     * back when Jasper restores its windows, which at start may be before the plugin's own data has loaded. The
+     * back when Jasper restores its window, which at start may be before the plugin's own data has loaded. The
      * resolver runs on the UI thread and must do no I/O. It returns empty when the key cannot be reopened now, for
      * example because its host was deleted, and otherwise a factory that builds the document for the window reopening
      * it (null when there is none). A later registration of the same prefix replaces the earlier one; the longest
@@ -90,10 +90,10 @@ public interface Editor {
     }
 
     /**
-     * Adds an item to the end of every Editor tab's right-click menu, after a rule, in registration order with the other
-     * plugins' items. The menu shows {@code title} as plain text. Choosing the item runs {@code run} on the UI thread with
-     * the tab's window, its document's key and the selected text; the Editor does not change the document. A handler that
-     * throws is logged. Since Editor 0.16.0.
+     * Adds an item to the end of the text's right-click menu in every Editor tab, after a rule, in registration order
+     * with the other plugins' items. The menu shows {@code title} as plain text. Choosing the item runs {@code run} on
+     * the UI thread with the tab's window, its document's key and the selected text; the Editor does not change the
+     * document. A handler that throws is logged. Since Editor 0.16.0.
      *
      * @param title the item's title; not blank ({@link IllegalArgumentException} otherwise)
      * @param run told what the item was chosen on

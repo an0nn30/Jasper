@@ -32,8 +32,8 @@ Usage: jasper [--config <path>] [--background] [--no-window] [--safe-mode] [--pl
 | `--no-window` | Starts with no window, to serve the `jasper` command; the command starts Jasper this way when nothing answers it. It exits without a window when a Jasper already runs, or when it cannot serve the command socket. A Jasper that becomes resident stays; any other quits once its calls have ended and no Jasper window is open, or after 30 seconds without a call. Cannot be combined with `--background`. |
 | `--help` | Prints the usage line to standard output and exits with status 0, without reading configuration or opening a window. |
 | `--url [<url>]` | The launch Jasper's web browser registration makes (`"Jasper.exe" --url "%1"` on Windows, `Jasper --url %u` on Linux; [Browser](browser.md#making-jasper-your-default-browser)). Only as the first argument, followed by at most one `http` or `https` address, which opens as a web address given without it does, or one `file:` URL, such as Linux passes for Open With and a drop on the launcher, which opens as the path it names; anything else after it, or `--url` anywhere else, refuses the whole launch. Without an argument it is a plain launch. The usage leaves it out. |
-| `<path>...` | Files and folders to open in the most recently active window: each file in the [Editor](editor.md#opening-files), or revealed when no editor plugin runs, and each folder as a terminal tab. A relative path resolves against the working directory; a path that names nothing is skipped. A `file:` URL, such as `file:///Users/me/notes.txt` or `file://localhost/Users/me/notes.txt`, is the path of the local file it names, without its query and fragment. |
-| `<url>...` | `http` and `https` addresses, in any case, such as `https://example.com`, at most 32: each opens in a new browser tab, once Jasper's plugins have started, in the first window, or, when Jasper already runs, in its most recently active window ([Browser](browser.md#links-from-terminals-and-jasper)). As browsers do, Jasper percent-encodes these characters after the host: a space, `"`, `<`, `>`, `\`, `^`, `` ` ``, `{`, `\|` and `}`, and a `%` that starts no escape; any other character an address cannot hold, such as `[` in its path, refuses the address. |
+| `<path>...` | Files and folders to open in the most recently active window: each file in the [Jasper Editor](editor.md#opening-files), whatever the default editor is, or revealed when no editor plugin runs, and each folder as a terminal tab. A relative path resolves against the working directory; a path that names nothing is skipped. A `file:` URL, such as `file:///Users/me/notes.txt` or `file://localhost/Users/me/notes.txt`, is the path of the local file it names, without its query and fragment. |
+| `<url>...` | `http` and `https` addresses, in any case, such as `https://example.com`, at most 32: each opens in a new browser tab (when no plugin provides a web browser, in your default browser, or nowhere while Jasper is itself your default browser: [When the Browser is off](browser.md#when-the-browser-is-off)), once Jasper's plugins have started, in the first window, or, when Jasper already runs, in its most recently active window ([Browser](browser.md#links-from-terminals-and-jasper)). As browsers do, Jasper percent-encodes these characters after the host: a space, `"`, `<`, `>`, `\`, `^`, `` ` ``, `{`, `\|` and `}`, and a `%` that starts no escape; any other character an address cannot hold, such as `[` in its path, refuses the address. |
 
 Each option may appear once. A value follows its option as the next argument; `--config=<path>` is an unknown
 argument.
@@ -110,8 +110,8 @@ With a COMMAND, runs it in the running Jasper. Jasper is started first when it i
 
 | Form | What it does |
 |---|---|
-| `jasper` | Brings the most recently active window to the front, restoring Jasper's windows first when none is open and starting Jasper first when none is running, and exits with status 0. A new window it opens does not start in the caller's working directory. |
-| `jasper PATH...` | Opens each file in the [Jasper Editor](editor.md#opening-files), or reveals it in the file manager when no editor plugin runs, and each folder as a terminal tab, in the most recently active window, starting Jasper first when none is running. A relative PATH resolves against the caller's working directory, and every PATH must name an existing file or folder. A subcommand of the same name wins, so `jasper ./editor` opens a file named `editor`. |
+| `jasper` | Brings the most recently active window to the front, restoring Jasper's window first when none is open and starting Jasper first when none is running, and exits with status 0. A new window it opens does not start in the caller's working directory. |
+| `jasper PATH...` | Opens each file in the [Jasper Editor](editor.md#opening-files), whatever the [default editor](editor.md#default-editor) is, or reveals it in the file manager when no editor plugin runs, and each folder as a terminal tab, in the most recently active window, starting Jasper first when none is running. A relative PATH resolves against the caller's working directory, and every PATH must name an existing file or folder. A subcommand of the same name wins, so `jasper ./editor` opens a file named `editor`. |
 | `jasper URL...` | When every argument is an absolute `http` or `https` address, such as `jasper https://example.com`, opens each, without asking first, in the web browser a plugin provides, from the window of the pane `jasper` ran in, else in your default browser; while Jasper is itself your default browser, it then opens nothing ([Browser](browser.md#when-the-browser-is-off)). With the bundled [Browser](browser.md#links-from-terminals-and-jasper) on, each opens in a new browser tab right after that window's shown tab, or the most recently active window's. Addresses given before Jasper's plugins start wait for them, and so does the call. It exits with status 0 once every address has been handed on, and with 1 when one was dropped because 32 were already waiting. A call that mixes addresses and paths is a `PATH...` call. |
 | `jasper --help` | Prints the usage and the subcommands of the plugins that were running when Jasper last started, read from `daemon/subcommands` in Jasper home, without contacting Jasper. Before that file exists it prints "Start Jasper once to list the plugin commands." |
 | `jasper --<option> ...` | Any first argument starting with `--`, other than `--help`, starts Jasper with all the arguments (at most 64; with more it exits with status 1 and starts nothing), detached, in the caller's working directory and environment, so relative paths resolve there. Every [launcher option](#launching-jasper-with-options) works, including those the usage leaves out; while Jasper runs, the launch hands off and the running Jasper says that it keeps its own options. It exits with status 0 once it has started the launcher and does not wait, so a Jasper that rejects its arguments shows nothing. |
@@ -142,7 +142,9 @@ Jasper Editor is the default editor its shells' `EDITOR` names that missing comm
 | Windows | Adds the installation's `bin` folder, which holds `jasper.exe`, to your own `Path` (`HKEY_CURRENT_USER\Environment`) and tells running programs. | "Open a new terminal, or quit Jasper completely for its own tabs, to use it" |
 
 The command finds its app from its own path, following links, so the link keeps working when Jasper is updated in
-place. In Jasper's own shells, `jasper` reaches the Jasper that started the shell once the command is on `PATH`.
+place. In Jasper's own shells, `jasper` reaches the Jasper that started the shell once the command is on `PATH`. The
+[Gentoo package](../packaging/gentoo/README.md) links `/usr/bin/jasper` to the command itself, so there `jasper` is on
+`PATH` without **Install**.
 
 The row shows one of these states:
 
@@ -238,10 +240,10 @@ when you save it. With --wait, returns once every tab it opened has closed, as g
 | `FILE[:LINE[:COLUMN]]` | A file to open, relative to the caller's working directory. An argument that names an existing file opens as written, even `a:1`; otherwise a trailing `:LINE` or `:LINE:COLUMN` of digits is split off, so `C:\notes.txt` is never split. LINE and COLUMN start at 1. |
 
 With no Jasper window open, Jasper first restores its window, so a FILE that was a saved tab selects that tab. Each
-FILE opens in an Editor tab, in the window of the Jasper pane the command ran in, otherwise in the most recently active window; a file
-already open selects its tab. The caret moves to the line and column once the text is loaded. A FILE that does not
-exist yet opens as an empty tab, and its first save creates it, when its folder exists. With no FILE the command shows
-the Editor: the selected Editor tab, or a new untitled tab when there is none.
+FILE opens in an Editor tab, in the window of the Jasper pane the command ran in, otherwise in the most recently active
+window; a file already open selects its tab. The caret moves to the line and column once the text is loaded. A FILE
+that does not exist yet opens as an empty tab, and its first save creates it, when its folder exists. With no FILE the
+command shows the Editor: the selected Editor tab, or a new untitled tab when there is none.
 
 | Exit code | Messages | When |
 |---|---|---|

@@ -196,7 +196,9 @@ terminal commands, and the application's translation of
 [WorkspaceActivity](../jasper-app/src/main/java/dev/jasper/app/workspace/WorkspaceActivity.java), or
 [ActivityNotifier](../jasper-app/src/main/java/dev/jasper/app/notifications/ActivityNotifier.java), which shows plugin
 activities and connections with the plugin id as their source.
-Allocate a source-qualified stable opaque id. Pair opened and closed registration; remove the active identity before
+Allocate a source-qualified stable opaque id. `post(notice, visible)` sets a notice's first visibility in the same step;
+`updateContext(id, group, visible)` changes its `BuddyNotice.Group` or visibility later and `updateState` its phase,
+such as waiting for input, neither promoting it. Pair opened and closed registration; remove the active identity before
 cancelling delayed work. Every delayed callback and event checks the producer's current lifetime. Suppliers and
 activation callbacks run on the EDT and must not block. When the work ends, and when the producer closes, dismiss the
 card; report how the work ended as a notification (see [Posting a notification](#posting-a-notification)), never through
@@ -241,7 +243,9 @@ Application code never opens a message dialog to tell the user something; it pos
   `PanelEntry.setBadge` on the panel: a window's icon rail stripe button shows it as a `BadgedIcon`, with the count in the
   tooltip and accessible description, and a labelled stripe or the bottom strip shows a count pill after the label
   (`StripeLabels`). Cards stack in the layer `WindowContent.mountCornerLayer` keeps in the bottom-right corner of the
-  `ToolWindowArea`, on `PALETTE_LAYER`, below a dock drag's `DRAG_LAYER` guides.
+  `ToolWindowArea`, on `PALETTE_LAYER`, below a dock drag's `DRAG_LAYER` guides. `NotificationsFeature` shows each card
+  in every open window's `CardLayer` and withdraws it from all of them together; a click on one first raises the
+  window the notification pertains to (`JasperApplication.pertainingWindow`).
 
 ## Recording an incident
 
@@ -315,14 +319,31 @@ Verify the example with `./gradlew :jasper-app:test --tests "*AppExamplesTest"`,
 One Jasper process owns each home. `bootstrap.SingleInstance` takes `residency.InstanceLock` before AWT and decides with
 `LaunchAction`; the owner's `bootstrap.Instance` binds both sockets at once and holds requests in `EarlyRequests` until
 `compose` hands it the application. Change the handoff's wire format in `residency.LaunchRequest` (with its protocol
-number), the owner's answer in `HandoffSocket.answering`, when the owner takes a request in `bootstrap.Instance`, and
-what a request opens in `JasperApplication.open` (`OpenPlan`). On POSIX systems closing any descriptor of a file drops
-the process's locks on it, so once the owner holds `daemon/instance.lock` nothing in its process may open that file,
-even to close it at once. The process-level tests start child JVMs through `testsupport.ChildJvm` with only the test
-classes and jasper-app's classes, so those classes must not reach the toolkit or the other modules.
+number; a request without web addresses still goes as protocol 2, which the build before reads), the owner's answer in
+`HandoffSocket.answering`, when the owner takes a request in `bootstrap.Instance`, and what a request opens in
+`JasperApplication.open` (`OpenPlan`; its web addresses through `application.ExternalAddresses`). On POSIX systems
+closing any descriptor of a file drops the process's locks on it, so once the owner holds `daemon/instance.lock` nothing
+in its process may open that file, even to close it at once. The process-level tests start child JVMs through
+`testsupport.ChildJvm` with only the test classes and jasper-app's classes, so those classes must not reach the toolkit
+or the other modules.
 
 ```sh
 ./gradlew :jasper-app:test --tests "*InstanceLockTest" --tests "*SingleInstance*" --tests "*EarlyRequestsTest" --tests "*LaunchRequestTest" --tests "*HandoffSocketTest"
+```
+
+### Web addresses, the default browser and file associations
+
+Where a web address opens is decided in three places ([architecture](app-architecture.md#web-addresses-and-files)):
+a terminal click in `JasperApplication.openLink` (`workspace.LinkClick`), an address from outside in
+`application.ExternalAddresses`, and the provided browser in `plugins.WebBrowsers`, which `PluginRuntime.openLink`,
+`openExternalLink` and `openLocalWebFile` ask. `platform.Browser.webAddress` decides what is a web address, and
+`PluginRuntime.reachesBrowser` which of them the browser is asked about. `platform.DefaultBrowser` and
+`platform.FileAssociations` take their system calls as functions, so tests never ask the real system: macOS answers
+through `libjasper-macos.dylib`'s `MacLaunchServices.m` (`testMacLaunchServices`), Windows through `WindowsRegistry`,
+and Linux through `xdg-settings` and `xdg-mime`, run by `ToolProcess`.
+
+```sh
+./gradlew :jasper-app:test --tests "*ExternalAddressesTest" --tests "*LocalWebFilesTest" --tests "*FileLinkClickTest" --tests "*JasperApplicationPluginsTest" --tests "*DefaultBrowserTest" --tests "*FileAssociationsTest" --tests "*FileUrlsTest"
 ```
 
 ### Workspace glass
@@ -441,36 +462,36 @@ bridge as a `DockControl`, so tests use a recording stand-in. A `--background` l
 the toolkit initialises, only when `MacDock.available(osName, appPath)` holds (macOS, and the bundle carries the
 library), so a development run or an image without the bridge never starts hidden. `platform.ResidentTray` is the macOS
 menu bar item (a template image of the terminal artwork; `apple.awt.enableTemplateImages` is set with the desktop
-properties) and the Windows notification-area icon, which also carries system notification balloons (see
-[System notifications](#system-notifications)).
+properties), the Windows notification-area icon, which also carries system notification balloons (see
+[System notifications](#system-notifications)), and the Linux tray icon (below).
 
-Start-up does not wait for any of this. The bridge is prepared, and the menu bar item or notification-area icon
-appears, in one idempotent step once start-up has settled (`residencySettled`: the first output painted, a finished
-`--background` warm-up, or 2 s after the first paint, whichever comes first), never at the first paint itself.
+Start-up does not wait for any of this. The bridge is prepared, and the menu bar item, notification-area icon or Linux
+tray icon appears, in one idempotent step once start-up has settled (`residencySettled`: the first output painted, a
+finished `--background` warm-up, or 2 s after the first paint, whichever comes first), never at the first paint itself.
 `DockControl.prepare` is a `BooleanSupplier`: `MacDock.prepare()` returns whether the bridge loaded and the power-off
 observer is installed, and `DockPresence.prepared()` holds only then. Until it does, and whenever preparation reported
 failure, Jasper cannot tell a log-out from a user's Quit, so a quit is a real quit: it never goes to the background.
 `quitIsSystemQuit()` is that decision: a resident process with a Dock presence that is not prepared or whose power-off
 flag is set. A process that is not resident keeps the ordinary quit (cancel, then `quit()`) even with a presence
 installed, as does one with no presence (a development run, Windows, Linux). On the system branch the request is a real
-quit, and only two things cancel it: the Keymap page's key recorder holding Cmd+Q (when macOS is not powering off), or
-a refusing guard, because `quit()` goes through `guardsAllowQuit()` (a content tab's closing guard or a plugin quit
-guard). The power-off flag is sticky: macOS has no "log-out cancelled" notification, so after a
-cancelled log-out a later Cmd+Q quits for real, which is the safe direction. During a log-out with Jasper hidden, a
-plugin quit guard that opens a window or an ownerless dialog brings Jasper back into the Dock first (the dialog needs
-the menu bar and focus to be answered). GUI behaviour is on the
-[packaging checklist](packaging.md#native-acceptance-checklist); `testMacDock` covers the native code headlessly.
+quit, and only two things cancel it: the Keymap page's key recorder holding Cmd+Q (when macOS is not powering off), or a
+refusing guard, because `quit()` goes through `guardsAllowQuit()` (a content tab's closing guard or a plugin quit
+guard). The power-off flag is sticky: macOS has no "log-out cancelled" notification, so after a cancelled log-out a
+later Cmd+Q quits for real, which is the safe direction. During a log-out with Jasper hidden, a plugin quit guard that
+opens a window or an ownerless dialog brings Jasper back into the Dock first (the dialog needs the menu bar and focus to
+be answered). GUI behaviour is on the [packaging checklist](packaging.md#native-acceptance-checklist); `testMacDock`
+covers the native code headlessly.
 
 `system.run_in_background` defaults on for macOS, Windows and Linux; residency is decided at start-up and does not
 require an indicator. For an eligible installed launch, `platform.LoginItem` plans login registration (a LaunchAgent,
-Windows Run value or Linux XDG autostart entry). `bootstrap.LoginItemUpdates` serializes registration writes and
+Windows Run value or Linux XDG autostart entry). `bootstrap.LoginItemUpdates` serialises registration writes and
 coalesces pending saves to the latest accepted choice. Registration failures are logged; the next start reconciles again.
 
 Linux's settled indicator hook starts `LinuxTrayRuntime`: a live StatusNotifier host takes precedence over an owned
 XCB tray connection. The X11 fallback accepts local Unix displays and bounded regular nonsymlink authority files;
 its native worker resolves system `libxcb.so.1`, `libxcb-render.so.0` and `libXau.so.6`. Cancellation wakes owned
 socket work and cleanup retires the connection, popup, subscriptions and scheduler. Authority filesystem reads are
-cooperative: one canceled daemon worker may remain until the filesystem returns; late results cannot publish.
+cooperative: one cancelled daemon worker may remain until the filesystem returns; late results cannot publish.
 
 ### Background warm-up
 
@@ -480,16 +501,16 @@ from memory, so it starts no shell, PTY or child process; it is painted once int
 It stays invisible to everything else: it opens no `WindowTrace` and marks no `FIRST_PAINT` or `OUTPUT_PAINTED` (those
 would settle residency for a window nobody sees), only `WARMED_UP`, which the `done` callback passed to `warmUp` marks
 whether the rehearsal succeeded, failed or threw; it is not registered with the terminal registry and is not a content
-host (`connectContributions(model, state, hostsContent)` with `false`), so plugin content never opens into it; and its
-error, info and launch-failure callbacks are logged, never shown, posted as notifications or recorded as incidents
-(`Rehearsal.silence`). It uses its own in-memory `UiState`, never restores the saved dock layout and is discarded rather
-than closed (`WindowFrame.discard`; a window that failed to open is discarded by `WindowManager`), so its default dock
-layout never replaces a window's saved one; it bypasses `WindowManager`, so it never reads or writes
-`workspace.toml`. A process that has warmed up labels its first plain window `menu` rather than `cold`. Once `done` has
-run, on every path (a played rehearsal, a failed one, an `Error`, and the headless early return), `warmUp` starts one
-`System.gc()` on a daemon thread from a later EDT event, so the rehearsal's garbage does not stay in the resident heap;
-`JasperApplication.collector` is the test seam. A headless JVM cannot build a `WindowFrame`, so some of the rehearsal's
-failure paths are covered by reading only.
+host (`connectContributions(model, app, tools, hostsContent)` with `false`), so plugin content never opens into it; and
+its error, info and launch-failure callbacks are logged, never shown, posted as notifications or recorded as incidents
+(`Rehearsal.silence`). It uses an in-memory `UiState` and the built-in tool windows (`ToolWindows.BUILT_IN`), never a
+saved window's, and is discarded rather than closed (`WindowFrame.discard`; a window that failed to open is discarded by
+`WindowManager`), so its default dock layout never replaces a window's saved one; it bypasses `WindowManager`, so it
+never reads or writes `workspace.toml`. A process that has warmed up labels its first plain window `menu` rather than
+`cold`. Once `done` has run, on every path (a played rehearsal, a failed one, an `Error`, and the headless early
+return), `warmUp` starts one `System.gc()` on a daemon thread from a later EDT event, so the rehearsal's garbage does
+not stay in the resident heap; `JasperApplication.collector` is the test seam. A headless JVM cannot build a
+`WindowFrame`, so some of the rehearsal's failure paths are covered by reading only.
 
 ### Adding a file type to the catalogue
 
@@ -567,7 +588,7 @@ To add a bundled plugin:
    `:jasper-sdk-testkit`) and `src/main/resources/plugin.toml`. `settings.gradle.kts` includes every such folder as
    `:jasper-plugin-<name>`, and `gradle/plugin-packaging.gradle.kts` gives it `stagePlugin` and `pluginZip` and adds
    it to `pluginZips`.
-2. Add its jar, and its runtime classpath when it bundles libraries, to `stagePlugins` in
+2. Add its `stagePlugin` output (its jar and the libraries it bundles) to `stagePlugins` in
    `jasper-app/build.gradle.kts`, into a folder named after its id.
 3. When it uses another plugin's exported API, declare `requires` in its `plugin.toml`, depend on that module with
    `compileOnly`, and list the exported packages for it in `declaredImports` (`gradle/plugin-architecture.gradle.kts`);
@@ -575,6 +596,10 @@ To add a bundled plugin:
 4. Record every library it bundles in `notices.toml` (see [Adding or bumping a dependency](#adding-or-bumping-a-dependency)).
 5. When it exports an API package, run `./gradlew sdkReference`: the SDK reference includes every package a bundled
    plugin exports, and `verifySdkReference` fails `check` until it is regenerated.
+6. Add `:jasper-plugin-<name>:check` to `OTHER` in `.github/scripts/windows_shards.py`. The two Windows CI jobs first
+   check that their task graphs together are exactly `check`'s, and both stop when a project's tasks are in neither
+   ([Release workflows](packaging.md#release-workflows)); `python3 .github/scripts/test_windows_shards.py` tests the
+   script.
 
 ## Packaged runtime, bundled natives and the AOT cache
 
@@ -670,7 +695,9 @@ needs its entry there.
 
 `JasperTheme.builtIns()` lists the built-in theme files ([architecture](app-architecture.md#themes),
 [themes](themes.md)), Slate Cobalt first; Jasper Meadow (`jasper-meadow.json`, `JasperTheme.DARK_DEFAULT_ID` and
-`LIGHT_DEFAULT_ID`) is the default for both appearances. The Catppuccin files are the theme converter's output for the
+`LIGHT_DEFAULT_ID`) is the default for both appearances, except on Linux, where both default to Desktop colors
+(`CoreSettings.interfaceThemeByDefault`) unless the look sets its own defaults, as the Enterprise look sets Jasper
+Meadow. The Catppuccin files are the theme converter's output for the
 plugin jar vendored in `tools/themes/catppuccin/`, with the hand-picked roles in its `roles.json` (its `SOURCE.md` says
 how to regenerate them); a converter test fails when they differ. The Enterprise plugin's `enterprise.json` is
 likewise the converter's port (`convert_port`) of IntelliJ's own IntelliJ Light and New UI Dark files in
@@ -697,16 +724,18 @@ Run `./gradlew check` and all architecture guards; hand native visual acceptance
 
 ### Linux Desktop colors diagnostics
 
-`platform.DesktopColors` owns the portal and requested GTK/Qt/KDE children; `application.DesktopAppearance` handles demand,
-generations and EDT publication through the existing theme transaction. `appearance.DesktopPalette` maps complete
-observations and checks final paint pairs. Automatic uses desktop hints captured at startup or Reload; explicit Qt / KDE
-falls back within that family. Qt/KDE report the current palette polarity, so an opposite appearance uses compatible
-last-good colors or the bundled fallback while the healthy helper remains observable. Authored-only configurations
-request the portal without toolkit children.
-The helpers are siblings of the application jar in `desktop-colors/` (`lib/desktop-colors` in installDist,
-`lib/app/desktop-colors` in a Linux native image). Gradle `run` sets the absolute `jasper.desktopColors.helpers`
-development override. `compileDesktopHelpers`, `stageDesktopHelpers` and `verifyDesktopHelpers` build, stage and
-check modes, ELF architecture and runtime linkage; packaging builds on Ubuntu 22.04 for the glibc 2.35 baseline.
+`platform.DesktopColors` owns the portal and requested GTK/Qt/KDE children; `application.DesktopAppearance` handles
+demand, generations and EDT publication through the existing theme transaction. `appearance.DesktopPalette` maps
+complete observations and checks final paint pairs. Automatic ranks the sources by hints from Jasper's process
+environment (`XDG_CURRENT_DESKTOP`, `KDE_SESSION_VERSION`, `KDE_FULL_SESSION`, `QT_QPA_PLATFORMTHEME`), which
+`DesktopEnvironment.capture` reads at start-up and again on Reload; the process environment does not change while Jasper
+runs, so new hints apply only after a restart. Explicit Qt / KDE falls back within that family. Qt/KDE report the current palette polarity, so an opposite appearance
+uses compatible last-good colours or the bundled fallback while the healthy helper remains observable. Authored-only
+configurations request the portal without toolkit children. The helpers are siblings of the application jar in
+`desktop-colors/` (`lib/desktop-colors` in installDist, `lib/app/desktop-colors` in a Linux native image). Gradle `run`
+sets the absolute `jasper.desktopColors.helpers` development override. `compileDesktopHelpers`, `stageDesktopHelpers`
+and `verifyDesktopHelpers` build, stage and check modes, ELF architecture and runtime linkage; packaging builds on
+Ubuntu 22.04 for the glibc 2.35 baseline.
 
 For protocol diagnostics, start a helper with `--protocol=1` and keep its input open while sending one JSON line:
 `{"v":1,"kind":"sample","generation":7,"appearance":"dark"}` to a toolkit helper, or
@@ -729,18 +758,20 @@ requires the user's desktop session.
 
 The Appearance page's Theme section is `Editors.appearance(AppearanceChoices)`: `settingsui.AppearanceSelection` edits
 `ui.appearance` with the Dark / Light / Match System tiles, each previewing its pick, and stages `ui.theme.dark` and
-`ui.theme.light` from the Dark theme and Light theme dropdowns as companions (their rows are hidden); one Reset returns
-all three to their defaults. `terminal.scheme` is `Editors.schemeChoice`'s `SchemePick`, "Same as UI theme" then every
-installed scheme, noted "Colors for terminal panes". A saved pick that is not installed shows as "<id> (not
-installed)". `AppearanceChoices` carries `InstalledThemes` (the theme options with previews and the schemes, read again
-on every refresh), the workspace glass defaults and the system-appearance observation from application wiring
-(`application.SettingsAppearance`, over the controller's live library), so settingsui reads jasper-ui only through
-`ui.model` and `ui.swing`. When the application supplies `ThemeImports`, each of the three dropdowns has a gear
-(`settingsui.ThemeMenu`, a `MenuButton`): Import Theme… and Remove run `appearance.ThemeFolder`'s file work on a worker,
-come back on the EDT and reload the configuration; an import is then staged in the gear's dropdown, and Remove returns
-the removed theme's saved and staged picks to their defaults. The application asks its questions and shows failures
-with `pluginmanager.ConfirmView` sheets. The gears' item actions are never row edits (the editors return false for
-them). The Light row holds a hidden copy of Reset, so the three rows' dropdowns line up. The Match System tile names
+`ui.theme.light` from the Dark theme and Light theme dropdowns, and `ui.theme.desktop_source` from the Desktop color
+source dropdown, as companions (their rows are hidden); the Desktop color source row and its status line show while
+either pick is Desktop colors. One Reset returns all four to their defaults. `terminal.scheme` is
+`Editors.schemeChoice`'s `SchemePick`, "Same as UI theme" then every installed scheme, noted "Colors for terminal
+panes". A saved pick that is not installed shows as "<id> (not installed)". `AppearanceChoices` carries
+`InstalledThemes` (the theme options with previews and the schemes, read again on every refresh), the workspace glass
+defaults, the system-appearance observation and the desktop palette's previews and status (`DesktopChoices`) from
+application wiring (`application.SettingsAppearance`, over the controller's live library), so settingsui reads jasper-ui
+only through `ui.model` and `ui.swing`. When the application supplies `ThemeImports`, each of the three dropdowns has a
+gear (`settingsui.ThemeMenu`, a `MenuButton`): Import Theme… and Remove run `appearance.ThemeFolder`'s file work on a
+worker, come back on the EDT and reload the configuration; an import is then staged in the gear's dropdown, and Remove
+returns the removed theme's saved and staged picks to their defaults. The application asks its questions and shows
+failures with `pluginmanager.ConfirmView` sheets. The gears' item actions are never row edits (the editors return false
+for them). The Light row holds a hidden copy of Reset, so the three rows' dropdowns line up. The Match System tile names
 the observed appearance, or says it is unavailable and Dark is used. Terminal › Font & Colors links to the section.
 
 The command palette's `view.terminal_scheme.match` and `view.terminal_scheme.<theme>.<key>` commands save
@@ -950,9 +981,13 @@ A change to how panes split, move, close or maximise starts in `layout.Layout` a
 layout, and `WorkspaceView` only renders the layout it holds. What `workspace.toml` keeps changes in
 `persistence.WorkspaceFile`, whose reader drops a bad entry alone (`WorkspaceFileTest`, `WorkspaceFileReadTest`), and in
 `WindowManager.snapshot` and `WindowContent.restore` (`WorkspaceRestoreTest`, `RestoredPaneTest`,
-`PluginTabRestoreTest`, `WorkspaceStoreTest`). The file says `version = 1`; a file of another version is set aside as
-`workspace.toml.bad`. After a format change, write the start-up benchmark's seed again (see
-[the AOT cache](#packaged-runtime-bundled-natives-and-the-aot-cache)).
+`PluginTabRestoreTest`, `WorkspaceStoreTest`). The file says `version = 2`; a version 1 file (an older Jasper's) is
+read as nothing saved and left in place, and a file of another version is set aside as `workspace.toml.bad`. After a
+format change, write the start-up benchmark's seed again (see
+[the AOT cache](#packaged-runtime-bundled-natives-and-the-aot-cache)). A window's tool windows are
+`persistence.ToolWindows` (`ToolWindowsTest`); what `layouts.toml` keeps changes in `persistence.LayoutsFile`
+(`LayoutsFileTest`) and `workspace.LayoutStore` (`LayoutStoreTest`), and Window › Layouts in `LayoutCommands`
+(`LayoutCommandsTest`) and `WindowManager.applyLayout` (`LayoutApplyTest`).
 
 A window's parent tabs are shown in its one strip (`ParentTabBar` over the look's `TabStrip`); a group (`GroupView`)
 shows its one tab and no strip. The strip shows from two parent tabs under the equal tabs and always under the classic
@@ -1061,11 +1096,15 @@ Several tests and checks read the guides, so a documentation edit can fail the b
 | `TerminalDocumentationTest` (jasper-terminal) | The terminal README, architecture and maintenance guides' links resolve and their examples equal `TerminalExamplesTest`. |
 | `UiDocumentationTest` (jasper-ui) | The UI README, architecture and maintenance guides and the calibration record exist, their links resolve and their examples equal `UiExamplesTest`. |
 | `SlateCobaltFileTest` (jasper-ui) | [The Slate Cobalt record](design/theme-engine/slate-cobalt.md) has exactly one fenced `json` block, and it equals jasper-ui's `slate-cobalt.json`. |
-| `ConfigTemplateTest` | [configuration](configuration.md) has a table cell holding just the backticked key of every core setting, and none for an alias. The root `config.example.toml` has `version = 2` and every core setting at its built-in default, except `ui.font.size`, `system.run_in_background` and `ui.workspace.opacity`, which stay commented out; it parses without diagnostics on macOS and on other platforms. Its comments are free. |
+| `ConfigTemplateTest` | [configuration](configuration.md) has a table cell holding just the backticked key of every core setting, and none for an alias. The root `config.example.toml` has `version = 2` and every core setting at its built-in default, except `ui.font.size`, `system.run_in_background`, `ui.workspace.opacity`, `ui.theme.dark` and `ui.theme.light`, which stay commented out; it parses without diagnostics on macOS and on other platforms. Its comments are free. |
 | `VersionRangeTest` | Every `sdk = "…"` range in [plugin authoring](plugin-authoring.md), the [SDK README](../jasper-sdk/README.md), [plugin icons](sdk-icons.md) and the example plugin's `plugin.toml` admits the current SDK, and each file has at least one; the example build's SDK version is `JasperSdk.VERSION`. |
 | `verifyPackagingSupport` | The `runtime-modules` block in [plugin authoring](plugin-authoring.md#the-java-runtime) lists exactly the packaged runtime's modules. |
 | `verifySdkReference` (`:jasper-sdk:check`) | [docs/sdk-reference.html](sdk-reference.html) is what the SDK's, the testkit's and the plugins' exported API sources and `tools/sdk-reference` generate; `./gradlew sdkReference` rewrites it. |
 | `VimDocsTest` (Editor) | [vim-divergences](vim-divergences.md) lists every divergent corpus case; [the Vim reference](editor-vim-reference.md) is generated from `VimCommands` (`./gradlew :jasper-plugin-editor:test --tests '*VimDocsTest' -PupdateDocs=true`), never edited by hand. |
+
+Two links into the guides are not checked: Settings' Help button opens `docs/configuration.md` anchors (see
+[settings](#saved-live-and-session-only-settings)), and the build's refusal of another runtime (`requireJcefRuntime`)
+names `docs/packaging.md#requirements`. Keep those headings.
 
 ## Review checklist
 

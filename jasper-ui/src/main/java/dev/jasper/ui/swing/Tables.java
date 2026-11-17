@@ -19,9 +19,9 @@ import javax.swing.*;
 
 /**
  * Column-aligned virtual rows; numeric cells align to the trailing column edge. A column takes the width the user dragged
- * it to, else its own width, and the others share the rest by weight; the header shows the host's sort, reports clicks
- * as {@link UiEvent.Sorted} and a finished boundary drag as {@link UiEvent.ColumnsResized}, and a muted row dims its
- * plain cells and Text cell nodes.
+ * or fitted it to, else its own width, and the others share the rest by weight; the header shows the host's sort, reports
+ * clicks as {@link UiEvent.Sorted} and a finished boundary drag, or a boundary double-click that fits a column to its
+ * content, as {@link UiEvent.ColumnsResized}, and a muted row dims its plain cells and Text cell nodes.
  * A column holds a plain cell or a cell node (a bare dropdown among them), and a heading row shows its title and its
  * muted count across the row.
  */

@@ -6,7 +6,7 @@
 | --- | --- |
 | `AppDocumentationTest` | A broken link or `#anchor` in any Markdown under `docs/`, the root READMEs and the module, CLI, launcher and mock-tool READMEs; a changed `<!-- example:name -->` block; a missing file from its GUIDES list |
 | `TerminalDocumentationTest`, `UiDocumentationTest` | The same for the terminal and UI guides and their pinned examples |
-| `ConfigTemplateTest` | A `CoreSettings` key without its `| \`key\` |` row in `docs/configuration.md`, or `config.example.toml` keys or values that differ from the defaults |
+| `ConfigTemplateTest` | A `CoreSettings` key without its `| \`key\` |` row in `docs/configuration.md`, or a `config.example.toml` key or value that differs from the defaults, or an uncommented `ui.font.size`, `system.run_in_background`, `ui.workspace.opacity`, `ui.theme.dark` or `ui.theme.light` |
 | `VersionRangeTest` | An `sdk = "..."` range in the SDK guides that excludes `JasperSdk.VERSION`; the external example's `jasperSdkVersion` default not equal to it |
 | `VimDocsTest` | A changed corpus row in `docs/vim-divergences.md`; a stale `docs/editor-vim-reference.md` (regenerate with `-PupdateDocs=true`) |
 | `verifySdkReference` | A stale `docs/sdk-reference.html`, an unresolved `{@link}`, a missing anchor, a dead relative link, a block tag written mid-line |
@@ -30,5 +30,9 @@
 - `StagedTransferLifecycleTest`, `FileServerPluginTest.addsStartsServesAndStopsAServer` and `RemoteShortcutConfigTest`
   ("Plugin workers did not finish resource cleanup after stop") time out under heavy load.
   Re-run the class alone before treating a failure as real.
+- Feature authors sometimes add their STATUS.md entries above `## Current state`; move them, verbatim and in order,
+  to the top of the handoff log so "Current state" opens the file again.
+- Code problems a sync finds (stale setting descriptions, CI workflows, install checks) are not fixed in the sync:
+  record them under "Current state"'s open items and tell the user.
 - `checkThemeTool` needs Python 3.11 to 3.13 (`-Pjasper.python=<interpreter>`); 3.14 fails one of its tests.
 - The auto-mode permission classifier blocks pushing to `main` without an approval in the conversation; ask.

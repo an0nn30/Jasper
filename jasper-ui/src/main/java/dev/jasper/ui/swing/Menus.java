@@ -649,7 +649,7 @@ final class Menus {
     }
 
     /**
-     * A submenu row (SDK 0.27.0): an item with children, drawn as a {@link Item} is, with an arrow at its end in place of
+     * A submenu row: an item with children, drawn as a {@link Item} is, with an arrow at its end in place of
      * a shortcut. Pointing at it, or Right or Enter on it, opens its children beside it in the menu's card, as wide as a
      * menu at least; a disabled one does not open. It reports nothing itself.
      */

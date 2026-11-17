@@ -40,17 +40,17 @@ any third-party plugin. The SDK depends only on the JDK.
 | Group | Types |
 | --- | --- |
 | Actions and where they appear | `Actions`, `ActionSpec`, `ActionContext`, `PluginAction`, `ShortcutContext`, `Toolbar`, `ToolbarItem`, `ToolbarViewFactory`, `Menus`, `StandardMenu`, `PluginMenu`, `MenuEntries`, `StatusBar`, `StatusItemSpec`, `Side`, `StatusItem`, `StatusProgress`, `StatusProgressState`, `Rail` |
-| Declarative views | `UiKit`, `ViewSpec`, `Nodes`, `UiView`, `UiEvent`, `ControlState`, `ListItem`, `TableRow`, `TreeItem`, `Column`, `Option`, `MenuItem`, `Crumb`, `CustomContent`, `IconAsset`, `PixelImage`, `UiAnchor` |
+| Declarative views | `UiKit`, `ViewSpec`, `Nodes`, `UiView`, `UiEvent`, `ControlState`, `ListItem`, `TableRow`, `TreeItem`, `Column`, `ColumnState`, `ColumnStateFile`, `Option`, `MenuItem`, `Crumb`, `CustomContent`, `ContentArea`, `IconAsset`, `PixelImage`, `UiAnchor` |
 | Tool windows | `Panels`, `PanelSpec`, `Anchor`, `PanelFactory`, `PanelHost`, `PanelPlacement`, `PanelMode`, `PanelHeader` |
-| Dialogs, content tabs and split items | `Windows`, `WindowSurface`, `DialogSpec`, `PluginDialog`, `OverlaySpec`, `PluginPopover`, `ContentSpec`, `ContentTab`, `TabPlacement`, `ContentPresentation`, `ContentCommand`, `ContentStatus`, `SplitItemSpec`, `SplitChoice`, `TabChoice`, `TabRestorer`, `RestoreRequest` |
+| Dialogs, content tabs and split items | `Windows`, `WindowSurface`, `DialogSpec`, `PluginDialog`, `OverlaySpec`, `PluginPopover`, `ContentSpec`, `ContentTab`, `TabPlacement`, `ContentPresentation`, `ContentCommand`, `ContentStatus`, `InsertedText`, `TextTarget`, `SplitItemSpec`, `SplitChoice`, `TabChoice`, `TabRestorer`, `RestoreRequest` |
 | Colours for custom content and the look | `Appearance`, `SemanticColor`, `WorkspacePalette`, `EditorPalette`, `EditorScheme`, `SyntaxPalette`, `SyntaxRole`, `SyntaxStyle`, `Presentation`, `TerminalTypography` |
-| Desktop integration | `Platform`, `FileEditor`, `WebBrowser`, `WebLink`, `LinkOrigin`, `LinkPlacement` |
+| Desktop integration | `Platform`, `FileEditor`, `FileOrigin`, `WebBrowser`, `WebLink`, `LinkOrigin`, `LinkPlacement` |
 
 A plugin implements `Plugin`, `PaletteScope`, `FileSource`, `FileBrowser` and `SettingsPanel`, the functional
-`CommandHandler`, `FileEditor`, `WebBrowser`, `PanelFactory`, `TabRestorer` and `ToolbarViewFactory`, and the service interfaces it
-publishes.
-Jasper and the testkit implement the other service interfaces; `FileLocation`, `OpenRequest`, `ToolbarItem`, `UiEvent`,
-`SettingKind`, `EditorHint` and `Nodes.Node` are sealed, and the SDK's own records implement them.
+`CommandHandler`, `FileEditor`, `WebBrowser`, `PanelFactory`, `TabRestorer` and `ToolbarViewFactory`, and the service
+interfaces it publishes. Jasper and the testkit implement the other service interfaces; `FileLocation`, `OpenRequest`,
+`ToolbarItem`, `UiEvent`, `SettingKind`, `EditorHint` and `Nodes.Node` are sealed, and the SDK's own records implement
+them.
 
 ## Versioning
 
@@ -68,10 +68,10 @@ A plugin that uses something only a later 0.32 version has starts its range ther
 
 Jasper checks the range at launch: a plugin whose range does not contain the running SDK is skipped, and Settings ›
 Plugins shows it as Skipped with the reason "needs SDK *range*; this is SDK *version*". Install from Zip… refuses such a
-plugin ("*name* *version* needs SDK *range*; this Jasper has SDK *version*"). When a plugin loads, Jasper also reads its
-classes and refuses a jar that references an SDK type, member or enum constant this SDK no longer has ("… references
-removed SDK type …" or "… references removed SDK member …", ending "rebuild it for SDK *version*"); the plugin is then
-reported as "*name* could not be loaded".
+plugin ("*name* *version* needs SDK *range*; this Jasper has SDK *version*"). When a plugin that is not bundled loads,
+Jasper also reads its classes and refuses a jar that references an SDK type, member or enum constant this SDK no longer
+has ("… references removed SDK type …" or "… references removed SDK member …", ending "rebuild it for SDK
+*version*"); the plugin is then reported as "*name* could not be loaded".
 
 ## Jars for plugins built outside this repository
 

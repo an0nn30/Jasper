@@ -112,7 +112,7 @@ These tables freeze values; a change to what they freeze edits the table in the 
 | Test | Rule |
 | --- | --- |
 | `verifyUiArchitecture` | The package edges each package-info lists, no package cycle, no other Jasper module, JDK-only `theme`, `model` and `kit` |
-| `StaticDefaultTest` (jasper-app) | Geometry and type follow a kit: outside `dev.jasper.ui.metrics` and `dev.jasper.ui.kit`, only `AnimationSettings` reads `DesignMetrics.DEFAULT`; nothing reads `TypeScale.DEFAULT`, `FaceSet.PLATFORM`, `DesignMetrics.CLASSIC` or `TypeScale.CLASSIC`; the kit parser reads `Kit.CLASSIC`, and the classes that choose the start-up kit or fall back to it read `Kit.DEFAULT`; `DesktopPaintPairs` reads both solely to validate generated palettes against the shipped definitions; no static initializer reads a metric or builds a painter |
+| `StaticDefaultTest` (jasper-app) | Geometry and type follow a kit: outside `dev.jasper.ui.metrics` and `dev.jasper.ui.kit`, only `AnimationSettings` reads `DesignMetrics.DEFAULT`; nothing reads `TypeScale.DEFAULT`, `FaceSet.PLATFORM`, `DesignMetrics.CLASSIC` or `TypeScale.CLASSIC`; only the kit parser and `DesktopPaintPairs` read `Kit.CLASSIC`, and only the classes that choose the start-up kit or fall back to it and `DesktopPaintPairs` read `Kit.DEFAULT` (`DesktopPaintPairs` reads both kits' definitions to check Desktop colors' palettes, never the process's kit); no static initializer reads a metric or builds a painter |
 | `VariantReadTest` (jasper-app) | `ControlVariants` is read only in `dev.jasper.ui.kit`, `dev.jasper.app.presentation` and `KitFaces` |
 | `StrategyIsolationTest` (jasper-app) | Faces never reference `Kit`, `ControlVariants` or `ChromeSpec`; the reconciler references control classes only, never a face or `KitFaces` |
 | `ProjectionReadTest` (jasper-app) | Each look projection's variants are read only by the factory or supplier that owns them |
@@ -164,6 +164,12 @@ including the counts there (and the point count in the [rendering matrix](#rende
 - Change a control's look through its face. A face declares the pairs it paints in `pairs()` and a change to them
   edits `face-pairs.tsv`; a classic face paints every declared pair through its guard (`ThemePainting.painted`). A
   painter that repairs a pair declares it in `PaintedContrastTest`.
+- Desktop colors holds its palettes to every contrast pair both shipped kits' faces declare, numbered in their order,
+  and to the shared-role uses jasper-app's `DesktopPaintPairs` lists. A change to those pairs edits two files in
+  `jasper-app/src/test/resources/dev/jasper/app/appearance/`: `desktop-paint-pairs.tsv`, each requirement's ink,
+  surface and kind, which `DesktopPaletteTest` compares with `DesktopPaintPairs`; and `desktop-render-coverage.tsv`,
+  which lists every requirement in order with the rendered owner that proves it under each kit. It also edits that
+  file's count in `DesktopColorsRenderTest`.
 - A derived role's recipe lives in `DerivedPalette`. Changing one updates `DerivedColorTest.INPUTS` when the roles it
   reads change, and updates `derived-roles.tsv` and `derived-roles-enterprise.tsv`. Changing a built-in theme updates
   `derived-roles.tsv`; changing the Enterprise theme updates `derived-roles-enterprise.tsv`. Make these edits in the
@@ -179,6 +185,11 @@ including the counts there (and the point count in the [rendering matrix](#rende
   `ThemeLibraryTest`, `ThemeSelectionTest`, `SettingsAppearanceTest` and `PackagedResourcesTest`. Name it in
   [themes](themes.md), in the [packages table](ui-architecture.md#packages) and
   [built-in list](ui-architecture.md#themes) of UI architecture and in the [module README](../jasper-ui/README.md).
+  Its start-up splash shows Jasper Meadow's art unless it has its own: add `<id>.png` (at least 1440 × 880 pixels, at
+  the splash's 720:440 ratio) to `jasper-app/src/main/resources/dev/jasper/app/splash/themes/` and record where it came
+  from in `provenance.json` there, add the id to `ThemeSplash.IDS` and to `ThemeSplashTest.IDS` (and that test's count
+  of distinct illustrations; it also checks the lettering's contrast against the art), give it lettering colours in
+  `SplashColors.palette`, and name it in [Looks](looks.md#branding).
 - When changing appearance, test contrasting chrome and workspace colours, replay and rollback, and disposal.
 
 ### Layout

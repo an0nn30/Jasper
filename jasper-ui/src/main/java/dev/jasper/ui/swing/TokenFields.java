@@ -30,7 +30,7 @@ import javax.swing.text.DocumentFilter;
 import javax.swing.text.StyleConstants;
 
 /**
- * The token field (SDK 0.29.0): its tokens as chips the look's tag face draws, each with a remove button inside it, and
+ * The token field: its tokens as chips the look's tag face draws, each with a remove button inside it, and
  * the text being typed after them, in a field's box that grows a line at a time as the chips wrap.
  */
 final class TokenFields {

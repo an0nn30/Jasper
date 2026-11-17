@@ -2,10 +2,10 @@
 
 `jasper-buddy` is the JDK-only library behind Jasper's desk buddy: a pixel-art Jasper in a
 small always-on-top window who shows live work (running commands, plugin activities,
-connections) as capsules beside him. It has no dependency on the Jasper app, the terminal
-library, the UI kit (`jasper-ui`), the SDK, TOML, FlatLaf or JetBrains-specific APIs. Use
-a Java 25 runtime; repository builds require the JetBrains vendor's JBR 25 and use the
-Gradle wrapper.
+connections) in a summary beside him and a drawer of grouped entries. It has no
+dependency on the Jasper app, the terminal library, the UI kit (`jasper-ui`), the SDK,
+TOML, FlatLaf or JetBrains-specific APIs. Use a Java 25 runtime; repository builds
+require the JCEF build of JBR 25 and use the Gradle wrapper.
 Add `implementation(project(":jasper-buddy"))` in this multi-project build. Buddy needs
 no external runtime library; its host must provide a runtime with Swing/AWT and ImageIO.
 In Jasper the buddy is off by default; the `buddy.enabled` setting (**Show Jasper**) turns
@@ -73,10 +73,11 @@ each UI event.
 Construct and operate `BuddyCompanion` on the Swing EDT. This includes `close()`, and
 every call after close; off-EDT calls throw `IllegalStateException`. Constructing values
 or building options requires no EDT and performs no I/O. A detail supplier or host callback
-runs on the EDT when presentation needs it, so it must be fast and nonblocking. Buddy
-reads a shown notice's detail on every paint: about 60 times a second while any retained
-notice is `RUNNING`, and at least once a second otherwise. Do not read a live terminal
-buffer or wait for a worker from one of these callbacks.
+runs on the EDT when presentation needs it, so it must be fast and nonblocking. The
+drawer reads each shown notice's detail on every paint: once a second while it is open,
+and about 60 times a second for the 120 ms of a hover change. The summary shows each
+notice's state, not its detail. Do not read a live terminal buffer or wait for a worker
+from one of these callbacks.
 
 | Operation | Model and resource effect |
 | --- | --- |
@@ -108,31 +109,39 @@ also compares callbacks and is not notice identity.
 
 | Kind | Accepted states | Wants attention | Capsule marker |
 | --- | --- | --- | --- |
-| `TASK` | `RUNNING`, `NEEDS_INPUT` | `NEEDS_INPUT` | `RUNNING`: a highlight sweeps the detail text; `NEEDS_INPUT`: a dot |
+| `TASK` | `RUNNING`, `NEEDS_INPUT` | `NEEDS_INPUT` | `NEEDS_INPUT`: a dot |
 | `CONNECTION` | `UP`, `DEGRADED`, `DOWN` | `DEGRADED`, `DOWN` | `DEGRADED`: a dot; `DOWN`: a cross |
 
 Buddy shows live work only. `post(BuddyNotice)` promotes its ID to newest and makes it
-visible; `post(BuddyNotice, boolean visible)` can retain it suppressed. The six-argument
-notice constructor remains ungrouped; its seven-argument form takes an optional `Group`.
+visible; `post(BuddyNotice, boolean visible)` also promotes it and sets whether it shows,
+so a notice can be retained suppressed. The six-argument notice constructor makes an
+ungrouped notice; the seven-argument form takes an optional `Group`.
 `updateContext(BuddyNoticeId, BuddyNotice.Group, boolean visible)` changes grouping and
-visibility in place; a null group makes the notice ungrouped. Context and title updates
-preserve arrival order and never recreate a dismissed ID. The model holds at most 50
-notices, including suppressed notices, dropping the oldest beyond that limit.
+visibility in place; a null group makes the notice ungrouped. `updateState` changes a
+notice's state in place, without revealing a suppressed one. Context, state and title
+updates preserve arrival order and never recreate a dismissed ID. The model holds at most
+50 notices, including suppressed notices, dropping the oldest beyond that limit.
 
-One compact summary counts visible tasks and connections. A single notice uses its group
-or notice title; attention takes priority and names the notice needing input or help.
-Clicking the summary or Buddy opens all visible work. The drawer groups members under
-expandable headers, keeps first-observed order and expansion while identities remain,
-and shows each member's title and live detail. Duplicate titles gain stable discriminators.
-Clicking a drawer entry runs its activation.
+One summary counts the visible notices: a single notice shows its group's title, or its
+own when ungrouped, and its state ("Running", "Needs input", "Connected", "Degraded",
+"Disconnected"); several show counts such as "3 tasks · 1 connection". A notice that wants
+attention takes priority (`NEEDS_INPUT`, then `DOWN`, then `DEGRADED`, keeping the one
+already named on a tie): the summary then shows that notice's own title, its state and
+how many others there are. Clicking the summary or Buddy opens the drawer. It shows each
+group under a heading with its member count, which a click collapses or expands, and each
+ungrouped notice on its own; members show their title and live detail. Groups and members
+keep the order in which they were first seen, and a group its expansion, while any of their
+notices is retained. Notices in one group with the same title gain a stable " · N" number.
+Clicking a drawer entry runs its activation and closes the drawer.
 
 A producer dismisses its notice when work ends. The drawer's × dismisses one entry;
-**Dismiss all**, shown for multiple entries, includes collapsed sections and preserves
-suppressed notices. Dismissal removes the model entry without notifying the host; another
-post of the same ID shows it again. Escape, focus loss, activation, an empty visible deck
-or hiding Buddy closes the drawer. It stays open across pointer exit. Buddy keeps no
-outcomes: hosts report those elsewhere (Jasper posts a notification). Cancel producer
-work first, then dismiss. Hiding the companion does not stop producers.
+**Dismiss all**, shown for more than one entry, dismisses every visible notice, those in
+collapsed groups included, and keeps suppressed ones. Dismissal removes the model entry
+without notifying the host; another post of the same ID shows it again. Escape, focus
+loss, activation, an empty visible deck or hiding Buddy closes the drawer; it stays open
+when the pointer leaves it. Buddy keeps no outcomes: hosts report those elsewhere (Jasper
+posts a notification). Cancel producer work first, then dismiss. Hiding the companion does
+not stop producers.
 
 ## Host appearance and position
 
@@ -160,7 +169,7 @@ pointer frames. Hiding cancels a pending drag and is not an extra persistence fl
 
 The cross on a `DOWN` connection is the one colour Buddy takes from the look and feel:
 the `UIManager` colour `Jasper.semantic.status.danger` (Jasper's theme engine publishes
-it), else `#C45A53`. Buddy listens for `lookAndFeel` changes and refreshes its column
+it), else `#C45A53`. Buddy listens for `lookAndFeel` changes and refreshes its summary
 and drawer. The host owns persistence, visibility policy, activation and producer
 cancellation; Buddy accepts values and requests.
 

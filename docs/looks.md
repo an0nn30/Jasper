@@ -180,7 +180,7 @@ The base gives every key its starting value (the columns below) and also decides
 | Key | Values | `default` base | `classic` base | What it changes |
 |---|---|---|---|---|
 | `title_bar` | `unified`, `native`, `classic` | `unified` | `native` | `unified`: on macOS the title row holds the toolbar; on Linux and Windows Jasper draws the title bar, or the system draws it with `window.native_decorations`. `native`: the system title bar on every platform, on macOS following the theme's darkness; Settings hides `window.native_decorations`. `classic`: IntelliJ Classic's title bar on macOS and Windows, and `native`'s on Linux ([the classic title bar](#the-classic-title-bar)). Under `native` and `classic` the toolbar is a classic row beneath the title (22-pixel icon buttons named by their tooltips under `window.toolbar = "icons"`, each button's icon and then its label under `"icons_and_labels"`), and Settings draws no title row of its own. |
-| `menu_bar` | `system`, `window` | `system` | `window` | `system`: the standard menus, in the screen menu bar on macOS. `window`: the window's classic menus: File, Edit, View, then Session and Transfer, the plugins' menus and Tools, each when filled, then Window and Help. Window holds the Tab items and the tool window toggles, which leave View. Under `native` they are a row in each window on every platform, the macOS screen menu bar is off and auxiliary windows have none; under `classic` they are where [the classic title bar](#the-classic-title-bar) puts them. Needs `title_bar = "native"` or `"classic"`. |
+| `menu_bar` | `system`, `window` | `system` | `window` | `system`: the standard menus, in the screen menu bar on macOS. `window`: the window's classic menus: File, Edit, View, then Session and Transfer, the plugins' menus and Tools, each when filled, then Window and Help. Window holds **Layouts ›**, the Tab items and the tool window toggles, which leave View. Under `native` they are a row in each window on every platform, the macOS screen menu bar is off and auxiliary windows have none; under `classic` they are where [the classic title bar](#the-classic-title-bar) puts them. Needs `title_bar = "native"` or `"classic"`. |
 | `window_title` | 1 to 120 characters | `"{context}"` | `"{context}"` | A window's title, from the [tokens](#window-title-tokens) below. |
 | `tool_windows` | `rails`, `stripes` | `rails` | `stripes` | `rails`: icon stripes as wide as `window.rail_width`. `stripes`: labelled stripes on the sides and a strip along the bottom, each label starting with its tool window's icon, tool windows framed flush under header strips, and a tool window becoming the active one, with the keyboard, when you click in it, open it from its stripe or use its toggle (a menu item or its shortcut); Settings hides `window.rail_width`, and the Notifications panel is called **Event Log** and starts in Bottom Left instead of Right Top ([tool windows](workspace.md#tool-windows-and-the-dock)). |
 | `editor_tabs` | `equal`, `classic` | `equal` | `classic` | Equal-width tabs, shown once a window has two tabs, or classic tabs, always shown and as wide as their labels, each with a × (a terminal tab also with a status dot), and a + after the last. |
@@ -197,7 +197,7 @@ The base gives every key its starting value (the columns below) and also decides
 
 | Platform | Title bar | Menus (`menu_bar = "window"`) |
 |---|---|---|
-| macOS | A 28-point band in the toolbar's colour, seamless with the toolbar row below it, where macOS draws the traffic lights and the window's title, light or dark with the theme. A double-click in it zooms, minimises or does nothing, as System Settings › Desktop & Dock says; full screen removes it. | The screen menu bar, with **About Jasper** and **Settings…** in the application menu. The screen menu bar follows the focused window, and its menus act on that window. Other windows, such as Settings and About, keep the system title bar and show a short File menu in the screen menu bar. |
+| macOS | A 28-point band in the toolbar's colour, seamless with the toolbar row below it, where macOS draws the traffic lights and the window's title, light or dark with the theme. A double-click in it zooms, minimises or does nothing, as System Settings › Desktop & Dock says; full screen removes it. | The screen menu bar, with **About Jasper** and **Settings…** in the application menu. The screen menu bar follows the focused window, and its menus act on that window. A tool window in a window of its own ([Float and Window](workspace.md#float-and-window)) has the band too. Other windows, such as Settings and About, keep the system title bar and show a short File menu in the screen menu bar. |
 | Windows | Jasper's 28-pixel title bar in the toolbar's colour, holding the menus and then the window's title, left-aligned and dimmed while the window is inactive, over a 1-pixel rule. As the window narrows, a long title shortens to 60 pixels, then the menus fold into "…" and then ☰. With `window.native_decorations = true` the system title bar instead, after a restart. | In the window's title bar, or a row in it under the system title bar. Other windows and dialogs have Jasper's title bar without menus. |
 | Linux | The system title bar, as `native`. | A row in the window; auxiliary windows have none. |
 
@@ -316,8 +316,8 @@ default ([look-dependent defaults](configuration.md#look-dependent-defaults)).
 
 | Key | Value | Core default |
 |---|---|---|
-| `"ui.theme.light"` | a theme id with a Light variant | `jasper-meadow` |
-| `"ui.theme.dark"` | a theme id with a Dark variant | `jasper-meadow` |
+| `"ui.theme.light"` | a theme id with a Light variant | `desktop-colors` on Linux, `jasper-meadow` elsewhere |
+| `"ui.theme.dark"` | a theme id with a Dark variant | `desktop-colors` on Linux, `jasper-meadow` elsewhere |
 | `"palette.visible_rows"` | integer, 1–20 | `5` |
 | `"window.toolbar_height"` | integer, 28–64 | `30` |
 | `"window.toolbar"` | `"icons_and_labels"`, `"icons"` or `"hidden"` | `"icons_and_labels"` |
@@ -380,12 +380,14 @@ The splash art must be an `svg` document without a DOCTYPE, processing instructi
 `animate`, `animateTransform` or `set` elements, `on…` or `base` attributes, links or CSS `url()` other than to `#id`
 fragments in the file, `\` or `@` in an attribute value or a `<style>` element, or nesting deeper than 128 elements.
 
-A look without `[branding]`, such as the default look or Enterprise, keeps Jasper's Shell Prompt icon and shows
-a still landscape and turtle illustration for the saved interface theme active at startup: Jasper Meadow, Slate
-Cobalt, Ubuntu Yaru or one of Catppuccin's four flavours. Custom themes and Desktop colors use Meadow art. A theme
-change chooses new artwork on the next launch. Runtime text shows "Jasper", "Make yourself at 127.0.0.1", the version,
-the step and "Your infrastructure. One workspace.", above the progress bar. If an illustration cannot be drawn, the
-original Meadow splash draws instead; its turtle is animated unless `ui.animations.enabled = false`.
+A look without `[branding]`, such as the default look or Enterprise, keeps Jasper's Shell Prompt icon, and its splash
+is a still landscape with the Desk Buddy turtle, drawn for the theme the saved settings show at start (under Match
+System, the system's appearance on macOS and Dark on Linux and Windows): Slate Cobalt, each Catppuccin flavour, Ubuntu
+Yaru and Jasper Meadow have their own, and every other theme and Desktop colors take Jasper Meadow's. A theme change
+shows its art from the next start. Over the art Jasper writes "Jasper", "Make yourself at 127.0.0.1" and the version,
+and under it the step, "Your infrastructure. One workspace." and the progress bar. When the art cannot be drawn,
+Jasper's animated Meadow splash shows instead; its turtle moves unless `ui.animations.enabled = false`, whatever the
+look's `motion` says.
 
 ### Messages
 
@@ -515,10 +517,11 @@ font_family = "IBM Plex Mono"
   base's values, except `title_bar` (`classic` for the base's `native`), `window_title` and `toolbar_search` (`icon`
   for the base's `field`).
 - The fonts sit in `presentation/fonts/`, inside the kit file's folder. There is no `[branding]`, so the look keeps
-  Jasper's Shell Prompt icon and Meadow splash.
-- `[defaults]` makes Jasper Meadow (`jasper-meadow`) the theme for both appearances, as the core defaults do, shows 8
-  Run window rows, makes the toolbar 28 pixels high, IntelliJ's, and shows its buttons as icons only; its Editor table
-  draws the Editor's documents in IBM Plex Mono, the look's data face.
+  Jasper's Shell Prompt icon and splash.
+- `[defaults]` makes Jasper Meadow (`jasper-meadow`) the theme for both appearances on every platform, Linux included,
+  where the core default is Desktop colors; it shows 8 Run window rows, makes the toolbar 28 pixels high, IntelliJ's,
+  and shows its buttons as icons only; its Editor table draws the Editor's documents in IBM Plex Mono, the look's data
+  face.
 
 [The Enterprise look](enterprise.md) describes the result.
 

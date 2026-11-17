@@ -49,11 +49,11 @@ Other plugins open files in it through its API: Remote for files on SFTP hosts, 
   With) or drop on its Dock icon, open in this Editor whatever [Default editor](#default-editor) says, in the most
   recently active window ([One Jasper per home](command-line.md#one-jasper-per-home)).
 
-A file opens in a new tab of the window it was opened from, otherwise of the most recently active window. Opening a file that is already
-open selects its tab, of several [views](#views-of-one-file) the one you were in last; `jasper editor` and a Cmd-click
-also move the caret to the line. While a file loads, its tab shows "Loading *name*…" ("Loading *name* from *host*…" for
-a remote file) with **Cancel**, which closes its pane. A file that cannot be opened shows **Could Not Open File** with
-the reason; see [Large, binary and unreadable files](#large-binary-and-unreadable-files).
+A file opens in a new tab of the window it was opened from, otherwise of the most recently active window. Opening a
+file that is already open selects its tab, of several [views](#views-of-one-file) the one you were in last;
+`jasper editor` and a Cmd-click also move the caret to the line. While a file loads, its tab shows "Loading *name*…"
+("Loading *name* from *host*…" for a remote file) with **Cancel**, which closes its pane. A file that cannot be opened
+shows **Could Not Open File** with the reason; see [Large, binary and unreadable files](#large-binary-and-unreadable-files).
 
 ## Tabs
 
@@ -65,17 +65,17 @@ others in a tab ([Plugin tabs](workspace.md#plugin-tabs)). A tab shows its activ
   by ` · `;
 - a file icon, or a server icon for a remote file. Its tooltip is the file's full location.
 
-Right-click the tab for **Move Tab to New Window**, **Move Tab Into** and **Close Tab**, then every
-[command](#commands-and-shortcuts) but Close Pane, with its shortcut, **Copy**, **Paste**, **Select All**, **Cut**,
-**Delete**, **Undo**, **Redo**, **Increase Font Size**, **Decrease Font Size** and **Reset Font Size**; the window's ⋮ menu also has **Move Tab to Window ▸**. Moving a tab keeps its text, undo history, unsaved changes and
-Markdown view.
+Right-click the tab for **Move Tab to New Window**, **Move Tab Into**, **Move Tab to Window** (while another window is
+open) and **Close Tab**, then every [command](#commands-and-shortcuts) but Close Pane, with its shortcut, **Copy**,
+**Paste**, **Select All**, **Cut**, **Delete**, **Undo**, **Redo**, **Increase Font Size**, **Decrease Font Size** and
+**Reset Font Size**. Moving a tab keeps its text, undo history, unsaved changes and Markdown view.
 Right-click the text for Undo, Redo, Cut, Copy, Paste, Delete, Select All and the **Folding** submenu (Toggle Current
 Fold, Collapse All Comments, Collapse All Folds, Expand All Folds), followed by **Save**, **Find…**, **Go to Line…**,
 **Toggle Comment**, **Revert to Saved**, **Split File Right** and **Split File Down**, then **Split** (Terminal Right,
-Terminal Down, Editor Right, Editor Down, Open File Right…, Open File Down…, then each plugin's split items), which
-opens the choice in a new pane beside the editor, **Move Pane to New Tab**, which gives the editor's pane a tab of its
-own while its tab holds another pane, **Move Pane to Tab**, which moves it into another tab of its window, and last the
-items other plugins add.
+Terminal Down, Browser Right, Browser Down, Editor Right, Editor Down, Open File Right…, Open File Down…, then other
+plugins' split items), which opens the choice in a new pane beside the editor, **Move Pane to New Tab**, which gives the
+editor's pane a tab of its own while its tab holds another pane, **Move Pane to Tab**, which moves it into another tab
+of its window, and last the items other plugins add.
 
 While an Editor file's pane is the active pane of the tab that shows, its own shortcuts take precedence over the
 window's: on macOS Cmd+N makes a new file instead of a new window. The Edit menu's **Copy**, **Paste**,
@@ -352,9 +352,9 @@ settings to read it." A change applies to open tabs at once, and each keeps its 
 scrolling. Chromium starts the first time a Chromium preview, or a browser page, shows.
 
 Every preview is Basic without the Browser plugin, and for the rest of Jasper's run once Chromium could not start or
-has stopped; a Chromium that could not start also posts "The browser could not start". A tab whose Chromium page did
-not load and show its document within 30 seconds, or whose page stopped, previews in Basic for the rest of the run;
-other tabs stay on Chromium.
+has stopped; a Chromium that could not start also posts "The browser could not start". A
+[view](#views-of-one-file) whose Chromium page did not load and show its document within 30 seconds, or whose page
+stopped, previews in Basic for the rest of the run; other views stay on Chromium.
 
 ### What the preview shows
 
@@ -384,9 +384,10 @@ sideways, and in Chromium's that code block or table does.
 
 Text is in the interface font's family at the tab's font size, with larger headings; code is in the Editor's font,
 with its fallback fonts and ligatures. Chromium draws only the fonts installed on the computer: in its preview, text in
-a font only Jasper bundles is in the system's interface font, and code in one, such as the default Cousine Nerd Font
-Mono, in the system's monospace font; colour emoji fonts come last, so digits and `#` in code are never drawn as emoji. In Basic, **Line height** spaces the preview's lines too. Colours come from the
-UI theme ([Theme colours](#theme-colours)). A change of theme or font applies to the preview at once.
+a font only Jasper bundles is in the system's interface font, and code in one, such as Cousine Nerd Font Mono, the
+terminal's default font, in the system's monospace font; colour emoji fonts come last, so digits and `#` in code are
+never drawn as emoji. In Basic, **Line height** spaces the preview's lines too. Colours come from the UI theme
+([Theme colours](#theme-colours)). A change of theme or font applies to the preview at once.
 
 The preview cannot be edited. Copy copies the text selected in it, and **Select All** in the tab menu selects all of it
 while it has the focus. In the Preview view, the commands that change or locate text (Paste, and **Cut**, **Delete**,
@@ -642,14 +643,14 @@ after a change; [Environment](terminal.md#environment) gives the order in which 
 When the chosen editor cannot take a file (a terminal editor with no Jasper window open, an app that does not start)
 or the Editor is off, Jasper hands the file to the desktop: its edit action, then its open action, then showing the file
 in the file manager. A Cmd-clicked path and a file from **File › Open File…** are never opened that way, only edited or
-shown.
+shown, and a file another program hands to Jasper ([Opening files](#opening-files)) is only shown in the file manager.
 
 ## Settings
 
 The settings live in `plugins/dev.jasper.editor/dev.jasper.editor.toml` in [Jasper home](getting-started.md#jasper-home)
-and on Settings › Tools › Editor, in the sections Font, Colors, Editing, Markdown, Files and Default editor. Jasper creates the
-file, with every setting commented out, when it is missing; changes in the file or on the page apply without a restart.
-A bad value is reported and its default used ([Plugin settings](plugins.md#plugin-settings)).
+and on Settings › Tools › Editor, in the sections Font, Colors, Editing, Markdown, Files and Default editor. Jasper
+creates the file, with every setting commented out, when it is missing; changes in the file or on the page apply
+without a restart. A bad value is reported and its default used ([Plugin settings](plugins.md#plugin-settings)).
 
 | Key | Default | Values | On the page | Applies to |
 |---|---|---|---|---|
@@ -691,13 +692,13 @@ The Editor takes its colours from an editor scheme: the background, text, caret,
 line numbers, and a colour with bold or italic for each syntax role, such as keywords, strings and comments. Every theme
 has an editor scheme for each of its variants. **Color scheme** (`color_scheme`, Settings › Tools › Editor › Colors)
 picks which one: **Follow Workspace Scheme** (`"workspace"`, the default) uses the scheme of the UI theme the window
-shows, Dark or Light, so it follows the appearance; the other entries, such as **Catppuccin Mocha (Dark)**
-(`"catppuccin-mocha/dark"`), list each installed theme's Dark and Light schemes, imported themes included, and keep
-that scheme whatever the appearance. A saved scheme whose theme is not installed is listed as not found, and the
+shows, Dark or Light, so it follows the appearance (Slate Cobalt's under [Desktop colors](themes.md#desktop-colors) on
+Linux); the other entries, such as **Catppuccin Mocha (Dark)** (`"catppuccin-mocha/dark"`), list each installed theme's
+Dark and Light schemes, imported themes included, and keep that scheme whatever the appearance. A saved scheme whose theme is not installed is listed as not found, and the
 Editor shows the workspace's scheme until the theme is back. The terminal scheme (`terminal.scheme`) does not change
-the Editor. A change of theme or of the setting applies to open tabs at once, without touching their text. On macOS a translucent workspace
-(`ui.workspace.opacity`) makes the text and gutter backgrounds translucent too. The find bar's and 'hlsearch' match
-highlight, and Vim sneak's magenta matches, keep their own colours.
+the Editor. A change of theme or of the setting applies to open tabs at once, without touching their text. On macOS a
+translucent workspace (`ui.workspace.opacity`) makes the text and gutter backgrounds translucent too. The find bar's
+and 'hlsearch' match highlight, and Vim sneak's magenta matches, keep their own colours.
 
 The [Markdown preview](#markdown-preview) takes its page from the UI theme's roles instead: `surface.panel` behind it
 (translucent too in Basic, with `ui.workspace.opacity`; the Chromium preview stays opaque), `text.primary` for text,
@@ -706,8 +707,8 @@ The [Markdown preview](#markdown-preview) takes its page from the UI theme's rol
 instead), and `selection.bg` and `text.onSelection` for selected text; Find's matches in it are highlighted in
 `selection.bg`, but for Chromium's current match, which is orange (`#FF9632`). In Chromium an alert's rule and title
 take `accent` (Note), `status.success` (Tip), the workspace's editor scheme's keyword colour (Important),
-`status.warning` (Warning) or `status.danger` (Caution). Its code blocks take the
-workspace's editor scheme's syntax colours, whatever **Color scheme** chooses. Writing an editor scheme:
+`status.warning` (Warning) or `status.danger` (Caution). Its code blocks take the workspace's editor scheme's syntax
+colours, whatever **Color scheme** chooses. Writing an editor scheme:
 [Creating themes](creating-themes.md); the SDK's view of it:
 [`Appearance.editorPalette()`](sdk-reference.html#dev.jasper.sdk.ui.Appearance.editorPalette()) and
 [`Appearance.syntaxPalette()`](sdk-reference.html#dev.jasper.sdk.ui.Appearance.syntaxPalette()), and every installed
@@ -832,8 +833,8 @@ and anything else is false. Lines Jasper cannot run are skipped: a notification 
 many, and `:messages` lists each with its line and the reason. A vimrc that cannot be read posts "Could not read the
 vimrc"; a missing one is not reported. The shortcut-conflict notification's **Use as Editor shortcut** appends a line
 such as `sethandler <C-f> a:ide` to the vimrc, creating it if missing, and reloads it; a vimrc it cannot write posts
-"Could not update the vimrc". **Open vimrc** in the status bar's Vim menu opens it in the editor, creating it empty if
-missing; one it cannot create posts "Could not open the vimrc".
+"Could not update the vimrc". **Open vimrc** in the status bar's Vim menu opens it in the
+[default editor](#default-editor), creating it empty if missing; one it cannot create posts "Could not open the vimrc".
 
 ### Vim options
 
@@ -956,12 +957,13 @@ The Editor exports `dev.jasper.editor.api`. A plugin that requires `dev.jasper.e
 Project Index do) finds the `Editor` service with `services().find(Editor.class)` and, on the UI thread, calls
 `open(Path)` for a local file or `open(EditorDocument)` for a file it reads and writes itself, each also with the
 `WindowOwner` to open it in. `EditorDocument.write` documents the save contract a provider follows, and
-`EditorDocument.resolveRelative(path)` (Editor 0.11.0) returns the document at a path relative to its folder, on the same
-storage and login, for a Markdown preview's relative links and images; a provider checks the path with
+`EditorDocument.resolveRelative(path)` returns the document at a path relative to its folder, on the same storage and
+login, for a Markdown preview's relative links and images; a provider checks the path with
 `RelativePaths.requireValid`, and one that keeps the default, which returns empty, has links that say "This document
 cannot resolve relative links" ([relative paths](plugin-apis.md#relative-paths)). A plugin with a file source calls
-`locationDocuments(sourceId, resolver)` so that Open in Editor…, Open in Editor Pane…, Open File Right…, Open File Down… and Save As… offer the source's places and open what
-the user picks through the `LocationResolver`; `reopener(prefix, resolve)` lets Recent files reopen its
-documents and Jasper restore their tabs (a restored document with a host is first read with
-`EditorDocument.readQuietly`, which asks the user nothing), and `opener(handler)` lets it answer Open in Editor…
-itself. [Plugin APIs](plugin-apis.md) describes the package.
+`locationDocuments(sourceId, resolver)` so that Open in Editor…, Open in Editor Pane…, Open File Right…, Open File
+Down… and Save As… offer the source's places and open what the user picks through the `LocationResolver`;
+`reopener(prefix, resolve)` lets Recent files reopen its documents and Jasper restore their tabs (a restored document
+with a host is first read with `EditorDocument.readQuietly`, which asks the user nothing), `opener(handler)` lets it
+answer Open in Editor… itself, and `contextItem(title, run)` adds an item to the end of the text's right-click menu in
+every Editor tab. [Plugin APIs](plugin-apis.md) describes the package.

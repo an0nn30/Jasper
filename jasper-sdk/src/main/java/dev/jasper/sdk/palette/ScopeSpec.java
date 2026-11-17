@@ -29,13 +29,13 @@ import java.util.regex.Pattern;
  * @param shortcutActionId one of the plugin's own actions: while the palette is open, that action's shortcut chooses
  *                         this scope instead of running the handler (the command palette dismisses when this scope is
  *                         already chosen); the Run window shows its shortcut beside the scope in its menu
- * @param inAll            whether a query with no scope chosen searches this scope too (since 0.8.0)
+ * @param inAll            whether a query with no scope chosen searches this scope too
  * @param inRecents        whether the palette may offer this scope's rows before anything is typed, among the
- *                         recently and most used items; only a scope in All is offered there (since 0.9.2)
+ *                         recently and most used items; only a scope in All is offered there
  * @param hue              the hue of this scope's row squares where a presentation draws them; NONE takes the plugin's
- *                         manifest {@code icon_hue}, and NEUTRAL without one (since 0.18.0)
+ *                         manifest {@code icon_hue}, and NEUTRAL without one
  * @param itemNoun         what one row is, as a lowercase singular noun such as "session", which a presentation shows
- *                         capitalised before a row's detail; blank uses the label (since 0.18.0)
+ *                         capitalised before a row's detail; blank uses the label
  */
 public record ScopeSpec(String id, String label, String description, String placeholder, List<PaletteVerb> verbs,
                         boolean monospaceRows, Optional<String> icon, Optional<String> shortcutActionId, boolean inAll,

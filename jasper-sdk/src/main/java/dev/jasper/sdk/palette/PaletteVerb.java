@@ -10,7 +10,6 @@ import java.util.Objects;
  * @param label what the hint bar shows next to this verb's key, such as "Paste and run"
  * @param role  STANDARD, or SPLIT for the split-pane variant of the scope's first verb, which a presentation may offer
  *              as an option of that verb ("Open in a split pane"); a scope has at most one SPLIT verb, never its first
- *              (since 0.18.0)
  */
 public record PaletteVerb(String id, String label, Role role) {
     /**

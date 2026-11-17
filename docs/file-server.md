@@ -61,9 +61,10 @@ No File Server command has a default shortcut; assign one in
 
 ## The File Servers tool window
 
-**Toggle File Servers** shows or hides the tool window. It starts in the left side's top slot of each window (see [Tool windows and the dock](workspace.md#tool-windows-and-the-dock)). Its header shows how
-many servers there are and **New File Server…** (**+**). With no servers it shows "No File Servers" and **Share
-Folder…**, which opens New File Server.
+**Toggle File Servers** shows or hides the tool window. Every window has its own, which starts in the left side's top
+slot (see [Tool windows and the dock](workspace.md#tool-windows-and-the-dock)). Its header shows how many servers there
+are and **New File Server…** (**+**). With no servers it shows "No File Servers" and **Share Folder…**, which opens
+New File Server.
 
 Saved servers are listed in the order of `servers.toml`, then a **Temporary** heading and the temporary servers. Each
 row shows the server's name; its protocol (HTTP blue, FTP amber, SFTP green, TFTP purple); its address (the first
@@ -112,8 +113,8 @@ In a window of its own ([Float and Window](workspace.md#float-and-window)) or do
 beside the list and are always shown: the row menu has no Show Details or Hide Details, and the keys above that show
 and hide them have no visible effect.
 
-While the File Servers tool window is visible, the addresses are recomputed every 10 seconds and each time it is shown, so
-a server reachable from all networks picks up a network you joined.
+While the File Servers tool window is visible, the addresses are recomputed every 10 seconds and each time it is
+shown, so a server reachable from all networks picks up a network you joined.
 
 The status bar shows "⇅ 1 server" or "⇅ *n* servers" while servers run; its tooltip lists each running server with its
 first address, and clicking it toggles the tool window.
@@ -123,13 +124,15 @@ first address, and clicking it toggles the tool window.
 Under a classic look, one whose [kit file starts from the classic base](looks.md#kit-and-base) as the
 [Enterprise look](enterprise.md)'s does, the tool window starts in the left side's bottom slot, beneath SFTP. It is a
 table of **Folder** (name and protocol), **Address** and **Status** (a status dot and the state); Enter or a double
-click starts or stops the selected server. A chosen server's details are **Properties — *name***: Folder, Protocol,
-Port, Access, Reachable from, User, TLS certificate, SSH host key, its addresses and Warning. The row menu reads **Copy
-URI** for Copy Address, adds **Copy *address*** for each further address, and has **Show Activity** / **Hide Activity**
-in place of Show Details, which shows the activity log under the properties. In a window of its own or docked at the
+click starts or stops the selected server. Click a header to sort the servers by it, again to reverse; drag a column
+boundary to resize a column, or double-click it to fit the column to its content. The sort and widths are remembered.
+A chosen server's details are **Properties — *name***: Folder, Protocol, Port, Access, Reachable from, User, TLS
+certificate, SSH host key, its addresses and Warning. The row menu reads **Copy URI** for Copy Address, adds **Copy
+*address*** for each further address, and has **Show Activity** / **Hide Activity** in place of Show Details, which
+shows the activity log under the properties. In a window of its own or docked at the
 bottom, the chosen server's properties, status line and activity stand beside the table, always shown, and the row menu
 has no Show Activity or Hide Activity. New File Server lists the authorized keys as a Type / Fingerprint / Comment
-table.
+table, which sorts and resizes the same way.
 
 Under labelled tool window stripes, as in Enterprise, **Toggle File Servers** makes the tool window the active one when
 it shows it, which takes the keyboard, and activates a shown tool window that is not the active one instead of hiding
@@ -439,6 +442,7 @@ Under Jasper home, in `plugins/dev.jasper.fileserver/`:
 | `data/servers.toml` | the saved servers |
 | `data/tls/server.p12`, `data/tls/password` | the [TLS certificate](#the-tls-certificate) and its password |
 | `data/hostkey` | the [SFTP host key](#sftp) |
+| `data/columns.properties` | the sort and column widths of the tables under a classic look |
 
 `servers.toml` is read when File Server starts. Saving from the tool window reads it again, applies the change and
 rewrites it; comments and keys File Server does not know are not kept. Each server is a `[[server]]` table:

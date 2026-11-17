@@ -19,7 +19,7 @@ import java.util.Optional;
  *                   to learn whether to offer a "More in &lt;label&gt;…" row; finding a recently used row again asks
  *                   for 50
  * @param macOs      whether to show macOS shortcut glyphs and wording
- * @param textTarget (since 0.29.0) with no {@code target}, the content tab the palette was opened from, or for the
+ * @param textTarget with no {@code target}, the content tab the palette was opened from, or for the
  *                   Run window that window's current item, while it takes inserted text
  *                   ({@code ContentTab.setTextInsertion}), read again before each search and run; empty otherwise. The
  *                   handle is bound to the scope's plugin, so inserting into it needs {@code terminal.inject}

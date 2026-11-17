@@ -13,7 +13,7 @@ import java.util.Objects;
  * @param palette the document's colours
  * @param syntax the colours and styles of code's tokens
  * @param textFamily the font family of the document's text; not blank
- * @param typography the code's font, and the size and line height of the document's text
+ * @param typography the code's font, with its fallback fonts and ligatures, and the size of the document's text
  */
 public record PreviewTheme(Variant variant, WorkspacePalette palette, SyntaxPalette syntax, String textFamily,
         TerminalTypography typography) {

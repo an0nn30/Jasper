@@ -3,10 +3,11 @@
 A pluggable DevOps workstation for macOS, Linux and Windows, written in Java Swing on the JetBrains Runtime.
 
 Jasper puts the tools you use to run systems in one window: local terminals with tabs and splits, SSH sessions, SFTP
-transfers and tunnels to your hosts, an encrypted credential vault, an editor for local and remote files, file servers
-for moving files to other machines, and a command palette that reaches all of them. It is for engineers who spend
-their day in shells and on remote hosts. Most of it is delivered as plugins on a public SDK, so the workstation can
-grow with what you need: the bundled plugins use the same API as any plugin you write or install.
+transfers and tunnels to your hosts, an encrypted credential vault, an editor for local and remote files, a web
+browser drawn by Chromium, file servers for moving files to other machines, and a command palette that reaches all of
+them. It is for engineers who spend their day in shells and on remote hosts. Most of it is delivered as plugins on a
+public SDK, so the workstation can grow with what you need: the bundled plugins use the same API as any plugin you
+write or install.
 
 ## What's inside
 
@@ -16,28 +17,33 @@ grow with what you need: the bundled plugins use the same API as any plugin you 
   programs, regex search, links and file paths you Cmd-click (Ctrl-click on Linux and Windows) to open, and shell
   integration for zsh, bash and fish: jumps between prompts, new tabs and splits in the same folder, and a
   notification when a long command finishes. See [the terminal](docs/terminal.md).
-- **Workspace**: windows whose tabs hold split panes, each pane a terminal, an Editor file or a
-  plugin's view. Drag a tab along its strip, into another tab or window, or out into a window of its own, drag a pane
-  beside another, and maximise a pane; Jasper saves the window you used last, with its tabs and panes, and restores it at the next start.
-  Each window has a dock of tool windows that you drag between its left, right and bottom edges. See
-  [the workspace](docs/workspace.md).
+- **Workspace**: as many windows as you like, each complete with its header, menus, tool windows, status bar and
+  notification cards, whose tabs hold split panes: a terminal, an Editor file, a web page or a plugin's view in each.
+  Drag a tab along its strip, into another tab or window, or out of every window into a new one, drag a pane beside
+  another or out into a window of its own, and maximise a pane. Each window docks its own tool windows at its left,
+  right and bottom edges, and a tool window can float or have a window of its own. Window › Layouts saves layouts to
+  apply later and the default layout new windows open with; Jasper saves the window you used last, with its tabs and
+  panes, and restores it at the next start. See [the workspace](docs/workspace.md).
 - **Command palette**: one search surface for commands and the plugins' scopes: saved hosts, shell history,
   snippets, vault logins, project files and more. Under the Enterprise look it is the Run window. See
   [the command palette](docs/command-palette.md).
-- **Notifications**: cards in the window, a Notifications tool window with history and an unread badge, and system
+- **Notifications**: cards in every window, a Notifications tool window with history and an unread badge, and system
   notifications while Jasper is in the background. See [notifications](docs/notifications.md).
 - **Settings**: a searchable Settings dialog over `config.toml`, a Keymap page where every action can be rebound, and
   most changes applied without a restart. See [configuration](docs/configuration.md).
-- **Themes and looks**: Jasper Meadow in both the Dark and the Light appearance by default; Slate Cobalt, Catppuccin
-  Latte, Frappé, Macchiato and Mocha, and Ubuntu Yaru built in; import further Jasper theme files. A *look* sets the
-  chrome and controls: the default look, or a plugin's look such as Enterprise. See [themes](docs/themes.md) and
-  [looks](docs/looks.md).
-- **The `jasper` command**: bring Jasper forward, open files and folders in it (`jasper <path>...`), start Jasper
-  with options, or run plugin commands such as `jasper editor FILE:LINE` from any shell. One Jasper runs per home:
-  launching it again hands what you asked for to the running Jasper. See [the command line](docs/command-line.md).
-- **Background residency**: by default on macOS and Windows, Jasper keeps running when its last window closes, so the
-  next window opens at once. See [running in the background](docs/getting-started.md#running-in-the-background).
-- **Desk Buddy**: an optional pixel-art companion above your windows that shows long-running commands and plugin work;
+- **Themes and looks**: Jasper Meadow in both the Dark and the Light appearance by default (on Linux, Desktop colors,
+  your desktop's own colours read from GTK, Qt or KDE); Slate Cobalt, Catppuccin Latte, Frappé, Macchiato and Mocha,
+  and Ubuntu Yaru built in; import further Jasper theme files. A *look* sets the chrome and controls: the default look,
+  or a plugin's look such as Enterprise. See [themes](docs/themes.md) and [looks](docs/looks.md).
+- **The `jasper` command**: bring Jasper forward, open files and folders in it (`jasper <path>...`) or web addresses
+  in its browser (`jasper <url>...`), start Jasper with options, or run plugin commands such as
+  `jasper editor FILE:LINE` from any shell. One Jasper runs per home: launching it again hands what you asked for to
+  the running Jasper. See [the command line](docs/command-line.md).
+- **Background residency**: by default Jasper keeps running when its last window closes, in the macOS menu bar, the
+  Windows notification area or the Linux desktop's tray where it has one, so the next window opens at once, and an
+  installed Jasper starts in the background at login. See
+  [running in the background](docs/getting-started.md#running-in-the-background).
+- **Desk Buddy**: an optional pixel-art companion above your windows that shows running commands and plugin work;
   off by default. See [Desk Buddy](docs/notifications.md#desk-buddy).
 
 ### Plugins
@@ -53,7 +59,7 @@ Everything below ships with Jasper as a bundled plugin, listed in Settings › P
 | Project Index | `dev.jasper.indexer` | Offers to index the project a terminal enters, locally or on a saved host, and finds its files from the command palette | Yes |
 | Shell History | `dev.jasper.history` | Searches every shell's history from the command palette, to paste or run a command or save it as a snippet | Yes |
 | Snippets | `dev.jasper.snippets` | Saved commands with fill-in placeholders, from the command palette | Yes |
-| Browser | `dev.jasper.browser` | Web pages in workspace tabs and panes, drawn by Chromium, with a toolbar, a Web menu, history, tagged bookmarks and popups that keep their `window.opener`; a /dev/null mode that saves no history, cookies or site data; site permissions, page notifications, audio muting, Clear Cookies and Clear Website Data, ad blocking and an HTTP proxy; downloads with the system's downloaded-file mark, reader mode, distraction removal and Save Page As; logins from the Credential Vault in page fields and HTTP sign-ins; links you click in a terminal can open here, after asking first | Yes |
+| Browser | `dev.jasper.browser` | Web pages in workspace tabs and panes, drawn by the Chromium that comes with Jasper's runtime, with a toolbar, a Web menu, history, tagged bookmarks and popups that keep their `window.opener`; a /dev/null mode that saves no history, cookies or site data; site permissions, page notifications, audio muting, Clear Cookies and Clear Website Data, ad blocking and an HTTP proxy; downloads with the system's downloaded-file mark, reader mode, distraction removal and Save Page As; logins from the Credential Vault in page fields and HTTP sign-ins; it draws the Editor's Markdown preview, opens the links you click in a terminal (after asking first) and can be your default browser | Yes |
 | Enterprise | `dev.jasper.enterprise` | The Enterprise look: IntelliJ Classic's title bar on macOS and Windows, labelled tool-window stripes led by their icons, the Run window, classic controls and icons and IBM Plex fonts, in Jasper Meadow by default; it also ships the Enterprise theme | No |
 | Sample | `dev.jasper.sample` | Exercises the plugin runtime for plugin authors; does nothing until one of its `demo_*` settings is set | Yes |
 
@@ -65,17 +71,18 @@ Every plugin in the table is built on the Jasper SDK (`dev.jasper.sdk`, Java, JD
 third-party plugin compiles against. A plugin is a folder of jars, one of which carries a `plugin.toml`; Jasper loads
 each plugin in its own class loader when it starts. Through the SDK and its `plugin.toml` a plugin adds actions, menus,
 toolbar items, status bar items, tool windows, command palette scopes, settings pages, notifications, workspace tabs,
-terminal sessions, `jasper` subcommands, places in the file chooser, themes and even a whole look, which can be data
-alone, as Enterprise's is. Plugins read the look Jasper runs with through the SDK, and a look can give other plugins'
-settings their defaults.
+terminal sessions, pieces of terminal tab names, `jasper` subcommands, places in the file chooser, the web browser
+Jasper opens links with, themes and even a whole look, which can be data alone, as Enterprise's is. Plugins read the
+look Jasper runs with through the SDK, and a look can give other plugins' settings their defaults.
 
 - **Capabilities and consent.** A plugin declares in `plugin.toml` what it does that you cannot see on screen, such as
   typing into terminals, reading the clipboard or accepting network connections. Jasper shows those capabilities
   before a plugin you installed first runs, and again when an update asks for more, and loads it only once you allow
   them. Consent is not a sandbox: an allowed plugin runs with everything your account can reach.
 - **Plugins build on plugins.** A plugin can export an API package and publish services that other plugins look up:
-  Remote and File Server take credentials from the Vault's API, Remote and Project Index open files through the
-  Editor's, Project Index reaches saved hosts through Remote's, and Shell History saves snippets through Snippets'.
+  Remote, File Server and the Browser take credentials from the Vault's API, Remote and Project Index open files
+  through the Editor's, the Editor draws its Markdown preview through the Browser's, Project Index reaches saved hosts
+  through Remote's, and Shell History saves snippets through Snippets'.
 - **Tooling.** Each release carries the SDK and test-kit jars; the test kit's fake host runs a plugin in unit tests
   without Jasper. `jasper --plugin-dir <dir>` loads a plugin under development, and Settings › Plugins installs a
   plugin from a zip.
@@ -97,7 +104,9 @@ sources (`Jasper-<version>-cygwin-sources-<amd64|aarch64>.zip`) beside the packa
 
 Every package bundles its own Java runtime. On Windows the setup wizard also installs a Cygwin environment, offered as
 the **Cygwin Bash** shell; with the portable ZIP, run `provision-cygwin.cmd` in its folder once. The packages are not
-notarized or signed by a publisher, so macOS and Windows may ask you to confirm before opening them.
+notarized or signed by a publisher, so macOS and Windows may ask you to confirm before opening them. On Gentoo (arm64,
+glibc), the [source overlay](packaging/gentoo/README.md) builds Jasper from a pinned commit, one from before the
+Browser plugin.
 [Getting started](docs/getting-started.md) covers installation, first launch and uninstalling on each platform.
 
 ## Getting started
@@ -135,9 +144,9 @@ The [documentation index](docs/README.md) lists every guide. The main ones:
   [keyboard shortcuts](docs/keyboard-shortcuts.md), [configuration](docs/configuration.md),
   [command line](docs/command-line.md), [diagnostics](docs/diagnostics.md).
 - **Plugins**: [managing plugins](docs/plugins.md), [Remote](docs/remote.md),
-  [Credential Vault](docs/credential-vault.md), [Editor](docs/editor.md), [File Server](docs/file-server.md),
-  [Project Index](docs/project-index.md), [Shell History and Snippets](docs/history-and-snippets.md),
-  [the Enterprise look](docs/enterprise.md).
+  [Credential Vault](docs/credential-vault.md), [Editor](docs/editor.md), [Browser](docs/browser.md),
+  [File Server](docs/file-server.md), [Project Index](docs/project-index.md),
+  [Shell History and Snippets](docs/history-and-snippets.md), [the Enterprise look](docs/enterprise.md).
 - **Theming**: [themes](docs/themes.md), [creating themes](docs/creating-themes.md), [looks](docs/looks.md).
 - **Building plugins**: [SDK reference](docs/sdk-reference.html), [writing a plugin](docs/plugin-authoring.md),
   [plugin UI](docs/plugin-ui.md), [plugin APIs](docs/plugin-apis.md), [SDK architecture](docs/sdk-architecture.md),
@@ -155,6 +164,11 @@ The [documentation index](docs/README.md) lists every guide. The main ones:
   JetBrains and usually finds the SDK itself, but cannot tell the plain and JCEF builds apart: keep only the JCEF build
   of JBR 25 installed and run Gradle on it. If Gradle does not find the SDK, set `JAVA_HOME` to it and put its `bin`
   directory on `PATH`, or set `org.gradle.java.installations.paths` in your Gradle properties.
+  Download `jbrsdk_jcef-25.0.4.1-<osx|linux|windows>-<aarch64|x64>-b635.75.tar.gz` from
+  `https://cache-redirector.jetbrains.com/intellij-jbr/` (the file name appended) and, in the folder that holds it,
+  check it against [`packaging/jcef/checksums.txt`](packaging/jcef/checksums.txt) with
+  `shasum -a 512 -c --ignore-missing <path to>/checksums.txt` (or `sha512sum -c --ignore-missing`), as CI's
+  `.github/actions/setup-jbr` checks the one archive it downloads.
 - **Python 3.11–3.13** on the `PATH` as `python3` or `python` for the theme converter's tests (or name an
   interpreter with `-Pjasper.python=<path>`). The `python3` in Xcode's command line tools (3.9) is too old. Under
   Python 3.14 `checkThemeTool`'s `test_deeply_nested_input_is_a_message` fails; use 3.11 to 3.13.
@@ -269,14 +283,14 @@ start-up recovery and no native `jasper` command.
 | `jasper-sdk/` | The plugin SDK, `dev.jasper.sdk` (JDK only) |
 | `jasper-sdk-testkit/` | The test kit's fake plugin host and the contract suite it shares with the real host |
 | `plugins/` | The bundled plugins, one Gradle module (`:jasper-plugin-<folder>`) per folder |
-| `packaging/` | Jasper's launcher and launch watcher, the native `jasper` command, icons, Buddy sprites, the Linux and Windows packaging scripts, and the Windows Cygwin seed, PTY relay and installer tools |
+| `packaging/` | Jasper's launcher and launch watcher, the native `jasper` command, icons, Buddy sprites, the JCEF runtime's checksums and Chromium file lists, the Linux Desktop colors helpers, the Linux and Windows packaging scripts, the Gentoo source overlay, and the Windows Cygwin seed, PTY relay and installer tools |
 | `tools/` | Benchmark runners, the theme converter, the SDK reference generator, icon and tab previews, and the mock comparison tools |
 | `docs/` | The documentation, the external plugin example, and dated design records |
 | `website/` | Jasper's homepage: static HTML, CSS and JavaScript, its screenshots and the script that packages it for GitHub Pages |
 | `gradle/` | The build's shared scripts: architecture checks, packaging, launcher, SDK release |
 | `config.example.toml` | The core settings at their defaults, as a starting `config.toml` |
 | `design/` | The app icon's exploration rounds |
-| `.github/workflows/` | CI, the Linux package checks, the Release workflow, the SDK jar upload and the manual website deployment |
+| `.github/workflows/` | CI, the Qt and KDE SDK build CI uses for the Desktop colors helpers, the Linux package checks, the Release workflow, the SDK jar upload and the manual website deployment |
 
 ## License
 

@@ -17,9 +17,10 @@ becomes an `AttachedConnection`. What a user sees in a pane is described in
 
 ## Start here
 
-1. Install the **JetBrains Runtime SDK 25**, including development tools. The
+1. Install the **JetBrains Runtime SDK 25** with JCEF, including development tools. The
    Gradle toolchain requires vendor JetBrains; another Java 25 distribution is
-   insufficient. See the [root setup guide](../README.md#requirements).
+   insufficient, and `./gradlew check` refuses any runtime but the pinned JCEF build. See the
+   [root setup guide](../README.md#requirements).
 2. From the repository root run `./gradlew :jasper-terminal:test`.
 3. Read [architecture and ownership](../docs/terminal-architecture.md), then the
    session and view entry points below.

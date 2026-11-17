@@ -30,8 +30,8 @@ the focus, and they act on that window.
 
 **New Window** (File menu, the toolbar's New Window button, Cmd+N on macOS, Ctrl+Shift+N on Linux and
 Windows) opens a window with the [default layout](#layouts): until you save one, a terminal tab and the built-in tool
-windows. With another window open its tool windows are out of Zen and its Float and Window tool windows hidden; with none
-open it restores the saved window. With no default layout saved, its shell starts in the focused pane's folder when Jasper
+windows. Its tool windows are out of Zen, with Float and Window tool windows hidden. When no window is open, Jasper
+restores its saved window first. With no default layout saved, its shell starts in the focused pane's folder when Jasper
 knows it, otherwise in your home folder. **Close Window** (File menu, Cmd+Shift+W on macOS, no default shortcut on Linux and
 Windows) closes the window it runs in, as its title-bar close button does.
 
@@ -48,8 +48,9 @@ goes to the most recently active window; when no window is open, Jasper restores
 default shortcut) moves the shown tab, or the tab whose menu it was, with all its panes into a new window, when
 its window holds two or more tabs. Dragging a tab out of every window does the same ([Tabs](#tabs)).
 **Move Tab to Window ▸** (the window's ⋮, a terminal's right-click menu, a tab's menu and the command palette), while another window is
-open, lists the other windows by their shown tab's title and moves the shown tab to the one you choose, which comes to the
-front; the command palette's moves it to the most recently active other window. A move keeps every shell, file and view
+open, lists the other windows by their shown tab's title and moves the shown tab, or the tab whose menu it was, to the one you
+choose, right after the tab that window shows; that window comes to the front. The command palette's moves it to the most recently active other
+window. A move keeps every shell, file and view
 as it was. Neither runs while a dialog is open in one of the panes it would move.
 
 ### Layouts
@@ -86,9 +87,11 @@ large for the 256 KiB file is not saved: "This layout is too large to save."
 
 ### Size and position
 
-A new window is sized for `window.columns` × `window.lines` cells (100 × 35 by default; Settings › Window › New
-Windows › Initial size) at the terminal font size. A tab dragged out of every window opens a window as large as the
-workspace it left, where you release it.
+New Window opens its window as large as the window it opens from, 30 pixels below and to the right of it: the most
+recently active window, or the window New Window opened last while no other has come to the front since. A tab or pane dragged
+out of every window opens a window as large as the workspace it left, where you release it. Any other new window, such
+as the first one with nothing saved, Move Tab to New Window's or a plugin's, is sized for `window.columns` ×
+`window.lines` cells (100 × 35 by default; Settings › Window › New Windows › Initial size) at the terminal font size.
 
 ### Saving and restoring the windows
 
@@ -105,9 +108,9 @@ dialogs, such as the Credential Vault's, do not come back. An Editor file ([Edit
 ([Remote](remote.md#restored-ssh-tabs)) comes back through its plugin; a plugin's item that cannot come back shows a
 placeholder that says why, with **Close** and, while its plugin runs, **Retry**. When the saved window cannot all come
 back, Jasper opens what it can, keeps the saved file as `workspace.toml.bad` and says "Jasper could not restore your
-window". With **Reopen with** (`system.reopen`) set to **Empty State**, the window opens with one terminal tab and
-the built-in tool windows at the saved window's place. Folders a launch names open in new tabs after the restored ones. See
-[workspace.toml](configuration.md#workspacetoml).
+window". With **Reopen with** (`system.reopen`, Settings › System Settings) set to **Empty State** instead of **Last
+Known State**, the window opens with the [default layout](#layouts) at the saved window's place. Folders a launch names
+open in new tabs after the restored ones. See [workspace.toml](configuration.md#workspacetoml).
 
 ### Title bar and menus
 
@@ -149,8 +152,9 @@ its title (a plugin tab's shows its location), followed by its **Select Tab** sh
 ### Plugin tabs
 
 Plugins can open their own items in tabs and panes beside terminals; the Editor opens each document this way (see
-[Editor](editor.md)). A plugin opens an item in a new tab, in a new pane beside the focused one (from a
-[Split](#panes-and-splits) list) or in a new window; a new tab fills a window's empty workspace. A plugin's
+[Editor](editor.md)). A plugin opens an item in a new tab, at the end of the strip or right after the shown tab, in a
+new pane beside the focused one (from a [Split](#panes-and-splits) list) or in a new window; a new tab fills a window's
+empty workspace. A plugin's
 item shows ● before its title while it has unsaved changes. While one is active:
 
 - its own commands take their shortcuts (the Editor's Cmd+S, Ctrl+S on Linux and Windows, and so on), and **Find**,
@@ -170,8 +174,9 @@ Each tab holds one or more panes, and each pane one terminal, Editor file or plu
   shell profile, and beside anything else (an SSH pane, a shell that has exited, a plugin's view) where a new tab would
   start, with the configured profile. The **Split**
   submenu of the Tab menu and of a terminal's or an editor's right-click menu opens a terminal (**Terminal Right**,
-  **Terminal Down**), an editor (**Editor Right**, **Editor Down**), a file you choose (**Open File Right…**, **Open
-  File Down…**) or a plugin's split item in a new pane beside the focused one. A split of the same direction as the
+  **Terminal Down**), a web page (**Browser Right**, **Browser Down**), an editor (**Editor Right**, **Editor Down**),
+  a file you choose (**Open File Right…**, **Open File Down…**) or another plugin's split item in a new pane beside the
+  focused one. A split of the same direction as the
   one around the pane adds a pane to it, so a row or column can hold any number of panes.
 - The Editor's **Split File Right** and **Split File Down** show the active file in another pane beside its own
   ([Views of one file](editor.md#views-of-one-file)).
@@ -220,14 +225,14 @@ The toolbar sits at the trailing end of the header:
 | Maximize Pane | **Maximize Pane** |
 | Plugin buttons | What plugins add, after their own separator. The Editor adds **New Editor Window**, which opens an untitled file in a new window; Remote adds a **Sessions** menu of your saved hosts, your WSL distributions on Windows, and **Manage Sessions…**. |
 | Find, Settings | **Find**, [Settings](#settings) |
-| ⋮ (View Options) | The window menu: **Move Tab to New Window**, **Move Tab to Window ▸** |
+| ⋮ (View Options) | The window menu: **Move Tab to New Window**, and **Move Tab to Window ▸** while another window is open |
 
 A button's tooltip names its action and current shortcut, for example "Find (Ctrl+Shift+F)" on Linux and Windows. When
 the header is too narrow, buttons move into **More actions** (⋯), the least important first; Find and Settings stay
 longest, and the ⋮ never moves.
 
 View › Show/Hide › Toolbar, or the palette's **Toolbar: Icons and Labels**, **Toolbar: Icons Only** and **Toolbar:
-Hidden**, choose how it shows; the choice is saved as `window.toolbar`. The built-in buttons are always icons; **Icons
+Hidden**, choose how it shows in every window; the choice is saved as `window.toolbar`. The built-in buttons are always icons; **Icons
 and Labels** also shows the labels of Split and of plugin buttons. **Hidden** hides the buttons, the ⋮ included, and
 keeps the header with its search field. Settings › Window sets the same choice and the toolbar height.
 
@@ -264,7 +269,7 @@ See [Configuration](configuration.md).
 
 While a plugin's item is active, the bar shows its location and its own items instead of the shell, folder and size.
 View › Show/Hide › Status Bar (palette: **Show Status Bar** / **Hide Status Bar**; no default shortcut,
-`toggle_status_bar`) shows or hides it and saves `window.status_bar`; Settings › Window also sets its height.
+`toggle_status_bar`) shows or hides it in every window and saves `window.status_bar`; Settings › Window also sets its height.
 
 ## Menus
 
@@ -272,22 +277,26 @@ Menu items show their current shortcuts. Opening a menu refreshes which items ar
 
 | Menu | Items |
 |---|---|
-| File | New Tab, New Window, Open File…, Close Pane, Close Tab, Close Window, Settings, Reload Config, Quit; then, each after a separator, Jasper's **Manage Plugins…** and the plugins' items: Browser's **New Browser Tab** and **New Browser Window**, Editor's **Open in Editor…**, **New Editor Tab**, **Split Right with Editor**, **Open in Editor Pane…** and **New Editor Window**, Credential Vault's **Open Vault...**, **Change Vault Master Password...** and **Vault Plugin Grants...**, Project Index's **Index Folder…** |
+| File | New Tab, New Window, Open File…, Close Pane, Close Tab, Close Window, Settings, Reload Config, Quit; then, each after a separator, Jasper's **Manage Plugins…** and the plugins' items: Credential Vault's **Open Vault...**, **Change Vault Master Password...** and **Vault Plugin Grants...**, Browser's **New Browser Tab** and **New Browser Window**, Editor's **Open in Editor…**, **New Editor Tab**, **Split Right with Editor**, **Open in Editor Pane…** and **New Editor Window**, Project Index's **Index Folder…** |
 | Edit | Copy, Paste, Find, Find Next, Find Previous, Clear Scrollback |
 | View | Command Palette; View Modes › Zen; Maximize Pane; Show/Hide › Toolbar (Icons and Labels, Icons Only, Hidden), Status Bar, Rail; Font Size › Increase Font Size, Decrease Font Size, Reset Font Size; Tool Windows › one toggle per tool window |
 | Tab | Split › Terminal Right, Terminal Down, then each split item's Right and Down (Browser Right, Browser Down, Editor Right, Editor Down, Open File Right…, Open File Down…); Move Pane to New Tab, Move Pane to Tab ›, Move Tab Into ›, Focus Pane Left, Focus Pane Right, Focus Pane Up, Focus Pane Down, Previous Prompt, Next Prompt; Rename Tab; Next Tab, Previous Tab, Select Tab 1 to Select Tab 9 |
 | Window | [Layouts ›](#layouts) |
 | Session | Plugins' session items. Remote: Connect to SSH Host..., Toggle SSH hosts, Split with Same Host, New Host..., Import from ~/.ssh/config..., Toggle Tunnels, Start or Stop a Tunnel..., New Tunnel..., Forward a Port..., Stop All Tunnels |
-| Transfer | Plugins' transfer items. Remote: Open SFTP here, Transfers; File Server: Share Folder…, New File Server… |
+| Transfer | Plugins' transfer items. File Server: Share Folder…, New File Server…; Remote: Open SFTP here, Transfers |
 | Tools | Plugins' tool items |
 | Plugins' own menus | Any menus plugins add, in the order they start |
 | Help | Keyboard Shortcuts…; Change Memory Settings…, Edit Custom VM Options…; About Jasper |
 
-Session, Transfer, Tools and plugins' own menus appear only while a plugin has put something in them. A plugin's menu
-can also show only while one of its items is the window's current item, as the Browser's Web menu does.
+Session, Transfer, Tools and plugins' own menus appear only while a plugin has put something in them, as the Browser's
+Downloads menu does from the first download ([Downloads](browser.md#downloads)). A plugin's menu can also show only
+while one of its items is the window's current item, as the Browser's Web menu does. Plugins' items come in the order
+the plugins start.
 
 - **Open File…** opens a file you choose in the [file chooser](#the-file-chooser), starting in the focused pane's
-  folder, the same way a Cmd-click (Ctrl-click) on a file path in the terminal does; see [Terminal](terminal.md).
+  folder, in the [Default editor](editor.md#default-editor), as a Cmd-click (Ctrl-click) on a file path in the terminal
+  does, except that it never offers a web file, such as an HTML page or an image, to the Browser; see
+  [Terminal](terminal.md#links-and-file-paths).
 - **Settings** opens [Settings](#settings); **Reload Config** reads `config.toml` again now.
 - **Keyboard Shortcuts…** opens Settings › Keymap. **Change Memory Settings…** opens Settings › System Settings at the
   maximum heap size. **Edit Custom VM Options…** opens `jasper.vmoptions` in your editor (in an installed Jasper;
@@ -301,7 +310,7 @@ On macOS, while the menus are in the screen menu bar, the application menu (Jasp
 
 | Where | Items |
 |---|---|
-| A terminal pane | Copy, Paste, Find, Clear Terminal, Split › (as in the Tab menu), Move Pane to New Tab, Move Pane to Tab ›, Maximize Pane, Close Pane, then the window menu's Move Tab to New Window and Move Tab to Window ›; then plugins' items: Remote's **Forward a Port...** and **Open SFTP here**, File Server's **Share Path** › HTTP, HTTPS, FTP, FTPS, SFTP, TFTP |
+| A terminal pane | Copy, Paste, Find, Clear Terminal, Split › (as in the Tab menu), Move Pane to New Tab, Move Pane to Tab ›, Maximize Pane, Close Pane, then the window menu's Move Tab to New Window and Move Tab to Window ›; then plugins' items: the Browser's **Open URL in Split Right** and **Open URL in Split Down** while the selection is one web address ([Links and file paths](terminal.md#links-and-file-paths)), File Server's **Share Path** › HTTP, HTTPS, FTP, FTPS, SFTP, TFTP, Remote's **Forward a Port...** and **Open SFTP here** |
 | A tab's entry in the strip | Rename Tab (for a terminal), Move Tab to New Window, Move Tab Into ›, Move Tab to Window ›, Close Tab, then the active item's own commands |
 | A rail button, or a tool window's Options (⋮) button | View Mode › Docked, Float, Window (the current one checked); Move to › Left Top, Left Bottom, Bottom Left, Right Top, Right Bottom, Bottom Right (the current slot checked); Hide |
 
@@ -409,8 +418,8 @@ When the window is too small for everything, the bottom area gives way first, th
 before the terminal column shrinks.
 
 Jasper saves the layout, which tool windows show and the rails' visibility in `workspace.toml` whenever it changes; the
-next start uses the last saved window's layout. A window opened while another is open starts with a copy of the active
-window's tool windows, out of Zen and with its Float and Window tool windows hidden.
+next start uses the last saved window's layout. A window opened while another is open starts with the
+[default layout's](#layouts) tool windows, out of Zen and with its Float and Window tool windows hidden.
 
 ## View modes
 
@@ -439,15 +448,15 @@ Import Theme…, and plugins' pickers. It opens over the window that asked and r
 - The top row has Back, Forward, Up and Refresh, the location as breadcrumbs (click to type a path, or Cmd+L; Ctrl+L), a
   search field that filters the folder, **New folder** (when saving), **Show hidden items** (on by default; Cmd+Shift+.;
   Ctrl+Shift+.) and the **Preview pane** switch (off by default).
-- The listing has Name, Modified and Size columns, folders first; click a column to sort by it, again to reverse; drag a column boundary to resize it. The sort and widths are remembered.
+- The listing has Name, Modified and Size columns, folders first; click a column to sort by it, again to reverse; drag a column boundary to resize it, or double-click it to fit the column to its content. The sort and widths are remembered.
 - The preview shows the start of a text file (its first 8 KiB), `Binary file`, a folder's item count, or how many items
   are selected.
 - The primary button reads **Open**, **Save** or **Choose**. Saving over an existing file asks
   "<name> already exists. Do you want to replace it?".
 
-Keys: Enter presses the primary button, Escape cancels, Alt+Left and Alt+Right go back and forward, Alt+Up (or
-Backspace in the listing) goes up. Pinned and recent folders, the preview and hidden-items choices are kept in
-`ui-state.toml`.
+Keys: Enter presses the primary button, Escape cancels, Option+Left and Option+Right (Alt+Left and Alt+Right) go back
+and forward, Option+Up (Alt+Up), or Backspace in the listing, goes up. Pinned and recent folders, the sort and column
+widths, and the preview and hidden-items choices are kept in `ui-state.toml`.
 
 ## Settings
 
@@ -482,10 +491,10 @@ Palette, or by clicking the header's search field; it drops down from the field.
 
 ## Notifications
 
-Jasper reports results and problems as cards in the bottom-right corner of every window instead of dialogs. The
-Notifications tool window (bell button, Right Top) keeps this session's history
-([the Notifications panel](notifications.md#the-notifications-panel)), and **Notifications: Show Errors** opens the
-Errors tab in the most recently active window. When Jasper is in the background, the operating system shows them too. See
+Jasper reports results and problems as cards in the bottom-right corner of every window instead of dialogs; clicking
+one first brings forward the window the notification concerns. The Notifications tool window (bell button, Right Top)
+keeps this session's history ([the Notifications panel](notifications.md#the-notifications-panel)), and
+**Notifications: Show Errors** opens the Errors tab in the most recently active window. When Jasper is in the background, the operating system shows them too. See
 [Notifications](notifications.md).
 
 ## Quitting, background residency and restarts
@@ -497,9 +506,10 @@ stops, except on macOS while it runs in the background (below).
 
 One Jasper runs per home. Launching it again, with its launcher or the
 [`jasper` command](command-line.md#one-jasper-per-home), hands the request to the running one, which brings its most recently active
-window to the front, restoring its window first when none is open, and opens the files and folders the launch
-named (`Jasper notes.txt src`): each folder as a terminal tab in that window, and each file in the
-[Jasper Editor](editor.md#opening-files), in that window. On macOS
+window to the front, restoring its window first when none is open, and opens the files, folders and web addresses the
+launch named (`Jasper notes.txt src https://example.com`): each folder as a terminal tab in that window, each file in
+the [Jasper Editor](editor.md#opening-files), in that window, and each web address in a new browser tab there
+([Browser](browser.md#links-from-terminals-and-jasper)). On macOS
 a file or folder you open with Jasper in Finder (Open With), or drop on its Dock icon, opens the same way. A running
 Jasper that does not answer within 10 seconds is reported with its process id, and the launch starts no second one.
 
@@ -519,10 +529,12 @@ has prepared its first window.
 - **Windows:** the notification-area icon (Windows may keep it among the hidden icons until you pin it) has **Open
   Jasper** and **Quit Jasper**. Double-clicking it opens or raises a window, or, while a notification's balloon waits
   unread, opens that notification. Quit in the File menu quits.
-- **Linux:** Jasper shows a tray icon when the desktop provides a compatible status notifier or local X11 tray.
-  Its menu provides **Open Jasper**, **New Window**, **Settings…** and **Quit Jasper**. Jasper keeps running without
-  an icon when no tray is available; launch it normally to reopen it and use Quit in the app to exit. GNOME needs
-  an enabled indicator extension to show the icon.
+- **Linux:** Jasper shows a tray icon when the desktop provides a compatible status notifier or local X11 tray, and
+  adds it as soon as one appears, for example after you enable GNOME's indicator extension or the panel restarts.
+  Clicking the icon opens or raises a window, as **Open Jasper** does; right-click it for its menu: **Open Jasper**,
+  **New Window**, **Settings…** and **Quit Jasper**. Jasper keeps running without an icon when no tray is available;
+  launch it normally to reopen it and use Quit in the app to exit. GNOME needs an enabled indicator extension to show
+  the icon.
 
 With Run in background off, closing the last window quits Jasper. See
 [Configuration](configuration.md#background-residency).

@@ -135,7 +135,8 @@ constructor. A plugin that fails to load is posted as "*name* could not be loade
 | --- | --- |
 | `Plugin.start` and `stop`, registrations, event delivery, settings listeners, view events, action handlers, palette scopes, file source methods, subcommand handlers | The UI thread (the event dispatch thread) |
 | `background()` tasks | One virtual thread per task, `jasper-plugin-<id>-<n>`; tasks may run at the same time; each runs contained |
-| `Events.publish`, activity and connection handles, notification posts, `Setting.get` and `set`, `PaneHandle.sendText`, `sendBytes` and `paste`, `TabNamePiece.set`, `Services.find` and `require`, closing a `Subscription` | Any thread |
+| `Events.publish`, activity and connection handles, notification posts, `Setting.get` and `set`, `PaneHandle.sendText`, `sendBytes` and `paste`, `TabNamePiece.set`, `Platform.copyOnSelect` and `downloadsFolder`, `Services.find` and `require`, closing a `Subscription` | Any thread |
+| `Platform.markDownloaded` | The caller's thread, never the UI thread |
 | Saving a setting | A virtual thread, `jasper-plugin-settings-save`; a successful save completes the returned stage on the UI thread, a failed write completes it exceptionally on the save thread, and an invalid value or a save after the plugin stopped fails it at once |
 | Reading changed plugin settings files | The daemon `jasper-plugin-settings` polls every second; listeners run on the UI thread |
 | `PaneHandle.foregroundJob()` | Completes on a virtual thread, `jasper-foreground-job` |
@@ -147,9 +148,12 @@ constructor. A plugin that fails to load is posted as "*name* could not be loade
 ## Activities and connections
 
 `ActivityHub` stamps each activity's source plugin, coalesces progress (the latest report between deliveries
-survives) and ends each activity once; an activity still open when its plugin stops or fails to start ends as failed.
+survives), delivers each change between running and waiting for input (`NEEDS_INPUT`, `RESUMED`) in order, dropping a
+report still queued from the phase before, and ends each activity once; an activity still open when its plugin stops or
+fails to start ends as failed.
 `PluginRuntime` forwards activities to `notifications.ActivityNotifier`, which shows a running activity as a Buddy card
-keyed by `BuddyNoticeId(pluginId, activityId)` and dismisses it when the activity ends. `PluginHost` hears
+keyed by `BuddyNoticeId(pluginId, activityId)`, marks it waiting while the activity needs input, and dismisses it when
+the activity ends; Buddy works while one of these cards runs or a terminal is busy (`BuddyIntegration`). `PluginHost` hears
 `Activities.TOPIC` and posts a running plugin's succeeded or failed activity in its `<plugin-id>.activities` group;
 a cancelled activity posts nothing. Jasper never calls `ActivitySpec.cancel`: Buddy's activity cards offer no way to
 stop the work.
@@ -233,10 +237,10 @@ never hear the place it overtook; a failing handler is contained, and nothing ru
 a panel out another way describes another `ViewSpec` and calls `UiView.update`, as the Sample plugin's does.
 
 `persistence.UiState` (`ui-state.toml`, version 3) holds auxiliary window bounds, the dragged command palette's and Run
-window's places and the file chooser's choices; `workspace.toml` holds the window itself with its tool windows (each
-panel's slot, order, visibility, mode and own window's bounds, the dock's sizes and ratios per look, Zen and rail
-visibility). It is application state, not configuration: a bad panel, window or dock entry falls back alone, an
-unreadable file falls back to defaults, and writes are atomic.
+window's places and the file chooser's choices; `workspace.toml` holds the window itself with its tool windows
+(`persistence.ToolWindows`: per look, each panel's slot, order, visibility, mode and own window's bounds and the dock's
+sizes and ratios; Zen and stripe visibility). It is application state, not configuration: a bad panel, window or dock
+entry falls back alone, an unreadable file falls back to defaults, and writes are atomic.
 
 Plugin dialogs and the application's auxiliary windows follow the `WindowFrame`/`WindowContent` split.
 `AuxiliarySurface` holds the content, title, closing guards and lifetime and is tested headlessly; `NativeShells` is
@@ -273,9 +277,10 @@ where the look draws one (`TitleInset`).
 - **Quitting.** `JasperApplication.quit()` and `restart()` first ask content tabs' close guards
   (`guardsAllowQuit()`) and then the `Windows.onQuitting` guards (`QuitGuards`, one at a
   time, pumping UI events while a decision is pending), without closing anything and before the exit deadline is
-  armed. A refusal leaves Jasper running; a guard that throws or fails allows the quit. On a resident macOS Jasper,
-  Cmd+Q only sends Jasper to the background, which asks the content tabs but not the quit guards,
-  and plugins keep running.
+  armed. A refusal leaves Jasper running; a guard that throws or fails allows the quit. With
+  `system.run_in_background` on, closing the last window leaves Jasper running without asking the quit guards, and on
+  a resident macOS Jasper Cmd+Q only sends Jasper to the background, which asks the content tabs but not the quit
+  guards; either way plugins keep running.
 
 ## Content tabs
 
@@ -286,7 +291,9 @@ application's contributions model, its two actions registered as the plugin's ow
 `tabChoices` and `moveToTab` reach the item's window through the tab registry. `WindowContent` hosts terminal and
 plugin items alike in its `WorkspaceView`. Content views take the workspace theme.
 
-`ContentTab` updates its literal presentation, commands and status items, moves to a new window, another window, a new tab or another tab of its window without disposing the content, and is a dialog and chooser owner whose
+`ContentTab` updates its literal presentation, commands and status items, shows a right-click menu
+(`contributions.ContentMenu`: the plugin's items around the pane items its window adds, its choice reported once),
+moves to a new window, another window, a new tab or another tab of its window without disposing the content, and is a dialog and chooser owner whose
 later prompts follow its current window. A move is ignored while a close decision or a modal prompt is pending. `requestClose` asks the plugin's
 `Windows.onTabsClosing` guard, which gets the affected tabs and whether the request closes a window, quits or
 restarts; an exception or a false decision keeps the content. Repeated requests share the pending result; `close`
@@ -437,13 +444,16 @@ the UI thread through `FileEditors.editFromWorker`, waits up to 30 s, and otherw
 its edit action, then its open action, then revealing it. A Cmd-click (Ctrl-click on Linux and Windows) on a file
 path in a local terminal pane (`JasperApplication.openClickedFile`) asks the same way, with the line and the clicked
 window, and so does File › Open File… (`openFileAt`), at no line; `openClickedFile` first offers a local web file to
-the web browser role (below). `JasperApplication.openRequestedFile` passes `PluginRuntime.Origin.OUTSIDE`, which reaches the
-editor as `FileOrigin.OUTSIDE`; every other open is `JASPER`. A clicked path is program output, and an OSC 8 link's address can
-differ from the text shown, so that fallback is the desktop's edit or reveal action, never its open action, and a
-plugin's editor should edit the file and never run it. `Platform.openFile` asks the file editor the same way from the
-plugin's worker, with the active window and no line, and falls back to that edit or reveal action; it never asks the
-web browser role. A failed `Platform.openInEditor` or `Platform.openFile` is posted in the plugin's notification group,
-as is a failed `Platform.browse`, which accepts only an absolute http or https address.
+the web browser role (below). `JasperApplication.openRequestedFile`, for a file another program handed to Jasper (a
+second launch, the `jasper` command, the macOS open-file event), passes `PluginRuntime.Origin.OUTSIDE`, which reaches the
+editor as `FileOrigin.OUTSIDE`, and falls back only to revealing the file (`ConfigEditor.revealOnly`), never to the
+desktop's edit action, which could hand it back to Jasper; every other open is `JASPER`. A clicked path is program
+output, and an OSC 8 link's address can differ from the text shown, so its fallback is the desktop's edit or reveal
+action, never its open action, and a plugin's editor should edit the file and never run it. `Platform.openFile` asks
+the file editor the same way from the plugin's worker, with the active window and no line, and falls back to that edit
+or reveal action; it never asks the web browser role. A failed `Platform.openInEditor` or `Platform.openFile` is
+posted in the plugin's notification group, as is a failed `Platform.browse`, which accepts only an absolute http or
+https address.
 
 `Platform.browser` (needs `browser.provide`) registers a `WebBrowser` in `plugins.WebBrowsers`, one at a time, by the
 same bundled rule; it runs on the UI thread and must not block, so nothing waits for it. `PluginRuntime.openLink`
@@ -579,7 +589,8 @@ standard rows handles an event it re-renders the view with the rows' new state, 
 `pendingChanged`; its host's `closeThen` is the dialog's `PageContext.closeThen`, which asks about unsaved changes as
 Cancel does and runs the action, contained, in a later UI turn), and a `PluginStubPage` with Open in Editor for a plugin the user meant to run that is not running
 (awaiting consent, skipped, failed or disabled by safe mode), at most one page per plugin id. `CorePages` places them
-under Settings › Tools. Apply writes the plugin's file through `DeclaredSettings.save`.
+under Settings › Tools. Apply writes the plugin's file through `DeclaredSettings.save`. `PluginSettings.show` opens
+Settings at `PluginRuntime.settingsPageId(id)` in a later UI turn, since Settings is modal.
 
 ## Command-line subcommands
 

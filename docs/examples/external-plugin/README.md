@@ -38,8 +38,10 @@ builds the example from them; CI runs this on Linux:
 ## Running it in Jasper
 
 - `jasper --plugin-dir build/plugin/dev.example.hello` starts a Jasper that loads the folder without asking for
-  consent. The option applies only to a Jasper that starts: quit a Jasper running in the same Jasper home first, or set
-  `JASPER_HOME` to another folder ([one Jasper per home](../../command-line.md#one-jasper-per-home)). See
+  consent. The option applies only to a Jasper that starts: quit a Jasper running in the same Jasper home completely
+  first (on macOS with Run in background on, **Quit Jasper Completely** from its menu bar item; elsewhere **Quit
+  Jasper** from the tray icon or File › Quit), or set `JASPER_HOME` to another folder
+  ([one Jasper per home](../../command-line.md#one-jasper-per-home)). See
   [launching Jasper with options](../../command-line.md#launching-jasper-with-options).
 - To install it, open File › Manage Plugins…, choose Install from Zip… from the Plugin options menu (the three-dot
   button) on the Plugins page, pick the zip, review the plugin and choose Install. It loads after Jasper restarts; see

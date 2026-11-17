@@ -74,7 +74,7 @@ lives in `internal.process.PtyChild` and an attached connection's in
 | `ShellIntegrationFilter` | Streaming rewrite of OSC 7 and OSC 133 into `OSC 1341;jasper;…`, a `link-target` command before each OSC 8, plus a `cursor-reset` command after DECSCUSR 0, across read-chunk boundaries; drops `q`-final CSI without a space intermediate |
 | `ShellCommandTracker` | Ordered shell marks, command text, cwd and monotonic duration |
 | `DirectoryProvenance` | Classifies OSC 7 reports and clicked `file:` links as local or remote and applies the local path mapper |
-| `LinkDetector`, `PathDetector` | Plain-text URLs and file paths in a soft-wrap-joined row |
+| `LinkDetector`, `PathDetector` | Plain-text URLs, with the cells each covers, and file paths in a soft-wrap-joined row |
 | `TerminalAccess` | Unsupported concrete composition bridge; never the live buffer |
 | `TerminalView`, `Viewport` | Swing assembly, one viewport, coordinated invalidation, attachment lifecycle |
 | `KeyboardController`, `MouseController` | Key suppression/precedence and press-to-release gesture ownership |
@@ -131,6 +131,9 @@ what keeps the click local, so the gesture stays `OPEN`. A path or `file:` link 
 the `FileLink` handler with no gesture: Shift does not split it.
 `internal.text.PathDetector` reads the soft-wrap-joined row, which `BufferQueries`
 captures under the buffer lock and matches after releasing it.
+A double-click selects the link under the pointer whole (`BufferQueries.wordSelection`): the cells of an OSC 8 link,
+whatever its scheme, else the URL `LinkDetector.urlSpanAt` finds, followed across soft wraps; elsewhere it selects the
+word. A drag after it extends the selection word by word and keeps that link whole (`SelectionController`).
 
 ```mermaid
 sequenceDiagram
@@ -203,8 +206,9 @@ OSC 7 and 133 are rewritten because the pinned emulator swallows them. OSC 8
 links use the installed hyperlink filter: `http`, `https`, `ftp` and `mailto`
 URIs go to the link opener, a `file:` URI that the OSC 7 host rule places on
 this machine is a file link, and other URIs open nothing. That filter sees only the URI, so the shell filter puts
-`OSC 1341;jasper;link-target;<name>` before each OSC 8, naming its `target=` parameter (empty when it has none or the
-OSC 8 ends a link), and an empty one after an OSC 8 that names one; the engine gives the name to the link the OSC 8
+`OSC 1341;jasper;link-target;<name>` before each OSC 8, naming its `target=` parameter (empty when it has none, when
+the name is not 1 to 256 characters free of control characters, or when the OSC 8 ends a link), and an empty one after
+an OSC 8 that names one; the engine gives the name to the link the OSC 8
 opens, and a click reports it as `TerminalLink.target()`. The filter ends an OSC where JediTerm does, at BEL, `ESC \` or the C1 ST U+009C. CSI `q` lacking a space intermediate
 is dropped so XTVERSION/DECLL cannot override the configured cursor. DECSCUSR 0
 is followed by a cursor-reset command that restores the configured cursor. An OSC 7 or 133 sequence longer than 4096

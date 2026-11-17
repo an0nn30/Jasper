@@ -19,7 +19,9 @@ import java.util.Optional;
  * @param activate what a click on the body does
  * @param cause the failure behind an error: the host records it as an incident attributed to the plugin and offers
  *     Show more…, which opens its stack trace
- * @param window the window whose card it is; absent means the window the user used last
+ * @param window the window the notification concerns: a click on its card or one of its links, or on its system
+ *     notification, brings that window forward while it is open; otherwise a click on the card acts in the window
+ *     clicked, and one on the system notification in the window used last. The card shows in every window
  */
 public record NotificationSpec(Severity severity, String title, String content, Optional<String> icon,
                                List<NotificationAction> actions, Optional<Runnable> activate, Optional<Throwable> cause,
@@ -109,7 +111,8 @@ public record NotificationSpec(Severity severity, String title, String content, 
     }
 
     /**
-     * A copy whose card shows in this window.
+     * A copy that concerns this window: a click on the card or one of its links brings the window forward while it is
+     * open. The card still shows in every window.
      *
      * @param value the window
      * @return the copy

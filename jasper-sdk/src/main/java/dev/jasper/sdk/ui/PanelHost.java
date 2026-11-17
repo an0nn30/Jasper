@@ -24,7 +24,7 @@ public interface PanelHost {
     /**
      * Shows the panel: docked, in its slot, hiding whatever else showed there; with a window of its own, in that window.
      * Called from the panel's own toggle action as its handler runs, it also makes the panel the active tool window under
-     * a look with flush tool windows (since 0.18.2).
+     * a look with flush tool windows.
      */
     void show();
 

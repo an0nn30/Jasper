@@ -6,12 +6,12 @@ bundled plugins, the plugin SDK, and the libraries the application is built from
 
 ## Using Jasper
 
-- [Getting started](getting-started.md): installing on each platform, the first launch, a first tour, safe mode and
-  uninstalling.
-- [Workspace](workspace.md): windows, tabs, panes, saving and restoring them, tool windows and the dock, menus, the
-  toolbar, the status bar, view modes and the file chooser.
+- [Getting started](getting-started.md): installing on each platform, the first launch, running in the background, a
+  first tour, safe mode and uninstalling.
+- [Workspace](workspace.md): windows and their layouts, tabs, panes, saving and restoring the window, tool windows
+  (docked, floating or in a window of their own), menus, the toolbar, the status bar, view modes and the file chooser.
 - [Terminal](terminal.md): terminal panes, shell profiles (WSL and [Cygwin Bash](terminal.md#cygwin-bash) among them),
-  selection, links, search and shell integration.
+  selection, links, search, shell integration and tab names.
 - [Command palette](command-palette.md): commands, scopes, recents and the Run window.
 - [Notifications](notifications.md): cards, the Notifications tool window, groups, the Errors tab, system
   notifications and Desk Buddy.
@@ -42,8 +42,8 @@ bundled plugins, the plugin SDK, and the libraries the application is built from
 
 ## Theming
 
-- [Themes](themes.md): the built-in, plugin and installed themes, choosing the appearance and the terminal scheme, and
-  importing and removing themes.
+- [Themes](themes.md): the built-in, plugin and installed themes, Desktop colors on Linux, choosing the appearance and
+  the terminal scheme, and importing and removing themes.
 - [Creating themes](creating-themes.md): the theme file format, writing a theme, and converting Alacritty and IntelliJ
   themes.
 - [Looks](looks.md): what a look changes and the kit file a look plugin ships.
@@ -68,7 +68,7 @@ bundled plugins, the plugin SDK, and the libraries the application is built from
 [AGENTS.md](../AGENTS.md) covers the toolchain, the architecture rules and what coding agents may run unattended.
 The root [README](../README.md#building-from-source) lists the build requirements and, under
 [Windows user installation](../README.md#windows-user-installation), says how to install a build for the current
-Windows user without a C/C++ compiler. Use the Gradle wrapper with a JetBrains Runtime SDK 25:
+Windows user without a C/C++ compiler. Use the Gradle wrapper with the JetBrains Runtime SDK 25 with JCEF:
 
 ```sh
 ./gradlew check :jasper-app:installDist
@@ -89,6 +89,8 @@ window, so a coding agent runs them only with the user's authorization.
 - [Packaging](packaging.md): native images, the DMG, the Windows ZIP, setup wizard and user installation, the Linux
   packages, the release workflow and the acceptance checklists. The [Gentoo source overlay](../packaging/gentoo/README.md)
   covers installation, optional integration USE flags and offline input updates.
+- [Linux Desktop colors helpers](../packaging/desktop-colors/README.md): the helper programs that read the desktop's
+  colours, their protocol, native tests and Qt and KDE builds.
 - [Bundled Windows Cygwin](../packaging/windows/cygwin/README.md): the seed, provisioning, package management and
   native acceptance, and its [prebuilt PTY relay](../packaging/windows/cygwin/relay/README.md).
 - [Benchmarks](benchmarks.md): throughput, memory and start-up measurements and how to compare them.

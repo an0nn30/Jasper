@@ -10,7 +10,7 @@ import java.util.Optional;
  * @param dirty whether the host shows an unsaved marker
  * @param location full local or remote path, never converted to a local path by the host
  * @param host remote host label, empty for local content
- * @param image (since 0.27.0) the image the tab shows in place of its icon, such as a web page's favicon; empty for none
+ * @param image the image the tab shows in place of its icon, such as a web page's favicon; empty for none
  * @since 0.8.5
  */
 public record ContentPresentation(String title,String detail,String icon,boolean dirty,String location,String host,Optional<PixelImage> image) {

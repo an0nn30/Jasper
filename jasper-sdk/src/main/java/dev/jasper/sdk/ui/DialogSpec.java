@@ -13,7 +13,6 @@ import java.util.Objects;
  * @param modal whether the dialog blocks its owner; {@link WindowSurface#show()} then returns only after it closes
  * @param swatch a small square of this hue drawn before the title wherever Jasper draws the dialog's title, as in a
  *     login dialog's coloured square; a title bar the system draws shows none, and {@link Nodes.Hue#NONE} draws none
- *     (since 0.18.0)
  */
 public record DialogSpec(String title, WindowOwner owner, boolean modal, Presentation presentation, Nodes.Hue swatch) {
     /** Placement, independent of the form's content kind; a hint the presentation may place another way. */

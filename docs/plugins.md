@@ -22,7 +22,7 @@ Shortcuts below are given as macOS / Linux and Windows.
 - Items in the File, Edit, View, Tab, Tools, Session and Transfer menus, a menu of its own, and items in the
   terminal's context menu. Jasper has no Tools, Session or Transfer items of its own, so those menus appear only while
   a plugin has entries in them.
-- Toolbar buttons, buttons on the left tool window stripe and status-bar items, all in every window, and dialogs.
+- Toolbar buttons, buttons on the left tool window stripe and status-bar items, in every window, and dialogs.
 - Content tabs: its own views in tabs and panes beside terminals, in any window. They can open a terminal or another
   item beside themselves, can be offered in the Split menus, and can come back when Jasper restores its window.
 - Background activities, shown on [Desk Buddy](notifications.md#desk-buddy) while they run and posted in the plugin's
@@ -32,8 +32,8 @@ Shortcuts below are given as macOS / Linux and Windows.
 - Command palette scopes, and places in Jasper's file chooser.
 - Terminal sessions of its own, such as SSH, which can come back when Jasper restores its window, and variables in
   the environment of new shells.
-- The editor Jasper opens files with, `jasper` commands, notifications in its own groups, a page in Settings › Tools,
-  themes and a look.
+- The editor Jasper opens files with, the web browser Jasper opens web addresses with, pieces of terminal tab names,
+  `jasper` commands, notifications in its own groups, a page in Settings › Tools, themes and a look.
 
 Everything a plugin registered is removed when it stops or fails to start. A shortcut you set under `[keybindings]` for
 a plugin's action wins over the plugin's default. A default that collides with a shortcut already in use is dropped:
@@ -64,8 +64,8 @@ present" only while that plugin is running; without it, the features that need i
 SSH, SFTP and tunnels: saved hosts with groups, favourites and ProxyJump jump hosts, host-key trust, Vault or SSH-agent
 authentication, SSH terminal tabs and splits that come back when Jasper restores its window, an SFTP browser with
 persistent file transfers, local, remote and SOCKS tunnels with live counters, import from `~/.ssh/config`, a Sessions
-tool window that also lists the WSL distributions on Windows, the `ssh >` and `tunnels >` palette scopes, and saved
-hosts as places in Jasper's file chooser.
+tool window that also lists the WSL distributions on Windows, the `ssh >` and `tunnels >` palette scopes, saved hosts
+as places in Jasper's file chooser, and the `{host}` piece of terminal tab names.
 
 - **Start with** Session › Connect to SSH Host... (Cmd+Shift+H / Ctrl+Shift+H).
 - **Capabilities** `terminal.open`, `session.provide`, `terminal.observe`, `palette.contribute`, `files.source`.
@@ -76,8 +76,10 @@ hosts as places in Jasper's file chooser.
 
 Logins, SSH keys and secure notes in one encrypted file, which can be bound to this device: a manager dialog, a lock
 item in the status bar, a palette scope that copies a login's password or username, SSH key generation and a master
-password change. Other plugins, such as Remote and File Server, get a credential only after you allow it in a grant
-dialog, once or always; File › Vault Plugin Grants... shows the grants. Secure notes are never handed to other plugins.
+password change. Other plugins, such as Remote, File Server and the Browser, get a credential only when you choose it in
+the vault's picker, allow it in a grant dialog (once or always), or store it through that plugin, as Remote's key import
+and the Browser's **Remember this password** do; File › Vault Plugin Grants... shows the grants. Secure notes are never
+handed to other plugins.
 
 - **Start with** File › Open Vault... (Cmd+Shift+\\ / Ctrl+Alt+Shift+\\).
 - **Capabilities** `palette.contribute`.
@@ -92,8 +94,8 @@ files with (or it hands them to another editor you choose), it can set `EDITOR` 
 `jasper editor` command.
 
 - **Start with** File › Open in Editor… (Cmd+O / Ctrl+Shift+O).
-- **Capabilities** `palette.contribute`, `terminal.environment`, `editor.provide`, `terminal.open`, `terminal.observe` (the
-  other tabs' names in its Move Pane to Tab menu).
+- **Capabilities** `palette.contribute`, `terminal.environment`, `editor.provide`, `terminal.open`,
+  `terminal.observe` (the other tabs' names in its Move Pane to Tab menu).
 - **Uses, when present** Browser (`>=0.2.0`) to draw the Markdown preview with Chromium.
 - **Exports** `dev.jasper.editor.api`, which Remote and Project Index use to open files.
 
@@ -130,8 +132,9 @@ history file.
 
 ### Snippets
 
-Saved commands in the command palette's Snippets chip: insert one, paste and run it, fill in its `{{placeholder}}`
-fields, or edit the file that holds them, `plugins/dev.jasper.snippets/data/snippets.toml` in Jasper home.
+Saved commands in the command palette's Snippets chip: insert one into a terminal or a browser page's field, paste and
+run it, fill in its `{{placeholder}}` fields, or edit the file that holds them,
+`plugins/dev.jasper.snippets/data/snippets.toml` in Jasper home.
 
 - **Start with** Snippets… (Cmd+J / Ctrl+Shift+J).
 - **Capabilities** `palette.contribute`, `terminal.inject`.
@@ -150,8 +153,9 @@ listed in a Downloads menu, and its page tools are reader mode, distraction remo
 With the Credential Vault it fills a page's login fields from the vault, and its dialog for a site's HTTP sign-in can
 sign in with a login from the vault and remember the one you type.
 It is Jasper's web browser: links you click in a terminal and Jasper's own web links can open here, by default after
-asking "Open in Jasper?", and `jasper URL...` opens here without asking. It also draws the Editor's Markdown preview.
-Chromium starts the first time a browser page or a Markdown preview shows.
+asking "Open in Jasper?" (without asking while Jasper is the system's default browser), and `jasper URL...` opens here
+without asking. It also draws the Editor's Markdown preview.
+Chromium starts the first time a browser page or a Chromium Markdown preview shows.
 
 - **Start with** File › New Browser Tab.
 - **Capabilities** `browser.provide`, `palette.contribute`.
@@ -176,8 +180,8 @@ plugin's code does nothing; Credential Vault, Remote and File Server use their c
 The smallest complete plugin: the runtime's end-to-end test fixture and the source of the compiled examples in
 [plugin authoring](plugin-authoring.md). It is enabled but does nothing until you set one of its `demo_*` settings in
 Settings › Tools › Sample (or its settings file): a demonstration activity; toolbar, menu and status-bar items with a
-Sample tool window and an **About Sample** tab that comes back when Jasper restores its window; a terminal greeting; an
-echo session; and a "Greetings" palette scope.
+Sample tool window, an activity that waits for your confirmation and an **About Sample** tab that comes back when
+Jasper restores its window; a terminal greeting; an echo session; and a "Greetings" palette scope.
 
 - **Capabilities** `terminal.observe`, `terminal.inject`, `terminal.open`, `session.provide`, `palette.contribute`.
 
@@ -383,14 +387,15 @@ call from a plugin that did not declare its capability.
 Jasper's log ([diagnostics](diagnostics.md)) records capability use under the logger `dev.jasper.app.plugins.audit`, as
 "Plugin *id* used *capability*: …", with amounts and never content: each write or paste into a pane (in bytes), each
 read of a selection or the clipboard (in characters), each tab or split opened (with the file name of the program it
-runs, if any), the shell-variable, editor and tab name piece registrations, and the first palette use, file-chooser registration,
-terminal-event subscription and list of other tabs' titles for a plugin's Move Pane to Tab menu.
+runs, if any), each insertion into another plugin's content tab, such as a browser page's field (in bytes), the
+shell-variable, editor, web browser and tab name piece registrations, and the first palette use, file-chooser
+registration, terminal-event subscription and list of other tabs' titles for a plugin's Move Pane to Tab menu.
 
 | Capability | The sheet says | Notes |
 |---|---|---|
 | `terminal.observe` | See your terminals: titles, folders, the commands you run and how they end; add to tab names | Also every terminal event a plugin can subscribe to. Without it a plugin's Move Pane to Tab menu still works, listing a tab as "Tab 2" instead of by title unless the tab shows one of the plugin's own items |
 | `terminal.selection` | Read the text you select in a terminal | |
-| `terminal.inject` | Type into your terminals | Typing and pasting into a pane |
+| `terminal.inject` | Type into your terminals | Typing and pasting into a pane, and putting text from the command palette into another plugin's content tab, as Snippets does into a browser page's field |
 | `terminal.open` | Open terminal tabs, splits and windows, and run programs in them | |
 | `session.provide` | Run its own terminal sessions, such as remote connections | |
 | `palette.contribute` | Add scopes to the command palette and open it | |
@@ -435,8 +440,8 @@ The banner "Restart Jasper to apply your changes." with **Restart Now** appears 
 different set of plugins, or different versions, than this process did, or an install is waiting. When you turned on a
 look, it adds "*Name* was turned off: one look can be active at a time."
 
-**Restart Now** quits Jasper and starts it again with the same options, except `--background` and `--no-window`; the
-new Jasper waits for this one to exit. When Jasper cannot tell how it was started, the banner says "Jasper could not
+**Restart Now** quits Jasper and starts it again with the same options, except `--background`, `--no-window`, `--url`
+and the paths and web addresses the launch opened; the new Jasper waits for this one to exit. When Jasper cannot tell how it was started, the banner says "Jasper could not
 work out how it was started. Quit and reopen it to apply your changes." with **Quit Jasper**.
 
 ## Safe mode

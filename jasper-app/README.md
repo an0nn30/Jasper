@@ -23,9 +23,13 @@ cd Jasper
 Install the **JetBrains Runtime (JBR) 25** SDK with JCEF (`jbrsdk_jcef-25.0.4.1`, b635.75), including its development
 tools. The Gradle toolchain requires the JetBrains vendor and finds the installed runtime itself; `check` fails when it
 is not that build. The developer Mac's path is in [AGENTS.md](../AGENTS.md). Use the wrapper, never a system Gradle.
-`check` also compiles native code (Jasper's launcher, its recovery watcher, the native `jasper` command and, on macOS,
-the Objective-C bridges), so it needs the host's C/C++ compiler, and it runs the theme converter's tests with Python
-3.11 to 3.13 (`-Pjasper.python=<interpreter>` picks one).
+`check` also compiles native code (Jasper's launcher, its recovery watcher, the native `jasper` command, on macOS the
+Objective-C bridges and on Linux the Desktop colors helpers), so it needs the host's C/C++ compiler, and it runs the
+theme converter's tests with Python 3.11 to 3.13 (`-Pjasper.python=<interpreter>` picks one). On Linux the helpers
+also need `pkg-config`, GIO's development files and `dbus-run-session`; the GTK helpers need only GIO, the Qt and KDE
+helpers are built when CMake 3.21 or later and their development packages are present, and the GTK tests run when
+GTK's and libadwaita's are; `-Pjasper.desktop.<name>=auto|off|required` (`gtk3`, `gtk4`, `qt5`, `qt6`, `kde5`, `kde6`)
+sets each ([the helpers' README](../packaging/desktop-colors/README.md)).
 
 `check` is headless. Besides the tests it runs the bytecode architecture checks (`verifyTerminalArchitecture`,
 `verifyApplicationArchitecture`, `verifySdkArchitecture`, `verifyPluginArchitecture`, `verifyUiArchitecture`),
@@ -43,7 +47,7 @@ The entry point is [Main](src/main/java/dev/jasper/app/Main.java), which delegat
 | Command | Home | Bundled plugins | Notes |
 | --- | --- | --- | --- |
 | `./gradlew :jasper-app:run` | `jasper-app/build/dev-home`, or `-Pjasper.home=<dir>` | `jasper-app/build/plugins` (`stagePlugins`) | Its own home, so it runs beside an installed Jasper: never resident, no login item. |
-| IntelliJ "Jasper (dev home)" (`.run/`) | `jasper-app/build/dev-home` | `jasper-app/build/plugins` | Sets only `jasper.home` and `jasper.plugins.bundled`. Without `run`'s `jasper.commandClient`, plugins see no `jasper` command; on macOS, without `jasper.glassLibrary`, `jasper.appearanceLibrary` and the glass `--add-opens`/`--add-exports`, there is no blur or translucency and Match System shows Dark. |
+| IntelliJ "Jasper (dev home)" (`.run/`) | `jasper-app/build/dev-home` | `jasper-app/build/plugins` | Sets only `jasper.home` and `jasper.plugins.bundled`. Without `run`'s `jasper.commandClient`, plugins see no `jasper` command; on macOS, without `jasper.glassLibrary`, `jasper.appearanceLibrary` and the glass `--add-opens`/`--add-exports`, there is no blur or translucency and Match System shows Dark; on Linux, without `jasper.desktopColors.helpers`, there are no Desktop colors and Match System shows Dark. |
 | `build/install/jasper-app/bin/` after `installDist` | the real Jasper home | `lib/plugins/<id>/` beside the jars | Can be resident; registers no login item and never hides from the Dock (no `jpackage.app-path`). |
 
 `run` sets `jasper.home`, which wins over `JASPER_HOME`, so only `-Pjasper.home` moves its home. A separate home keeps
@@ -58,8 +62,8 @@ Building the distribution (`installDist`, `packageApp`) is headless; on macOS, A
 ## Find the owner before editing
 
 - [Architecture](../docs/app-architecture.md): the module and package graph, start-up and its rollback, residency and
-  the single instance, the windows and the saved workspace, quit and shutdown, threading, saved versus live
-  configuration, every package's owner, looks and window chrome, themes.
+  the single instance, the windows, the saved workspace and layouts, web addresses and files, quit and shutdown,
+  threading, saved versus live configuration, every package's owner, looks and window chrome, themes.
 - [Maintenance recipes](../docs/app-maintenance.md): commands and shortcuts, palette scopes, settings, notifications,
   platform hooks, session launches, packaging, releases, dependencies, themes and the workspace chrome, and the tests
   that read the documentation.
@@ -79,15 +83,21 @@ Starting points by change:
 | A built-in command or shortcut | `commands/ActionId`, `workspace/WorkspaceActions`, `workspace/WindowCommands`, `workspace/WindowChrome` |
 | An application command outside the workspace | `JasperApplication.startPlugins` (`contributions.addAction`) |
 | Windows, tabs and panes | `workspace/WindowManager`, `workspace/WindowContent`, `workspace/WorkspaceView`, `layout/Layout`, `contributions/TabRegistry` |
-| What `workspace.toml` keeps | `persistence/WorkspaceFile`, `workspace/WorkspaceStore`, `WindowManager.snapshot` |
+| What `workspace.toml` keeps | `persistence/WorkspaceFile`, `persistence/ToolWindows`, `workspace/WorkspaceStore`, `WindowManager.snapshot` |
+| Layouts (`layouts.toml`, Window › Layouts) | `persistence/LayoutsFile`, `workspace/LayoutStore`, `workspace/LayoutCommands`, `WindowManager.applyLayout` |
+| Floating tool windows | `dock/DockState`, `workspace/DetachedToolWindows`, `workspace/DetachedFrame`, `workspace/DockDrag` |
 | A second launch, `jasper <path>...` or a macOS open-file event | `bootstrap/SingleInstance`, `residency/LaunchRequest`, `JasperApplication.open`, `application/OpenPlan` |
 | A web address from outside: a launch argument, a second launch or the macOS open-URI event | `bootstrap/AppArguments`, `residency/LaunchRequest`, `JasperApplication.uriOpened`, `application/ExternalAddresses` |
+| A link clicked in a terminal, and the web browser a plugin provides | `JasperApplication.openLink`, `workspace/LinkClick`, `application/LocalWebFiles`, `plugins/WebBrowsers` |
+| Whether Jasper is the default browser, and file associations | `platform/DefaultBrowser`, `platform/FileAssociations`, `platform/file-types.tsv` (resources) |
+| The resident indicator | `platform/ResidentTray`, `platform/LinuxTrayRuntime`, `JasperApplication.residencySettled` |
+| Linux Desktop colors | `platform/DesktopColors`, `application/DesktopAppearance`, `appearance/DesktopPalette`, `packaging/desktop-colors/` |
 | A core setting | `config/CoreSettings`, `config/ConfigSnapshot`, `settingsui/CorePages`, `workspace/WorkspaceConfiguration` |
 | A notification or incident | `notifications/NotificationCenter`, `application/NotificationsFeature`, `application/IncidentNotices` |
 | Buddy notices | `notifications/CommandNotifier`, `workspace/WorkspaceActivity`, `notifications/ActivityNotifier` |
 | Something plugins can do | `plugins/HostedContext`, `plugins/HostedUi`, `contributions/Contributions`, and the SDK |
 | A look's effect on the chrome | `presentation/Projections`, `workspace/WorkspaceChrome`, `windows/ShellChrome` |
-| The boot splash | `bootstrap/ApplicationBootstrap.openSplash`, `splash/SplashPainter`, `splash/MeadowSplash`, `startup/StartupSteps` |
+| The boot splash | `bootstrap/ApplicationBootstrap.openSplash`, `bootstrap/SplashSelection`, `splash/SplashPainter`, `splash/ThemeSplash`, `splash/MeadowSplash`, `startup/StartupSteps` |
 | Cygwin Bash on Windows | `cygwin/`, `launch/CygwinLaunch`, `application/CygwinFeature`, `packaging/windows/cygwin/` |
 
 ## Tests
@@ -146,10 +156,13 @@ glyphs. The terminal library keeps its own default font options.
 ([architecture](../docs/app-architecture.md#themes)). `ui.appearance` (system, dark, light) picks the appearance,
 `ui.theme.dark` and `ui.theme.light` the theme each shows, and `terminal.scheme` the terminal panes' colours;
 `application.ConfigurationController` applies them through `appearance.ThemeController`, with
-`application.AppearancePolicy` resolving `system` against the macOS appearance (Dark elsewhere). A look (the default
-look, or a plugin's such as Enterprise) is chosen once per launch before Swing starts (`presentation`). See
+`appearance.AppearancePolicy` resolving `system` against the macOS appearance or the Linux desktop portal's (Dark
+elsewhere). On Linux both theme picks default to Desktop colors unless the look sets its own defaults;
+`ui.theme.desktop_source` chooses its source. A look
+(the default look, or a plugin's such as Enterprise) is chosen once per launch before Swing starts (`presentation`). See
 [themes](../docs/themes.md), [looks](../docs/looks.md),
-[architecture](../docs/app-architecture.md#looks-and-window-chrome) and [maintenance](../docs/app-maintenance.md#themes).
+[architecture](../docs/app-architecture.md#looks-and-window-chrome) and
+[maintenance](../docs/app-maintenance.md#themes).
 
 ## Change workflow
 

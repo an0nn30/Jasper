@@ -117,7 +117,8 @@ problems in [plugin settings files](#plugins), each with its own file's path.
 ## Settings dialog
 
 **Settings** opens with Cmd+, on macOS and Ctrl+Shift+, on Linux and Windows, from File › Settings, the toolbar's
-Settings button, Jasper › Settings… on macOS, or the resident menu bar item's **Settings…**. The command palette's
+Settings button, Jasper › Settings… on macOS, or **Settings…** in the resident menu bar item (macOS) or tray icon
+(Linux). The command palette's
 **Themes…**, **Window Settings…**, **Keyboard Shortcuts…**, **Manage Plugins…** and **Change Memory Settings…** open it
 at the matching page. It is a modal dialog; opening it again brings it forward at the page asked for, and otherwise it
 returns to the last page you visited.
@@ -141,7 +142,7 @@ the reason in the footer.
 
 | Page | Under | Holds | Help |
 |---|---|---|---|
-| Appearance | Appearance & Behavior | **Theme**: the Dark, Light and Match System tiles, Dark theme, Light theme, Terminal scheme; **Workspace** (macOS): Enable opacity, Opacity, Background blur; **Interface Font**: Font, Use platform font size, Font size; **View mode**; **Animations** | [Theme](#theme) |
+| Appearance | Appearance & Behavior | **Theme**: the Dark, Light and Match System tiles, Dark theme, Light theme, Desktop color source (while a theme is Desktop colors), Terminal scheme; **Workspace** (macOS): Enable opacity, Opacity, Background blur; **Interface Font**: Font, Use platform font size, Font size; **View mode**; **Animations** | [Theme](#theme) |
 | Window | Appearance & Behavior | **Toolbar & Status Bar**: Toolbar, Toolbar height, Show status bar, Height, Show memory indicator, Use the system title bar; **Tabs & Panels**: Tab height, Panel rail width; **New Windows**: Initial size | [Supported settings](#supported-settings) |
 | Notifications | Appearance & Behavior | **System Notifications**: Show system notifications, Notify after; **Groups** | [Finished-command notifications](#finished-command-notifications) |
 | Command Palette | Appearance & Behavior | Visible rows | [Palette](#palette) |
@@ -177,16 +178,16 @@ those opened afterwards, *Restart* at the next start. **Settings** names the pag
 | `window.native_decorations` | boolean | `false` | Linux and Windows: `true` uses the operating system's title bar, with the menus and the toolbar in rows of their own; ignored on macOS | Restart | Window › Use the system title bar; hidden on macOS and under a look with the system title bar |
 | `window.view_mode` | string | `"normal"` | `"normal"`, `"compact"` ([View modes](#view-modes)) | Restart | Appearance › View mode |
 | `buddy.enabled` | boolean | `false` | Shows the [desk buddy](#desk-buddy) | Live | Desk Buddy › Show Jasper |
-| `notifications.long_command_seconds` | integer | `10` | 0–3600 seconds; `0` turns finished-command notifications off | Live | Notifications › Notify after |
+| `notifications.long_command_seconds` | integer | `10` | 0–3600 seconds; `0` turns finished-command notifications and the desk buddy's running commands off | Live | Notifications › Notify after |
 | `notifications.system` | boolean | `true` | Also shows notifications as the operating system's own while Jasper is away | Live | Notifications › Show system notifications |
 | `notifications.groups` | table | `{}` | Group id to `"card"`, `"sticky"`, `"history"` or `"off"` ([Notification groups](#notification-groups)) | Live | Notifications › Groups |
 | `system.run_in_background` | boolean | `true` on macOS, Windows and Linux | [Background residency](#background-residency) | Restart; the login item at once | System Settings › Run in background |
-| `system.reopen` | string | `"last_known_state"` | `"last_known_state"` or `"empty_state"`: what the window Jasper opens while none is open holds, the window you used last or the default layout where it was | Live | System Settings › Reopen with |
+| `system.reopen` | string | `"last_known_state"` | `"last_known_state"` or `"empty_state"`: what the window Jasper opens while none is open holds, the window you used last or the [default layout](#layoutstoml) where it was | Live | System Settings › Reopen with (Last Known State, Empty State) |
 | `palette.visible_rows` | integer | `5`, or the [look's](#look-dependent-defaults) | 1–20 rows | Live | Command Palette › Visible rows |
 | `terminal.scrollback` | integer | `10000` | 0–1000000 lines; `0` keeps no scrollback | New panes | Terminal › Scrollback lines |
 | `terminal.option_as_meta` | string | `"left"` | `"left"`, `"right"`, `"both"`, `"none"`: which Option key sends Meta, on macOS only | Live | Terminal › Option key as Meta (Left Option, Right Option, Both, Neither); hidden on Linux and Windows |
 | `terminal.dim_inactive_panes` | number | `0.3` | 0–1: `0` does not dim panes without focus, `1` dims them fully | Live | Terminal › Dim inactive panes |
-| `terminal.tab_name` | string | `"{dir} {process} {title}"` | 1–200 characters: free text with pieces in braces ([Tab names](#tab-names)) | Live | Terminal › Tab name |
+| `terminal.tab_name` | string | `"{dir} {process} {title}"` | 1–200 characters, not blank: free text with pieces in braces ([Tab names](#tab-names)) | Live | Terminal › Tab name |
 | `terminal.copy_on_select` | boolean | `false` | Copies a finished selection to the clipboard, in terminals and in [browser pages](browser.md#copy-on-select) | Live | Terminal › Copy on select |
 | `terminal.bell` | string | `"visual"` | `"visual"` (a short flash), `"sound"` (the system beep), `"none"` | Live | Terminal › Bell |
 | `terminal.on_exit` | string | `"keep_open"` | When a pane's shell exits: `"keep_open"` keeps the pane and its output, `"close_on_success"` closes it after exit code 0, `"close"` closes it after any exit | Live, for later exits | Terminal › When the shell exits (Keep the pane open, Close when it succeeds, Close) |
@@ -205,8 +206,8 @@ those opened afterwards, *Restart* at the next start. **Settings** names the pag
 | `terminal.env` | table | `{}` | Environment variables for new shells ([Shell](#shell-environment-and-history)) | New panes | Shell › Environment variables |
 | `ui.appearance` | string | `"system"` | `"system"`, `"dark"`, `"light"` ([Theme](#theme)) | Live | Appearance › Dark, Light, Match System |
 | `ui.theme.dark` | string | `"desktop-colors"` on Linux, `"jasper-meadow"` elsewhere, or the [look's](#look-dependent-defaults) | A theme id | Live | Appearance › Dark theme |
-| `ui.theme.desktop_source` | string | `"auto"` | `"auto"`, `"qt"`, `"gtk3"`, `"gtk4"` | Live | Desktop color source |
 | `ui.theme.light` | string | `"desktop-colors"` on Linux, `"jasper-meadow"` elsewhere, or the [look's](#look-dependent-defaults) | A theme id | Live | Appearance › Light theme |
+| `ui.theme.desktop_source` | string | `"auto"` | `"auto"`, `"qt"`, `"gtk3"`, `"gtk4"`: where [Desktop colors](#theme) takes its colours from, on Linux | Live | Appearance › Desktop color source (Automatic, Qt / KDE, GTK 3, GTK 4 / libadwaita), while a theme is Desktop colors |
 | `ui.font.family` | string | `"system"` | `"system"` or a font family name ([Interface font](#interface-font)) | Live | Appearance › Font |
 | `ui.font.size` | number | Not set: the look's size | 8–32 points | Live | Appearance › Use platform font size, Font size |
 | `ui.workspace.opacity` | number | Not set: opaque | 10–100 percent: the opacity of terminal and editor backgrounds, the Editor's Basic Markdown preview included; macOS only | Live | Appearance › Enable opacity, Opacity (macOS) |
@@ -233,21 +234,29 @@ Plex Mono. A look can also hide Settings rows it makes meaningless: `window.nati
 ### Theme
 
 `ui.appearance` chooses which theme shows: `"dark"` shows `ui.theme.dark`, `"light"` shows `ui.theme.light`, and
-`"system"` follows the system's light or dark appearance, live. Only macOS reports its appearance: on Linux and Windows
-`"system"` shows the Dark theme. A change of the system's appearance never writes `config.toml`.
+`"system"` follows the system's light or dark appearance, live. macOS reports it, and Linux through the desktop portal;
+where neither does, as on Windows, `"system"` shows the Dark theme. A change of the system's appearance never writes
+`config.toml`.
 
 `ui.theme.dark` and `ui.theme.light` name a theme by id: a built-in one (`slate-cobalt`, `ubuntu-yaru`,
-`jasper-meadow`, `catppuccin-latte`, `catppuccin-frappe`, `catppuccin-macchiato`, `catppuccin-mocha`), one a plugin
-provides (such as `enterprise`), or one you imported into `themes/` (its file name without `.json`). Unless the look
-sets its own, both appearances use Jasper Meadow (`jasper-meadow`): moonlit blue-green for Dark and warm cream for
-Light. An id is lowercase letters and digits in words joined by `-`, at most 64 characters. A theme without the variant
-asked for is reported and the appearance's default is used: Jasper Meadow for both Dark and Light. A theme that fails
-to apply keeps the current appearance, is reported on `ui.appearance`, and is tried again by Reload Config.
+`jasper-meadow`, `catppuccin-latte`, `catppuccin-frappe`, `catppuccin-macchiato`, `catppuccin-mocha`), on Linux
+`desktop-colors`, one a plugin provides (such as `enterprise`), or one you imported into `themes/` (its file name
+without `.json`). Unless the look sets its own, both appearances use Desktop colors on Linux and, elsewhere, Jasper
+Meadow (`jasper-meadow`), moonlit blue-green for Dark and warm cream for Light. An id is lowercase letters and digits
+in words joined by `-`, at most 64 characters. A theme without the variant asked for is reported and Jasper Meadow is
+used instead. A theme that fails to apply keeps the current appearance, is
+reported on `ui.appearance`, and is tried again by Reload Config.
+
+Desktop colors (`desktop-colors`) takes the interface colours from the Linux desktop, through the toolkit
+`ui.theme.desktop_source` names: `"qt"` (Qt and KDE), `"gtk3"`, `"gtk4"`, or `"auto"`, which picks by the desktop
+session. When the colours cannot be read, that appearance shows Slate Cobalt and the choice stays saved; Reload Config
+asks the desktop again. [Desktop colors](themes.md#desktop-colors) describes the toolkits and how Automatic chooses.
 
 The Appearance page shows the three appearances as tiles. Its Dark theme, Light theme and Terminal scheme menus list the
 installed themes and schemes; each has a gear (a ⋯ button under Enterprise) with **Import Theme…** and **Remove
-*theme***, which removes an imported theme's file at once. [Themes](themes.md) lists the themes and how importing works;
-[Creating themes](creating-themes.md) describes the theme file.
+*theme***, which removes an imported theme's file at once. While Dark theme or Light theme is Desktop colors, **Desktop
+color source** follows them, with a line saying which source is in use. [Themes](themes.md) lists the themes and how
+importing works; [Creating themes](creating-themes.md) describes the theme file.
 
 On macOS, `ui.workspace.opacity` makes terminal and editor backgrounds translucent and `ui.workspace.blur` blurs the
 desktop behind them; leaving `opacity` unset keeps the terminal area opaque. Linux and Windows ignore both.
@@ -282,16 +291,17 @@ per window in [`workspace.toml`](#workspacetoml). Its action, `toggle_zen_mode`,
 `ui.animations.enabled` turns motion on or off in every window: workspace tabs sliding as they open and close, the
 command palette card unrolling as it opens, and modal overlays fading in. Turning it off finishes running transitions
 at once. Under a look without motion, such as Enterprise, nothing in the windows moves whatever it says, and Settings
-hides the row. The [splash screen](looks.md#branding) uses a still illustration of the interface theme selected at the next launch.
-Its original Meadow fallback animates the turtle unless the setting is `false`.
+hides the row. The [splash screen](looks.md#branding) shows a still illustration for the saved interface theme; when
+it cannot draw that, it shows the original Meadow splash, whose turtle is animated unless the setting is `false`.
 
 ### Window
 
 `window.columns` and `window.lines` are the terminal grid a new window opens with, measured in the saved terminal font
 and limited to the display's usable area. Jasper restores its window where it was
-([`workspace.toml`](#workspacetoml)); the grid sizes any other new window, except one a tab dragged out of every window
-opens, which is as large as the workspace it left. A window keeps its size when they change; new tabs and splits in it
-take the space the layout gives them.
+([`workspace.toml`](#workspacetoml)), and New Window opens one as large as the most recently active window, 30 pixels
+below and right of it; the grid sizes any other new window, such as the first with nothing saved, Move Tab to New
+Window's or a plugin's, except one a tab or pane dragged out of every window opens, which is as large as the workspace
+it left. A window keeps its size when they change; new tabs and splits in it take the space the layout gives them.
 
 `window.native_decorations` and `window.view_mode` are read when Jasper starts. Under the default look, Jasper puts its
 header, the title search field and the toolbar, in the window's title bar: on macOS beside the window buttons, on
@@ -344,9 +354,9 @@ kept in [`ui-state.toml`](#ui-statetoml). [Command palette](command-palette.md) 
 
 ### Desk buddy
 
-`buddy.enabled` shows the pixel-art Jasper who floats above your windows while a window is open and not
-minimised. The command palette's **Show Jasper**/**Hide Jasper** and his right-click **Hide Jasper** show or hide him
-for the session only; a saved change to `buddy.enabled` replaces that choice. His position is kept in `buddy.toml` in
+`buddy.enabled` shows the pixel-art Jasper who floats above your windows while the most recently active window is
+open and not minimised. The command palette's **Show Jasper**/**Hide Jasper** and his right-click **Hide Jasper** show
+or hide him for the session only; a saved change to `buddy.enabled` replaces that choice. His position is kept in `buddy.toml` in
 Jasper's home. [Notifications](notifications.md) describes what he shows.
 
 ### Background residency
@@ -354,15 +364,14 @@ Jasper's home. [Notifications](notifications.md) describes what he shows.
 With `system.run_in_background` on (the default on macOS, Windows and Linux), Jasper keeps running when its last
 window closes, so the next window opens without a cold start; plugins keep running, but no shell does.
 
-On Linux, Jasper shows a tray icon when the desktop provides a compatible status notifier or local X11 tray.
-Its menu provides **Open Jasper**, **New Window**, **Settings…** and **Quit Jasper**. Jasper keeps running without
-an icon when no tray is available; launch it normally to reopen it and use Quit in the app to exit. GNOME needs
-an enabled indicator extension to show the icon.
-
 On macOS, Quit (Cmd+Q) closes every window and leaves Jasper in the menu bar, whose item offers **New Window**,
 **Settings…** and **Quit Jasper Completely**. On Windows, a notification-area icon offers **Open Jasper** and
-**Quit Jasper**. [The workspace](workspace.md) describes quitting and reopening;
-`system.reopen` chooses whether the reopened window holds the window you used last or the default layout.
+**Quit Jasper**. On Linux, a tray icon offers **Open Jasper** (also a click on the icon), **New Window**, **Settings…**
+and **Quit Jasper** where the desktop has a StatusNotifier host or an X11 system tray (GNOME needs an enabled indicator
+extension), and appears as soon as one does; without one,
+Jasper stays resident with no icon, launching it opens its window, and Quit in the File menu ends it.
+[The workspace](workspace.md) describes quitting and reopening; `system.reopen` chooses whether the reopened window
+holds the window you used last or the default layout.
 
 Residency also starts Jasper in the background at login:
 
@@ -429,7 +438,9 @@ Plugins add pieces of their own, such as Remote's `{host}`; a piece that nothing
 value takes the text before it with it, or the text after it when no piece before it shows, so
 `{dir} | {process} | {title}` without a title reads `moray | zsh`. Text before the first piece and after the last always
 shows. `{{` and `}}` write a brace. A pattern that comes out empty names the tab after its shell. Settings › Terminal ›
-Tab name previews the name the pattern gives the tab you are using.
+Tab name previews the name the pattern gives the most recently active window's shown tab when that is a Terminal tab,
+else that window's first Terminal tab, else a sample tab in `~/projects` running `zsh` on macOS, PowerShell on
+Windows and `bash` on Linux.
 
 ### Terminal font
 
@@ -609,7 +620,7 @@ plugin with settings; Apply writes the plugin's file and keeps its comments.
 | File Server | `plugins/dev.jasper.fileserver/dev.jasper.fileserver.toml` | [File Server](file-server.md) |
 | Project Index | `plugins/dev.jasper.indexer/dev.jasper.indexer.toml` | [Project Index](project-index.md) |
 | Shell History | `plugins/dev.jasper.history/dev.jasper.history.toml` | [Shell History and Snippets](history-and-snippets.md) |
-| Browser | `plugins/dev.jasper.browser/dev.jasper.browser.toml` | [Browser](browser.md#settings): Start page, Page zoom, Downloads folder, Open Links From Terminal, Open Local Web Files, Default Search Engine, Custom Search URL, Custom Search Suggestions URL, Use /dev/null mode, Enable Ad Blocking, Filter List URL, Enable HTTP Proxy, Proxy Server, Proxy Port |
+| Browser | `plugins/dev.jasper.browser/dev.jasper.browser.toml` | [Browser](browser.md#settings) |
 | Sample | `plugins/dev.jasper.sample/dev.jasper.sample.toml` | [Plugins](plugins.md) |
 
 Snippets and Enterprise have no settings; Snippets keeps its snippets in `plugins/dev.jasper.snippets/data/`.
@@ -624,7 +635,7 @@ which is kept aside ([below](#workspacetoml)).
 
 | File | Holds |
 |---|---|
-| `ui-state.toml` | Where dialogs, the palette and the file chooser's choices were ([below](#ui-statetoml)) |
+| `ui-state.toml` | Where dialogs and the palette were, and the file chooser's choices ([below](#ui-statetoml)) |
 | `workspace.toml` | A window's place, tabs, panes and tool windows ([below](#workspacetoml)) |
 | `layouts.toml` | The default layout and the named layouts ([below](#layoutstoml)) |
 | `command-history.toml` | The command palette's recent commands and how often you used each result ([Command palette](command-palette.md)) |
@@ -649,17 +660,17 @@ At most 256 KiB. `workspace.toml` keeps one window: its size, position and maxim
 order with the one it shows, each tab's split panes, the active one and what each pane holds, and its tool windows
 (`[window.tool_windows]`: whether the rails show and Zen is on; `.dock`, the dock's sizes and ratios; `.panels."<id>"`,
 each tool window's slot, place on the stripe, visibility, mode and own window's bounds; and `.look."<plugin id>"`, the
-same for a plugin's look, such as Enterprise). The file is `version = 2`; a version 1 file is read as nothing saved. Jasper
-saves it within a second of each change and of a window coming to the front, with the most recently active window's
-state; at once when you close a window, with that window's state; and on Quit or going to the background, with the
-most recently active window's. A window a move empties writes nothing at once, so the last window to close is the one
-saved. Whenever a window opens with none open, at start or after the last one closed, Jasper opens exactly one window,
-from what it saved last, else from the file; with `system.reopen` set to `empty_state` it opens the [default layout](#layoutstoml)
-at the saved window's bounds instead. A
-window keeps its normal bounds while maximised or minimised and never comes back minimised; one that no longer fits an
-available display is fitted to a usable display. A terminal comes back with the name you gave it and its profile and a
-new shell in its last local directory, or where a new shell starts when that directory was on another host or is gone;
-only the terminals of the tab the window shows start at once, the others when their tab first shows. A plugin's view
+same for a plugin's look, such as Enterprise). The file is `version = 2`; a version 1 file is read as nothing saved.
+Jasper saves it within a second of each change and of a window coming to the front, with the most recently active
+window's state; at once when you close a window, with that window's state; and on Quit or going to the background, with
+the most recently active window's. A window a move empties writes nothing at once, so the last window to close is the
+one saved. Whenever a window opens with none open, at start or after the last one closed, Jasper opens exactly one
+window, from what it saved last, else from the file; with `system.reopen` set to `"empty_state"` it opens the
+[default layout](#layoutstoml) where the saved window was instead. A window keeps its normal bounds while maximised or
+minimised and never comes back minimised; one that no longer fits an available display is fitted to a usable display.
+A terminal comes back with the name you gave it and its profile and a new shell in its last local directory, or where a
+new shell starts when that directory was on another host or is gone; only the terminals of the tab the window shows
+start at once, the others when their tab first shows. A plugin's view
 that its plugin saves for restoring (the Editor's files, Remote's SSH tabs) comes back in its tab and pane; when its
 plugin does not run or cannot restore it, a placeholder says why (the plugin is not installed, turned off, marked for
 removal, off in safe mode, waiting for your review or could not start, or it could not restore that view), with Close
@@ -667,16 +678,16 @@ and, while its plugin runs, Retry. Scrollback, running programs, plugin views th
 untitled Editor tab, and Jasper's own tabs, such as the Errors tab, do not come back. When the window would pass the
 size limit, Jasper leaves out plugins' views and then terminals, the largest first, and logs each one.
 
-When the saved window does not all come back (the file cannot be read, has an unknown `version` (not 1 or 2) or keeps no
-window, an entry in it is bad, or the window cannot be restored), Jasper keeps it as `workspace.toml.bad`, opens what it could
-(the default layout when the file itself is unusable) and posts "Jasper could not restore your window". Quit Jasper
-before changing the file: once Jasper has opened a window it restores from what it last saved, not from the file, and
-a later save may replace the change.
+When the saved window does not all come back (the file cannot be read, has a `version` other than 1 and 2 or keeps no
+window, an entry in it is bad, or the window cannot be restored), Jasper keeps it as `workspace.toml.bad`, opens what it
+could (the default layout when the file itself is unusable) and posts "Jasper could not restore your window". Quit
+Jasper before changing the file: once Jasper has opened a window it restores from what it last saved, not from the
+file, and a later save may replace the change.
 
 ### layouts.toml
 
 At most 256 KiB; `version = 1`. It keeps the optional default layout (`[default]`) and the named layouts (`[[layouts]]`,
-each with a `name` of 1 to 64 characters), saved through Window › Layouts ([Workspace](workspace.md#layouts)). A
-layout holds what a window in `workspace.toml` holds without `[window]`'s size and position: its tabs, panes and
-`tool_windows`. A save that would pass the limit is refused with "This layout is too large to save.". A file that cannot
+each with a unique `name` of 1 to 64 characters), saved through Window › Layouts ([Workspace](workspace.md#layouts)).
+A layout holds what a window in `workspace.toml` holds without `[window]`'s size and position: its tabs, panes and
+`tool_windows`. A save that would pass the limit is refused ("This layout is too large to save."). A file that cannot
 be read is kept as `layouts.toml.bad` and read as empty; a bad entry is dropped alone.

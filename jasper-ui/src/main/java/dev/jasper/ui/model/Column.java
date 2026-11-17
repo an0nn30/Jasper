@@ -9,7 +9,8 @@ import java.util.OptionalInt;
  * {@code sorted} shows the kit's sort indicator (true ascending, false descending). Clicking a column header reports
  * {@link UiEvent.Sorted}; the host owns the order. A present {@code width} is the column's unscaled width in pixels: a
  * table column with one takes it and the last column absorbs the rest, and a tree's trailing column with one takes it
- * instead of fitting its values; dragging a header's edge reports {@link UiEvent.ColumnsResized}.
+ * instead of fitting its values; dragging a header's edge, or a double-click on it that fits a column to its content,
+ * reports {@link UiEvent.ColumnsResized}.
  */
 public record Column(String id, String title, Nodes.TextRole role, boolean numeric, double weight, Optional<Boolean> sorted, OptionalInt width) {
     public Column {

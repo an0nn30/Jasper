@@ -1,15 +1,19 @@
-# Linux desktop colors helpers
+# Linux Desktop colors helpers
+
+These helper processes read the Linux desktop's appearance and colours for **Desktop colors**
+([themes](../../docs/themes.md#desktop-colors)); the packages carry them in
+`lib/app/desktop-colors/` ([packaging](../../docs/packaging.md#desktop-colors-helpers)).
 
 `src/protocol.h` carries C11 values shared by the independent desktop helpers. It has no toolkit types.
 `dc_read_command` accepts only the fixed version 1 `sample` and `ping` schemas and publishes a command only on
 success. `dc_write_palette` validates and buffers a complete palette before writing its newline-terminated JSON;
-invalid optional color pairs are omitted. Both functions return zero on success and minus one on invalid input
+invalid optional colour pairs are omitted. Both functions return zero on success and minus one on invalid input
 or an I/O error.
 
 Messages use UTF-8 JSON lines, at most 64 KiB per line. The Java decoder validates the whole flat scalar object
 before interpreting fields, with at most 32 keys and 1024 Unicode characters in `reason`. Duplicate keys,
 nesting, malformed UTF-8, trailing content and unknown versions or kinds reject the envelope. Unknown scalar
-keys are ignored. A malformed color or missing pair half removes that pair; portal accent and contrast are
+keys are ignored. A malformed colour or missing pair half removes that pair; portal accent and contrast are
 independently optional. Generations are nonnegative signed 64-bit integers. RGBA values are comma-separated
 dot-decimal strings with finite components in `[0,1]`. Native output uses a thread-local C numeric locale and
 17 significant digits, preserving the caller's locale.
@@ -39,7 +43,7 @@ Run `./gradlew :jasper-app:test --tests '*DesktopPortalTest'` on any host and
 includes the fake-portal suite under `dbus-run-session`, with a private test bus and no visible windows.
 The native targets require GIO development headers, `pkg-config` and `dbus-run-session`. Tests cover signal/read
 ordering, owner replacement, partial and malformed preferences, late registration, the response timeout,
-pending-read shutdown, and helper ping/EOF behavior.
+pending-read shutdown, and helper ping/EOF behaviour.
 
 `src/gtk3.c` and `src/gtk4.c` build separate `jasper-desktop-gtk3 --protocol=1` and
 `jasper-desktop-gtk4 --protocol=1` processes. `gtk_api.c` opens GTK with `RTLD_LOCAL`, checks GTK 3.24 or
@@ -54,7 +58,7 @@ GTK 3 uses paired theme background/foreground, base/text and selected background
 surfaces use Window. GTK 4 before 4.16 uses paired underscore names, followed by GTK 3-style base-pair names.
 GTK 4.16+ creates dedicated labels beneath an unmapped root, assigning each documented variable to `color`
 with magenta and cyan fallbacks. An idle follows invalidation before foreground lookup. Matching results identify
-resolved variables, preserving real magenta/cyan. The instrumentation provider outranks user label colors while
+resolved variables, preserving real magenta/cyan. The instrumentation provider outranks user label colours while
 variables inherit the theme/user cascade. Missing modern libadwaita variables remain absent; plain GTK 4 can
 supply complete named pairs when its variables are absent. Theme/dark-preference and
 optional StyleManager notifications coalesce into an idle resample of the last requested appearance/generation;
@@ -85,7 +89,7 @@ Run `./gradlew :jasper-app:test --tests '*DesktopGtkProtocolTest'` on any host a
 compiles ABI checks, and uses `xvfb-run -a` and a private D-Bus configuration without service activation.
 It requires GTK 3/4 and libadwaita development headers, GIO development headers, `pkg-config`, Xvfb, xauth and
 D-Bus. Production compilation needs only GIO headers. Fixture CSS is loaded into the real toolkit in-process;
-subprocess fault injection covers absent libraries and unsupported runtimes. Ubuntu 24.04 CI covers named colors;
+subprocess fault injection covers absent libraries and unsupported runtimes. Ubuntu 24.04 CI covers named colours;
 a digest-pinned Ubuntu 26.04 container requires GTK 4.16+ and covers overridden variables. Linux `check` includes
 available GTK gates; unavailable headers/display prerequisites warn and skip each affected suite in auto mode.
 Required GTK modes and strict mode fail on missing native test prerequisites. Other hosts skip native discovery.
@@ -97,7 +101,7 @@ GIO/dlopen and build without toolkit headers; `off` omits them. Portal and GLib/
 `jasper.desktop.strict=true` requires every integration and native test prerequisite, rejects `off`, and adds
 full native Qt/KDE and release linkage validation to `check` on an equipped host.
 
-`compileDesktopHelpers` records selected production names in `build/desktop-colors/selected-helpers.txt`;
+`compileDesktopHelpers` records selected production names in `jasper-app/build/desktop-colors/selected-helpers.txt`;
 `stageDesktopHelpers` synchronizes exactly that selection into `jasper-app/build/desktop-helpers` with mode
 0755. Disabling/removing an SDK deletes stale production and staged helpers. The manifest stays outside the
 executable directory and drives JVM resource assertions, ELF validation and package verification. Linux
@@ -144,9 +148,11 @@ JBR's control/spec templates retain their content while their dependency placeho
 scan plus `xdg-utils`; changed placeholders fail closed. Actual DEB Depends/Pre-Depends and RPM Requires
 must match that scan. Minimal-image install checks require missing optional runtimes to affect only their
 helpers, while all mandatory libraries resolve. Equipped-runtime install checks sample all four installed
-Qt/KDE helpers under private Xvfb/D-Bus. CI keeps the baseline/equipped-runtime split: baseline jobs
-explicitly require all Qt/KDE SDKs and seven-helper release verification; GTK coverage requires both GTK
-modes. The equipped runtime matrix runs every Qt/KDE fixture, while Ubuntu22 records its KDE6 runtime
-absence. Baseline SDK caches are keyed by architecture, manifest, patches and build flags. CI runs exact baseline-built fixtures on Ubuntu22 and Fedora44 system runtimes;
-Ubuntu22's absent KDE6 capability is recorded separately. Minimum separately installed KDE6 and real desktop
-acceptance remain distinct matrix cases.
+Qt/KDE helpers under private Xvfb/D-Bus.
+
+CI builds the baseline SDKs on Ubuntu 22.04 (`.github/workflows/desktop-qt-sdk.yml`, cached by architecture and by
+everything under `toolchains/`). The Linux `check` job requires all six integrations; the package jobs require the four
+Qt/KDE integrations, run `verifyDesktopHelpersRelease` and archive the release helpers with their matching
+`compileDesktopQtNativeTests` fixtures. A runtime job runs those exact files on the installed system runtimes of
+Ubuntu 22.04, which has no KF6 or Qt 6.5 and skips `kde6`, and Fedora 44, which runs all four and installs the `.rpm`
+in `check-install.sh`'s equipped mode (`test/check-runtime.sh`).

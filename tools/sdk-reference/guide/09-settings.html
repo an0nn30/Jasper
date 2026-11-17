@@ -102,14 +102,15 @@ declaration order, with its label, control, description and a way to reset it to
 section changes.
 Apply saves the changed values to the file. A plugin the user meant to run but that is not running (waiting for a
 review, skipped, failed or held back by safe mode) gets a page that says "Start <i>name</i> to edit its settings.", gives
-the reason and offers <b>Open in Editor</b> for the file.</p>
+the reason and offers <b>Open in Editor</b> for the file. {@link PluginSettings#show()}, on the UI thread, opens Settings
+at the plugin's page over the active window once the call has returned, for a command or button of the plugin's own.</p>
 <p>A plugin that needs more than rows gives a page of its own with {@link PluginSettings#page(SettingsPanel)}, once, while
 it starts. Settings calls {@link SettingsPanel#create(SettingsPanelHost)} the first time the page is shown in each
 opening of Settings; the page returns a <a href="#ui">view</a>. {@link SettingsPanelHost#row(Setting)} gives the standard
 row for a declared setting, bound to the page's unsaved value, and Settings saves those on Apply itself.
 {@link SettingsPanelHost#stage(Setting,Object)} sets an unsaved value from a control of the plugin's own and
 {@link SettingsPanelHost#changed()} says the page's modified state changed. Settings is modal, so a control that opens
-a window of the plugin's own calls {@link SettingsPanelHost#closeThen(Runnable)} (since 0.32.0): Settings closes,
+a window of the plugin's own calls {@link SettingsPanelHost#closeThen(Runnable)}: Settings closes,
 asking about unsaved changes as Cancel does, and the action runs in a later UI turn. {@link SettingsPanel#modified()},
 {@link SettingsPanel#apply()} and {@link SettingsPanel#reset()} cover only state of the plugin's own beyond its declared
 settings; {@link SettingsPanel#dispose()} runs when Settings closes the page.</p>

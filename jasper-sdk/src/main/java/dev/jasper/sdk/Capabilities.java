@@ -17,7 +17,7 @@ public final class Capabilities {
     /** Reading the text selected in a pane. */
     public static final String TERMINAL_SELECTION = "terminal.selection";
     /**
-     * Typing and pasting into a pane, and, since 0.29.0, inserting text into another plugin's content tab through a
+     * Typing and pasting into a pane, and inserting text into another plugin's content tab through a
      * palette query's {@code TextTarget}.
      */
     public static final String TERMINAL_INJECT = "terminal.inject";

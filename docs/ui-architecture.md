@@ -35,10 +35,11 @@ checks that no plugin runtime or staged plugin jar carries `dev/jasper/ui/`.
 A theme supplies colours only. `JasperTheme` reads a Jasper theme file with the JDK-only `ThemeJson` reader.
 `JasperTheme.builtIns()` holds the seven built-ins in their order (Slate Cobalt, Catppuccin Latte, Catppuccin Frappé,
 Catppuccin Macchiato, Catppuccin Mocha, Ubuntu Yaru, Jasper Meadow), `builtIn(id)` finds one, `DARK_DEFAULT_ID` and
-`LIGHT_DEFAULT_ID` are both Jasper Meadow's id (`jasper-meadow`, the default of either appearance) and `bundled()` is
-Slate Cobalt (`slate-cobalt.json`, kept identical to the machine-readable block of
-[`slate-cobalt.md`](design/theme-engine/slate-cobalt.md) by `SlateCobaltFileTest`). `parse(json, id)` reads any other
-file; the app reads installed and plugin theme files through it. [Themes](themes.md) describes the file format.
+`LIGHT_DEFAULT_ID` are both Jasper Meadow's id (`jasper-meadow`, the fallback of either appearance and its default
+outside Linux, where the app's default look defaults to its Desktop colors) and `bundled()` is Slate Cobalt (`slate-cobalt.json`,
+kept identical to the machine-readable block of [`slate-cobalt.md`](design/theme-engine/slate-cobalt.md) by
+`SlateCobaltFileTest`). `parse(json, id)` reads any other file; the app reads installed and plugin theme files through
+it. [Creating themes](creating-themes.md) describes the file format.
 
 Read a Slate Cobalt role without constructing Swing controls:
 
@@ -64,9 +65,8 @@ overrides the file lists.
   a role.
 - **FlatLaf keys.** `UiColorKeys.flatLaf(theme, keys)` derives FlatLaf's colour keys from the roles. `UiKeySet.DEFAULT`
   is the default look's set; `UiKeySet.CLASSIC` adds the classic overlay (table headers, zebra rows, gradient buttons).
-  `surface.textSelection` optionally overrides inherited text-component selection fills; otherwise they keep the
-  variant's terminal selection.
-  A kit names its set, so the theme engine never sees the kit.
+  Text components' selection (`UiColorKeys.textSelection`) is the variant's `surface.textSelection` override, else its
+  terminal selection. A kit names its set, so the theme engine never sees the kit.
 - **Title bar.** `TitleBarTheme.of(theme)` is the window header's theme: when a variant sets `surface.titlebar` or
   `text.titlebar`, the header's surface and inks derive from them.
 - **Terminal colours.** `TerminalColors` takes background before foreground and copies exactly 16 non-null ANSI
@@ -77,8 +77,8 @@ overrides the file lists.
   to the binding's failure handler. `ThemeRoute` selects a view's theme from the pair: `CHROME`, `WORKSPACE`, or
   `TITLE_BAR` (`TitleBarTheme.of` the chrome theme).
 
-Alpha treatments (focus and error rings, hover, category tiles) apply one kit metric to a base role;
-opaque `focus.halo` and `error.halo` overrides supply the final ring paint when present; a role that
+Alpha treatments (focus and error rings, hover, category tiles) apply one kit metric to a base role, except that a
+variant's `focus.halo` or `error.halo` override is that ring's opaque colour (`DerivedPalette.halo`); a role that
 carries alpha (`surface.scrim`, `border.subtle`) is painted as given.
 
 ## Kits
@@ -190,8 +190,8 @@ never below zero, and sets `FIELD_VERTICAL_PADDING` and `BUTTON_VERTICAL_PADDING
 
 - A control paints its full nominal bounds (`FIELD_HEIGHT`, `BUTTON_HEIGHT`, …). The view owns the external focus or
   error halo, `FOCUS_RING` wide (`focus_ring`), `border.focus` at `FOCUS_HALO_PERCENT_DARK` (32) or
-  `FOCUS_HALO_PERCENT_LIGHT` (25) and `border.error` at `ERROR_HALO_PERCENT` (22); real viewports clip it and it never
-  changes row gaps.
+  `FOCUS_HALO_PERCENT_LIGHT` (25) and `border.error` at `ERROR_HALO_PERCENT` (22), or the variant's `focus.halo` and
+  `error.halo` overrides; real viewports clip it and it never changes row gaps.
 - Named radii are radii; Java rounded rectangles receive twice the value as their arc diameter.
 - Category tiles and chips paint their `hue.<name>.surface` at `TILE_PERCENT_DARK` (17) or `TILE_PERCENT_LIGHT` (13);
   selected tiles use `text.onAccent` on the accent.
@@ -234,8 +234,9 @@ platform face.
   the platform family lacks it too (Liberation Sans on Linux, for example), so Java's installed fallback fonts fill it
   in glyph by glyph.
 - Under a kit whose regular UI face is registered, `FlatLafInstaller` gives FlatLaf's component fonts that face at the
-  kit's body size times the user scale; menu accelerators keep the platform face. A family-only override retains
-  FlatLaf's desktop font size for scale derivation while native and kit text retain the look's body size.
+  kit's body size times the user scale; menu accelerators keep the platform face. A user family without a user size
+  keeps FlatLaf's desktop font size, from which FlatLaf derives its user scale, while native and kit text keep the
+  look's body size.
 
 ## Motion
 
@@ -342,10 +343,12 @@ copy of the context, so `route(ThemeRoute)` re-routes only that view.
   starts with `<html>` is not rendered as HTML. Swing reads the property only when a component's UI is installed or
   its text, font or foreground changes, and a tooltip does not take it from its component.
 
-`KitOwnership.owns(component)` says whether the kit created a component; `KitOwnership.CONTEXT_MENU`
-(`"Jasper.kit.contextMenu"`) is the client property that holds a row collection's, breadcrumbs' or setting row's
-context menu, or a button's hold menu, and `KitOwnership.SUGGESTIONS` (`"Jasper.kit.suggestions"`) the one on a field's input that holds its
-list of suggestions while the field offers it, whether or not the popup is on screen.
+`KitOwnership.owns(component)` says whether the kit created a component. Client properties let a host or a headless
+test read what the kit shows: `KitOwnership.CONTEXT_MENU` (`"Jasper.kit.contextMenu"`) holds a row collection's,
+breadcrumbs' or setting row's context menu, or a button's hold menu; `KitOwnership.SUGGESTIONS`
+(`"Jasper.kit.suggestions"`), on a field's input, its list of suggestions while the field offers it, whether or not the
+popup is on screen; and `KitOwnership.SELECTED_TOKEN` (`"Jasper.kit.selectedToken"`), on a token field's input, the
+token whose chip the keyboard has selected.
 
 ### Secrets
 
@@ -388,6 +391,7 @@ These `KitView` methods serve the app's native hosts; none is part of the plugin
 | `setTreeRowPresentation`, `setButtonValuePresentation`, `setButtonKeycaps`, `attachTreeDetail` | Keymap rows: locked rows and keycaps, the shortcut recorder face, keycap values and a detail below a tree leaf (`TreeDetailHandle`) |
 | `setArtworkPresentation(iconId, …)` | Identity row or header treatment for an icon |
 | `anchorTarget(id)` | The component a host attaches a popup to: a visible, enabled, idle `Button`, `MenuButton` (its main button) or PICKER `Choice` |
+| `customTarget(id)` | The component a host attaches a popup to over an area of specialized content: a live `Custom` node's registered component |
 | `panelHeader`, `setPanelHostActions`, `setPanelHostHeader` | Borrowed panel headers (see [Panels](#panels)) |
 
 ### Shells, dialogs and surfaces
@@ -424,8 +428,8 @@ These `KitView` methods serve the app's native hosts; none is part of the plugin
 `Section`, `Empty`, `ItemList`, `Header`, `Panel`, `Form`, `Split`, `Table`, `Tree`, `Breadcrumbs`, `Custom`,
 `Separator`, `Notice`, `Properties`, `TokenField`. Every node carries a `ControlState(visible, enabled, busy,
 error)`; `error` is validation prose and `ControlState.READY` is visible, enabled, idle and without an error. No node
-carries pixel dimensions, delegates or secret values, and no domain meaning is inferred from ids or text. `UiEvent` has
-13 kinds:
+carries delegates or secret values, or pixel dimensions other than the column widths a header drag reports and the
+owner hands back (`Column.width`), and no domain meaning is inferred from ids or text. `UiEvent` has 13 kinds:
 `Action`, `Edited`, `Selected`, `Toggled`, `Expanded`, `Removed`, `Reordered`, `SecretChanged`, `Clicked`, `Sorted`,
 `ColumnsResized`, `SuggestionChosen`, `TokensChanged`.
 
@@ -463,11 +467,11 @@ the title; and a field's `listId` naming an `ItemList` in the same view.
   ellipsis, then its detail in `TEXT_TERTIARY`; the selected row in `SELECTION_BG`, and the row under the pointer,
   unless selected, in `HOVER_OVERLAY` at 5%; "Loading suggestions…" last while more load. The first suggestion is
   selected; the pointer never moves the selection, an update keeps the selected id while it is listed, and an edit
-  selects the first. A key listener on the input reads Up, Down, Tab and Enter while the list shows suggestions and Escape while
-  it shows at all, before the field's bindings, so the hidden list leaves the field's keys untouched; Tab leaves the
-  input's forward traversal keys meanwhile. A choice, Escape, a permanent focus loss and a press outside hide the list
-  until the next edit; it appears on screen only while the input has the focus, and never over another open menu. A
-  TEXTAREA, a NUMBER field and a field with a `listId` take no suggestions.
+  selects the first. A key listener on the input reads Up, Down, Tab and Enter while the list shows suggestions and
+  Escape while it shows at all, before the field's bindings, so the hidden list leaves the field's keys untouched; Tab
+  leaves the input's forward traversal keys meanwhile. A choice, Escape, a permanent focus loss and a press outside
+  hide the list until the next edit; it appears on screen only while the input has the focus, and never over another
+  open menu. A TEXTAREA, a NUMBER field and a field with a `listId` take no suggestions.
 - Token fields (`TokenFields`): a field's box (`FieldSurface`, painted by the field policy) holding a chip per token, an
   `Indicators.ChipControl` in the neutral hue that the kit's `tag` face styles and paints (its text as entered: the chip
   is `entered`, which the classic face does not upper-case), with a non-focusable ghost remove button ("Remove" and the
@@ -494,6 +498,11 @@ the title; and a field's `listId` naming an `ItemList` in the same view.
   cue and other kinds none). A PICKER or DROPDOWN may carry a `PickerFace` (title, detail, glyph, hue, density) painted
   in place of its plain label. A dropdown in an ACTIONS stack is labelled by its accessible name only, and a
   natural-width dropdown reserves its chevron lane for its longest plain option.
+- A `PickerMenu` is a searchable menu whose checked value and keyboard-active row are distinct. Its search takes the
+  focus with its text unselected and the caret at its end, so typing adds to a starting search. Up and Down move the
+  active row, wrapping, and from no active row Down goes to the first and Up to the last; an `activeId` that names no
+  row leaves none active, so Enter accepts nothing. A press on a row reports it as `Selected`, then accepts it; Enter
+  accepts the active row, reporting its id (or the footer's action) as an `Action`, and Escape reports `cancelAction`.
 - `SettingRow` and `FormRow` carry a search `highlighted` flag; tree items carry an optional trailing count and an
   emphasized title.
 - `Toggle.pending` shows an operable midway switch on the warning colour while the domain confirms a change; switches
@@ -511,9 +520,9 @@ the title; and a field's `listId` naming an `ItemList` in the same view.
   button's menu is (`Menus.showUnder`, which shows nothing while the button is not on screen), when a left press has
   been held for 500 ms by its clock (the timer re-checks until then) and the button is still pressed and armed; the
   pointer leaving the button stops the timer. It disarms the button so the release reports nothing, and the button
-  reports no click while the menu shows. A popup
-  trigger opens it at once, and Shift+F10 and the context-menu key are bound on the button only while it has items. An
-  open menu, a menu button's included, whose rows are rebuilt is packed to its new size (`Menus.repack`).
+  reports no click while the menu shows. A popup trigger opens it at once, and Shift+F10 and the context-menu key are
+  bound on the button only while it has items. An open menu, a menu button's included, whose rows are rebuilt is
+  packed to its new size (`Menus.repack`).
 - `Text.severity` tints text and `Text.caret` draws a command line's insertion bar. Body, description and caption text
   flows (wraps, keeping line breaks, no wider than `TEXT_FLOW_COLUMNS`) in vertical stacks, form bodies, cards and
   sections. ACTIONS stacks wrap instead of squeezing their buttons. A stack's `cancelAction` answers Escape from
@@ -535,12 +544,22 @@ the title; and a field's `listId` naming an `ItemList` in the same view.
 - `SelectionMode.NONE` makes rows passive: no selected ids, the canvas is not a focus stop, row selection and
   activation are off, embedded controls keep their own behaviour and text paints at full opacity; a field's `listId`
   keys fall back to the look and feel.
-- Tables share the width by column weight, draw the sort indicator of the `Column.sorted` the view's owner sets and
-  report header clicks as `Sorted`; the owner orders the rows. Cells are plain text or cell nodes (Text, StatusDot,
-  Icon, Chip, an INLINE stack, or a bare DROPDOWN); heading rows carry a title and an optional count; tables can take
-  the OVERLAY scroll policy. A table with no rows shows its `emptyText` as a muted line or its `Empty` state (at most
-  one action) below the column headers. Tree items carry a tooltip, a status dot and aligned trailing columns with
-  minimum widths.
+- Tables share the width by column weight. A column with a `width` (unscaled pixels) takes it, scaled and at least its
+  minimum, and when every column has one the last takes what is left; widths that overflow shrink in proportion
+  towards their minimums, so the columns always fill the width without scrolling. A column tree's trailing columns
+  fit their values unless a `width` sets them, and the item column takes the rest.
+- Tables and trees draw the sort indicator of the `Column.sorted` the view's owner sets and report header clicks as
+  `Sorted`; the owner orders the rows. Within 3 pixels of a boundary between two header titles (`ColumnResizer`) the
+  pointer shows the resize cursor and a click never sorts: a drag moves width between the two neighbours, within their
+  minimums (a tree's first boundary moves it from the item column), and a double-click fits a table's column on its
+  left to its title and mounted cells, or returns a tree's trailing column to its values' fit. A finished drag, or a
+  fit that changed a width, reports `ColumnsResized` once with the columns' unscaled widths. The view keeps those
+  widths, which outrank the columns' own until the owner changes the set of columns or that column's `width`. A laned
+  tree (the Keymap's) has no boundaries.
+- Table cells are plain text or cell nodes (Text, StatusDot, Icon, Chip, an INLINE stack, or a bare DROPDOWN);
+  heading rows carry a title and an optional count; tables can take the OVERLAY scroll policy. A table with no rows
+  shows its `emptyText` as a muted line or its `Empty` state (at most one action) below the column headers. Tree items
+  carry a tooltip, a status dot and aligned trailing columns with minimum widths.
 - Item-list row slots accept Text, Icon, Chip, StatusDot, Progress, Strength, Button, MenuButton, Toggle, Choice and
   INLINE stacks of those. `ListItem.heading` is a title-only section row (never selected, activated, hovered or given
   a menu; a hairline opens every heading after the first). `emptyText` is the muted line an empty list shows, above
@@ -620,6 +639,8 @@ children; same-id updates keep it.
 | `Tree` | Right expands, Left collapses |
 | `ItemList` | Escape runs `cancelAction`; D runs `detailsAction`; the platform Copy shortcut (Cmd+C on macOS, Ctrl+C on Linux and Windows) runs `copyAction` (each only while the rows have focus) |
 | `Field` | Enter runs `trailingAction` (not TEXTAREA or PATH); Shift+Enter `alternateAction`; Escape `cancelAction`; NUMBER: Up/Down (and the keypad arrows) step; with `listId`: Up/Down/Page Up/Page Down move the list |
+| `Field` with suggestions | While the list shows suggestions: Up/Down move the selection, Tab and Enter choose it; while the list shows at all: Escape hides it and runs `cancelAction` |
+| `TokenField` | Enter with text typed, or a comma, adds the typed text; Backspace with nothing typed removes the last token; Left at the caret's start selects the last chip, then Left/Right/Home/End move among the chips, Backspace and Delete remove the selected one, and Escape (or Right past the last) returns to the typed text |
 | `Secret` (input kinds) | Enter runs `submitAction` |
 | `Stack` | Escape runs `cancelAction` from anything inside |
 | `Form` | Enter presses the primary action (`FormSubmission.PRIMARY`; `NONE` leaves Enter to the fields and buttons); Escape runs the cancel action |
@@ -630,6 +651,7 @@ children; same-id updates keep it.
 | `PickerMenu` | Up/Down, Enter, Escape |
 | `Breadcrumbs` typed path | Enter submits, Escape cancels |
 | `SettingRow` with a menu | The menu key and Shift+F10 open it |
+| `Button` with a hold menu | The menu key and Shift+F10 open the menu |
 
 A kit binding whose action is blank never hides the look and feel's own binding for the same key
 (`KitKeyBindingAuditTest`).
@@ -640,18 +662,18 @@ A kit binding whose action is blank never hides the look and feel's own binding 
 owns a registry; `register(...)` returns an `IconRegistration` whose idempotent close
 removes only its own registration. `IconRegistry.prepareBuiltIns()` decodes the built-ins ahead of time.
 
-The built-in path glyphs are original Jasper vectors on a 16-unit grid (89 names; `folder.filled`, `play.filled`,
+The built-in path glyphs are original Jasper vectors on a 16-unit grid (90 names; `folder.filled`, `play.filled`,
 `run` and `triangle.down` are filled, the rest outlines):
 
 `add`, `appearance`, `application`, `arrow.right`, `back`, `bell`, `bookmark`, `brightness`, `check`, `chevron.down`,
 `chevron.left`, `chevron.right`, `chevron.up`, `clock`, `close`, `collapse`, `collapse.all`, `command-palette`, `copy`,
 `cursor`, `delete`, `desktop`, `download`, `edit`, `error`, `expand.all`, `file`, `folder`, `folder.add`,
 `folder.filled`, `font`, `forward`, `help`, `hidden`, `history`, `home`, `import`, `info`, `key`, `keyboard`, `laptop`,
-`link`, `lock`, `lock.keyhole`, `login`, `logout`, `match.case`, `match.word`, `menu`, `more`, `none`, `note`,
-`notification.card`, `notification.history`, `notification.off`, `notification.sticky`, `paste`, `pause`, `play`,
-`play.filled`, `plugin`, `preview`, `question`, `refresh`, `regex`, `remove`, `reset`, `reveal`, `run`, `save`,
-`search`, `server`, `settings`, `shield`, `sparkle`, `split`, `star`, `star.filled`, `target`, `terminal`,
-`triangle.down`, `tunnel`, `unlock`, `upload`, `user`, `warning`, `window`, `window.add`, `zoom`.
+`link`, `lock`, `lock.keyhole`, `login`, `logout`, `match.case`, `match.word`, `menu`, `more`, `more.vertical`,
+`none`, `note`, `notification.card`, `notification.history`, `notification.off`, `notification.sticky`, `paste`,
+`pause`, `play`, `play.filled`, `plugin`, `preview`, `question`, `refresh`, `regex`, `remove`, `reset`, `reveal`,
+`run`, `save`, `search`, `server`, `settings`, `shield`, `sparkle`, `split`, `star`, `star.filled`, `target`,
+`terminal`, `triangle.down`, `tunnel`, `unlock`, `upload`, `user`, `warning`, `window`, `window.add`, `zoom`.
 
 Four sets of byte-identical IntelliJ Platform icons (Apache-2.0; `icons/LICENSE.txt`, `NOTICE.txt`, `ATTRIBUTION.txt`
 and `SOURCE.md` beside them, listed in the app's third-party notices as "IntelliJ Platform icons (New UI and Classic)")
@@ -661,9 +683,10 @@ SHA-256 in a manifest:
 - **The catalog** (`assets-selected.tsv`, 14 files): `settings`, `network`, `tunnel`, `more.vertical`,
   `chevron.right`, `search`, `file`. Ordinary contexts given a theme draw these meanings with this artwork, picking
   the sibling for the theme's darkness; the surface context draws only `network` and `more.vertical` from it (the
-  sibling for the surface's darkness) and the path glyphs otherwise. `network` and `more.vertical` exist only here.
-  Compact contexts (panel, prompt, tile and palette-only icons) draw only `network`, `tunnel` and `more.vertical` from
-  it and the path glyphs otherwise.
+  sibling for the surface's darkness) and the path glyphs otherwise. `network` exists only here. Compact contexts
+  (panel, prompt, tile and palette-only icons) draw only `network`, `tunnel` and `more.vertical` from it and the path
+  glyphs otherwise, except that `panel(name, palette, foreground, size)`, which a header strip's actions use, draws
+  `more.vertical` as its path glyph in that foreground.
 - **The chrome set** (`assets-chrome.tsv`, 20 files): `add`, `window.add`, `split`, `zoom`, `chevron.down`, `folder`,
   `server`, `bell`, `lock`, `terminal`. Only `chromeIcon(name, size[, artwork])`, the native workspace chrome's
   context (title bar, toolbar, tool window stripes and status bar), draws them; descriptor, panel, tile and plugin
@@ -691,7 +714,7 @@ Receiving contexts:
 | --- | --- |
 | `icon(name, theme \| palette, hue \| tint, size)` | Ordinary artwork in a hue or semantic tint |
 | `icon(name, surface, foreground, size)` | Artwork on a surface outside the palette: the foreground moved toward black or white until it reaches 3:1 (`surfaceTint`) |
-| `panel(...)` | Compact panel artwork: a lighter stroke for `add`, `search`, `edit` and `import`, 2 px dots for `more` |
+| `panel(...)` | Compact panel artwork: a lighter stroke for `add`, `search`, `edit` and `import`, 2 px dots for `more` and `more.vertical` |
 | `prompt(...)` | Prompt glyphs, with a 1.75 px optical stroke at 24 px |
 | `tile(...)` | A category tile at the kit's tile opacity; selected tiles on the accent |
 | `identityHeader(...)` | An identity header tile outlined in `border.identity` |

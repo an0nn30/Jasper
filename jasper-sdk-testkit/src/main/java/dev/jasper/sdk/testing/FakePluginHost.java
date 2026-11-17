@@ -834,7 +834,7 @@ public final class FakePluginHost implements AutoCloseable {
      * @param target {@code FILE}, {@code EDIT}, {@code VIEW}, {@code TAB}, {@code TOOLS}, {@code SESSION},
      *     {@code TRANSFER}, {@code context} or {@code top:<menuId>}
      * @return {@code item:id}, {@code web-address:id} (an {@code addForWebAddress} item), {@code ---} and
-     *     {@code submenu:title} lines, children indented, sections separated by {@code ===}; since 0.31.0, menu entries
+     *     {@code submenu:title} lines, children indented, sections separated by {@code ===}; menu entries
      *     ({@code addEntries}) as {@code entry:id:label} lines and {@code entries:label} lines for their submenus, each
      *     followed by {@code :disabled} while disabled
      */
@@ -2039,8 +2039,8 @@ public final class FakePluginHost implements AutoCloseable {
         }
 
         /**
-         * The ids of registered scopes whose spec sets {@code inRecents}, in registration order (since 0.9.2). The
-         * application offers a scope's rows before anything is typed only when it is in All too.
+         * The ids of registered scopes whose spec sets {@code inRecents}, in registration order. The application
+         * offers a scope's rows before anything is typed only when it is in All too.
          */
         public List<String> scopesInRecents() {
             return scopes.values().stream().filter(registered -> registered.spec().inRecents()).map(registered -> registered.spec().id()).toList();
@@ -2073,7 +2073,7 @@ public final class FakePluginHost implements AutoCloseable {
         /**
          * Searches a scope as the palette would, as {@code rowId|title|enabled} lines; later row lookups use this
          * answer. Every palette call this host makes passes {@code maxResults} 5 and {@code macOs} true, and with no pane
-         * the window's current item as the {@code textTarget} while it takes inserted text (since 0.29.0).
+         * the window's current item as the {@code textTarget} while it takes inserted text.
          */
         public List<String> searchScope(String scopeId, String query, UUID windowId, UUID paneIdOrNull) {
             var registered = scope(scopeId);

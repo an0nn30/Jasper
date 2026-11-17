@@ -35,14 +35,16 @@ pane by a screen less one line on every platform; they are not rebindable and ne
 Right-clicking a pane (Shift-right-clicking while a program asks for [mouse reports](#mouse-reporting)) focuses it and
 opens its context menu: **Copy**, **Paste**, **Find**, **Clear Terminal**, **Split** (a terminal, an editor, a file you
 choose or a plugin's view, right or down), **Move Pane to New Tab**, **Move Pane to Tab**, **Maximize Pane** and **Close
-Pane**, then **Move Tab to New Window** and **Move Tab to Window ▸** and the items plugins add, such
+Pane**, then **Move Tab to New Window**, **Move Tab to Window ▸** (while another window is open) and the items plugins
+add, such
 as Remote's **Open SFTP here**, File Server's **Share Path** and, while the selection is a web address, the Browser's
 **Open URL in Split Right** and **Open URL in Split Down** ([Links and file paths](#links-and-file-paths)).
 
 ## Shells and profiles
 
-**Shell profile** (`terminal.shell.profile`) on **Settings › Terminal › Shell** chooses the shell new tabs and windows
-start. A split beside a running local shell starts that shell's profile. Splitting a pane that runs a plugin's
+**Shell profile** (`terminal.shell.profile`) on **Settings › Terminal › Shell** chooses the shell new tabs start, and
+new windows while no [default layout](workspace.md#layouts) is saved; a saved default's terminals keep their own
+profiles. A split beside a running local shell starts that shell's profile. Splitting a pane that runs a plugin's
 session, such as an SSH pane, starts a local shell with the configured profile in your home folder; Remote's
 [**Split with Same Host**](remote.md#split-with-same-host) opens another session on the host.
 
@@ -344,7 +346,7 @@ Default Browser while Jasper is not the system's default browser, which sends it
 Browser off, it opens as a Cmd-click does. When the selection is one `http` or `https` address and either Open Links
 From Terminal is not Default Browser or Jasper is the system's default browser, the pane's right-click menu has the
 Browser's **Open URL in Split Right** and **Open URL in Split Down**, which open it the same way to the right of the
-pane or below it. Select the address by dragging: a double-click selects only part of it.
+pane or below it.
 
 ## Find
 
@@ -521,12 +523,13 @@ In a Cygwin Bash pane Jasper's script reports the directory's Windows path, whic
 `localhost`, so `/home`, `/cygdrive/c` and other mounts report the folder they show; a directory without a drive-letter
 path, such as one on a network share, is not reported.
 
-New tabs, splits and new windows start in the focused pane's local directory; when it has none (before any report, or
-since a remote report), they start in the directory the pane was started in. A pane started without a directory, such as
-the first pane of the window Jasper opens at start-up, or a plugin's session, then passes nothing on, and the new shell
-starts in your home folder (a WSL profile's `~`, Cygwin Bash's Cygwin home). New Tab and New Window start the
-configured profile; a split beside a running terminal starts that terminal's profile, and any other split the configured
-one. A terminal Jasper restores starts in its last local directory, or where a new shell starts when that directory is
+New tabs, splits and new windows (while no [default layout](workspace.md#layouts) is saved) start in the focused
+pane's local directory; when it has none (before any report, or since a remote report), they start in the directory the
+pane was started in. A pane started without a directory, such as the first pane of the window Jasper opens at start-up,
+or a plugin's session, then passes nothing on, and the new shell starts in your home folder (a WSL profile's `~`,
+Cygwin Bash's Cygwin home). New Tab, and New Window without a saved default layout, start the configured profile; a
+split beside a running terminal starts that terminal's profile, and any other split the configured one. A terminal
+Jasper restores starts in its last local directory, or where a new shell starts when that directory is
 gone. On Windows, a directory on another computer's network share
 is never started in or looked at: such a report is ignored, and a new pane asked to start there starts where a new shell
 starts. A pane that is not WSL asked to start on a `\\wsl.localhost` share starts in your home folder.
@@ -541,6 +544,11 @@ A tab is named after its active pane:
    name, the foreground program, checked every half second on macOS and Linux (a login shell shows without its
    leading `-`; on Windows and in a plugin's session, the shell's or session's name), and the title a program set
    with OSC 0, 1 or 2, which with shell integration lasts until the next command starts or finishes.
+
+Under **Tab name** on **Settings › Terminal**, a preview shows the name the pattern gives the active window's shown
+terminal tab, or its first terminal tab (a sample while it has none), followed by every piece and what it shows, each
+plugin's piece with the plugin that adds it, such as Remote's `{host}`. A piece that nothing provides gets the warning
+"Nothing provides {name} right now, so it shows nothing".
 
 Under the default look, the search field in the window's header shows `user@~/path` for the focused pane, or
 `host:path` for a remote one, followed by ` : ` and the running command with shell integration, else the foreground
@@ -576,7 +584,10 @@ remote side is not accepting input" shows for four seconds.
 
 **Increase Font Size** and **Decrease Font Size** change the focused pane by one point, from 6 to 72 points. **Reset
 Font Size** returns it to the saved **Font size**. Saving a new `terminal.font.size` applies it to every pane; other
-font changes keep each pane's own size. New panes start at the saved size.
+font changes keep each pane's own size. New panes start at the saved size. Sizes are points at Jasper's interface
+scale. A larger interface font scales the interface up, whether it comes from `ui.font.size` or, on Linux, from the
+desktop's text size or font DPI; terminal text and the space around it then grow by the same factor, and so does a new
+window sized for `window.columns` × `window.lines` cells.
 
 ## Resizing
 

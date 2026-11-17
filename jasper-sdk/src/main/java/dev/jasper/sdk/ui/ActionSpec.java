@@ -18,8 +18,8 @@ import java.util.regex.Pattern;
  *                       Windows, unless {@code otherDefaultBinding} names one, cmd means Ctrl+Shift, and a default
  *                       naming cmd and shift also gets alt ({@code cmd+shift+x} becomes Ctrl+Alt+Shift+X)
  * @param otherDefaultBinding the Linux and Windows default when it should differ from {@code defaultBinding}, naming
- *                            ctrl, alt and shift literally; {@code none} for no default there (since 0.11.0)
- * @param context where the shortcut applies; {@link ShortcutContext#global()} unless set (since 0.11.0)
+ *                            ctrl, alt and shift literally; {@code none} for no default there
+ * @param context where the shortcut applies; {@link ShortcutContext#global()} unless set
  */
 public record ActionSpec(String id, String title, Optional<String> icon, List<String> keywords, Optional<String> defaultBinding,
                          Optional<String> otherDefaultBinding, ShortcutContext context) {
