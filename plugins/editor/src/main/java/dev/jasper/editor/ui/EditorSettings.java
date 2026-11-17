@@ -164,7 +164,8 @@ public record EditorSettings(String fontFamily, double fontSize, List<String> fo
                 .description("When Jasper was started with EDITOR or VISUAL set, its shells keep both and the default editor sets neither.")
                 .section("Default editor").keywords("editor", "EDITOR", "VISUAL", "environment"));
             fileAssociationExtensions = settings.declare(SettingSpec.of("file_association_extensions", SettingKind.stringList(
-                    value -> dev.jasper.editor.associations.FileTypeRows.addError(value, List.of()).isEmpty()), List.<String>of())
+                    value -> dev.jasper.editor.associations.FileTypeRows.normalised(value).equals(value)
+                        && dev.jasper.editor.associations.FileTypeRows.addError(value, List.of()).isEmpty()), List.<String>of())
                 .label("File association extensions").description("Extra file extensions the File associations section lists, such as [\".proto\"].")
                 .section("File associations").keywords("editor", "file", "association", "extension", "default app"));
         }

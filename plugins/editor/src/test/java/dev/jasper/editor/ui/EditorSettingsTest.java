@@ -108,6 +108,21 @@ class EditorSettingsTest {
         }
     }
 
+    /** Only extensions already in their normalised form are saved, so the rows built from them are never raw text. */
+    @Test void fileAssociationExtensionsAcceptOnlyNormalisedUserExtensions() {
+        var specs = new java.util.ArrayList<dev.jasper.sdk.settings.SettingSpec<?>>();
+        try (var host = new FakePluginHost(home.resolve("plugins"))) {
+            host.start(INFO, Set.of(), Set.of(), context -> new EditorSettings.Declared(recording(context.settings(), specs), Set.of()));
+            @SuppressWarnings("unchecked")
+            var kind = (dev.jasper.sdk.settings.SettingKind<java.util.List<String>>) specs.stream()
+                .filter(spec -> spec.key().equals("file_association_extensions")).findFirst().orElseThrow().kind();
+            assertThat(kind.check(java.util.List.of(".proto"))).isEmpty();
+            assertThat(kind.check(java.util.List.of("proto"))).isPresent();
+            assertThat(kind.check(java.util.List.of(".PROTO"))).isPresent();
+            assertThat(kind.check(java.util.List.of(".java"))).isPresent();
+        }
+    }
+
     /**
      * Plan 3 Task 8 and the default editor plan: the declarations group the settings as Font, Editing, Files and Default
      * editor, as the Editor's own page shows them, with the on/off settings as switches.

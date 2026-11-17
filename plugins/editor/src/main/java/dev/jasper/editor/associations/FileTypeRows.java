@@ -1,6 +1,5 @@
 package dev.jasper.editor.associations;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -51,14 +50,14 @@ public final class FileTypeRows {
     }
 
     /**
-     * The built-in rows, then one row per user extension, in the order given.
+     * The built-in rows, then one row per distinct user extension, in the order given.
      *
      * @param userExtensions the saved user extensions, normalised
      * @return the rows
      */
     public static List<Row> withUser(List<String> userExtensions) {
         return Stream.concat(BUILT_IN.stream(),
-            userExtensions.stream().map(extension -> new Row("user:" + extension, extension, List.of(extension), true))).toList();
+            userExtensions.stream().distinct().map(extension -> new Row("user:" + extension, extension, List.of(extension), true))).toList();
     }
 
     /**
@@ -76,9 +75,7 @@ public final class FileTypeRows {
         if (BROWSER_OWNED.contains(extension)) {
             return Optional.of(extension + " opens in Jasper's browser");
         }
-        List<String> taken = new ArrayList<>(userExtensions);
-        BUILT_IN.forEach(row -> taken.addAll(row.extensions()));
-        if (taken.contains(extension)) {
+        if (userExtensions.contains(extension) || BUILT_IN.stream().anyMatch(row -> row.extensions().contains(extension))) {
             return Optional.of(extension + " is already in the list");
         }
         return Optional.empty();

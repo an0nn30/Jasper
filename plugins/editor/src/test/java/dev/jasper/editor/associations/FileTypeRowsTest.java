@@ -33,6 +33,11 @@ class FileTypeRowsTest {
             new Row("user:.gradle", ".gradle", List.of(".gradle"), true));
     }
 
+    @Test void withUserDropsDuplicatesKeepingTheFirst() {
+        var rows = FileTypeRows.withUser(List.of(".proto", ".gradle", ".proto"));
+        assertThat(rows.stream().filter(Row::user).map(Row::id)).containsExactly("user:.proto", "user:.gradle");
+    }
+
     @Test void normalisingLowerCasesAndAddsTheDot() {
         assertThat(FileTypeRows.normalised("JAVA")).isEqualTo(".java");
         assertThat(FileTypeRows.normalised(".Proto")).isEqualTo(".proto");
