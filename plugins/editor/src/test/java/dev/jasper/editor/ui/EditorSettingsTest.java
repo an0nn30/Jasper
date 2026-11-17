@@ -28,7 +28,7 @@ class EditorSettingsTest {
             assertThat(start(host, Set.of("Menlo", "JetBrains Mono")).current())
                 .isEqualTo(new EditorSettings("JetBrains Mono", 13, java.util.List.of(), false, 1.0, false, 4, false, 10, false, "workspace"));
             assertThat(host.declared(ID)).containsExactly("font_family", "font_size", "font_fallback", "font_ligatures", "font_line_height", "follow_terminal_font", "color_scheme", "markdown_view_mode", "markdown_preview", "tab_size", "soft_wrap", "vim", "max_file_mib", "recent_files_days",
-                "default_editor", "custom_command", "custom_in_terminal", "keep_environment_editor");
+                "default_editor", "custom_command", "custom_in_terminal", "keep_environment_editor", "file_association_extensions");
             assertThat(host.settingsReports(ID)).isEmpty();
         }
         try (var host = new FakePluginHost(home.resolve("other"))) {
@@ -119,7 +119,7 @@ class EditorSettingsTest {
             assertThat(specs).extracting(spec -> spec.section() + "/" + spec.key()).containsExactly(
                 "Font/font_family", "Font/font_size", "Font/font_fallback", "Font/font_ligatures", "Font/font_line_height", "Font/follow_terminal_font", "Colors/color_scheme", "Markdown/markdown_view_mode", "Markdown/markdown_preview", "Editing/tab_size", "Editing/soft_wrap", "Editing/vim", "Files/max_file_mib", "Files/recent_files_days",
                 "Default editor/default_editor", "Default editor/custom_command", "Default editor/custom_in_terminal",
-                "Default editor/keep_environment_editor");
+                "Default editor/keep_environment_editor", "File associations/file_association_extensions");
             assertThat(specs).filteredOn(spec -> spec.kind() instanceof dev.jasper.sdk.settings.SettingKind.Bool)
                 .extracting(dev.jasper.sdk.settings.SettingSpec::key).containsExactly("font_ligatures", "follow_terminal_font", "soft_wrap", "vim", "custom_in_terminal", "keep_environment_editor");
             assertThat(specs).allSatisfy(spec -> {

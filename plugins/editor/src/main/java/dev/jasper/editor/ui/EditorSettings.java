@@ -75,6 +75,7 @@ public record EditorSettings(String fontFamily, double fontSize, List<String> fo
         final Setting<Boolean> softWrap, vim;
         final Setting<String> defaultEditor, customCommand;
         final Setting<Boolean> customInTerminal, keepEnvironmentEditor;
+        final Setting<List<String>> fileAssociationExtensions;
 
         /** {@code color_scheme}'s default: the workspace's editor scheme. */
         public static final String WORKSPACE = "workspace";
@@ -162,7 +163,14 @@ public record EditorSettings(String fontFamily, double fontSize, List<String> fo
                 .label("Keep EDITOR and VISUAL from Jasper's environment")
                 .description("When Jasper was started with EDITOR or VISUAL set, its shells keep both and the default editor sets neither.")
                 .section("Default editor").keywords("editor", "EDITOR", "VISUAL", "environment"));
+            fileAssociationExtensions = settings.declare(SettingSpec.of("file_association_extensions", SettingKind.stringList(
+                    value -> dev.jasper.editor.associations.FileTypeRows.addError(value, List.of()).isEmpty()), List.<String>of())
+                .label("File association extensions").description("Extra file extensions the File associations section lists, such as [\".proto\"].")
+                .section("File associations").keywords("editor", "file", "association", "extension", "default app"));
         }
+
+        /** @return {@code file_association_extensions}: the extra extensions the File associations section lists, in the order saved */
+        public List<String> fileAssociationExtensions() { return fileAssociationExtensions.get(); }
 
         /** @return the shared Markdown default and serialized settings writer */
         public MarkdownPreferences markdownPreferences() { return markdownPreferences; }

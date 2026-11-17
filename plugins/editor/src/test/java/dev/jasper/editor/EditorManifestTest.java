@@ -20,6 +20,11 @@ class EditorManifestTest {
         assertThat(manifest().getArrayOrEmpty("capabilities").toList()).contains("terminal.observe");
     }
 
+    /** The File associations section reaches {@code Platform.fileAssociations()}, which needs {@code files.associate}. */
+    @Test void theEditorDeclaresFilesAssociateForItsFileAssociationsSection() throws IOException {
+        assertThat(manifest().getArrayOrEmpty("capabilities").toList()).contains("files.associate");
+    }
+
     /**
      * The Chromium Markdown preview draws with the Browser's exported API, which the Editor reaches only when it requires
      * the Browser; optionally, so the Editor runs, with the Basic preview, while the Browser is off or not installed.

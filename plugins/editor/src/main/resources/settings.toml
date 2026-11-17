@@ -57,3 +57,6 @@
 
 # When Jasper itself was started with EDITOR or VISUAL set, leave both alone in its shells.
 # keep_environment_editor = true
+
+# Extra file extensions the File associations section lists, such as [".proto"].
+# file_association_extensions = []
