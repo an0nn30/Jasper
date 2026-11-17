@@ -12,7 +12,8 @@ class CapabilitiesTest {
         assertThat(Capabilities.EDITOR_PROVIDE).isEqualTo("editor.provide");
         assertThat(Capabilities.PRESENTATION_PROVIDE).isEqualTo("presentation.provide");
         assertThat(Capabilities.BROWSER_PROVIDE).isEqualTo("browser.provide");
+        assertThat(Capabilities.FILE_ASSOCIATIONS).isEqualTo("files.associate");
         assertThat(Capabilities.ALL).endsWith(Capabilities.CLIPBOARD_READ, Capabilities.TERMINAL_ENVIRONMENT, Capabilities.EDITOR_PROVIDE,
-            Capabilities.PRESENTATION_PROVIDE, Capabilities.BROWSER_PROVIDE);
+            Capabilities.PRESENTATION_PROVIDE, Capabilities.BROWSER_PROVIDE, Capabilities.FILE_ASSOCIATIONS);
     }
 }

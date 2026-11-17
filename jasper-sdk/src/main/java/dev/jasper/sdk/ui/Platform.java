@@ -96,6 +96,18 @@ public interface Platform {
     }
 
     /**
+     * The file-type associations: choosing Jasper as the system's application for file types and handing them back.
+     * Needs {@code files.associate}. Implementations throw {@code MissingCapabilityException} without it.
+     *
+     * @return the associations
+     * @throws UnsupportedOperationException if the host predates this call
+     * @since 0.31.0
+     */
+    default FileAssociations fileAssociations() {
+        throw new UnsupportedOperationException("File associations are unavailable");
+    }
+
+    /**
      * Puts text on the system clipboard. UI thread only; elsewhere it throws {@code IllegalStateException}. When the
      * clipboard cannot be written, for example while another program holds it, a failure is posted in the plugin's
      * notification group, never thrown.

@@ -237,6 +237,7 @@ window (actions, menus, tool windows, content tabs, dialogs, notifications, sett
 | `editor.provide` | call `Platform.editor` | Open the files Jasper opens for editing |
 | `presentation.provide` | nothing at run time: it goes with the manifest's `presentation` key | Change Jasper's window chrome and controls after a restart |
 | `browser.provide` | call `Platform.browser` | Open the web addresses Jasper opens, such as links you click in a terminal |
+| `files.associate` | call `Platform.fileAssociations` | Choose Jasper as the app for file types |
 
 - The declared capabilities are the granted ones. An installed plugin loads only after the user allows everything it
   declares on its review sheet ("Needs review" until then); bundled and `--plugin-dir` plugins need no review. A new
@@ -1267,6 +1268,12 @@ active window; `jasper <address>…`, with the window of the pane it ran in
 - One plugin at a time: a bundled plugin's registration replaces one that is not bundled; otherwise a later
   registration throws `IllegalStateException` ("The browser is already provided by *id*"). The role ends with the
   plugin.
+
+`context.platform().fileAssociations()` (`files.associate`) chooses Jasper as the system's app for file types, on the
+UI thread. `status` reads who opens each extension's types, `claim` makes Jasper the app (saving each type's previous
+app first) and `restore` hands back only the types that are still Jasper's; the futures complete on the UI thread and
+never exceptionally, and Windows answers `InSettings`: the user picks Jasper there. See
+[`FileAssociations`](sdk-reference.html#dev.jasper.sdk.ui.FileAssociations).
 
 ## Looks and themes
 

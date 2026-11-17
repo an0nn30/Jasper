@@ -76,9 +76,15 @@ public final class Capabilities {
      * @since 0.23.0
      */
     public static final String BROWSER_PROVIDE = "browser.provide";
+    /**
+     * Choosing Jasper as the system's app for file types, through {@code Platform.fileAssociations}.
+     *
+     * @since 0.31.0
+     */
+    public static final String FILE_ASSOCIATIONS = "files.associate";
     /** Every capability this SDK version knows. */
     public static final List<String> ALL = List.of(TERMINAL_OBSERVE, TERMINAL_SELECTION, TERMINAL_INJECT, TERMINAL_OPEN, SESSION_PROVIDE, PALETTE_CONTRIBUTE, FILES_SOURCE, NETWORK_LISTEN, CLIPBOARD_READ,
-        TERMINAL_ENVIRONMENT, EDITOR_PROVIDE, PRESENTATION_PROVIDE, BROWSER_PROVIDE);
+        TERMINAL_ENVIRONMENT, EDITOR_PROVIDE, PRESENTATION_PROVIDE, BROWSER_PROVIDE, FILE_ASSOCIATIONS);
 
     private Capabilities() { }
 }
