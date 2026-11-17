@@ -2756,8 +2756,9 @@ public final class FakePluginHost implements AutoCloseable {
     public void failFileTypeClaims(String type, String detail) { fileAssociations.failClaims(type, detail); }
 
     /**
-     * Sets whether a claim only opens the system's Settings, as on Windows: while it does, a claim answers
-     * {@code InSettings} for each type, still saving the previous application, and changes no handler.
+     * Sets whether a claim or restore only opens the system's Settings, as on Windows: while it does, a claim answers
+     * {@code InSettings} for each type, still saving the previous application, a restore answers {@code InSettings} for
+     * each type it would hand back to an application, keeping what was saved, and neither changes a handler.
      *
      * @param windowsLike whether claims end in Settings
      * @since 0.31.0

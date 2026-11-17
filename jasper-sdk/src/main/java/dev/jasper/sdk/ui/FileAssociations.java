@@ -236,7 +236,8 @@ public interface FileAssociations {
     CompletableFuture<List<TypeResult>> restore(List<String> extensions);
 
     /**
-     * Drops what Jasper saved for an extension, and any declaration it made for it, without changing who opens it.
+     * Drops any declaration Jasper made for an extension, with the file type it declared; which application opens the
+     * system's own types and what a claim saved are unchanged.
      *
      * @param extension the extension
      * @return a future that completes when done

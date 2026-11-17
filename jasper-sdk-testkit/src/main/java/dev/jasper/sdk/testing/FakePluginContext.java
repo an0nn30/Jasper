@@ -186,6 +186,9 @@ public final class FakePluginContext implements PluginContext {
                 }
                 @Override public dev.jasper.sdk.ui.FileAssociations fileAssociations() {
                     requireOpen();
+                    // As the application: a UI-thread call.
+                    if (!javax.swing.SwingUtilities.isEventDispatchThread())
+                        throw new IllegalStateException("Platform.fileAssociations must be called on the UI thread: " + info.id());
                     if (!info.capabilities().contains(dev.jasper.sdk.Capabilities.FILE_ASSOCIATIONS))
                         throw new dev.jasper.sdk.MissingCapabilityException(info.id(), dev.jasper.sdk.Capabilities.FILE_ASSOCIATIONS);
                     return fileAssociations;

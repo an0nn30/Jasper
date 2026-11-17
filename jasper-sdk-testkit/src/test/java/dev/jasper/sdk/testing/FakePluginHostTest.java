@@ -35,6 +35,28 @@ class FakePluginHostTest {
         }
     }
 
+    /** SDK 0.31.0: while claims end in Settings, a restore does too, keeping what the claim saved; no app before still says so. */
+    @Test void aWindowsLikeRestoreEndsInSettingsAndKeepsWhatWasSaved(@TempDir Path root) throws Exception {
+        var info = new PluginInfo("test.alpha", "Alpha", "1.0.0", Set.of(Capabilities.FILE_ASSOCIATIONS));
+        try (var host = new FakePluginHost(root)) {
+            var context = host.start(info, Set.of(), Set.of(), c -> { });
+            var xcode = new dev.jasper.sdk.ui.FileAssociations.Handler.Other("Xcode");
+            javax.swing.SwingUtilities.invokeAndWait(() -> {
+                var associations = context.platform().fileAssociations();
+                host.setFileType(".java", List.of("t.java"));
+                host.setFileType(".kt", List.of("t.kt"));
+                host.setFileTypeHandler("t.java", xcode);
+                associations.claim(List.of(".java", ".kt")).join();
+                host.setFileAssociationsInSettings(true);
+                assertThat(associations.restore(List.of(".java", ".kt")).join()).containsExactly(
+                    new dev.jasper.sdk.ui.FileAssociations.TypeResult(".java", "t.java", new dev.jasper.sdk.ui.FileAssociations.Outcome.InSettings()),
+                    new dev.jasper.sdk.ui.FileAssociations.TypeResult(".kt", "t.kt", new dev.jasper.sdk.ui.FileAssociations.Outcome.NoPrevious()));
+                assertThat(associations.status(List.of(".java")).join().getFirst().types()).containsExactly(
+                    new dev.jasper.sdk.ui.FileAssociations.TypeState("t.java", new dev.jasper.sdk.ui.FileAssociations.Handler.Jasper(), Optional.of(xcode)));
+            });
+        }
+    }
+
     /**
      * SDK 0.31.0 (F15): the fake's Downloads folder is {@code home/Downloads} under its data root, never the user's own,
      * and reading it creates nothing; {@code setDownloadsFolder} replaces it with an absolute folder.

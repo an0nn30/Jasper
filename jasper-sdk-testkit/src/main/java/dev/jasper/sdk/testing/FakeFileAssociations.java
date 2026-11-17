@@ -24,8 +24,8 @@ import java.util.regex.Pattern;
 
 /**
  * The scripted file associations every plugin's {@code Platform.fileAssociations} shares, with the application's
- * semantics: extensions are normalised, the browser's are refused, a claim saves each type's first previous application
- * and a restore hands back only types that are Jasper's now. Everything runs on the caller's thread, which must be the
+ * semantics: extensions are normalised, the browser's are refused, a claim saves each type's first previous application,
+ * a restore hands back only types that are Jasper's now, and a forget keeps what a claim saved. Everything runs on the caller's thread, which must be the
  * EDT, and every future is complete when it is returned.
  */
 final class FakeFileAssociations {
@@ -174,10 +174,7 @@ final class FakeFileAssociations {
                 Objects.requireNonNull(extension, "extension");
                 Optional<String> normal = normalise(extension);
                 if (normal.isPresent()) {
-                    synchronized (lock) {
-                        calls.add("forget:" + normal.get());
-                        typesOf(normal.get()).forEach(saved::remove);
-                    }
+                    synchronized (lock) { calls.add("forget:" + normal.get()); }
                 }
                 return CompletableFuture.completedFuture(null);
             }
@@ -259,6 +256,8 @@ final class FakeFileAssociations {
                     saved.remove(type);
                 } else if (previous instanceof Handler.None) {
                     results.add(new TypeResult(name, type, new Outcome.NoPrevious()));
+                } else if (inSettings) {
+                    results.add(new TypeResult(name, type, new Outcome.InSettings()));
                 } else {
                     handlers.put(type, previous);
                     saved.remove(type);

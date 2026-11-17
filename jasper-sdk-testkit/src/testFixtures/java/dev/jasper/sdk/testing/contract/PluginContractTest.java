@@ -5282,6 +5282,34 @@ public abstract class PluginContractTest {
         h.ui(() -> assertThat(b.platform().fileAssociations()).isNotNull());
     }
 
+    /** SDK 0.31.0: {@code Platform.fileAssociations()} itself is a UI-thread call. */
+    @Test void fileAssociationsNeedTheUiThread() {
+        PluginContext a = associating("test.a");
+        assertThatThrownBy(() -> a.platform().fileAssociations()).isInstanceOf(IllegalStateException.class);
+        h.ui(() -> assertThat(a.platform().fileAssociations()).isNotNull());
+    }
+
+    /** SDK 0.31.0: {@code forget} drops only a declaration; who opens the type and what the claim saved stay. */
+    @Test void forgetKeepsWhatAClaimSaved() {
+        PluginContext a = associating("test.a");
+        var xcode = new dev.jasper.sdk.ui.FileAssociations.Handler.Other("Xcode");
+        h.ui(() -> {
+            h.fileType(".java", List.of("t.java"));
+            h.fileTypeHandler("t.java", xcode);
+        });
+        onUi(() -> a.platform().fileAssociations().claim(List.of(".java")));
+        onUi(() -> a.platform().fileAssociations().forget(".java"));
+        var status = onUi(() -> a.platform().fileAssociations().status(List.of(".java")));
+        assertThat(status).containsExactly(new dev.jasper.sdk.ui.FileAssociations.FileTypeStatus(".java", List.of(
+            new dev.jasper.sdk.ui.FileAssociations.TypeState("t.java", new dev.jasper.sdk.ui.FileAssociations.Handler.Jasper(),
+                Optional.of(xcode)))));
+        var restored = onUi(() -> a.platform().fileAssociations().restore(List.of(".java")));
+        assertThat(restored).containsExactly(new dev.jasper.sdk.ui.FileAssociations.TypeResult(".java", "t.java",
+            new dev.jasper.sdk.ui.FileAssociations.Outcome.Done()));
+        status = onUi(() -> a.platform().fileAssociations().status(List.of(".java")));
+        assertThat(status.getFirst().types().getFirst().handler()).isEqualTo(xcode);
+    }
+
     /** SDK 0.31.0: {@code unavailable} gives the host's reason, and a claim then fails each extension without a type. */
     @Test void unavailableIsReportedAndBlocksNothing() {
         PluginContext a = associating("test.a");

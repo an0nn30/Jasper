@@ -7599,7 +7599,8 @@ handed back.</p></div>
 </div>
 <div class="member" id="dev.jasper.sdk.ui.FileAssociations.forget(String)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.FileAssociations.forget(String)" aria-label="Link to this member">#</a><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html" title="java.util.concurrent.CompletableFuture">CompletableFuture</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Void.html" title="java.lang.Void">Void</a>&gt; <b>forget</b>(<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> extension)</code></pre>
-<div class="doc"><p>Drops what Jasper saved for an extension, and any declaration it made for it, without changing who opens it.</p></div>
+<div class="doc"><p>Drops any declaration Jasper made for an extension, with the file type it declared; which application opens the
+system's own types and what a claim saved are unchanged.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>extension</code> the extension</dd><dt>Returns</dt><dd>a future that completes when done</dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalStateException.html">IllegalStateException</a> off the UI thread</dd><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/NullPointerException.html">NullPointerException</a> when <code>extension</code> is null</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.ui.FileAssociations.onChanged(Runnable)">
@@ -13661,8 +13662,9 @@ claimable (no system type). The extension is normalised, as the application does
 <div class="member" id="dev.jasper.sdk.testing.FakePluginHost.setFileAssociationsInSettings(boolean)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.testing.FakePluginHost.setFileAssociationsInSettings(boolean)" aria-label="Link to this member">#</a><code><span class="kw">void</span> <b>setFileAssociationsInSettings</b>(<span class="kw">boolean</span> windowsLike)</code></pre>
 <p class="badges"><span class="since">since 0.31.0</span></p>
-<div class="doc"><p>Sets whether a claim only opens the system's Settings, as on Windows: while it does, a claim answers
-<code>InSettings</code> for each type, still saving the previous application, and changes no handler.</p></div>
+<div class="doc"><p>Sets whether a claim or restore only opens the system's Settings, as on Windows: while it does, a claim answers
+<code>InSettings</code> for each type, still saving the previous application, a restore answers <code>InSettings</code> for
+each type it would hand back to an application, keeping what was saved, and neither changes a handler.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>windowsLike</code> whether claims end in Settings</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.testing.FakePluginHost.fileAssociationCalls()">
