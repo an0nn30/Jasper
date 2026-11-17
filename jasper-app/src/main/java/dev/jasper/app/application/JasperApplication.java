@@ -1646,6 +1646,8 @@ public final class JasperApplication {
             else updateDock();
         };
         auxiliary.onFirstOpened = this::windowOpening;
+        // Settings is a modal dialog: coming back to it from Windows Settings has to check the file types again too.
+        auxiliary.onActivated = () -> fileAssociations.refresh();
         logFolder = dirs.logs();
         errorsTab = new ErrorsTab(contributions, incidents, new ErrorsView.Hooks(this::pluginName,
             id -> plugins == null ? "" : plugins.pluginVersions().getOrDefault(id, ""), IncidentReport.Environment.current(),

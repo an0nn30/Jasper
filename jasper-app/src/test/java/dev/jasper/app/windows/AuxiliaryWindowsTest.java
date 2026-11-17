@@ -206,6 +206,20 @@ class AuxiliaryWindowsTest {
         assertThat(events).containsExactly("empty");
     }
 
+    /** File associations plan 3 final review: Settings is a modal dialog, so the application hears every surface come to the front. */
+    @Test void everySurfacesActivationIsReported() {
+        List<String> events = new ArrayList<>();
+        windows.onActivated = () -> events.add("activated");
+        AuxiliarySurface settings = windows.modalDialog("settings", "Settings", new Dimension(640, 480), null);
+        AuxiliarySurface manager = windows.window("dev.x.manager", "Manager", new Dimension(640, 480), true);
+        settings.notifyActivated();
+        manager.notifyActivated();
+        assertThat(events).containsExactly("activated", "activated");
+        settings.close();
+        settings.notifyActivated();
+        assertThat(events).hasSize(2);
+    }
+
     @Test void activationReachesListenersUntilTheyUnsubscribeOrTheWindowCloses() {
         AuxiliarySurface manager = windows.window("dev.x.manager", "Manager", new Dimension(640, 480), true);
         List<String> events = new ArrayList<>();

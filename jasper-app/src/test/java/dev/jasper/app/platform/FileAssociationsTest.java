@@ -334,6 +334,18 @@ class FileAssociationsTest {
         assertThat(status.getFirst().types().getFirst().handler()).isEqualTo(new Handler.Unknown());
     }
 
+    /** Final review 6: work the worker never runs still answers every extension, so no row waits on Checking… for ever. */
+    @Test void workThatIsNotRunAnswersEveryExtension() {
+        backend.claimable(".a", "t.a");
+        store = new PreviousHandlers(home.resolve("file-associations.toml"));
+        var associations = new FileAssociations(task -> { throw new java.util.concurrent.RejectedExecutionException("stopped"); },
+                backend, store);
+        assertThat(associations.status(List.of(".A", ".b")).join()).containsExactly(
+                new FileAssociations.ExtensionStatus(".a", List.of()), new FileAssociations.ExtensionStatus(".b", List.of()));
+        assertThat(associations.claim(List.of(".a")).join()).containsExactly(new TypeResult(".a", "", new Outcome.Failed("stopped")));
+        assertThat(associations.restore(List.of(".a")).join()).containsExactly(new TypeResult(".a", "", new Outcome.Failed("stopped")));
+    }
+
     @Test void unsupportedIsAlwaysUnsupported() {
         var associations = FileAssociations.unsupported();
         assertThat(associations.unavailable()).contains(FileAssociations.Unavailable.UNSUPPORTED_SYSTEM);

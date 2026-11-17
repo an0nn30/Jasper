@@ -18,6 +18,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import javax.swing.SwingUtilities;
@@ -27,7 +28,9 @@ import javax.swing.SwingUtilities;
  * system-specific part is a {@link Backend}; this class adds the extension rule, the previous-handler bookkeeping
  * ({@link PreviousHandlers}) and the threading: backend work runs on one worker under one lock, so calls never overlap,
  * and the futures returned never complete exceptionally. A backend exception becomes {@link Outcome.Failed} for the
- * extension's types (for {@link #status}, a handler {@link Handler.Unknown}) with a log line.
+ * extension's types (for {@link #status}, a handler {@link Handler.Unknown}) with a log line. Work that is not run, or
+ * fails outside the backend, still answers every extension: with no types for {@link #status}, and with an empty type
+ * and {@link Outcome.Failed} for {@link #claim} and {@link #restore}.
  */
 public final class FileAssociations {
     private static final System.Logger LOG = System.getLogger(FileAssociations.class.getName());
@@ -307,7 +310,7 @@ public final class FileAssociations {
         if (BROWSER_OWNED.contains(normal.get())) {
             return CompletableFuture.completedFuture(new Claimability.NotClaimable(Refusal.BROWSER_OWNED));
         }
-        return run(() -> claimabilityOf(normal.get()), () -> new Claimability.NotClaimable(Refusal.NO_SYSTEM_TYPE));
+        return run(() -> claimabilityOf(normal.get()), detail -> new Claimability.NotClaimable(Refusal.NO_SYSTEM_TYPE));
     }
 
     /**
@@ -323,7 +326,7 @@ public final class FileAssociations {
                 lastAnswer = answer;
                 return answer;
             }
-        }, () -> List.of());
+        }, detail -> asked.stream().map(extension -> new ExtensionStatus(normalise(extension).orElse(extension), List.of())).toList());
     }
 
     /**
@@ -348,7 +351,7 @@ public final class FileAssociations {
             }
             changed();
             return results;
-        }, () -> List.of());
+        }, detail -> failed(asked, detail));
     }
 
     /**
@@ -373,7 +376,7 @@ public final class FileAssociations {
             }
             changed();
             return results;
-        }, () -> List.of());
+        }, detail -> failed(asked, detail));
     }
 
     /** Drops what Jasper declared for a custom extension. */
@@ -391,7 +394,7 @@ public final class FileAssociations {
                 }
             }
             return null;
-        }, () -> null);
+        }, detail -> null);
     }
 
     /**
@@ -462,7 +465,7 @@ public final class FileAssociations {
         SwingUtilities.invokeLater(() -> listener.run());
     }
 
-    private <T> CompletableFuture<T> run(Supplier<T> work, Supplier<T> fallback) {
+    private <T> CompletableFuture<T> run(Supplier<T> work, Function<String, T> fallback) {
         CompletableFuture<T> future = new CompletableFuture<>();
         try {
             worker.execute(() -> {
@@ -470,7 +473,7 @@ public final class FileAssociations {
                     future.complete(work.get());
                 } catch (Throwable failure) {
                     LOG.log(System.Logger.Level.WARNING, "File association work failed", failure);
-                    future.complete(fallback.get());
+                    future.complete(fallback.apply(detail(failure)));
                     if (failure instanceof VirtualMachineError error) {
                         throw error;
                     }
@@ -478,9 +481,19 @@ public final class FileAssociations {
             });
         } catch (RuntimeException notRun) {
             LOG.log(System.Logger.Level.WARNING, "File association work was not run", notRun);
-            future.complete(fallback.get());
+            future.complete(fallback.apply(detail(notRun)));
         }
         return future;
+    }
+
+    private static String detail(Throwable failure) {
+        return failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
+    }
+
+    /** For every extension, a {@code Failed(detail)} with an empty type. */
+    private static List<TypeResult> failed(List<String> extensions, String detail) {
+        Outcome failed = new Outcome.Failed(detail);
+        return extensions.stream().map(extension -> new TypeResult(normalise(extension).orElse(extension), "", failed)).toList();
     }
 
     /** For every extension, a {@code Failed("unavailable: <reason>")} with an empty type, when there is a reason. */
@@ -489,9 +502,7 @@ public final class FileAssociations {
         if (reason.isEmpty()) {
             return Optional.empty();
         }
-        Outcome failed = new Outcome.Failed("unavailable: " + reason.get());
-        return Optional.of(extensions.stream()
-                .map(extension -> new TypeResult(normalise(extension).orElse(extension), "", failed)).toList());
+        return Optional.of(failed(extensions, "unavailable: " + reason.get()));
     }
 
     /** Asks status again for the last extensions after a change, so the next refresh sees no second change. Under lock. */

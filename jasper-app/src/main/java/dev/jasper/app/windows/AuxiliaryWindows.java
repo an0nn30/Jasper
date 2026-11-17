@@ -165,6 +165,8 @@ public final class AuxiliaryWindows implements AutoCloseable {
     public Runnable onAllClosed = () -> { };
     /** Run when a surface opens while none is open; the application brings Jasper back into the Dock for it. */
     public Runnable onFirstOpened = () -> { };
+    /** Run when any surface's native window comes to the front; the application checks the file types again for it. */
+    public Runnable onActivated = () -> { };
     private boolean emptyReported = true;
 
     private AuxiliarySurface track(AuxiliarySurface surface) {
@@ -175,6 +177,7 @@ public final class AuxiliaryWindows implements AutoCloseable {
         open.add(surface);
         emptyReported = false;
         if (first) onFirstOpened.run();
+        surface.onActivated(() -> onActivated.run());
         surface.onClosed(() -> {
             open.remove(surface);
             // Dialogs die with their owner, as native dialogs do.
