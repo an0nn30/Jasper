@@ -1232,6 +1232,8 @@ public final class JasperApplication {
     /** Sets the file associations, refreshed whenever a Jasper window activates. Injected so tests never ask the system. EDT. */
     public void fileAssociations(dev.jasper.app.platform.FileAssociations associations) {
         fileAssociations = Objects.requireNonNull(associations, "associations");
+        // The plugins hear each change; one from a facade this application no longer asks is not passed on.
+        associations.onChanged(() -> { if (fileAssociations == associations && plugins != null) plugins.fileAssociationsChanged(); });
     }
 
     /** The file associations; {@code FileAssociations.unsupported()} until one is set. */
@@ -1683,6 +1685,7 @@ public final class JasperApplication {
             System.getProperty("jasper.commandClient")));
         // Read at each call, so the answer follows the check the bootstrap injects and every later one.
         plugins.defaultBrowser(() -> defaultBrowser.isJasper());
+        plugins.fileAssociations(() -> fileAssociations);
         plugins.systemBrowser(this::openInSystemBrowserForPlugin);
         plugins.appearance(themes::current, handler -> themes.subscribe((value, changed) -> handler.accept(value)));
         // The application's own entry, contributed like any other action so it is in the palette, rebindable and in the menu.

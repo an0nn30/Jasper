@@ -67,6 +67,8 @@ final class HostedContext implements PluginContext {
     final HostedTerminals terminals;
     final HostedPalette palette;
     final HostedFileSources fileSources;
+    /** This plugin's {@code Platform.fileAssociations()}, made at the first call. UI thread. */
+    private HostedFileAssociations associations;
     final HostedNotifications notifications;
     final HostedCommandLine commandLine;
     private boolean observing;
@@ -279,6 +281,21 @@ final class HostedContext implements PluginContext {
                     });
                     // As the browser's: HostedUi.closeAll closes it when the plugin stops or fails to start.
                     return ui.tracked(registration::close);
+                }
+                @Override public dev.jasper.sdk.ui.FileAssociations fileAssociations() {
+                    requireOpen();
+                    requireUi("Platform.fileAssociations");
+                    gate.require(Capabilities.FILE_ASSOCIATIONS);
+                    if (associations == null) {
+                        associations = new HostedFileAssociations(id, () -> host.fileAssociations.get(), () -> state != State.CLOSED,
+                            host.environment.onUi(), handler -> {
+                                dev.jasper.app.lifecycle.Subscription registration = host.onFileAssociationsChanged(
+                                    () -> host.containment.run(id, "file types change", handler));
+                                // As the default browser's: HostedUi.closeAll closes it when the plugin stops or fails to start.
+                                return ui.tracked(registration::close);
+                            });
+                    }
+                    return associations;
                 }
                 @Override public boolean copy(String text) {
                     requireOpen();

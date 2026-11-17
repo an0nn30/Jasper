@@ -5274,7 +5274,7 @@ public abstract class PluginContractTest {
     }
 
     /** SDK 0.31.0: file associations need {@code files.associate}. */
-    @Test public void fileAssociationsNeedTheCapability() {
+    @Test void fileAssociationsNeedTheCapability() {
         PluginContext a = started("test.a", Set.of());
         h.ui(() -> assertThatThrownBy(() -> a.platform().fileAssociations())
             .isInstanceOfSatisfying(MissingCapabilityException.class, failure -> assertThat(failure.capability()).isEqualTo("files.associate")));
@@ -5283,7 +5283,7 @@ public abstract class PluginContractTest {
     }
 
     /** SDK 0.31.0: {@code unavailable} gives the host's reason, and a claim then fails each extension without a type. */
-    @Test public void unavailableIsReportedAndBlocksNothing() {
+    @Test void unavailableIsReportedAndBlocksNothing() {
         PluginContext a = associating("test.a");
         h.ui(() -> assertThat(a.platform().fileAssociations().unavailable()).isEmpty());
         h.ui(() -> h.fileAssociationsUnavailable(Optional.of(dev.jasper.sdk.ui.FileAssociations.Unavailable.NOT_INSTALLED)));
@@ -5300,7 +5300,7 @@ public abstract class PluginContractTest {
     }
 
     /** SDK 0.31.0: a claim saves the previous application and takes the type; a restore hands it back. */
-    @Test public void aClaimSavesThePreviousAppAndARestoreHandsItBack() {
+    @Test void aClaimSavesThePreviousAppAndARestoreHandsItBack() {
         PluginContext a = associating("test.a");
         var xcode = new dev.jasper.sdk.ui.FileAssociations.Handler.Other("Xcode");
         h.ui(() -> {
@@ -5323,7 +5323,7 @@ public abstract class PluginContractTest {
     }
 
     /** SDK 0.31.0: the browser's extensions and invalid ones are refused, whatever their case. */
-    @Test public void browserOwnedAndInvalidExtensionsAreRefused() {
+    @Test void browserOwnedAndInvalidExtensionsAreRefused() {
         PluginContext a = associating("test.a");
         var results = onUi(() -> a.platform().fileAssociations().claim(List.of(".HTML", "../x")));
         assertThat(results).containsExactly(
@@ -5334,7 +5334,7 @@ public abstract class PluginContractTest {
     }
 
     /** SDK 0.31.0: {@code onChanged} runs on the UI thread after a claim, and a stopped plugin hears nothing. */
-    @Test public void onChangedRunsOnTheUiThreadAfterAClaimAndEndsWithThePlugin() {
+    @Test void onChangedRunsOnTheUiThreadAfterAClaimAndEndsWithThePlugin() {
         PluginContext a = associating("test.a");
         h.ui(() -> h.fileType(".java", List.of("t.java")));
         List<String> heard = new CopyOnWriteArrayList<>();
@@ -5349,7 +5349,7 @@ public abstract class PluginContractTest {
     }
 
     /** SDK 0.31.0: every future completes on the UI thread. */
-    @Test public void everyFutureCompletesOnTheUiThread() {
+    @Test void everyFutureCompletesOnTheUiThread() {
         PluginContext a = associating("test.a");
         h.ui(() -> h.fileType(".java", List.of("t.java")));
         List<String> where = new CopyOnWriteArrayList<>();

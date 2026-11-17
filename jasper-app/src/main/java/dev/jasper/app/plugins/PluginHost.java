@@ -24,6 +24,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import dev.jasper.app.terminals.PaneEntry;
 import dev.jasper.app.terminals.TerminalEvent;
 import dev.jasper.app.terminals.TerminalRegistry;
@@ -138,10 +139,14 @@ final class PluginHost {
     volatile Optional<Path> commandClient = Optional.empty();
     /** Whether Jasper is the system's default browser, as last checked ({@code Platform.isDefaultBrowser}); never blocks. */
     volatile java.util.function.BooleanSupplier defaultBrowser = () -> false;
+    /** The platform layer's file associations ({@code Platform.fileAssociations}), asked at each call; never blocks. */
+    volatile Supplier<dev.jasper.app.platform.FileAssociations> fileAssociations = dev.jasper.app.platform.FileAssociations::unsupported;
     /** Whether Copy on select is on ({@code terminal.copy_on_select}, {@code Platform.copyOnSelect}); read on any thread. */
     volatile boolean copyOnSelect;
     /** The plugins' {@code Platform.onDefaultBrowserChanged} handlers, in registration order. UI thread. */
     private final List<Consumer<Boolean>> defaultBrowserHandlers = new ArrayList<>();
+    /** The plugins' {@code FileAssociations.onChanged} handlers, in registration order. UI thread. */
+    private final List<Runnable> fileAssociationsHandlers = new ArrayList<>();
     final EventBus bus;
     final ActivityHub activities;
     final ConnectionHub connections;
@@ -192,6 +197,24 @@ final class PluginHost {
     void defaultBrowserChanged(boolean jasper) {
         requireUi();
         for (Consumer<Boolean> handler : List.copyOf(defaultBrowserHandlers)) handler.accept(jasper);
+    }
+
+    /**
+     * Adds a handler of a change the file associations report; closing the registration removes it, and a closed one is not
+     * run by a change already under way. UI thread.
+     */
+    dev.jasper.app.lifecycle.Subscription onFileAssociationsChanged(Runnable handler) {
+        Objects.requireNonNull(handler, "handler");
+        var live = new java.util.concurrent.atomic.AtomicBoolean(true);
+        Runnable guarded = () -> { if (live.get()) handler.run(); };
+        fileAssociationsHandlers.add(guarded);
+        return new dev.jasper.app.lifecycle.Subscription(() -> { live.set(false); fileAssociationsHandlers.remove(guarded); });
+    }
+
+    /** Runs every {@link #onFileAssociationsChanged} handler. UI thread. */
+    void fileAssociationsChanged() {
+        requireUi();
+        for (Runnable handler : List.copyOf(fileAssociationsHandlers)) handler.run();
     }
 
     Outcome start(HostedPlugin hosted) {

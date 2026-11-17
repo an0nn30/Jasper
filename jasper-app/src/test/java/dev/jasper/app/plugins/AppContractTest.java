@@ -24,6 +24,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import javax.swing.SwingUtilities;
 import dev.jasper.app.terminals.TerminalRegistry;
 import java.util.UUID;
@@ -293,6 +294,13 @@ class AppContractTest extends PluginContractTest {
         });
         PluginHost host = host(data, Duration.ofMillis(200), contributions, dark, auxiliary, terminalFixture.registry, notifications, edited,
             diagnostics, shells.source(), browsed, appearance, glass);
+        var associations = dev.jasper.app.platform.FileAssociationsBridge.open(Map.of(), Map.of(), Optional.empty());
+        Consumer<dev.jasper.app.platform.FileAssociations> useFacade = facade -> {
+            // As the application's wiring: a change the current facade reports reaches the plugins.
+            facade.onChanged(() -> host.fileAssociationsChanged());
+            host.fileAssociations = () -> facade;
+        };
+        onEdt(() -> useFacade.accept(associations.facade()));
         boolean[] clipboardBusy = {false};
         var clipboardContents = new java.awt.datatransfer.Clipboard("contract") {
             @Override public synchronized void setContents(java.awt.datatransfer.Transferable contents, java.awt.datatransfer.ClipboardOwner owner) {
@@ -870,17 +878,22 @@ class AppContractTest extends PluginContractTest {
                 });
             }
             @Override public void copyOnSelect(boolean on) { onEdt(() -> host.copyOnSelect = on); }
-            // Task 3 of the file associations plan 3 implements these three over the application's facade.
             @Override public void fileAssociationsUnavailable(Optional<dev.jasper.sdk.ui.FileAssociations.Unavailable> reason) {
-                throw new UnsupportedOperationException();
+                onEdt(() -> useFacade.accept(associations.unavailable(reason.map(value ->
+                    dev.jasper.app.platform.FileAssociations.Unavailable.valueOf(value.name())))));
             }
-            @Override public void fileType(String extension, List<String> types) { throw new UnsupportedOperationException(); }
+            @Override public void fileType(String extension, List<String> types) { associations.type(extension, types); }
             @Override public void fileTypeHandler(String type, dev.jasper.sdk.ui.FileAssociations.Handler handler) {
-                throw new UnsupportedOperationException();
+                associations.handler(type, switch (handler) {
+                    case dev.jasper.sdk.ui.FileAssociations.Handler.Jasper jasper -> new dev.jasper.app.platform.FileAssociations.Handler.Jasper();
+                    case dev.jasper.sdk.ui.FileAssociations.Handler.Other other -> new dev.jasper.app.platform.FileAssociations.Handler.Other(other.name(), other.name());
+                    case dev.jasper.sdk.ui.FileAssociations.Handler.None none -> new dev.jasper.app.platform.FileAssociations.Handler.None();
+                    case dev.jasper.sdk.ui.FileAssociations.Handler.Unknown unknown -> new dev.jasper.app.platform.FileAssociations.Handler.Unknown();
+                });
             }
             @Override public void close() {
                 try { stopAll(); flush(); }
-                finally { dev.jasper.app.testsupport.TempFolders.delete(data); }
+                finally { associations.close(); dev.jasper.app.testsupport.TempFolders.delete(data); }
             }
         };
     }
@@ -1021,12 +1034,4 @@ class AppContractTest extends PluginContractTest {
                 .collect(java.util.stream.Collectors.joining(", ", "[", "]"));
         return dev.jasper.app.settings.TomlLiterals.format(raw);
     }
-
-    // Task 3 of the file associations plan 3 removes these six overrides, which keep the new contract tests off the app; the base tests are public only so that they can be overridden from this package.
-    @Override @org.junit.jupiter.api.Disabled("Task 3") @org.junit.jupiter.api.Test public void fileAssociationsNeedTheCapability() { }
-    @Override @org.junit.jupiter.api.Disabled("Task 3") @org.junit.jupiter.api.Test public void unavailableIsReportedAndBlocksNothing() { }
-    @Override @org.junit.jupiter.api.Disabled("Task 3") @org.junit.jupiter.api.Test public void aClaimSavesThePreviousAppAndARestoreHandsItBack() { }
-    @Override @org.junit.jupiter.api.Disabled("Task 3") @org.junit.jupiter.api.Test public void browserOwnedAndInvalidExtensionsAreRefused() { }
-    @Override @org.junit.jupiter.api.Disabled("Task 3") @org.junit.jupiter.api.Test public void onChangedRunsOnTheUiThreadAfterAClaimAndEndsWithThePlugin() { }
-    @Override @org.junit.jupiter.api.Disabled("Task 3") @org.junit.jupiter.api.Test public void everyFutureCompletesOnTheUiThread() { }
 }

@@ -907,6 +907,32 @@ public final class PluginRuntime {
         if (host != null) host.defaultBrowserChanged(jasper);
     }
 
+    private java.util.function.Supplier<dev.jasper.app.platform.FileAssociations> fileAssociations =
+        dev.jasper.app.platform.FileAssociations::unsupported;
+
+    /**
+     * Supplies the platform layer's file associations, which plugins reach with {@code Platform.fileAssociations}; asked at
+     * each call, so a replaced facade is followed; before {@link #start}. It must answer at once.
+     *
+     * @param associations supplies the current facade
+     * @throws IllegalStateException once the plugins have started
+     */
+    public void fileAssociations(java.util.function.Supplier<dev.jasper.app.platform.FileAssociations> associations) {
+        if (host != null) throw new IllegalStateException("Plugins have already started");
+        fileAssociations = Objects.requireNonNull(associations, "associations");
+    }
+
+    /**
+     * Tells the plugins that the file associations changed: each {@code FileAssociations.onChanged} handler runs. Before the
+     * plugins start it tells nobody. UI thread.
+     *
+     * @throws IllegalStateException off the UI thread
+     */
+    public void fileAssociationsChanged() {
+        if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("File association changes are told on the UI thread");
+        if (host != null) host.fileAssociationsChanged();
+    }
+
     public void start(Map<String, Map<String, Object>> pluginTables, boolean dark) {
         start(PluginSelection.scan(options, "", Version.parse(JasperSdk.VERSION), PluginSelection.host()), pluginTables, dark);
     }
@@ -961,6 +987,7 @@ public final class PluginRuntime {
         created.openSettings = openSettings;
         created.commandClient = commandClient;
         created.defaultBrowser = defaultBrowser;
+        created.fileAssociations = fileAssociations;
         created.copyOnSelect = copyOnSelect;
         Set<String> loadingIds = new HashSet<>();
         for (PluginCandidate loading : resolution.load()) loadingIds.add(loading.id());
