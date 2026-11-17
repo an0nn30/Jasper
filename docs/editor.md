@@ -644,10 +644,58 @@ or the Editor is off, Jasper hands the file to the desktop: its edit action, the
 in the file manager. A Cmd-clicked path and a file from **File › Open File…** are never opened that way, only edited or
 shown.
 
+## Making Jasper the default for file types
+
+**File associations** on the Editor's settings page (Settings › Tools › Editor) chooses the file types your system
+opens with Jasper, so a double-click in Finder, File Explorer or your file manager opens the file in the
+[Editor](#opening-files). It lists the built-in file types and your own extensions, each with the app that opens it now:
+**Jasper**, the app's name, **Several apps**, **No default app**, **Partly Jasper's** (some of the type's system types
+are Jasper's and others were refused), **Checking…** or **Unknown**. A type the system treats as another kind of file
+says so: "macOS has no file type for <ext>", or "<system> treats <ext> as another kind of file". Nothing is Jasper's
+until you choose it: installing Jasper makes it the default for no file type.
+
+Tick the types to choose, then press **Make Jasper the Default** (**Choose in Windows Settings…** on Windows).
+**Restore Previous** hands the ticked types that are still Jasper's back to the app each had before. Ticks last while
+the page is open and are not saved. A type the system refuses shows "<system> refused: <detail>" in its row.
+When no app had the type before Jasper, Restore says so and points to Finder's Get Info (macOS) or Windows Settings ›
+Default apps (Windows), or to your file manager (Linux).
+
+To add a type, type an extension such as `.toml` in the field (a dot and up to 16 letters, digits, `_`, `+` or `-`) and
+press **Add Extension**; `.html`, `.htm` and the built-in types' extensions are refused. Your extensions are saved as
+`file_association_extensions` ([Settings](#settings)), and a new one can be chosen only after you apply Settings: its row
+says "Apply Settings to choose Jasper for <ext>". **Remove** in a row's context menu takes an extension of yours off the
+list; applying Settings then drops the file type Jasper declared for it.
+
+When the section cannot work it shows one line instead of the controls: "File associations work in an installed
+Jasper." in a run from a source checkout; "Install Jasper with its installer to choose it for file types." on
+Windows when Jasper was not installed with its setup wizard; "Install Jasper's .deb or .rpm
+package to choose it for file types." on Linux; "Install xdg-utils to choose Jasper for file types." when `xdg-mime` is
+missing; and "This system has no file associations Jasper can set." elsewhere.
+
+Uninstalling Jasper leaves your choices as the system keeps them.
+
+### On macOS
+
+**Make Jasper the Default** changes Finder's default app for each ticked type at once; Get Info on a file shows it.
+Jasper claims types that conform to text, so an extension macOS has no file type for cannot be chosen.
+
+### On Windows
+
+**Choose in Windows Settings…** registers Jasper for the ticked types and opens Windows Settings at Jasper's page,
+where you pick Jasper for each type: Jasper never changes Windows' own record of your choice. The rows update when a
+Jasper window becomes active again. Row results read "Pick Jasper for <ext> in Windows Settings". An upgrade keeps the
+types you chose.
+
+### On Linux
+
+**Make Jasper the Default** changes your `mimeapps.list` at once. An extension the system has no file type for gets a
+file type of Jasper's own (`text/x-jasper-<ext>`), written to `~/.local/share/mime/packages/jasper-workstation.xml`.
+**Restore Previous** for a type no app had before Jasper removes Jasper's line from `mimeapps.list`.
+
 ## Settings
 
 The settings live in `plugins/dev.jasper.editor/dev.jasper.editor.toml` in [Jasper home](getting-started.md#jasper-home)
-and on Settings › Tools › Editor, in the sections Font, Colors, Editing, Markdown, Files and Default editor. Jasper creates the
+and on Settings › Tools › Editor, in the sections Font, Colors, Editing, Markdown, Files, Default editor and File associations. Jasper creates the
 file, with every setting commented out, when it is missing; changes in the file or on the page apply without a restart.
 A bad value is reported and its default used ([Plugin settings](plugins.md#plugin-settings)).
 
@@ -671,6 +719,7 @@ A bad value is reported and its default used ([Plugin settings](plugins.md#plugi
 | `custom_command` | `""` | A command line; the file's path is added at the end | Custom command (while Custom command is chosen) | As `default_editor` |
 | `custom_in_terminal` | `true` | | Run in a terminal tab (while Custom command is chosen) | The next file opened |
 | `keep_environment_editor` | `true` | | Keep EDITOR and VISUAL from Jasper's environment | Shells started afterwards |
+| `file_association_extensions` | `[]` | Extensions of your own: a dot and 1–16 lower-case letters, digits, `_`, `+` or `-`, none of the built-in types' or `.html` and `.htm` | The File associations list ([Making Jasper the default for file types](#making-jasper-the-default-for-file-types)) | The page; a new extension can be chosen once Settings is applied |
 
 ## Files
 

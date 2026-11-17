@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-Status: not started (written 2026-11-11). Plan 3 of 3. Plans 1 (handed-in files open in the Jasper Editor) and 2 (the
+Status: done (2026-11-17) on branch claude/editor-file-associations-3 (written 2026-11-11). Plan 3 of 3. Plans 1 (handed-in files open in the Jasper Editor) and 2 (the
 platform layer, `dev.jasper.app.platform.FileAssociations`) are on main at 0a4ec9bb9.
 
 Planned deviations, recorded as AGENTS.md asks:
@@ -10,6 +10,14 @@ Planned deviations, recorded as AGENTS.md asks:
   there is no released 0.31.0 for them to break.
 - (b) Plugins need a new capability, `files.associate`, to use `Platform.fileAssociations()`. The Editor declares it.
 - (c) The plan fixes every label and message (the "Copy" table below), which the spec left to the builder.
+- (d) Task 3's `FileAssociationsBridge` is an instance class (open/facade/type/handler/unavailable/close), not a static
+  `scripted(...)`, because the facade caches its availability answer.
+- (e) Task 4's setting validator also requires a normalised value, and `withUser` drops duplicates.
+- (f) Task 5: user rows have a per-row Remove context item and no list `deleteAction` (it cannot name a row under
+  SelectionMode.NONE); an added extension is claimable only once Settings is applied ("Apply Settings to choose Jasper
+  for <ext>"), so a claimed-then-cancelled extension cannot leak a declaration; strings added beyond the Copy table:
+  Linux NoPrevious ("…choose one in your file manager"), macOS NOT_INSTALLED (the Windows line), accessible labels
+  "Choose Jasper for <name>" and "Extension"; the NO_SYSTEM_TYPE text names the system.
 
 **Goal:** The Editor's settings page gets a **File associations** section. It lists file types with their current
 app, has ticks and **Make Jasper the Default** (**Choose in Windows Settings…** on Windows), **Restore Previous**, and
