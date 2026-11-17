@@ -20,12 +20,14 @@ import dev.jasper.editor.ui.EditorEnvironment;
 import dev.jasper.editor.ui.EditorSettings;
 import dev.jasper.editor.ui.EditorSettingsPanel;
 import dev.jasper.editor.ui.EditorWindow;
+import dev.jasper.sdk.Capabilities;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.WindowOwner;
 import dev.jasper.sdk.notifications.NotificationGroup;
 import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.ui.ActionSpec;
+import dev.jasper.sdk.ui.FileAssociations;
 import dev.jasper.sdk.ui.PluginMenu;
 import dev.jasper.sdk.ui.SplitItemSpec;
 import dev.jasper.sdk.ui.StandardMenu;
@@ -180,7 +182,11 @@ public final class EditorPlugin implements Plugin {
             context.log().log(System.Logger.Level.INFO, "Another plugin provides the editor Jasper opens files with, so the default "
                 + "editor setting does not choose it: " + provided.getMessage());
         }
-        context.settings().page(new EditorSettingsPanel(context.kit(), context.appearance(), settings, defaults, System.getenv()));
+        Optional<FileAssociations> associations = context.plugin().capabilities().contains(Capabilities.FILE_ASSOCIATIONS)
+            ? Optional.of(context.platform().fileAssociations()) : Optional.empty();
+        associations.ifPresent(over -> forgetRemovedExtensions(context, settings, over));
+        context.settings().page(new EditorSettingsPanel(context.kit(), context.appearance(), settings, defaults, System.getenv(),
+            associations, System.getProperty("os.name", "")));
         context.palette().register(scope);
         // Workspace tabs spec 13: a saved document tab comes back from its key, as Recent Files reopens it, local or not.
         context.windows().restorer(EditorWindow.RESTORE_KIND, request -> {
@@ -208,6 +214,19 @@ public final class EditorPlugin implements Plugin {
         typography = () -> { };
         if (window != null) window.dispose();
         if (imageLoader != null) imageLoader.close();
+    }
+
+    /**
+     * File associations plan 3: an extension the user removed from {@code file_association_extensions}, once that is
+     * applied, has what Jasper saved for it forgotten. Cancelling Settings saves nothing, so it forgets nothing.
+     */
+    private void forgetRemovedExtensions(PluginContext context, EditorSettings.Declared settings, FileAssociations associations) {
+        var saved = new java.util.concurrent.atomic.AtomicReference<>(settings.fileAssociationExtensions());
+        context.settings().onChanged(() -> ui.execute(() -> {
+            List<String> now = settings.fileAssociationExtensions(), before = saved.getAndSet(now);
+            if (associations.unavailable().isPresent()) return;
+            before.stream().filter(extension -> !now.contains(extension)).forEach(associations::forget);
+        }));
     }
 
     private EditorWindow window() {

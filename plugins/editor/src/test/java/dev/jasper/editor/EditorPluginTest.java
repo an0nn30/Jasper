@@ -293,6 +293,75 @@ class EditorPluginTest {
         throw new AssertionError("no " + text);
     }
 
+    private static final PluginInfo ASSOCIATING = new PluginInfo(INFO.id(), INFO.name(), INFO.version(),
+        java.util.stream.Stream.concat(INFO.capabilities().stream(), java.util.stream.Stream.of(dev.jasper.sdk.Capabilities.FILE_ASSOCIATIONS))
+            .collect(java.util.stream.Collectors.toSet()));
+
+    /** Adds an extension on the open Settings page's File associations section. */
+    private static void addExtension(FakePluginHost host, String extension) {
+        var view = host.settingsPanelView(INFO.id()).orElseThrow();
+        view.emit(new dev.jasper.sdk.ui.UiEvent.Edited("editor.associations.add.field", extension));
+        view.emit(new dev.jasper.sdk.ui.UiEvent.Action("editor.associations.add"));
+    }
+
+    private static void removeExtension(FakePluginHost host, String extension) {
+        host.settingsPanelView(INFO.id()).orElseThrow().emit(new dev.jasper.sdk.ui.UiEvent.Action("editor.associations.remove:user:" + extension));
+    }
+
+    /** File associations plan 3 Task 5: an extension removed and applied is forgotten once; the section itself never forgets. */
+    @Test void applyingARemovedExtensionForgetsItOnce() throws Exception {
+        try (var host = host()) {
+            host.start(ASSOCIATING, Set.of(), Set.of(), plugin());
+            host.settingsPanel(INFO.id()).orElseThrow();
+            addExtension(host, ".foo");
+            host.applySettingsPanel(INFO.id());
+            assertThat(host.savedSettings(INFO.id())).containsEntry("file_association_extensions", List.of(".foo"));
+            removeExtension(host, ".foo");
+            assertThat(host.fileAssociationCalls()).as("staged only").isEmpty();
+            host.applySettingsPanel(INFO.id());
+            assertThat(host.fileAssociationCalls()).containsExactly("forget:.foo");
+            host.closeSettingsPanel(INFO.id());
+            assertThat(host.fileAssociationCalls()).containsExactly("forget:.foo");
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    @Test void cancellingARemovalForgetsNothing() throws Exception {
+        try (var host = host()) {
+            host.start(ASSOCIATING, Set.of(), Set.of(), plugin());
+            host.settingsPanel(INFO.id()).orElseThrow();
+            addExtension(host, ".foo");
+            host.applySettingsPanel(INFO.id());
+            host.closeSettingsPanel(INFO.id());
+            host.settingsPanel(INFO.id()).orElseThrow();
+            removeExtension(host, ".foo");
+            host.closeSettingsPanel(INFO.id());
+            assertThat(host.savedSettings(INFO.id())).containsEntry("file_association_extensions", List.of(".foo"));
+            assertThat(host.fileAssociationCalls()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    @Test void withoutFileAssociationsNothingIsForgotten() throws Exception {
+        try (var host = host()) {
+            host.setFileAssociationsUnavailable(Optional.of(dev.jasper.sdk.ui.FileAssociations.Unavailable.DEVELOPMENT_RUN));
+            host.setSetting(INFO.id(), "file_association_extensions", List.of(".foo"));
+            host.start(ASSOCIATING, Set.of(), Set.of(), plugin());
+            host.setSetting(INFO.id(), "file_association_extensions", List.of());
+            assertThat(host.fileAssociationCalls()).isEmpty();
+        }
+        try (var host = host()) {
+            host.setSetting(INFO.id(), "file_association_extensions", List.of(".foo"));
+            host.start(INFO, Set.of(), Set.of(), plugin());
+            host.settingsPanel(INFO.id()).orElseThrow();
+            assertThat(host.settingsPanelView(INFO.id()).orElseThrow().spec().toString()).as("no section without the capability")
+                .doesNotContain("editor.associations");
+            host.setSetting(INFO.id(), "file_association_extensions", List.of());
+            assertThat(host.fileAssociationCalls()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
     @Test void registersTheVimWidgetsIcon() throws Exception {
         try (var host = host()) {
             var context = host.start(INFO, Set.of(), Set.of(), plugin());

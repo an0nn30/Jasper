@@ -9,6 +9,7 @@ import dev.jasper.sdk.settings.SettingsPanel;
 import dev.jasper.sdk.settings.SettingsPanelHost;
 import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.Appearance;
+import dev.jasper.sdk.ui.FileAssociations;
 import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.Option;
 import dev.jasper.sdk.ui.UiEvent;
@@ -27,14 +28,14 @@ import java.util.Optional;
  * The Editor's page in Settings > Tools > Editor: Font, Colors (a dropdown of the workspace's editor scheme and every installed
  * scheme), Editing, Markdown and Files as Settings' standard rows, grouped as the generated page grouped them, then Default editor: a dropdown of the Jasper Editor, the editors detection found, the
  * system's default app and a custom command, the custom command's rows while it is chosen, and what Jasper's own
- * environment holds for {@code EDITOR} and {@code VISUAL}. Detection runs again each time the page opens, and the page
- * follows it. UI thread.
+ * environment holds for {@code EDITOR} and {@code VISUAL}, then, with {@code files.associate}, File associations
+ * ({@link FileAssociationsSection}). Detection runs again each time the page opens, and the page follows it. UI thread.
  */
 public final class EditorSettingsPanel implements SettingsPanel {
     static final String PAGE = "editor.settings", FONT = "editor.settings.font", COLORS = "editor.settings.colors",
         SCHEME = "editor.color-scheme", EDITING = "editor.settings.editing",
         MARKDOWN = "editor.settings.markdown", FILES = "editor.settings.files", DEFAULT = "editor.settings.default", CHOICE = "editor.default-editor",
-        COMMAND = "editor.custom-command", ENVIRONMENT = "editor.environment";
+        COMMAND = "editor.custom-command", ENVIRONMENT = "editor.environment", ASSOCIATIONS = "editor.associations";
     /** The note under what Jasper's environment holds. */
     static final String NOTE = "An export in a shell startup file, such as ~/.zshrc, still wins.";
     /** The custom command field's error while it is blank. */
@@ -45,6 +46,7 @@ public final class EditorSettingsPanel implements SettingsPanel {
     private final EditorSettings.Declared settings;
     private final DefaultEditor defaults;
     private final Map<String, String> environment;
+    private final Optional<FileAssociationsSection> associations;
     private SettingsPanelHost host;
     private UiView view;
     private Subscription detecting = () -> { };
@@ -58,13 +60,19 @@ public final class EditorSettingsPanel implements SettingsPanel {
      * @param settings the Editor's declared settings
      * @param defaults the default editor, whose detection the dropdown lists
      * @param environment Jasper's own environment, for what the page says about {@code EDITOR} and {@code VISUAL}
+     * @param associations the plugin's file associations, which the File associations section after Default editor uses;
+     *     empty without {@code files.associate}, and then the page has no such section
+     * @param osName the {@code os.name} the section's wording follows
      */
-    public EditorSettingsPanel(UiKit kit, Appearance appearance, EditorSettings.Declared settings, DefaultEditor defaults, Map<String, String> environment) {
+    public EditorSettingsPanel(UiKit kit, Appearance appearance, EditorSettings.Declared settings, DefaultEditor defaults, Map<String, String> environment,
+                               Optional<FileAssociations> associations, String osName) {
         this.kit = Objects.requireNonNull(kit, "kit");
         this.appearance = Objects.requireNonNull(appearance, "appearance");
         this.settings = Objects.requireNonNull(settings, "settings");
         this.defaults = Objects.requireNonNull(defaults, "defaults");
         this.environment = Map.copyOf(environment);
+        this.associations = associations.map(over -> new FileAssociationsSection(over, osName, () -> host.pending(settings.fileAssociationExtensions),
+            list -> stage(settings.fileAssociationExtensions, list), this::render));
     }
 
     @Override public UiView create(SettingsPanelHost host) {
@@ -74,11 +82,13 @@ public final class EditorSettingsPanel implements SettingsPanel {
         typography = appearance.onTerminalTypographyChanged(value -> render());
         schemes = appearance.onWorkspaceChanged(value -> render());
         defaults.detect();
+        associations.ifPresent(FileAssociationsSection::open);
         return view;
     }
 
     @Override public List<String> keywords() {
-        return List.of("default editor", "EDITOR", "VISUAL", "git", "external editor", "custom command", "vim", "nvim", "code");
+        return List.of("default editor", "EDITOR", "VISUAL", "git", "external editor", "custom command", "vim", "nvim", "code",
+            "file associations", "default app", "open with");
     }
 
     @Override public void highlight(String query) {
@@ -89,6 +99,7 @@ public final class EditorSettingsPanel implements SettingsPanel {
     @Override public void pendingChanged() { render(); }
 
     @Override public void dispose() {
+        associations.ifPresent(FileAssociationsSection::close);
         typography.close();
         typography = () -> { };
         schemes.close();
@@ -100,7 +111,7 @@ public final class EditorSettingsPanel implements SettingsPanel {
     }
 
     private void event(UiEvent event) {
-        if (view == null) return;
+        if (view == null || associations.map(section -> section.handle(event)).orElse(false)) return;
         switch (event) {
             case UiEvent.Selected selected when selected.id().equals(SCHEME) ->
                 selected.ids().stream().findFirst().ifPresent(id -> stage(settings.colorScheme, id));
@@ -114,7 +125,7 @@ public final class EditorSettingsPanel implements SettingsPanel {
         }
     }
 
-    private void stage(Setting<String> setting, String value) {
+    private <T> void stage(Setting<T> setting, T value) {
         host.stage(setting, value);
         host.changed();
         render();
@@ -132,13 +143,15 @@ public final class EditorSettingsPanel implements SettingsPanel {
         }
         defaultEditor.add(host.row(settings.keepEnvironmentEditor));
         defaultEditor.add(environmentRow());
-        return new Nodes.Stack(PAGE, ControlState.READY, Nodes.LayoutRole.SETTINGS_PAGE, List.of(
+        var sections = new ArrayList<Nodes.Node>(List.of(
             section(FONT, "Font", fontRows()),
             section(COLORS, "Colors", List.of(schemeRow(host.pending(settings.colorScheme)))),
             section(EDITING, "Editing", List.of(host.row(settings.tabSize), host.row(settings.softWrap), host.row(settings.vim))),
             section(MARKDOWN, "Markdown", List.of(host.row(settings.markdownViewMode), host.row(settings.markdownPreview))),
             section(FILES, "Files", List.of(host.row(settings.maxFileMib), host.row(settings.recentFilesDays))),
             section(DEFAULT, "Default editor", defaultEditor)));
+        associations.ifPresent(section -> sections.add(section(ASSOCIATIONS, "File associations", section.nodes(query))));
+        return new Nodes.Stack(PAGE, ControlState.READY, Nodes.LayoutRole.SETTINGS_PAGE, sections);
     }
 
     private List<Nodes.Node> fontRows() {

@@ -33,6 +33,8 @@ class EditorSettingsPanelTest {
     private FakePluginHost host;
     private DefaultEditor defaults;
     private Path bin;
+    private boolean associating;
+    private EditorSettingsPanel panel;
 
     @BeforeEach void open() throws Exception {
         host = new FakePluginHost(home.resolve("plugins"));
@@ -43,16 +45,50 @@ class EditorSettingsPanelTest {
 
     /** Starts a plugin that gives the Editor's page over its real declarations, then opens the page as Settings would. */
     private FakeKitView page(Map<String, String> environment) {
-        host.start(INFO, Set.of(), Set.of(), context -> {
+        host.start(associating ? new PluginInfo(ID, "Editor", "0.9.0", Set.of(dev.jasper.sdk.Capabilities.FILE_ASSOCIATIONS)) : INFO, Set.of(), Set.of(), context -> {
             var settings = new EditorSettings.Declared(context.settings(), Set.of());
             defaults = new DefaultEditor(() -> new DefaultEditor.Preference(settings.defaultEditor(), settings.customCommand(),
                     settings.customInTerminal(), settings.keepEnvironmentEditor()),
                 () -> new Detection.Probe("Mac OS X", List.of(bin), home, Map.of(), programs::contains), context.background(), Runnable::run,
                 context.terminals(), (file, line, window) -> false, (command, program) -> false, Optional.empty(), "Mac OS X", context.log());
-            context.settings().page(new EditorSettingsPanel(context.kit(), context.appearance(), settings, defaults, environment));
+            panel = new EditorSettingsPanel(context.kit(), context.appearance(), settings, defaults, environment,
+                associating ? Optional.of(context.platform().fileAssociations()) : Optional.empty(), "Mac OS X");
+            context.settings().page(panel);
         });
         host.settingsPanel(ID).orElseThrow();
         return host.settingsPanelView(ID).orElseThrow();
+    }
+
+    /** File associations plan 3 Task 5: with {@code files.associate} the section follows Default editor. */
+    @Test void fileAssociationsFollowDefaultEditorWithTheCapability() {
+        associating = true;
+        host.setFileType(".py", List.of("public.python-script"));
+        host.setFileTypeHandler("public.python-script", new dev.jasper.sdk.ui.FileAssociations.Handler.Other("Xcode"));
+        FakeKitView view = page(Map.of());
+        var page = (Nodes.Stack) view.spec().root();
+        assertThat(page.children()).extracting(node -> ((Nodes.Section) node).title())
+            .containsExactly("Font", "Colors", "Editing", "Markdown", "Files", "Default editor", "File associations");
+        assertThat(rows(view, EditorSettingsPanel.ASSOCIATIONS)).containsExactly(FileAssociationsSection.INTRO, FileAssociationsSection.LIST,
+            FileAssociationsSection.BUTTONS, FileAssociationsSection.ADD_ROW);
+        var python = node(view, FileAssociationsSection.LIST, Nodes.ItemList.class).items().stream().filter(item -> item.id().equals("python"))
+            .findFirst().orElseThrow();
+        assertThat(((Nodes.Text) python.subtitle().getFirst()).text()).as("open() asked for the statuses").isEqualTo(".py · Xcode");
+        assertThat(host.settingsPanel(ID)).isPresent();
+        assertThat(host.failures()).isEmpty();
+
+        view.emit(new UiEvent.Edited(FileAssociationsSection.FIELD, ".foo"));
+        view.emit(new UiEvent.Action(FileAssociationsSection.ADD));
+        assertThat(host.pendingSettings(ID)).containsEntry("file_association_extensions", List.of(".foo"));
+        assertThat(host.settingsPanelChanges(ID)).isPositive();
+        host.closeSettingsPanel(ID);
+        assertThat(host.savedSettings(ID)).doesNotContainKey("file_association_extensions");
+        host.fileTypesChanged();
+        assertThat(host.failures()).as("the closed page's subscription ended").isEmpty();
+    }
+
+    @Test void theKeywordsFindFileAssociations() {
+        page(Map.of());
+        assertThat(panel.keywords()).contains("file associations", "default app", "open with");
     }
 
     private void install(String name) { programs.add(bin.resolve(name).toAbsolutePath().normalize()); }
