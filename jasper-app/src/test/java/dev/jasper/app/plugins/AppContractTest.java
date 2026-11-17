@@ -870,6 +870,14 @@ class AppContractTest extends PluginContractTest {
                 });
             }
             @Override public void copyOnSelect(boolean on) { onEdt(() -> host.copyOnSelect = on); }
+            // Task 3 of the file associations plan 3 implements these three over the application's facade.
+            @Override public void fileAssociationsUnavailable(Optional<dev.jasper.sdk.ui.FileAssociations.Unavailable> reason) {
+                throw new UnsupportedOperationException();
+            }
+            @Override public void fileType(String extension, List<String> types) { throw new UnsupportedOperationException(); }
+            @Override public void fileTypeHandler(String type, dev.jasper.sdk.ui.FileAssociations.Handler handler) {
+                throw new UnsupportedOperationException();
+            }
             @Override public void close() {
                 try { stopAll(); flush(); }
                 finally { dev.jasper.app.testsupport.TempFolders.delete(data); }
@@ -1013,4 +1021,12 @@ class AppContractTest extends PluginContractTest {
                 .collect(java.util.stream.Collectors.joining(", ", "[", "]"));
         return dev.jasper.app.settings.TomlLiterals.format(raw);
     }
+
+    // Task 3 of the file associations plan 3 removes these six overrides, which keep the new contract tests off the app; the base tests are public only so that they can be overridden from this package.
+    @Override @org.junit.jupiter.api.Disabled("Task 3") @org.junit.jupiter.api.Test public void fileAssociationsNeedTheCapability() { }
+    @Override @org.junit.jupiter.api.Disabled("Task 3") @org.junit.jupiter.api.Test public void unavailableIsReportedAndBlocksNothing() { }
+    @Override @org.junit.jupiter.api.Disabled("Task 3") @org.junit.jupiter.api.Test public void aClaimSavesThePreviousAppAndARestoreHandsItBack() { }
+    @Override @org.junit.jupiter.api.Disabled("Task 3") @org.junit.jupiter.api.Test public void browserOwnedAndInvalidExtensionsAreRefused() { }
+    @Override @org.junit.jupiter.api.Disabled("Task 3") @org.junit.jupiter.api.Test public void onChangedRunsOnTheUiThreadAfterAClaimAndEndsWithThePlugin() { }
+    @Override @org.junit.jupiter.api.Disabled("Task 3") @org.junit.jupiter.api.Test public void everyFutureCompletesOnTheUiThread() { }
 }

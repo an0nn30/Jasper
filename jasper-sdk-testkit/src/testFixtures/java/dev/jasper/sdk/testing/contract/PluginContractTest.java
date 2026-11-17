@@ -5250,4 +5250,122 @@ public abstract class PluginContractTest {
         h.commandClient(client);
         assertThat(a.commandLine().client()).as("any thread").contains(client);
     }
+
+    private static <T> T awaited(java.util.concurrent.CompletableFuture<T> future) {
+        try { return future.get(10, TimeUnit.SECONDS); }
+        catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new IllegalStateException(interrupted); }
+        catch (ExecutionException | java.util.concurrent.TimeoutException failure) { throw new IllegalStateException(failure); }
+    }
+
+    /** Runs a call on the UI thread and waits for its future, which completes there too. */
+    private <T> T onUi(java.util.function.Supplier<java.util.concurrent.CompletableFuture<T>> call) {
+        var future = new AtomicReference<java.util.concurrent.CompletableFuture<T>>();
+        h.ui(() -> future.set(call.get()));
+        T answer = awaited(future.get());
+        h.ui(() -> { });
+        return answer;
+    }
+
+    private PluginContext associating(String id) {
+        var context = new AtomicReference<PluginContext>();
+        h.start(info(id, Capabilities.FILE_ASSOCIATIONS), Set.of(), Set.of(), context::set);
+        assertThat(h.active(id)).isTrue();
+        return context.get();
+    }
+
+    /** SDK 0.31.0: file associations need {@code files.associate}. */
+    @Test public void fileAssociationsNeedTheCapability() {
+        PluginContext a = started("test.a", Set.of());
+        h.ui(() -> assertThatThrownBy(() -> a.platform().fileAssociations())
+            .isInstanceOfSatisfying(MissingCapabilityException.class, failure -> assertThat(failure.capability()).isEqualTo("files.associate")));
+        PluginContext b = associating("test.b");
+        h.ui(() -> assertThat(b.platform().fileAssociations()).isNotNull());
+    }
+
+    /** SDK 0.31.0: {@code unavailable} gives the host's reason, and a claim then fails each extension without a type. */
+    @Test public void unavailableIsReportedAndBlocksNothing() {
+        PluginContext a = associating("test.a");
+        h.ui(() -> assertThat(a.platform().fileAssociations().unavailable()).isEmpty());
+        h.ui(() -> h.fileAssociationsUnavailable(Optional.of(dev.jasper.sdk.ui.FileAssociations.Unavailable.NOT_INSTALLED)));
+        h.ui(() -> assertThat(a.platform().fileAssociations().unavailable())
+            .contains(dev.jasper.sdk.ui.FileAssociations.Unavailable.NOT_INSTALLED));
+        var results = onUi(() -> a.platform().fileAssociations().claim(List.of(".java", ".kt")));
+        assertThat(results).hasSize(2);
+        assertThat(results).extracting(dev.jasper.sdk.ui.FileAssociations.TypeResult::extension).containsExactly(".java", ".kt");
+        assertThat(results).allSatisfy(result -> {
+            assertThat(result.type()).isEmpty();
+            assertThat(result.outcome()).isInstanceOfSatisfying(dev.jasper.sdk.ui.FileAssociations.Outcome.Failed.class,
+                failed -> assertThat(failed.detail()).startsWith("unavailable"));
+        });
+    }
+
+    /** SDK 0.31.0: a claim saves the previous application and takes the type; a restore hands it back. */
+    @Test public void aClaimSavesThePreviousAppAndARestoreHandsItBack() {
+        PluginContext a = associating("test.a");
+        var xcode = new dev.jasper.sdk.ui.FileAssociations.Handler.Other("Xcode");
+        h.ui(() -> {
+            h.fileType(".java", List.of("t.java"));
+            h.fileTypeHandler("t.java", xcode);
+        });
+        var claimed = onUi(() -> a.platform().fileAssociations().claim(List.of(".java")));
+        assertThat(claimed).containsExactly(new dev.jasper.sdk.ui.FileAssociations.TypeResult(".java", "t.java",
+            new dev.jasper.sdk.ui.FileAssociations.Outcome.Done()));
+        var status = onUi(() -> a.platform().fileAssociations().status(List.of(".java")));
+        assertThat(status).containsExactly(new dev.jasper.sdk.ui.FileAssociations.FileTypeStatus(".java", List.of(
+            new dev.jasper.sdk.ui.FileAssociations.TypeState("t.java", new dev.jasper.sdk.ui.FileAssociations.Handler.Jasper(),
+                Optional.of(xcode)))));
+        var restored = onUi(() -> a.platform().fileAssociations().restore(List.of(".java")));
+        assertThat(restored).containsExactly(new dev.jasper.sdk.ui.FileAssociations.TypeResult(".java", "t.java",
+            new dev.jasper.sdk.ui.FileAssociations.Outcome.Done()));
+        status = onUi(() -> a.platform().fileAssociations().status(List.of(".java")));
+        assertThat(status).containsExactly(new dev.jasper.sdk.ui.FileAssociations.FileTypeStatus(".java", List.of(
+            new dev.jasper.sdk.ui.FileAssociations.TypeState("t.java", xcode, Optional.empty()))));
+    }
+
+    /** SDK 0.31.0: the browser's extensions and invalid ones are refused, whatever their case. */
+    @Test public void browserOwnedAndInvalidExtensionsAreRefused() {
+        PluginContext a = associating("test.a");
+        var results = onUi(() -> a.platform().fileAssociations().claim(List.of(".HTML", "../x")));
+        assertThat(results).containsExactly(
+            new dev.jasper.sdk.ui.FileAssociations.TypeResult(".html", "",
+                new dev.jasper.sdk.ui.FileAssociations.Outcome.Refused(dev.jasper.sdk.ui.FileAssociations.Refusal.BROWSER_OWNED)),
+            new dev.jasper.sdk.ui.FileAssociations.TypeResult("../x", "",
+                new dev.jasper.sdk.ui.FileAssociations.Outcome.Refused(dev.jasper.sdk.ui.FileAssociations.Refusal.INVALID)));
+    }
+
+    /** SDK 0.31.0: {@code onChanged} runs on the UI thread after a claim, and a stopped plugin hears nothing. */
+    @Test public void onChangedRunsOnTheUiThreadAfterAClaimAndEndsWithThePlugin() {
+        PluginContext a = associating("test.a");
+        h.ui(() -> h.fileType(".java", List.of("t.java")));
+        List<String> heard = new CopyOnWriteArrayList<>();
+        h.ui(() -> a.platform().fileAssociations().onChanged(
+            () -> heard.add(javax.swing.SwingUtilities.isEventDispatchThread() ? "a" : "a:off the UI thread")));
+        onUi(() -> a.platform().fileAssociations().claim(List.of(".java")));
+        assertThat(heard).containsExactly("a");
+        h.stopAll();
+        PluginContext c = associating("test.c");
+        onUi(() -> c.platform().fileAssociations().restore(List.of(".java")));
+        assertThat(heard).as("the stopped plugin's handler").containsExactly("a");
+    }
+
+    /** SDK 0.31.0: every future completes on the UI thread. */
+    @Test public void everyFutureCompletesOnTheUiThread() {
+        PluginContext a = associating("test.a");
+        h.ui(() -> h.fileType(".java", List.of("t.java")));
+        List<String> where = new CopyOnWriteArrayList<>();
+        java.util.function.Consumer<String> record =
+            name -> where.add(name + ":" + javax.swing.SwingUtilities.isEventDispatchThread());
+        var done = new CopyOnWriteArrayList<java.util.concurrent.CompletableFuture<?>>();
+        h.ui(() -> {
+            var fa = a.platform().fileAssociations();
+            done.add(fa.status(List.of(".java")).thenRun(() -> record.accept("status")));
+            done.add(fa.claimability(".java").thenRun(() -> record.accept("claimability")));
+            done.add(fa.claim(List.of(".java")).thenRun(() -> record.accept("claim")));
+            done.add(fa.restore(List.of(".java")).thenRun(() -> record.accept("restore")));
+            done.add(fa.forget(".java").thenRun(() -> record.accept("forget")));
+        });
+        done.forEach(PluginContractTest::awaited);
+        h.ui(() -> { });
+        assertThat(where).containsExactlyInAnyOrder("status:true", "claimability:true", "claim:true", "restore:true", "forget:true");
+    }
 }

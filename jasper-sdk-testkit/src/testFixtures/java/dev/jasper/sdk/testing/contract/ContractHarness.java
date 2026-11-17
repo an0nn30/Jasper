@@ -435,4 +435,16 @@ public interface ContractHarness extends AutoCloseable {
         void defaultBrowser(boolean jasper);
         /** Sets whether Copy on select is on, as the user's {@code terminal.copy_on_select} says; until then it is off. */
         void copyOnSelect(boolean on);
+        /**
+         * Sets why file associations cannot be used, as the application's check answers; until then they can be.
+         * Asked on the UI thread.
+         */
+        void fileAssociationsUnavailable(java.util.Optional<dev.jasper.sdk.ui.FileAssociations.Unavailable> reason);
+        /**
+         * Makes an extension claimable with these system types, as a system that knows them would; an extension no call set
+         * is not claimable (no system type). Asked on the UI thread.
+         */
+        void fileType(String extension, java.util.List<String> types);
+        /** Sets who opens a system type now; until then no application does. Asked on the UI thread. */
+        void fileTypeHandler(String type, dev.jasper.sdk.ui.FileAssociations.Handler handler);
 }

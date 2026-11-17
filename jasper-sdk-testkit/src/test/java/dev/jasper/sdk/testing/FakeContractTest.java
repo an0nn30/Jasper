@@ -182,6 +182,13 @@ class FakeContractTest extends PluginContractTest {
             @Override public void commandClient(java.nio.file.Path client) { host.setCommandClient(client); }
             @Override public void defaultBrowser(boolean jasper) { host.setDefaultBrowser(jasper); }
             @Override public void copyOnSelect(boolean on) { host.setCopyOnSelect(on); }
+            @Override public void fileAssociationsUnavailable(java.util.Optional<dev.jasper.sdk.ui.FileAssociations.Unavailable> reason) {
+                host.setFileAssociationsUnavailable(reason);
+            }
+            @Override public void fileType(String extension, java.util.List<String> types) { host.setFileType(extension, types); }
+            @Override public void fileTypeHandler(String type, dev.jasper.sdk.ui.FileAssociations.Handler handler) {
+                host.setFileTypeHandler(type, handler);
+            }
             @Override public void close() { host.close(); }
         };
     }

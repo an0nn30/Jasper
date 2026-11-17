@@ -60,6 +60,7 @@ public final class FakePluginContext implements PluginContext {
     final FakeFileSources fileSources;
     final FakeCommandLine commandLine;
     final FakePluginSettings settings;
+    private final dev.jasper.sdk.ui.FileAssociations fileAssociations;
     final dev.jasper.sdk.notifications.Notifications notifications;
 
     FakePluginContext(FakePluginHost host, PluginInfo info, Set<String> requires, Plugin plugin) {
@@ -70,6 +71,7 @@ public final class FakePluginContext implements PluginContext {
         this.palette = new FakePalette(host, this);
         this.fileSources = new FakeFileSources(host, this);
         this.commandLine = new FakeCommandLine(host, this);
+        this.fileAssociations = host.fileAssociations.view(info.id(), () -> state != State.CLOSED, this::own);
         this.settings = new FakePluginSettings(host, info.id(), host.dataRoot().resolve(info.id()).resolve(info.id() + ".toml"));
         this.notifications = host.notifications.of(info.id(), () -> state != State.CLOSED, name -> kit().validateIcon(name));
     }
@@ -181,6 +183,12 @@ public final class FakePluginContext implements PluginContext {
                         throw new dev.jasper.sdk.MissingCapabilityException(info.id(), dev.jasper.sdk.Capabilities.BROWSER_PROVIDE);
                     Objects.requireNonNull(browser, "browser");
                     return host.provideBrowser(FakePluginContext.this, browser);
+                }
+                @Override public dev.jasper.sdk.ui.FileAssociations fileAssociations() {
+                    requireOpen();
+                    if (!info.capabilities().contains(dev.jasper.sdk.Capabilities.FILE_ASSOCIATIONS))
+                        throw new dev.jasper.sdk.MissingCapabilityException(info.id(), dev.jasper.sdk.Capabilities.FILE_ASSOCIATIONS);
+                    return fileAssociations;
                 }
                 @Override public boolean copy(String text) { requireOpen(); return copied(text, false); }
                 @Override public boolean copySecret(String text) { requireOpen(); return copied(text, true); }

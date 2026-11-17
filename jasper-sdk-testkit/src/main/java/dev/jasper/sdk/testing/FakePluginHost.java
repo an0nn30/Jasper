@@ -2696,6 +2696,92 @@ public final class FakePluginHost implements AutoCloseable {
         return () -> { entry.closed().set(true); defaultBrowserHandlers.remove(entry); };
     }
 
+    final FakeFileAssociations fileAssociations = new FakeFileAssociations(this);
+
+    /**
+     * Sets why {@code Platform.fileAssociations} cannot be used, as the application's check answers; until then it can. While
+     * there is a reason, a claim or restore gives each extension one result with an empty type and
+     * {@code Failed("unavailable: <reason>")}, as the application does.
+     *
+     * @param reason the reason, or empty
+     * @since 0.31.0
+     */
+    public void setFileAssociationsUnavailable(Optional<dev.jasper.sdk.ui.FileAssociations.Unavailable> reason) {
+        fileAssociations.unavailable(reason);
+    }
+
+    /**
+     * Makes an extension claimable with these system types; each type's handler starts as none until
+     * {@link #setFileTypeHandler} says otherwise. An extension set with neither this nor {@link #setFileTypeRefused} is not
+     * claimable (no system type). The extension is normalised, as the application does.
+     *
+     * @param extension the extension
+     * @param types the system types a claim takes, at least one
+     * @throws IllegalArgumentException when the extension is invalid or {@code types} is empty
+     * @since 0.31.0
+     */
+    public void setFileType(String extension, List<String> types) { fileAssociations.type(extension, types); }
+
+    /**
+     * Makes an extension not claimable for this reason, as a system that treats it as another kind of file would.
+     *
+     * @param extension the extension
+     * @param refusal why
+     * @throws IllegalArgumentException when the extension is invalid
+     * @since 0.31.0
+     */
+    public void setFileTypeRefused(String extension, dev.jasper.sdk.ui.FileAssociations.Refusal refusal) {
+        fileAssociations.refuse(extension, refusal);
+    }
+
+    /**
+     * Sets who opens a system type now; until then no application does. The change is silent: call
+     * {@link #fileTypesChanged} to tell the plugins.
+     *
+     * @param type the system type
+     * @param handler who opens it
+     * @since 0.31.0
+     */
+    public void setFileTypeHandler(String type, dev.jasper.sdk.ui.FileAssociations.Handler handler) {
+        fileAssociations.handler(type, handler);
+    }
+
+    /**
+     * Makes every claim of this system type fail with this detail, leaving its handler as it was.
+     *
+     * @param type the system type
+     * @param detail the system's message, as {@code Outcome.Failed} carries it
+     * @since 0.31.0
+     */
+    public void failFileTypeClaims(String type, String detail) { fileAssociations.failClaims(type, detail); }
+
+    /**
+     * Sets whether a claim only opens the system's Settings, as on Windows: while it does, a claim answers
+     * {@code InSettings} for each type, still saving the previous application, and changes no handler.
+     *
+     * @param windowsLike whether claims end in Settings
+     * @since 0.31.0
+     */
+    public void setFileAssociationsInSettings(boolean windowsLike) { fileAssociations.inSettings(windowsLike); }
+
+    /**
+     * Every {@code FileAssociations.claim}, {@code restore} and {@code forget} so far, as {@code claim:<ext>},
+     * {@code restore:<ext>} and {@code forget:<ext>} with the normalised extension, one per extension asked, in order.
+     *
+     * @return the calls
+     * @since 0.31.0
+     */
+    public List<String> fileAssociationCalls() { return fileAssociations.calls(); }
+
+    /**
+     * Runs every plugin's {@code FileAssociations.onChanged} handler on the EDT, as the application does when a background
+     * re-check finds that something changed; a handler that throws is recorded in {@link #failures()}. A claim or restore
+     * runs them by itself.
+     *
+     * @since 0.31.0
+     */
+    public void fileTypesChanged() { fileAssociations.changed(); }
+
     volatile boolean copyOnSelect;
 
     /**

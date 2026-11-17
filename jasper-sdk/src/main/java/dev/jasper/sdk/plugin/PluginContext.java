@@ -196,7 +196,8 @@ public interface PluginContext {
          * Desktop integration: opening a file in an editor or a web address in a browser, copying to and reading the
          * clipboard, and becoming the editor Jasper opens files with or the web browser it opens web addresses with.
          * Reading the clipboard needs {@code clipboard.read}, providing the editor {@code editor.provide} and providing
-         * the browser {@code browser.provide}; the rest needs no capability.
+         * the browser {@code browser.provide}, and {@link Platform#fileAssociations()} needs {@code files.associate}; the
+         * rest needs no capability.
          *
          * @return the platform service
          */

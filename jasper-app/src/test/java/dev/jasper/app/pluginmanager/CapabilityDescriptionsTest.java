@@ -38,4 +38,9 @@ class CapabilityDescriptionsTest {
         assertThat(Capabilities.describe("presentation.provide"))
             .isEqualTo("Change Jasper's window chrome and controls after a restart (presentation.provide)");
     }
+
+    @Test void theFileAssociationsCapabilityIsDescribed() {
+        assertThat(Capabilities.describe("files.associate"))
+            .isEqualTo("Choose Jasper as the app for file types (files.associate)");
+    }
 }
