@@ -148,7 +148,7 @@ class PageViewMouseTest {
             var input = wheel(view, InputEvent.ALT_DOWN_MASK, 1, 0, 0.35);
             view.processMouseWheelEvent(input);
             view.processMouseWheelEvent(wheel(view, 0, 1, 0, 0.08));
-            view.processMouseWheelEvent(wheel(view, 0, 1, 1, 1));
+            view.processMouseWheelEvent(wheel(view, 0, 3, 1, 1));
             assertThat(sent).extracting(MouseWheelEvent::getUnitsToScroll).containsExactly(-3, -1, -10);
             var output = sent.getFirst();
             assertThat(output.getModifiersEx()).isEqualTo(InputEvent.ALT_DOWN_MASK);
@@ -156,6 +156,7 @@ class PageViewMouseTest {
             assertThat(output.getLocationOnScreen()).isEqualTo(input.getLocationOnScreen());
             assertThat(output.getWhen()).isEqualTo(input.getWhen());
             assertThat(output.getScrollAmount()).isEqualTo(1);
+            assertThat(sent.getLast().getScrollAmount()).isEqualTo(1);
         });
     }
 
@@ -164,10 +165,13 @@ class PageViewMouseTest {
             var view = view(NavigationButtonTest.MAC);
             var sent = wheelEvents(view);
             view.processMouseWheelEvent(wheel(view, 0, 1, 0, 0.06));
+            view.processMouseWheelEvent(wheel(view, InputEvent.SHIFT_DOWN_MASK, 1, 0, 0.09));
+            assertThat(sent).isEmpty();
             view.processMouseWheelEvent(wheel(view, InputEvent.SHIFT_DOWN_MASK, 1, 1, 0.5));
             view.processMouseWheelEvent(wheel(view, 0, 1, 0, 0.06));
+            view.processMouseWheelEvent(wheel(view, InputEvent.SHIFT_DOWN_MASK, 1, 0, 0.02));
             assertThat(sent).extracting(MouseEvent::isShiftDown, MouseWheelEvent::getUnitsToScroll)
-                .containsExactly(tuple(true, -5), tuple(false, -1));
+                .containsExactly(tuple(true, -5), tuple(false, -1), tuple(true, -1));
 
             sent.clear();
             view.processMouseWheelEvent(wheel(view, 0, 1, 0, -0.06));
