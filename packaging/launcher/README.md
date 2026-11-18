@@ -122,7 +122,8 @@ property or `--config`.
 `buildLauncher` (`gradle/launcher.gradle`) compiles the launcher for the host with the flags of the JDK's
 `make/modules/jdk.jpackage/Lib.gmk`: C++14 and C11, `-O2` (MSVC `/O1`), the JDK's defines, hidden visibility, and on
 Windows the static CRT. Upstream files compile at the JDK's warning level; Jasper's own files except
-`JasperVmOptions.cpp` with warnings as errors. Outputs go to
+`JasperVmOptions.cpp` with warnings as errors. On macOS, the selected SDK path and version are task inputs, so an Xcode
+SDK update rebuilds the launcher. Outputs go to
 `jasper-app/build/launcher/resources/jdk/jpackage/internal/resources/`, where
 `jpackage -J--patch-module=jdk.jpackage=jasper-app/build/launcher/resources` takes them instead of its own:
 

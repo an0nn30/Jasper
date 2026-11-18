@@ -587,6 +587,15 @@ def buildLauncher = tasks.register('buildLauncher') {
     inputs.dir(jasperNative).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.property('sdk', launcherSdk.map { it.absolutePath })
     inputs.property('host', providers.provider { launcherHost().toString() })
+    // Xcode can replace its SDK in place; both its selected path and version invalidate the launcher.
+    if (launcherHost().os == 'macos') {
+        inputs.property('macSdkPath', providers.exec {
+            commandLine('/usr/bin/xcrun', '--show-sdk-path')
+        }.standardOutput.asText.map { it.trim() })
+        inputs.property('macSdkVersion', providers.exec {
+            commandLine('/usr/bin/xcrun', '--show-sdk-version')
+        }.standardOutput.asText.map { it.trim() })
+    }
     outputs.dir(launcherResources)
     doLast {
         def host = launcherHost()
