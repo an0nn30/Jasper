@@ -90,7 +90,9 @@ class OverlayScrollPane extends JScrollPane {
         Thumb() { super(JScrollBar.VERTICAL); }
 
         @Override public int getUnitIncrement(int direction) {
-            if (unitIncrementSet || getViewport().getView() instanceof Scrollable) {
+            JViewport viewport = getViewport();
+            Component view = viewport == null ? null : viewport.getView();
+            if (unitIncrementSet || view == null || view instanceof Scrollable) {
                 return super.getUnitIncrement(direction);
             }
             return 16;

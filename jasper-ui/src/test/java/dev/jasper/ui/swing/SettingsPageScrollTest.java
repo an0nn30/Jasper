@@ -45,6 +45,13 @@ class SettingsPageScrollTest {
         });
     }
 
+    @Test void theThumbKeepsSwingDefaultsWhenTheViewportIsRemoved() {
+        withPageScroller(new JPanel(), pane -> {
+            pane.setViewport(null);
+            assertThat(pane.getVerticalScrollBar().getUnitIncrement(1)).isEqualTo(1);
+        });
+    }
+
     private static void withPageScroller(JPanel page, java.util.function.Consumer<JScrollPane> check) {
         Edt.run(() -> {
             var previous = UIManager.getLookAndFeel();

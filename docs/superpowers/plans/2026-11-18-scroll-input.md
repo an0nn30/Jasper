@@ -8,7 +8,7 @@
 
 **Authorities.** Settings page layout in the [Enterprise presentation design](../specs/2026-10-15-jasper-enterprise-presentation-design.md) and Browser input in [Browser design sections 7 and 10](../specs/2026-10-26-jasper-browser-plugin-design.md). Runtime contract from [JBR AWTView](https://github.com/JetBrains/JetBrainsRuntime/blob/8a91bff64015/src/java.desktop/macosx/native/libawt_lwawt/awt/AWTView.m#L545-L562), [JCEF wheel bridge](https://github.com/JetBrains/jcef/blob/9df0879ddc3d775be97eb5bcc5cc834985a7e7e6/native/CefBrowser_N.cpp#L1072-L1118) and [IntelliJ's OSR adapter](https://github.com/JetBrains/intellij-community/blob/master/platform/ui.jcef/jcef/JBCefOsrWheelRotation.java).
 
-**Status.** Implemented on `codex/fix-scroll-input` from `e2eb05921`. Settings `fb7eaa5f3`, Browser `01af5c49d`. The focused runs used JBR JCEF 25.0.4.1 b635.75 and passed 31 tests with zero failures, errors or skips. Full check and branch review are pending. Hardware acceptance is user-run. The Browser red run was repeated with the mouse hook routed and its original cast in place to isolate the conversion.
+**Status.** Implemented on `codex/fix-scroll-input` from `e2eb05921`. Settings `fb7eaa5f3`, Browser `01af5c49d`. The focused runs used JBR JCEF 25.0.4.1 b635.75 and passed 32 tests with zero failures, errors or skips. Full check and branch review are pending. Hardware acceptance is user-run. The Browser red run was repeated with the mouse hook routed and its original cast in place to isolate the conversion. Settings review added a guard and regression test for a removed viewport.
 
 ## Settings overlay scrollbar
 
@@ -23,7 +23,9 @@ private final class Thumb extends ScrollBar {
     Thumb() { super(JScrollBar.VERTICAL); }
 
     @Override public int getUnitIncrement(int direction) {
-        if (unitIncrementSet || getViewport().getView() instanceof Scrollable) {
+        JViewport viewport = getViewport();
+        Component view = viewport == null ? null : viewport.getView();
+        if (unitIncrementSet || view == null || view instanceof Scrollable) {
             return super.getUnitIncrement(direction);
         }
         return 16;
@@ -38,6 +40,7 @@ private final class Thumb extends ScrollBar {
 ```
 
 - [x] **Green.** `./gradlew :jasper-ui:test --tests '*SettingsPageScrollTest' --tests '*SettingsControlsTest'` passed 17 tests. Committed as `fb7eaa5f3`.
+- [x] **Review fix.** A removed viewport raised a null-pointer exception on the thumb's unit lookup. The test removes it with `setViewport(null)` and checks the thumb falls back to Swing's one-pixel unit. After the guard, the same focused command passed 18 tests.
 
 ## macOS Browser wheel delivery
 
