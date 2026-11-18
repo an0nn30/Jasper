@@ -1,5 +1,7 @@
 # Jasper — Status and Handoff
 
+**macOS package build after an Xcode SDK update — 2026-11-17:** `codex/fix-packaged-launcher-sdk`, from `main` `7e3e0ca64`; fix `8cda7c7f5`, task review passed. `packageDist` had failed verification because Gradle reused a launcher linked against SDK 27.0 after Xcode updated to 27.2. `buildLauncher` now tracks the selected macOS SDK path and version. The regression failed before the fix and passed afterwards; the rebuilt launcher records 27.2, and a repeat build is up to date. Full headless checks, image verification and final review are in progress. No implementation deviations. [Plan](superpowers/plans/2026-11-17-packaged-launcher-sdk.md).
+
 **Browser plan 8: logins — 2026-11-11** (`claude/browser-logins`, worktree `.claude/worktrees/browser-4b-4c-e6deab`,
 from local `main` `c01d2feec`, which has plans 4a, 4b, 4c, 9, 5, 6 and 7 merged; the plan `58962695b`, brought in from
 `5c42e4a82`, commits `a2b5c118a` to `322bd5793`, the docs, `fd709d04b` and `479738513`, local `main` `0a4ec9bb9` (the

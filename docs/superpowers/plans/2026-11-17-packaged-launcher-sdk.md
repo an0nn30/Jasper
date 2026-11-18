@@ -2,8 +2,9 @@
 
 > **For agentic workers:** Use superpowers:subagent-driven-development to implement and review this task.
 
-**Status:** In progress on `codex/fix-packaged-launcher-sdk`, from `main` `7e3e0ca64`.
-The existing checkout is reused to reproduce its stale native output. No implementation deviations yet.
+**Status:** Implemented as `8cda7c7f5` on `codex/fix-packaged-launcher-sdk`, from `main` `7e3e0ca64`; task review passed.
+The existing checkout is reused to reproduce its stale native output. No implementation deviations.
+The regression failed on the missing SDK input, then passed; the rebuilt launcher records SDK 27.2, and a repeat build is up to date. Full headless checks, image verification and final review are in progress.
 
 **Goal:** Rebuild the macOS launcher when the selected SDK changes, then deliver a verified app image.
 
@@ -33,7 +34,7 @@ The existing checkout is reused to reproduce its stale native output. No impleme
 
 **Files:** `gradle/launcher.gradle`, `gradle/packaging-support-test.gradle`, `packaging/launcher/README.md`.
 
-- [ ] Add this regression block to `verifySupport` in `gradle/packaging-support-test.gradle`:
+- [x] Add this regression block to `verifySupport` in `gradle/packaging-support-test.gradle`:
 
 ```groovy
 verifySupport.configure {
@@ -54,8 +55,8 @@ verifySupport.configure {
 }
 ```
 
-- [ ] Run `./gradlew :jasper-app:verifyPackagingSupport --console=plain`; observe the missing SDK input failure.
-- [ ] Add the following after the existing `host` input in **buildLauncher only**:
+- [x] Run `./gradlew :jasper-app:verifyPackagingSupport --console=plain`; observe the missing SDK input failure.
+- [x] Add the following after the existing `host` input in **buildLauncher only**:
 
 ```groovy
     // Xcode can replace its SDK in place; both its selected path and version invalidate the launcher.
@@ -69,8 +70,8 @@ verifySupport.configure {
     }
 ```
 
-- [ ] Add to the launcher README's build paragraph: "On macOS, the selected SDK path and version are task inputs, so an Xcode SDK update rebuilds the launcher."
-- [ ] Run `./gradlew :jasper-app:verifyPackagingSupport :jasper-app:buildLauncher --console=plain`; inspect the binary with `xcrun vtool -show-build`, requiring SDK 27.2 on this host. Repeat `buildLauncher`, expecting UP-TO-DATE.
-- [ ] Commit the fix and regression with the required trailer; obtain task review.
+- [x] Add to the launcher README's build paragraph: "On macOS, the selected SDK path and version are task inputs, so an Xcode SDK update rebuilds the launcher."
+- [x] Run `./gradlew :jasper-app:verifyPackagingSupport :jasper-app:buildLauncher --console=plain`; inspect the binary with `xcrun vtool -show-build`, requiring SDK 27.2 on this host. Repeat `buildLauncher`, expecting UP-TO-DATE.
+- [x] Commit the fix and regression with the required trailer; obtain task review.
 - [ ] Controller: run the full headless `check` with Python 3.11–3.13, `:jasper-app:verifyPackage`, and final branch review. Record evidence and deviations here and in `docs/STATUS.md`.
 - [ ] Controller: obtain the required AOT approval after the headless image is concrete, then run `:jasper-app:packageDist` and deliver its verified DMG and app image. If AOT is declined, deliver the verified headless app image.
