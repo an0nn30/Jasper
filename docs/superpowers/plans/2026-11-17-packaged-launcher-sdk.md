@@ -4,7 +4,7 @@
 
 **Status:** Implemented as `8cda7c7f5` on `codex/fix-packaged-launcher-sdk`, from `main` `7e3e0ca64`; task review passed.
 The existing checkout is reused to reproduce its stale native output. No implementation deviations.
-The regression failed on the missing SDK input, then passed; the rebuilt launcher records SDK 27.2, and a repeat build is up to date. Full headless checks, image verification and final review are in progress.
+The regression failed on the missing SDK input, then passed; the rebuilt launcher records SDK 27.2, and a repeat build is up to date. Full headless checks and image verification passed in 29m 52s: 16,355 JUnit tests, zero failures/errors, 109 skipped. Final branch review passed. The headless app image is ready; AOT/DMG training and a local merge await the user approvals requested in this session.
 
 **Goal:** Rebuild the macOS launcher when the selected SDK changes, then deliver a verified app image.
 
@@ -73,5 +73,5 @@ verifySupport.configure {
 - [x] Add to the launcher README's build paragraph: "On macOS, the selected SDK path and version are task inputs, so an Xcode SDK update rebuilds the launcher."
 - [x] Run `./gradlew :jasper-app:verifyPackagingSupport :jasper-app:buildLauncher --console=plain`; inspect the binary with `xcrun vtool -show-build`, requiring SDK 27.2 on this host. Repeat `buildLauncher`, expecting UP-TO-DATE.
 - [x] Commit the fix and regression with the required trailer; obtain task review.
-- [ ] Controller: run the full headless `check` with Python 3.11–3.13, `:jasper-app:verifyPackage`, and final branch review. Record evidence and deviations here and in `docs/STATUS.md`.
+- [x] Controller: run the full headless `check` with Python 3.11–3.13, `:jasper-app:verifyPackage`, and final branch review. Record evidence and deviations here and in `docs/STATUS.md`.
 - [ ] Controller: obtain the required AOT approval after the headless image is concrete, then run `:jasper-app:packageDist` and deliver its verified DMG and app image. If AOT is declined, deliver the verified headless app image.
