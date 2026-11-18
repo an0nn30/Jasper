@@ -84,8 +84,22 @@ class OverlayScrollPane extends JScrollPane {
         super.removeNotify();
     }
 
-    private final class Thumb extends JScrollBar {
+    private final class Thumb extends ScrollBar {
+        private boolean unitIncrementSet;
+
         Thumb() { super(JScrollBar.VERTICAL); }
+
+        @Override public int getUnitIncrement(int direction) {
+            if (unitIncrementSet || getViewport().getView() instanceof Scrollable) {
+                return super.getUnitIncrement(direction);
+            }
+            return 16;
+        }
+
+        @Override public void setUnitIncrement(int increment) {
+            unitIncrementSet = true;
+            super.setUnitIncrement(increment);
+        }
 
         @Override public void updateUI() {
             if(!overlay){setOpaque(true);super.updateUI();return;}
