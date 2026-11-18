@@ -57,6 +57,23 @@ tasks.named('check') { dependsOn(verifySupport) }
 
 verifySupport.configure {
     doLast {
+        Map inputs = tasks.named('buildLauncher').get().inputs.properties
+        if (System.getProperty('os.name').toLowerCase(Locale.ROOT).startsWith('mac')) {
+            ['macSdkPath': '--show-sdk-path', 'macSdkVersion': '--show-sdk-version'].each { name, option ->
+                String expected = providers.exec {
+                    commandLine('/usr/bin/xcrun', option)
+                }.standardOutput.asText.get().trim()
+                assert inputs[name] == expected : "buildLauncher must track ${name}"
+            }
+        } else {
+            assert !inputs.containsKey('macSdkPath') && !inputs.containsKey('macSdkVersion')
+        }
+        logger.lifecycle('Verified launcher macOS SDK inputs')
+    }
+}
+
+verifySupport.configure {
+    doLast {
         // Format choice follows distro metadata even when an RPM host also has dpkg installed.
         [
             ['ID=fedora\n', ['packageRpm']],
