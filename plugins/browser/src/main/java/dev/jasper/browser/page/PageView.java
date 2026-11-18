@@ -95,6 +95,8 @@ import javax.swing.Timer;
 public final class PageView extends JComponent {
     static final int SHOWN_FRAME_RATE = 60, HIDDEN_FRAME_RATE = 1;
     private static final int RESIZE_DELAY_MILLIS = 100;
+    // JBR's macOS AWT peer divides native precise wheel distances by ten before creating the event.
+    private static final int MAC_WHEEL_PIXELS_PER_UNIT = 10;
     /** How long after the last selection gesture the view's listener hears it. */
     static final Duration SELECTION_DELAY = Duration.ofMillis(100);
     private static final Runnable NOTHING = () -> { };
@@ -135,6 +137,8 @@ public final class PageView extends JComponent {
     private int takenKey = KeyEvent.VK_UNDEFINED;
     // UI thread: the notches Ctrl+wheel has turned that no step took yet, as Chromium keeps them; negative away from the user.
     private double magnifyTurn;
+    // UI thread: subpixel wheel movement waiting to be sent to Chromium, stored per axis for diagonal gestures.
+    private double horizontalWheelRemainder, verticalWheelRemainder;
     // Runs a task on the UI thread after a delay and answers what cancels it: a Swing timer, or a test's.
     private final BiFunction<Duration, Runnable, Runnable> later;
     // UI thread: told once the user has finished a selection, or null while nothing listens; and what cancels the timer
@@ -220,6 +224,8 @@ public final class PageView extends JComponent {
      * whether the view shows. UI thread; once, from {@link PageBrowser#attach()}.
      */
     void attached(Hooks page, ImeAdapter adapter, DropTargetListener drops) {
+        horizontalWheelRemainder = 0;
+        verticalWheelRemainder = 0;
         hooks = Objects.requireNonNull(page, "page");
         ime = Objects.requireNonNull(adapter, "adapter");
         addInputMethodListener(adapter);
@@ -344,7 +350,7 @@ public final class PageView extends JComponent {
      * Has the view hand the mouse events the page gets to {@code page} from now on, as a test's recording one: a Chromium
      * browser cannot be made without Chromium. UI thread.
      *
-     * @param page told each mouse event that reaches the page, but the wheel's
+     * @param page told each mouse event that reaches the page, including translated wheel events
      */
     void useMouse(Consumer<MouseEvent> page) {
         Objects.requireNonNull(page, "page");
@@ -552,13 +558,31 @@ public final class PageView extends JComponent {
             magnify(zoom, event.getPreciseWheelRotation());
             return;
         }
-        PageBrowser target = browser;
-        if (target == null) return;
         double rotation = -event.getPreciseWheelRotation(); // Chromium's wheel turns the other way
-        target.sendMouseWheelEvent(new MouseWheelEvent(event.getComponent(), event.getID(), event.getWhen(),
+        int wholeRotation = (int) rotation;
+        int scrollAmount = event.getScrollAmount();
+        if (osName.startsWith("Mac") && event.getScrollType() == MouseWheelEvent.WHEEL_UNIT_SCROLL) {
+            if (rotation == 0) rotation = -(double) event.getWheelRotation();
+            if (rotation == 0) return;
+            rotation *= MAC_WHEEL_PIXELS_PER_UNIT;
+            wholeRotation = macWheelRotation(rotation, event.isShiftDown());
+            if (wholeRotation == 0) return;
+            // JCEF sends the integer product of wheel rotation and scroll amount as pixels.
+            scrollAmount = 1;
+        }
+        hooks.mouse().accept(new MouseWheelEvent(event.getComponent(), event.getID(), event.getWhen(),
             event.getModifiersEx(), event.getX(), event.getY(), event.getXOnScreen(), event.getYOnScreen(),
-            event.getClickCount(), event.isPopupTrigger(), event.getScrollType(), event.getScrollAmount(), (int) rotation,
-            rotation));
+            event.getClickCount(), event.isPopupTrigger(), event.getScrollType(), scrollAmount, wholeRotation, rotation));
+    }
+
+    private int macWheelRotation(double pixels, boolean horizontal) {
+        double remainder = horizontal ? horizontalWheelRemainder : verticalWheelRemainder;
+        if (Math.signum(pixels) != Math.signum(remainder)) remainder = 0;
+        double total = pixels + remainder;
+        int wholePixels = (int) total;
+        if (horizontal) horizontalWheelRemainder = total - wholePixels;
+        else verticalWheelRemainder = total - wholePixels;
+        return wholePixels;
     }
 
     @Override protected void processKeyEvent(KeyEvent event) {

@@ -13,6 +13,7 @@ import java.awt.dnd.DropTargetDropEvent;
 import java.awt.dnd.DropTargetEvent;
 import java.awt.dnd.DropTargetListener;
 import java.awt.dnd.InvalidDnDOperationException;
+import java.awt.event.MouseWheelEvent;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
@@ -104,7 +105,10 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
         PageView target = view;
         target.browser = this;
         target.attached(new PageView.Hooks(this::setWindowVisibility, this::setWindowlessFrameRate, this::sendKeyEvent,
-            this::sendMouseEvent), new ImeAdapter(target, this), new Drops());
+            event -> {
+                if (event instanceof MouseWheelEvent wheel) sendMouseWheelEvent(wheel);
+                else sendMouseEvent(event);
+            }), new ImeAdapter(target, this), new Drops());
     }
 
     /**

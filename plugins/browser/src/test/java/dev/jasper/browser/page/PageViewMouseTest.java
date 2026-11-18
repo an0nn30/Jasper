@@ -129,12 +129,67 @@ class PageViewMouseTest {
     @Test void onMacOsCtrlWheelIsThePages() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var view = view(NavigationButtonTest.MAC);
+            var sent = new ArrayList<MouseEvent>();
+            view.useMouse(sent::add);
             for (double notches : new double[] { -1, -3, 1 }) {
                 var turn = wheel(view, InputEvent.CTRL_DOWN_MASK, notches);
                 view.processMouseWheelEvent(turn);
                 assertThat(turn.isConsumed()).as(turn.paramString()).isFalse();
             }
             assertThat(magnified).isEmpty();
+            assertThat(sent).hasSize(3).allSatisfy(event -> assertThat(event.isControlDown()).isTrue());
+        });
+    }
+
+    @Test void macOsWheelRestoresPixelsAndCarriesFractions() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var view = view(NavigationButtonTest.MAC);
+            var sent = wheelEvents(view);
+            var input = wheel(view, InputEvent.ALT_DOWN_MASK, 1, 0, 0.35);
+            view.processMouseWheelEvent(input);
+            view.processMouseWheelEvent(wheel(view, 0, 1, 0, 0.08));
+            view.processMouseWheelEvent(wheel(view, 0, 1, 1, 1));
+            assertThat(sent).extracting(MouseWheelEvent::getUnitsToScroll).containsExactly(-3, -1, -10);
+            var output = sent.getFirst();
+            assertThat(output.getModifiersEx()).isEqualTo(InputEvent.ALT_DOWN_MASK);
+            assertThat(output.getPoint()).isEqualTo(input.getPoint());
+            assertThat(output.getLocationOnScreen()).isEqualTo(input.getLocationOnScreen());
+            assertThat(output.getWhen()).isEqualTo(input.getWhen());
+            assertThat(output.getScrollAmount()).isEqualTo(1);
+        });
+    }
+
+    @Test void macOsWheelKeepsFractionsPerAxisAndClearsThemOnReversal() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var view = view(NavigationButtonTest.MAC);
+            var sent = wheelEvents(view);
+            view.processMouseWheelEvent(wheel(view, 0, 1, 0, 0.06));
+            view.processMouseWheelEvent(wheel(view, InputEvent.SHIFT_DOWN_MASK, 1, 1, 0.5));
+            view.processMouseWheelEvent(wheel(view, 0, 1, 0, 0.06));
+            assertThat(sent).extracting(MouseEvent::isShiftDown, MouseWheelEvent::getUnitsToScroll)
+                .containsExactly(tuple(true, -5), tuple(false, -1));
+
+            sent.clear();
+            view.processMouseWheelEvent(wheel(view, 0, 1, 0, -0.06));
+            assertThat(sent).isEmpty();
+            view.processMouseWheelEvent(wheel(view, 0, 1, 0, -0.05));
+            assertThat(sent).extracting(MouseWheelEvent::getUnitsToScroll).containsExactly(1);
+        });
+    }
+
+    @Test void windowsAndLinuxKeepTheirExistingWheelEncodingAndTakeCtrlWheel() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            for (String os : List.of(NavigationButtonTest.WINDOWS, NavigationButtonTest.LINUX)) {
+                magnified.clear();
+                var view = view(os);
+                var sent = wheelEvents(view);
+                view.processMouseWheelEvent(wheel(view, 0, 3, 2, 2.25));
+                assertThat(sent).extracting(MouseWheelEvent::getUnitsToScroll, MouseWheelEvent::getPreciseWheelRotation)
+                    .containsExactly(tuple(-6, -2.25));
+                assertThat(turn(view, -1).isConsumed()).isTrue();
+                assertThat(magnified).containsExactly(1);
+                assertThat(sent).hasSize(1);
+            }
         });
     }
 
@@ -263,8 +318,18 @@ class PageViewMouseTest {
 
     /** A turn of the wheel over {@code view}, of {@code notches}: away from the user when negative. */
     private static MouseWheelEvent wheel(PageView view, int modifiers, double notches) {
-        return new MouseWheelEvent(view, MouseEvent.MOUSE_WHEEL, System.currentTimeMillis(), modifiers, 10, 10, 10, 10, 0, false,
-            MouseWheelEvent.WHEEL_UNIT_SCROLL, 3, (int) notches, notches);
+        return wheel(view, modifiers, 3, (int) notches, notches);
+    }
+
+    private static MouseWheelEvent wheel(PageView view, int modifiers, int amount, int rotation, double preciseRotation) {
+        return new MouseWheelEvent(view, MouseEvent.MOUSE_WHEEL, System.currentTimeMillis(), modifiers, 10, 12, 30, 32, 0, false,
+            MouseWheelEvent.WHEEL_UNIT_SCROLL, amount, rotation, preciseRotation);
+    }
+
+    private static List<MouseWheelEvent> wheelEvents(PageView view) {
+        var events = new ArrayList<MouseWheelEvent>();
+        view.useMouse(event -> events.add((MouseWheelEvent) event));
+        return events;
     }
 
     /** A button's press, release and click over the view. */
