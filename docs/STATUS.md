@@ -1,5 +1,13 @@
 # Jasper — Status and Handoff
 
+**Settings and macOS Browser scrolling — 2026-11-18.** Branch `codex/fix-scroll-input` from `e2eb05921`. Settings
+`fb7eaa5f3` restores the overlay scrollbar's Swing delegation to the page's scroll increments. Plain pages get a
+16-pixel step and callers can still set an explicit one-pixel step. Browser `01af5c49d` turns macOS JBR unit-wheel
+rotation back into Chromium pixels and carries subpixel movement per axis. Headless regressions reproduced the Settings
+one-pixel discrete step and the Browser's zero fractional deltas before the fixes. All 31 focused tests passed on JBR
+25.0.4.1 b635.75 JCEF. Full check and branch review pending. Hardware acceptance is user-run.
+[Plan](superpowers/plans/2026-11-18-scroll-input.md).
+
 **macOS package build after an Xcode SDK update — 2026-11-17:** `codex/fix-packaged-launcher-sdk`, from `main` `7e3e0ca64`; fix `8cda7c7f5`, task review passed. `packageDist` had failed verification because Gradle reused a launcher linked against SDK 27.0 after Xcode updated to 27.2. `buildLauncher` now tracks the selected macOS SDK path and version. The regression failed before the fix and passed afterwards; the rebuilt launcher records 27.2, and a repeat build is up to date. Full `check` and `verifyPackage` passed in 29m 52s: 16,355 JUnit tests, zero failures/errors, 109 skipped; final branch review passed. The verified Apple Silicon app image is `jasper-app/build/packaging/image/Jasper.app`; its launcher records SDK 27.2 and minimum macOS 11.0, and strict deep signature verification passes. After user approval, the fix was fast-forwarded into local `main` and `packageDist` passed in 1m 7s, including AOT training (76 MB), image verification, DMG integrity, mounted-copy signatures and cache acceptance. Installable DMG: `jasper-app/build/packaging/dist/Jasper-1.0.0-macos-aarch64.dmg`. Nothing pushed. No implementation deviations. [Plan](superpowers/plans/2026-11-17-packaged-launcher-sdk.md).
 
 **Browser plan 8: logins — 2026-11-11** (`claude/browser-logins`, worktree `.claude/worktrees/browser-4b-4c-e6deab`,
