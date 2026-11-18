@@ -97,7 +97,9 @@ public final class PageDownloads {
     /**
      * A download a browser starts, from plain values: for a page's own browser, whether the page is activated now, read
      * without consuming the activation, the allowance its downloads count in ({@link Page#downloadDocument}), and whether
-     * it asks where it goes, which takes the page's ask ({@link DownloadAsk#take}). Chromium's thread.
+     * it asks where it goes, which takes the page's ask ({@link DownloadAsk#take}). Any download of the page's top
+     * address, such as its main frame's request become a download, makes the commit before it the top address again
+     * (plan 8's L24, L25). Chromium's thread.
      *
      * @param browser the browser's identifier
      * @param pageUrl the address the browser shows
@@ -114,6 +116,7 @@ public final class PageDownloads {
         boolean activated = page.map(shown -> shown.activation().active(nowMillis)).orElse(false);
         long document = page.map(Page::downloadDocument).orElse(0L);
         boolean ask = page.map(shown -> shown.downloadAsk().take(url, nowMillis)).orElse(false);
+        page.ifPresent(shown -> shown.mainFrameRequestEnded(url));
         return new DownloadStart(browser, id, suggestedName, url, pageUrl, page, ask, activated, document, inMemory);
     }
 

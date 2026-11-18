@@ -86,6 +86,9 @@ final class PickerMenus {
         MenuControl(KitView view,Nodes.PickerMenu node){
             super(view,node,new JPanel(new BorderLayout()){@Override protected void paintComponent(Graphics g){Menus.paintSurface(this,g,view.context());}});
             search=new JTextField();search.putClientProperty("html.disable",true);KitOwnership.mark(search,node.id()+".search");KitOwnership.mark(list,node.id()+".rows");
+            // The search takes the focus as the menu shows, keeping its text unselected with the caret at its end, so typing
+            // adds to a starting search rather than replacing it (Browser plan 8's L36).
+            search.putClientProperty(com.formdev.flatlaf.FlatClientProperties.SELECT_ALL_ON_FOCUS_POLICY,com.formdev.flatlaf.FlatClientProperties.SELECT_ALL_ON_FOCUS_POLICY_NEVER);
             component.setOpaque(false);body.setOpaque(false);searchBox.setOpaque(false);
             search.setOpaque(false);search.setBorder(new EmptyBorder(0,0,0,0));
             searchSurface=new TextFields.FieldSurface(context(),search,false);searchSurface.role=Typography.Role.BODY;searchSurface.heightRole=DesignMetrics.Role.PICKER_SEARCH_HEIGHT;searchSurface.radiusRole=DesignMetrics.Role.PICKER_SEARCH_RADIUS;
@@ -100,13 +103,16 @@ final class PickerMenus {
             search.addInputMethodListener(ime);own(()->search.removeInputMethodListener(ime));
             ListSelectionListener selection=e->{if(!e.getValueIsAdjusting()&&!applying&&list.getSelectedValue()!=null)emit(new UiEvent.Selected(this.node.id(),Set.of(list.getSelectedValue().id())));};
             list.addListSelectionListener(selection);own(()->list.removeListSelectionListener(selection));
-            MouseAdapter click=new MouseAdapter(){public void mousePressed(MouseEvent e){if(SwingUtilities.isLeftMouseButton(e)){int i=list.locationToIndex(e.getPoint());if(i>=0&&list.getCellBounds(i,i).contains(e.getPoint())){list.setSelectedIndex(i);accept();}}}};
+            // The look's own press handler, which runs first, holds the selection adjusting until the release; ending it
+            // reports the pressed row as Selected before the press accepts it (Browser plan 8's L40).
+            MouseAdapter click=new MouseAdapter(){public void mousePressed(MouseEvent e){if(SwingUtilities.isLeftMouseButton(e)){int i=list.locationToIndex(e.getPoint());if(i>=0&&list.getCellBounds(i,i).contains(e.getPoint())){list.setSelectedIndex(i);list.setValueIsAdjusting(false);accept();}}}};
             list.addMouseListener(click);own(()->list.removeMouseListener(click));
             bind("DOWN","down",()->move(1));bind("UP","up",()->move(-1));bind("ENTER","enter",this::accept);bind("ESCAPE","escape",()->emit(new UiEvent.Action(((Nodes.PickerMenu)this.node).cancelAction())));
             refresh();
         }
         void bind(String stroke,String name,Runnable action){search.getInputMap().put(KeyStroke.getKeyStroke(stroke),"picker."+name);search.getActionMap().put("picker."+name,new AbstractAction(){public void actionPerformed(ActionEvent event){if(interactive()&&!composing)action.run();}});}
-        void move(int delta){if(model.isEmpty())return;list.setSelectedIndex(Math.floorMod(list.getSelectedIndex()+delta,model.size()));list.ensureIndexIsVisible(list.getSelectedIndex());}
+        /** Moves the active row by {@code delta}, wrapping round; from no active row Down goes to the first and Up to the last. */
+        void move(int delta){if(model.isEmpty())return;int from=list.getSelectedIndex();list.setSelectedIndex(from<0?(delta>0?0:model.size()-1):Math.floorMod(from+delta,model.size()));list.ensureIndexIsVisible(list.getSelectedIndex());}
         void accept(){if(composing||list.getSelectedValue()==null)return;emit(new UiEvent.Action(list.getSelectedValue().id()));}
         @Override JComponent focusTarget(){return search;}
         @Override void refresh(){state();var n=(Nodes.PickerMenu)node;applying=true;try{
@@ -123,7 +129,9 @@ final class PickerMenus {
             boolean changedRows=!Collections.list(model.elements()).equals(rows);
             if(changedRows){model.clear();model.addAll(rows);}
             if(changedRows||!Objects.equals(appliedActive,n.activeId())){
-                for(int i=0;i<model.size();i++)if(model.get(i).id().equals(n.activeId())){list.setSelectedIndex(i);break;}
+                // An active id naming no row leaves none active, so Enter accepts nothing.
+                int active=-1;for(int i=0;i<model.size();i++)if(model.get(i).id().equals(n.activeId())){active=i;break;}
+                if(active<0)list.clearSelection();else list.setSelectedIndex(active);
                 appliedActive=n.activeId();
             }
             list.setFixedCellHeight(-1);list.setVisibleRowCount(Math.min(9,model.size()));list.setBorder(new EmptyBorder(0,0,metric(context(),DesignMetrics.Role.PICKER_MENU_BOTTOM),0));list.setFont(search.getFont());

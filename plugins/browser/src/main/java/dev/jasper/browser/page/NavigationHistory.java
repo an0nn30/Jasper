@@ -11,6 +11,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiFunction;
 import org.cef.browser.CefDevToolsClient;
 
 /**
@@ -106,19 +107,48 @@ public final class NavigationHistory {
 
     /**
      * Has {@code browser} go to its history's entry {@code id}, as choosing it from a hold menu does. An entry the
-     * history no longer has is refused by Chromium, and nothing happens.
+     * history no longer has is refused by Chromium, and nothing happens but {@code refused}, which is told too when
+     * there is no browser or DevTools, or the call fails (plan 8's L44).
      *
      * @param browser a page's browser, or null while the page has none ready, which goes nowhere
      * @param id the entry's id
+     * @param refused told, on any thread, once the page will not go there
      */
-    static void goTo(PageBrowser browser, int id) {
-        if (browser == null) return;
+    static void goTo(PageBrowser browser, int id, Runnable refused) {
+        if (browser == null) {
+            refused.run();
+            return;
+        }
+        CefDevToolsClient client;
         try {
-            CefDevToolsClient client = browser.getDevToolsClient();
-            // The answer says only whether Chromium went; a refusal leaves the page where it is.
-            if (client != null) client.executeDevToolsMethod("Page.navigateToHistoryEntry", "{\"entryId\":" + id + "}");
+            client = browser.getDevToolsClient();
         } catch (RuntimeException failure) {
             LOG.log(System.Logger.Level.WARNING, "A page could not go to an entry of its history", failure);
+            refused.run();
+            return;
+        }
+        goTo(client == null ? null : client::executeDevToolsMethod, id, refused);
+    }
+
+    /**
+     * As {@link #goTo(PageBrowser, int, Runnable)}, through {@code devTools}, a DevTools method's call: Chromium's, or
+     * a test's; null for none. DevTools' failure, as for an entry the history no longer has, is the refusal; its
+     * answer otherwise says nothing more. A call that throws is logged, with the exception alone, and refused. Any
+     * thread.
+     */
+    static void goTo(BiFunction<String, String, CompletableFuture<String>> devTools, int id, Runnable refused) {
+        if (devTools == null) {
+            refused.run();
+            return;
+        }
+        try {
+            String entry = "{\"entryId\":" + id + "}";
+            devTools.apply("Page.navigateToHistoryEntry", entry).whenComplete((answer, failure) -> {
+                if (failure != null) refused.run();
+            });
+        } catch (RuntimeException failure) {
+            LOG.log(System.Logger.Level.WARNING, "A page could not go to an entry of its history", failure);
+            refused.run();
         }
     }
 

@@ -58,7 +58,8 @@ public interface VaultApi {
      * {@code false}.
      *
      * @param owner the window the prompt opens over
-     * @return {@code true} once unlocked; {@code false} when the user cancels or there is no vault
+     * @return {@code true} once unlocked; {@code false} when the user cancels, the prompt cannot be shown or there is no
+     *     vault
      */
     CompletableFuture<Boolean> ensureUnlocked(WindowHandle owner);
 
@@ -106,13 +107,16 @@ public interface VaultApi {
 
     /**
      * Shows Vault's credential chooser in a popover on the request's anchor, after unlocking (the unlock prompt
-     * attaches to the anchor too): a search field, a None row when the request allows clearing, a row for each
-     * credential and New Credential…, which opens Vault's own editor and then the chooser again without choosing or
-     * granting anything. Choosing a credential is a one-time grant for this plugin; naming an id in the request grants
-     * nothing. The interface default shows {@link #pick(WindowHandle)} instead and answers Chosen or Cancelled.
+     * attaches to the anchor too): a search field holding the request's search, a None row when the request allows
+     * clearing and the search is empty, a row for each credential the search matches and New Credential…, which opens
+     * Vault's own editor and then the chooser again without choosing or granting anything. A choice made within 500 ms
+     * of the chooser showing is ignored. A chooser with a starting search has no active row until the user moves to one
+     * with Up, Down or the pointer, so Enter in its search chooses nothing; without one, the first row is active.
+     * Choosing a credential is a one-time grant for this plugin; naming an id in the request grants nothing. The
+     * interface default shows {@link #pick(WindowHandle)} instead, without the search, and answers Chosen or Cancelled.
      *
      * @param owner the window the request comes from
-     * @param request the anchor, the current credential and whether None is offered
+     * @param request the anchor, the current credential, whether None is offered and the starting search
      * @return the outcome
      * @throws IllegalArgumentException when the anchor is not a live anchor Jasper issued
      */
@@ -126,4 +130,52 @@ public interface VaultApi {
         legacy.whenComplete((answer,failure)->{if(failure!=null)result.completeExceptionally(failure);else result.complete(answer.<CredentialPickResult>map(CredentialPickResult.Chosen::new).orElseGet(CredentialPickResult.Cancelled::new));});
         return result;
     }
+
+    /**
+     * Saves a password login, unlocking over {@code owner} first when needed, and gives this plugin a saved grant for
+     * it, all without a grant prompt. When this plugin's saved grant is the only grant on a password login named
+     * exactly {@code name}, the last such login in the vault takes the new username and password instead, keeping its
+     * id, grants and created time; a login of that name another plugin can read, or this plugin cannot, is left alone
+     * and a new one is added. Vault keeps its own copy of {@code password}, so the caller still zeroes its array. The
+     * interface default fails with {@link UnsupportedOperationException}; Credential Vault implements it.
+     *
+     * @param owner the window the unlock prompt opens over
+     * @param name the login's name in Vault
+     * @param username the login's username, which may be empty
+     * @param password the login's password, which may be empty
+     * @return the saved login; empty when {@code owner} is null or closes first, unlocking is cancelled, the vault locks
+     *     before the save finishes (a save the lock interrupts while it writes may still be in the vault when it next
+     *     unlocks) or there is no vault (Vault then posts a notification saying to create one). Fails with
+     *     {@link IllegalStateException} ("Could not save the login") when the vault cannot be written
+     * @throws IllegalArgumentException when {@code name} is null or blank, or {@code username} or {@code password} is
+     *     null
+     * @throws IllegalStateException when Credential Vault is called off the UI thread
+     */
+    default CompletableFuture<Optional<CredentialDescriptor>> saveLogin(WindowHandle owner, String name, String username,
+            char[] password) {
+        return CompletableFuture.failedFuture(new UnsupportedOperationException("This Vault does not save logins"));
+    }
+
+    /**
+     * The secret for {@code id} without any prompt, only while the vault is unlocked and this plugin holds a saved grant
+     * for {@code id}. A one-time grant from a pick is neither used nor spent. Close the result. The interface default
+     * answers empty.
+     *
+     * @param id a credential's {@link CredentialDescriptor#id() id}
+     * @return the secret; empty when the vault is locked or there is none, the id is unknown, or this plugin has no
+     *     saved grant for it
+     * @throws IllegalStateException when Credential Vault is called off the UI thread
+     */
+    default Optional<Credential> credentialIfGranted(UUID id) { return Optional.empty(); }
+
+    /**
+     * Opens the Credential Vault manager over {@code owner}, creating a vault or unlocking first as Open Vault... does;
+     * Vault reports its failures in its own notifications, and does nothing when {@code owner} is null or closed. A
+     * modal dialog over {@code owner}, such as Settings, keeps the manager and its prompts from taking input until it
+     * closes, so close such a dialog first. The interface default does nothing.
+     *
+     * @param owner the window the manager opens over
+     * @throws IllegalStateException when Credential Vault is called off the UI thread
+     */
+    default void openManager(WindowHandle owner) { }
 }

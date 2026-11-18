@@ -44,6 +44,8 @@ class PageViewMouseTest {
             for (int button : new int[] { MouseEvent.BUTTON1, MouseEvent.BUTTON2, MouseEvent.BUTTON3 }) {
                 for (MouseEvent event : click(view, button)) view.processMouseEvent(event);
                 assertThat(view.lastPress().button()).isEqualTo(button);
+                assertThat(view.lastPress().x()).as("where, on the canvas (L20)").isEqualTo(10);
+                assertThat(view.lastPress().y()).isEqualTo(10);
                 long pressed = view.lastPress().whenMillis();
                 assertThat(view.activation().consume(pressed)).as("each press activates the page, for one popup").isTrue();
                 assertThat(view.activation().consume(pressed)).isFalse();

@@ -118,6 +118,7 @@ public final class Kits {
         private void use(String call) { if (closed) kit.lateCalls.add(call); }
         @Override public void update(ViewSpec spec) { use("update"); if (!closed) delegate.update(spec); }
         @Override public dev.jasper.sdk.ui.UiAnchor anchor(String id) { return delegate.anchor(id); }
+        @Override public dev.jasper.sdk.ui.UiAnchor anchorAt(String id, dev.jasper.sdk.ui.ContentArea area) { return delegate.anchorAt(id, area); }
         @Override public ViewSpec spec() { return delegate.spec(); }
         @Override public void withSecret(String id, Consumer<char[]> use) { use("withSecret " + id); delegate.withSecret(id, use); }
         @Override public void clearSecret(String id) { use("clearSecret " + id); if (!closed) delegate.clearSecret(id); }

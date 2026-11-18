@@ -1,0 +1,14 @@
+// Applied from FILESDIR: the pinned source archive predates the overlay.
+def maven = System.getenv('JASPER_MAVEN_REPO')
+if (!maven || !new File(maven).isDirectory()) {
+    throw new GradleException('JASPER_MAVEN_REPO must name the staged Portage Maven repository')
+}
+gradle.projectsEvaluated {
+    allprojects {
+        repositories.clear()
+        repositories.maven {
+            url = uri(maven)
+            metadataSources { gradleMetadata(); mavenPom() }
+        }
+    }
+}

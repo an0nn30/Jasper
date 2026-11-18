@@ -149,6 +149,62 @@ public final class PageTestAccess {
     }
 
     /**
+     * The page's main frame starts a navigation request for {@code url} at {@code nowMillis}, as Chromium's IO thread
+     * notes it: begun with the page's user activation when that is active then (plan 8's L35). Any thread.
+     *
+     * @param page a page
+     * @param url the request's address
+     * @param nowMillis when, in milliseconds since the epoch
+     */
+    public static void mainFrameRequested(Page page, String url, long nowMillis) {
+        page.mainFrameRequested(url, nowMillis);
+    }
+
+    /**
+     * Has {@code page} read the time for its navigations' marks and activations from {@code clock} (plan 8's L42).
+     *
+     * @param page a page
+     * @param clock the time, in milliseconds since the epoch
+     */
+    public static void useClock(Page page, java.util.function.LongSupplier clock) {
+        page.useClock(clock);
+    }
+
+    /**
+     * Chromium's thread notes that the page's main frame starts loading a document, as the client's load handler does
+     * before it tells the UI thread ({@link #loadStarted}). Any thread.
+     *
+     * @param page a page
+     */
+    public static void mainFrameStarting(Page page) {
+        page.mainFrameStarting();
+    }
+
+    /**
+     * Chromium's thread notes that the page's main frame committed {@code url}, as the display handler does before it
+     * tells the UI thread ({@link #addressChanged}). Any thread.
+     *
+     * @param page a page
+     * @param url the committed address
+     */
+    public static void mainFrameCommitted(Page page, String url) {
+        page.mainFrameCommitted(url);
+    }
+
+    /**
+     * A load of the page's main frame failed with {@code code}, as the client's load handler tells it on Chromium's
+     * thread and then, at once here, the UI thread ({@link #loadFailed}).
+     *
+     * @param page a page
+     * @param url the address that failed
+     * @param code Chromium's name for the error, such as {@code ERR_ABORTED}
+     */
+    public static void mainFrameFailed(Page page, String url, String code) {
+        page.mainFrameRequestEnded(url);
+        page.loadFailed(url, code);
+    }
+
+    /**
      * The page's main frame finished loading its document, as the client's load handler tells it. UI thread.
      *
      * @param page a page

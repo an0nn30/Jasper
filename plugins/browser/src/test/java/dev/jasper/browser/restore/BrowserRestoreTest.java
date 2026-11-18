@@ -595,7 +595,7 @@ class BrowserRestoreTest {
         host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(), started -> {
             context.set(started);
             var stores = new DataStores(memory.make(), () -> false);
-            items.set(new BrowserItems(started, BrowserSettings.declare(started.settings())::read, stores, start));
+            items.set(new BrowserItems(started, BrowserSettings.declare(started.settings())::read, stores, Optional.empty(), start));
             started.windows().restorer(BrowserRestore.KIND, request -> {
                 items.get().restore(request.state(), START, request.window(), wait, stores.persistent());
                 return Optional.empty();

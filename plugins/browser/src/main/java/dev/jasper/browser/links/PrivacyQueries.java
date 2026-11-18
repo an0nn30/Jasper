@@ -1,7 +1,6 @@
 package dev.jasper.browser.links;
 
 import dev.jasper.browser.engine.AboutScheme;
-import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.page.ChallengeFrames;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageBrowser;
@@ -109,11 +108,10 @@ final class PrivacyQueries {
      *
      * @param client the pages' client
      * @param bridge the client's opener bridge
-     * @param chromium the plugin's Chromium, whose stop ends every answer
+     * @param stopped whether the plugin's Chromium has stopped, which ends every answer; any thread
      */
-    static void install(CefClient client, OpenerBridge bridge, Chromium chromium) {
-        var router = new Router(new PrivacyQueries(), bridge, PrivacyQueries::page, EventQueue::invokeLater,
-            () -> chromium.state() == Chromium.State.STOPPED);
+    static void install(CefClient client, OpenerBridge bridge, BooleanSupplier stopped) {
+        var router = new Router(new PrivacyQueries(), bridge, PrivacyQueries::page, EventQueue::invokeLater, stopped);
         client.addMessageRouter(CefMessageRouter.create(new CefMessageRouter.CefMessageRouterConfig(QUERY, CANCEL), router));
         PageEvents.onMainFrameLoadStart(client, (browser, frame) -> router.documentStarted(browser));
     }

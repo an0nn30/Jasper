@@ -110,7 +110,9 @@ import javax.swing.JComponent;
  * Exit Reader Mode, Escape in the page or the page's next load (spec section 10); Remove Distractions hides the overlays
  * the user clicks until Exit Distraction Removal, Escape or the next load, and either mode ends the other. Remove
  * Element, from the page's right-click menu, hides the overlay under the pointer, its point divided by the zoom the page
- * shows at, and Save Page As… saves the page with its resources in a folder the user chooses. UI thread.
+ * shows at, and Save Page As… saves the page with its resources in a folder the user chooses. Its page's HTTP sign-ins
+ * show Jasper's sign-in dialog over its tab, and with the Credential Vault its page's login fields show the Vault's
+ * buttons, whose picker opens under the field ({@link PageLoginsHost}, plan 8). UI thread.
  */
 public final class BrowserItem implements AutoCloseable {
     static final String ROOT = "browser", PAGE = "browser.page", CONTENT = "browser.page.content";
@@ -143,6 +145,8 @@ public final class BrowserItem implements AutoCloseable {
     private final PrivacyMenu privacy;
     // The page's tools, reader mode first, whose group leads the menu (plan 7's F38).
     private final PageToolsHost pageTools;
+    // The page's sign-ins and, with the Credential Vault, its field buttons, made once the tab opens (plan 8's F18).
+    private PageLoginsHost pageLogins;
     // Answers the page's camera, microphone and notification requests until the item closes or the plugin stops.
     private final SitePermissions sitePermissions;
     // The plugin's pages' notifications, which the page's go to.
@@ -304,9 +308,13 @@ public final class BrowserItem implements AutoCloseable {
         tab.onClosed(this::closed);
         // The page's alerts, confirmations and file choosers show over this item's tab, and close with it; so does its
         // right-click menu, which copies with the plugin's clipboard and searches with the engine chosen as it opens.
-        page.setDialogPlace(new DialogPlace(items.context().kit(), items.context().windows(), tab));
+        var place = new DialogPlace(items.context().kit(), items.context().windows(), tab);
+        page.setDialogPlace(place);
         page.setMenuPlace(new MenuPlace(tab, items.context().platform()::copy, this::engineName, this::search, errors::canGoBack,
             this::goBack, this::reload, this::savePage, this::viewSource, this::removeElement, this::inspect));
+        // The page's sign-ins show Jasper's dialog over this tab, with or without the Credential Vault; with it, the page's
+        // login fields show its buttons too, whose picker opens over this tab's window.
+        pageLogins = new PageLoginsHost(page, items.vault(), items.signIns(), place, store.devNull(), view, tab, () -> zoom);
         items.opened(this);
         present();
     }
@@ -725,6 +733,7 @@ public final class BrowserItem implements AutoCloseable {
         visitsChanged.close();
         privacy.close();
         pageTools.close();
+        if (pageLogins != null) pageLogins.close();
         sitePermissions.close();
         endSuggestions();
         sources.close();
@@ -819,6 +828,7 @@ public final class BrowserItem implements AutoCloseable {
     private void showZoom(int percent) {
         zoom = percent;
         page.setZoomLevel(Zoom.cefLevel(percent));
+        if (pageLogins != null) pageLogins.zoomChanged();
     }
 
     /** The chosen search engine's name, as the page's right-click menu says it in Search with (P26). */

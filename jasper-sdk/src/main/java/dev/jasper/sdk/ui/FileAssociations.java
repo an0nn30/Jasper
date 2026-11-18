@@ -25,7 +25,7 @@ import java.util.concurrent.CompletableFuture;
  * <p>{@link #status} also starts background re-checks, which run until {@code status(List.of())} is called and report
  * through {@link #onChanged}.
  *
- * @since 0.31.0
+ * @since 0.32.0
  */
 public interface FileAssociations {
     /** Who opens a file type. */

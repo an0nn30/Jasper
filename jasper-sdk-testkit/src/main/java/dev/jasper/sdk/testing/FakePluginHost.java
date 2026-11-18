@@ -536,7 +536,7 @@ public final class FakePluginHost implements AutoCloseable {
         var existing=panelHosts.get(pluginId);
         if(existing!=null)return java.util.Optional.ofNullable(existing.component);
         return context.settings.panel().map(panel -> {
-            var rows = new FakeSettingsPanelHost(context.settings, this::takeFileSelection);
+            var rows = new FakeSettingsPanelHost(context.settings, this::takeFileSelection, action -> closeSettingsThen(pluginId, action));
             panelHosts.put(pluginId, rows);
             try {
             var owned=java.util.Objects.requireNonNull(panel.create(rows),"Settings view");
@@ -585,6 +585,56 @@ public final class FakePluginHost implements AutoCloseable {
         });
         if(rows.view!=null)rows.view.close();
     }
+    private volatile boolean discard = true;
+    private final java.util.concurrent.atomic.AtomicInteger discardQuestions = new java.util.concurrent.atomic.AtomicInteger();
+
+    /**
+     * Scripts how Settings answers, from now on, when it asks whether to discard unsaved changes before a plugin's page
+     * closes it ({@code SettingsPanelHost.closeThen}): true discards them and closes Settings, false keeps editing, so
+     * Settings stays open and runs nothing. Until called, it discards.
+     *
+     * @param discard the answer
+     * @since 0.32.0
+     */
+    public void answerDiscard(boolean discard) { this.discard = discard; }
+
+    /**
+     * How often Settings asked whether to discard unsaved changes ({@link #answerDiscard(boolean)}).
+     *
+     * @return the count
+     * @since 0.32.0
+     */
+    public int discardQuestions() { return discardQuestions.get(); }
+
+    /**
+     * As Settings closes for its page's {@code closeThen}: asks about unsaved changes as Cancel does (the page's staged
+     * values or the panel's own {@code modified()}), closes the page as {@link #closeSettingsPanel} does, then runs the
+     * action in a later UI turn, contained, and not once the plugin has stopped.
+     */
+    private void closeSettingsThen(String pluginId, Runnable action) {
+        var rows = panelHosts.get(pluginId);
+        if (rows != null && !rows.closed) {
+            if (settingsModified(pluginId, rows)) {
+                discardQuestions.incrementAndGet();
+                if (!discard) return;
+            }
+            closeSettingsPanel(pluginId);
+        }
+        java.awt.EventQueue.invokeLater(() -> {
+            if (!active(pluginId)) return;
+            try { action.run(); } catch (Throwable failure) { recordFailure("Settings callback failed"); }
+        });
+    }
+
+    private boolean settingsModified(String pluginId, FakeSettingsPanelHost rows) {
+        if (rows.modified()) return true;
+        var context = contexts.get(pluginId);
+        return context != null && context.settings.panel().map(panel -> {
+            try { return panel.modified(); }
+            catch (Throwable failure) { recordFailure("Settings callback failed"); return false; }
+        }).orElse(false);
+    }
+
     /** Values staged since settingsPanel built the page. */
     public Map<String, Object> pendingSettings(String pluginId) {
         FakeSettingsPanelHost rows = panelHosts.get(pluginId);
@@ -1493,6 +1543,14 @@ public final class FakePluginHost implements AutoCloseable {
      * @return live mounted views
      */
     public List<FakeKitView> popoverViews(String pluginId){var context=contexts.get(pluginId);if(context==null)return List.of();return context.ui.popovers.stream().filter(p->p.shown&&!p.closed&&p.content!=null).map(p->p.content).toList();}
+    /**
+     * The areas of a plugin's shown popovers that opened on an area anchor ({@code UiView.anchorAt}), in creation order.
+     *
+     * @param pluginId content producer
+     * @return the areas, in their content's coordinates; empty when it shows none or is not running
+     * @since 0.32.0
+     */
+    public List<dev.jasper.sdk.ui.ContentArea> popoverAreas(String pluginId){var context=contexts.get(pluginId);if(context==null)return List.of();return context.ui.popovers.stream().filter(p->p.shown&&!p.closed&&p.content!=null&&p.anchor.area!=null).map(p->p.anchor.area).toList();}
     /** The open plugin dialogs and overlays as {@code id|title|shown}, in creation order; the id is {@code dialog} or {@code overlay}. */
     public List<String> windows() {
         List<String> lines = new ArrayList<>();
@@ -2704,7 +2762,7 @@ public final class FakePluginHost implements AutoCloseable {
      * {@code Failed("unavailable: <reason>")}, as the application does.
      *
      * @param reason the reason, or empty
-     * @since 0.31.0
+     * @since 0.32.0
      */
     public void setFileAssociationsUnavailable(Optional<dev.jasper.sdk.ui.FileAssociations.Unavailable> reason) {
         fileAssociations.unavailable(reason);
@@ -2718,7 +2776,7 @@ public final class FakePluginHost implements AutoCloseable {
      * @param extension the extension
      * @param types the system types a claim takes, at least one
      * @throws IllegalArgumentException when the extension is invalid or {@code types} is empty
-     * @since 0.31.0
+     * @since 0.32.0
      */
     public void setFileType(String extension, List<String> types) { fileAssociations.type(extension, types); }
 
@@ -2728,7 +2786,7 @@ public final class FakePluginHost implements AutoCloseable {
      * @param extension the extension
      * @param refusal why
      * @throws IllegalArgumentException when the extension is invalid
-     * @since 0.31.0
+     * @since 0.32.0
      */
     public void setFileTypeRefused(String extension, dev.jasper.sdk.ui.FileAssociations.Refusal refusal) {
         fileAssociations.refuse(extension, refusal);
@@ -2740,7 +2798,7 @@ public final class FakePluginHost implements AutoCloseable {
      *
      * @param type the system type
      * @param handler who opens it
-     * @since 0.31.0
+     * @since 0.32.0
      */
     public void setFileTypeHandler(String type, dev.jasper.sdk.ui.FileAssociations.Handler handler) {
         fileAssociations.handler(type, handler);
@@ -2751,7 +2809,7 @@ public final class FakePluginHost implements AutoCloseable {
      *
      * @param type the system type
      * @param detail the system's message, as {@code Outcome.Failed} carries it
-     * @since 0.31.0
+     * @since 0.32.0
      */
     public void failFileTypeClaims(String type, String detail) { fileAssociations.failClaims(type, detail); }
 
@@ -2761,7 +2819,7 @@ public final class FakePluginHost implements AutoCloseable {
      * each type it would hand back to an application, keeping what was saved, and neither changes a handler.
      *
      * @param windowsLike whether claims end in Settings
-     * @since 0.31.0
+     * @since 0.32.0
      */
     public void setFileAssociationsInSettings(boolean windowsLike) { fileAssociations.inSettings(windowsLike); }
 
@@ -2770,7 +2828,7 @@ public final class FakePluginHost implements AutoCloseable {
      * {@code restore:<ext>} and {@code forget:<ext>} with the normalised extension, one per extension asked, in order.
      *
      * @return the calls
-     * @since 0.31.0
+     * @since 0.32.0
      */
     public List<String> fileAssociationCalls() { return fileAssociations.calls(); }
 
@@ -2779,7 +2837,7 @@ public final class FakePluginHost implements AutoCloseable {
      * re-check finds that something changed; a handler that throws is recorded in {@link #failures()}. A claim or restore
      * runs them by itself.
      *
-     * @since 0.31.0
+     * @since 0.32.0
      */
     public void fileTypesChanged() { fileAssociations.changed(); }
 

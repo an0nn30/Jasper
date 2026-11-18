@@ -73,8 +73,26 @@
  * ({@link dev.jasper.browser.page.Page#onToolReport}), Save Page As's parts among them, and counts its documents
  * ({@link dev.jasper.browser.page.Page#document}), which tells Save Page As whether the page navigated meanwhile; the
  * right-click menu's Save Page As… is its item's, through the menu place.
+ * For its item's password manager (plan 8), a page runs a login script in each http or https document of its main
+ * frame as it starts loading, there and then on Chromium's thread, but never in a challenge provider's, and hands each
+ * {@code login.pick} of its top frame, which the {@code links} package's opener bridge makes a
+ * {@link dev.jasper.browser.page.PageQuery}, to its item's handler, to answer later, once, and only while the page
+ * shows the origin that asked ({@link dev.jasper.browser.page.Page#handleLogins},
+ * {@link dev.jasper.browser.page.Page#loginQuery}); {@code PageLoginHooks} holds the script and the handler, and the
+ * page's close cancels the queries not answered. Each HTTP sign-in Chromium asks for one of a page's requests reaches
+ * the page from the {@code links} package's request handler as a {@link dev.jasper.browser.page.SignIn}, answered
+ * once, which the page hands its item, or cancels when nothing listens or it has closed
+ * ({@link dev.jasper.browser.page.Page#onSignIn}); it is judged against the page's top address, the address of its
+ * main frame's latest navigation request after its redirects, which that handler and the opener bridge note on
+ * Chromium's IO thread, or of its latest commit, which the display handler notes there and then, whichever came last;
+ * a request that fails or becomes a download falls back to the commit before it
+ * ({@link dev.jasper.browser.page.Page#topAddress}); and it carries the number of the main frame's navigation requests
+ * then, which a redirect does not raise, whether the page had a user activation as that navigation's request started,
+ * and whether that request was Jasper's own navigation's ({@link dev.jasper.browser.page.Page#latestNavigation}). The
+ * page tells its item each final main-frame response's status
+ * ({@link dev.jasper.browser.page.Page#onMainFrameResponse}).
  * {@link dev.jasper.browser.page.LastPress}, {@code Favicons}, {@code DownloadStart}, {@code DownloadTarget},
- * {@code DownloadProgress}, {@code Page}'s methods and {@code PreviewPage}'s name no Chromium type, and none of these
- * classes loads until a browser item opens or a Markdown preview is made.
+ * {@code DownloadProgress}, {@code PageQuery}, {@code SignIn}, {@code Page}'s methods and {@code PreviewPage}'s name no
+ * Chromium type, and none of these classes loads until a browser item opens or a Markdown preview is made.
  */
 package dev.jasper.browser.page;

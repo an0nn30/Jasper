@@ -35,7 +35,7 @@ class FakePluginHostTest {
         }
     }
 
-    /** SDK 0.31.0: while claims end in Settings, a restore does too, keeping what the claim saved; no app before still says so. */
+    /** SDK 0.32.0: while claims end in Settings, a restore does too, keeping what the claim saved; no app before still says so. */
     @Test void aWindowsLikeRestoreEndsInSettingsAndKeepsWhatWasSaved(@TempDir Path root) throws Exception {
         var info = new PluginInfo("test.alpha", "Alpha", "1.0.0", Set.of(Capabilities.FILE_ASSOCIATIONS));
         try (var host = new FakePluginHost(root)) {

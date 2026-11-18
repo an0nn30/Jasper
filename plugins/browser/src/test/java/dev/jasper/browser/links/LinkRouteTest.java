@@ -47,7 +47,7 @@ class LinkRouteTest {
             assertThat(link(WEB, CMD_SHIFT_CLICK, gesture)).contains(Where.SPLIT);
             assertThat(link(WEB, press(InputEvent.SHIFT_DOWN_MASK, NOW - 100), gesture)).as("Shift-click").contains(Where.SAME_ITEM);
             assertThat(link(WEB, press(InputEvent.ALT_DOWN_MASK, NOW - 100), gesture)).as("Alt-click").contains(Where.SAME_ITEM);
-            assertThat(link(WEB, new LastPress(MouseEvent.BUTTON2, InputEvent.BUTTON2_DOWN_MASK, NOW - 100), gesture)).as("middle click")
+            assertThat(link(WEB, new LastPress(MouseEvent.BUTTON2, InputEvent.BUTTON2_DOWN_MASK, NOW - 100, 0, 0), gesture)).as("middle click")
                 .contains(Where.NEXT_TAB);
         }
     }
@@ -160,6 +160,6 @@ class LinkRouteTest {
 
     /** A left press at {@code when} with {@code keys} held. */
     private static LastPress press(int keys, long when) {
-        return new LastPress(MouseEvent.BUTTON1, keys | InputEvent.BUTTON1_DOWN_MASK, when);
+        return new LastPress(MouseEvent.BUTTON1, keys | InputEvent.BUTTON1_DOWN_MASK, when, 0, 0);
     }
 }

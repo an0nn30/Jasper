@@ -323,6 +323,24 @@ public interface ContractHarness extends AutoCloseable {
     List<String> settingsReports(String pluginId);
 
     /**
+     * Opens Settings at a plugin's own page ({@code PluginSettings.page}) and builds the page, as the user opening
+     * Settings there does, and waits.
+     */
+    void openSettingsPage(String pluginId);
+
+    /** Whether the Settings {@link #openSettingsPage} opened is open. */
+    boolean settingsOpen();
+
+    /**
+     * How Settings answers, from now on, when it asks whether to discard unsaved changes before it closes: true
+     * discards them, false keeps editing. Until called it discards.
+     */
+    void answerDiscard(boolean discard);
+
+    /** How often Settings asked whether to discard unsaved changes. */
+    int discardQuestions();
+
+    /**
      * Gives a plugin's setting a look default, as a kit's {@code [defaults."<plugin id>"]} table would; called before
      * any plugin starts. Raw values are what TOML reads: String, Long, Double, Boolean or List of String.
      */

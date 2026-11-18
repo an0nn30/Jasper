@@ -8,14 +8,14 @@ class LastPressTest {
     private static final int LEFT = 1;
 
     @Test void aPressActivatesItsPageUpToFiveSecondsAfterIt() {
-        var press = new LastPress(LEFT, 0, 100_000);
+        var press = new LastPress(LEFT, 0, 100_000, 0, 0);
         assertThat(press.withinActivation(100_000)).as("at the press").isTrue();
         assertThat(press.withinActivation(102_500)).isTrue();
         assertThat(press.withinActivation(105_000)).as("5,000 ms after it").isTrue();
     }
 
     @Test void aPressActivatesNothingOutsideThoseFiveSeconds() {
-        var press = new LastPress(LEFT, 0, 100_000);
+        var press = new LastPress(LEFT, 0, 100_000, 0, 0);
         assertThat(press.withinActivation(105_001)).as("past the activation").isFalse();
         assertThat(press.withinActivation(99_999)).as("before the press").isFalse();
     }

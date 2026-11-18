@@ -6,8 +6,8 @@ Status: done (2026-11-17) on branch claude/editor-file-associations-3 (written 2
 platform layer, `dev.jasper.app.platform.FileAssociations`) are on main at 0a4ec9bb9.
 
 Planned deviations, recorded as AGENTS.md asks:
-- (a) The new SDK members carry `@since 0.31.0`, not 0.32.0. 0.31.0 (plan 1's bump) has never left this machine, so
-  there is no released 0.31.0 for them to break.
+- (a) The new SDK members were written with `@since 0.31.0`. At the merge (2026-11-18) main had pushed 0.31.0 and
+  bumped to 0.32.0 (Browser plan 8), so they carry `@since 0.32.0`, the current version, with no bump of their own.
 - (b) Plugins need a new capability, `files.associate`, to use `Platform.fileAssociations()`. The Editor declares it.
 - (c) The plan fixes every label and message (the "Copy" table below), which the spec left to the builder.
 - (d) Task 3's `FileAssociationsBridge` is an instance class (open/facade/type/handler/unavailable/close), not a static

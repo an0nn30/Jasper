@@ -18,6 +18,8 @@ final class FakeSettingsPanelHost implements SettingsPanelHost {
     private final Map<String, Row> rows = new LinkedHashMap<>();
     private final Subscription reloads;
     private final java.util.function.Supplier<Optional<java.nio.file.Path>> chooseFile;
+    /** The fake Settings' close: asks about unsaved changes, closes the page, then runs the action. */
+    private final java.util.function.Consumer<Runnable> closeThen;
     int changes;
     private String query = "";
     boolean closed, applied;
@@ -34,9 +36,11 @@ final class FakeSettingsPanelHost implements SettingsPanelHost {
         void clear() { invalidText = null; error = ""; }
     }
 
-    FakeSettingsPanelHost(FakePluginSettings settings, java.util.function.Supplier<Optional<java.nio.file.Path>> chooseFile) {
+    FakeSettingsPanelHost(FakePluginSettings settings, java.util.function.Supplier<Optional<java.nio.file.Path>> chooseFile,
+                          java.util.function.Consumer<Runnable> closeThen) {
         this.settings = settings;
         this.chooseFile = chooseFile;
+        this.closeThen = closeThen;
         reloads = settings.onReloaded(() -> {
             if (EventQueue.isDispatchThread()) rebase(); else EventQueue.invokeLater(this::rebase);
         });
@@ -216,4 +220,14 @@ final class FakeSettingsPanelHost implements SettingsPanelHost {
     }
 
     @Override public void changed() { guard(); applied = false; changes++; }
+
+    @Override public void closeThen(Runnable action) {
+        guard();
+        if (!EventQueue.isDispatchThread()) throw new IllegalStateException("closeThen must be called on the UI thread");
+        java.util.Objects.requireNonNull(action, "action");
+        closeThen.accept(action);
+    }
+
+    /** Whether the page holds values Apply would save. */
+    boolean modified() { return !draft.isEmpty(); }
 }

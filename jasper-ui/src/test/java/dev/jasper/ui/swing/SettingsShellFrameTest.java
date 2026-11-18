@@ -72,6 +72,18 @@ class SettingsShellFrameTest {
         return image;
     }
 
+    /** Validate the real search field before using its content-aware height in the surrounding frame geometry. */
+    private static int searchHeight(KitView view, KitContext context) {
+        var field = KitViewTest.find(view, "search", JComponent.class);
+        var input = KitViewTest.find(view, "search.input", javax.swing.text.JTextComponent.class);
+        int height = CompactTextSizing.assertHeight(field, input,
+            com.formdev.flatlaf.util.UIScale.scale(context.metrics().value(DesignMetrics.Role.FIELD_HEIGHT)),
+            com.formdev.flatlaf.util.UIScale.scale(context.metrics().value(DesignMetrics.Role.FIELD_VERTICAL_PADDING)));
+        assertThat(input.getHeight()).as("the search input is not clipped").isGreaterThanOrEqualTo(input.getPreferredSize().height);
+        assertThat(view.getHeight()).as("the search view fits exactly its field").isEqualTo(height);
+        return height;
+    }
+
     @Test void theClassicFramePlacesItsPartsAsTheMocksDo() {
         Edt.run(() -> {
             var context = KitFixtures.context(KitFixtures.enterpriseLight(), KitFixtures.enterprise());
@@ -80,8 +92,10 @@ class SettingsShellFrameTest {
                 shell.setSize(1040, 691);
                 for (int i = 0; i < 3; i++) layout(shell);
                 var views = built.views();
-                assertThat(views.get(0).getBounds()).as("search").isEqualTo(new Rectangle(8, 8, 214, 22));
-                assertThat(views.get(1).getY()).as("navigation below the strip rule and the gap").isEqualTo(43);
+                int search = searchHeight(views.get(0), context);
+                assertThat(views.get(0).getBounds()).as("search").isEqualTo(new Rectangle(8, 8, 214, search));
+                assertThat(views.get(1).getY()).as("navigation below the search, inset, strip rule and gap")
+                    .isEqualTo(8 + search + 8 + 1 + 4);
                 assertThat(views.get(1).getWidth()).isEqualTo(230);
                 assertThat(views.get(2).getBounds()).as("header").isEqualTo(new Rectangle(231 + 14, 0, 1040 - 231 - 28, 34));
                 assertThat(views.get(4).getBounds()).as("footer").isEqualTo(new Rectangle(14, 691 - 45 + 1, 1040 - 28, 44));
@@ -104,7 +118,7 @@ class SettingsShellFrameTest {
                 assertThat(image.getRGB(pair.x + 50, pair.y) & 0xFFFFFF).as("the disabled half keeps the outline").isEqualTo(outline);
                 var theme = context.theme();
                 assertThat(image.getRGB(115, 4) & 0xFFFFFF).as("strip").isEqualTo(SemanticColor.SURFACE_SIDEBAR.color(theme).getRGB() & 0xFFFFFF);
-                assertThat(image.getRGB(115, 38) & 0xFFFFFF).as("strip rule").isEqualTo(DerivedColor.BORDER_ROW.color(theme).getRGB() & 0xFFFFFF);
+                assertThat(image.getRGB(115, 8 + search + 8) & 0xFFFFFF).as("strip rule").isEqualTo(DerivedColor.BORDER_ROW.color(theme).getRGB() & 0xFFFFFF);
                 assertThat(image.getRGB(200, 400) & 0xFFFFFF).as("navigation slot").isEqualTo(context.kit().colors().navigationSurface().color(theme).getRGB() & 0xFFFFFF);
                 assertThat(image.getRGB(230, 400) & 0xFFFFFF).as("sidebar rule").isEqualTo(ThemePainting.painted(context,
                     new dev.jasper.ui.theme.PaintPair(SemanticColor.BORDER_WINDOW, context.kit().colors().navigationSurface(), SurfaceContrast.Guard.STRUCTURAL)).getRGB() & 0xFFFFFF);
@@ -173,7 +187,8 @@ class SettingsShellFrameTest {
                 for (int i = 0; i < 3; i++) layout(shell);
                 var views = built.views();
                 assertThat(views.get(1).getWidth()).as("a third of 600").isEqualTo(200);
-                assertThat(views.get(0).getBounds()).as("search").isEqualTo(new Rectangle(8, 8, 184, 22));
+                int search = searchHeight(views.get(0), context);
+                assertThat(views.get(0).getBounds()).as("search").isEqualTo(new Rectangle(8, 8, 184, search));
                 assertThat(views.get(2).getBounds()).as("header").isEqualTo(new Rectangle(201 + 14, 0, 600 - 201 - 28, 34));
                 assertThat(views.get(4).getBounds()).as("footer").isEqualTo(new Rectangle(14, 500 - 45 + 1, 600 - 28, 44));
                 var ok = KitViewTest.find(views.get(4), "ok", JComponent.class);

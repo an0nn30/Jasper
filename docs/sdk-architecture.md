@@ -41,8 +41,10 @@ matching source file. The Browser (`plugins/browser`) shows Chromium pages throu
 runs in process; only it may name an `org.cef` or `com.jetbrains.cef` type, and only in its `engine`, `page`, `links`
 and `dialogs` packages (`ChromiumBoundaryTest`). It exports `dev.jasper.browser.api`, the Markdown previews Chromium
 draws, which names no JCEF type; the Editor optionally consumes it, and only its `ChromiumPreview` and
-`ChromiumPreviews` name it (`EditorBrowserBoundaryTest`). A plugin built elsewhere is not checked at build time;
-at run time the SDK has no way to mount an ordinary control, and custom content admission (below) refuses one.
+`ChromiumPreviews` name it (`EditorBrowserBoundaryTest`). The Browser optionally consumes the Vault API
+(`dev.jasper.vault.api`), and only its `logins.VaultLogins` names it (`VaultBoundaryTest`). A plugin built elsewhere
+is not checked at build time; at run time the SDK has no way to mount an ordinary control, and custom content
+admission (below) refuses one.
 
 ## Launch
 
@@ -254,6 +256,13 @@ where the look draws one (`TitleInset`).
 - **Anchors and popovers.** `UiView.anchor(id)` mints a `UiAnchor` only for a mounted, visible, enabled, not busy
   `Button`, `MenuButton` or PICKER `Choice`. Hiding, disabling, busying, removing, retyping or reparenting the control,
   closing its surface or stopping the plugin invalidates it for good; a refresh of the same control keeps it.
+  `UiView.anchorAt(id, area)` mints one on a `ContentArea` inside a live `Custom` node's registered content
+  (`KitView.customTarget`; an area outside the content's bounds is refused), which `HostedKitView` turns into a
+  `Rectangle`; a resize of the content invalidates it too
+  (a `ComponentListener` closes it at once), its popover consumes only a press inside the area and sets no picker
+  property on the content, and `HostedPopover.fitBeside` places that popover below or above the area, never over it,
+  no taller than the larger of the rooms below and above, closing it when that room is less than the content's minimum
+  height.
   `Windows.popover` attaches non-modal content from the anchor's own plugin; an anchor also owns a `DialogSpec` dialog
   above the surface that shows it. Neither passes view ownership to another plugin.
 - **File pickers.** `WindowSurface.chooseFile`, `Windows.chooseFiles`, `chooseDirectory`, `chooseSaveFile` and
@@ -567,7 +576,8 @@ A rejected value, and once `start` returns a key the plugin never declared, is l
 `PluginRuntime.settingsPages` returns, for each running plugin with settings, a generated page (`PluginSettingsPage`, a
 `SchemaPage` over the plugin's own draft) or the plugin's own (`PluginPanelPage`, every call contained; after one of its
 standard rows handles an event it re-renders the view with the rows' new state, then calls the panel's
-`pendingChanged`), and a `PluginStubPage` with Open in Editor for a plugin the user meant to run that is not running
+`pendingChanged`; its host's `closeThen` is the dialog's `PageContext.closeThen`, which asks about unsaved changes as
+Cancel does and runs the action, contained, in a later UI turn), and a `PluginStubPage` with Open in Editor for a plugin the user meant to run that is not running
 (awaiting consent, skipped, failed or disabled by safe mode), at most one page per plugin id. `CorePages` places them
 under Settings › Tools. Apply writes the plugin's file through `DeclaredSettings.save`.
 

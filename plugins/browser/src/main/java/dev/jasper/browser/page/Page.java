@@ -25,6 +25,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntConsumer;
+import java.util.function.LongSupplier;
 import java.util.function.ObjIntConsumer;
 import java.util.function.Predicate;
 import javax.swing.JComponent;
@@ -50,6 +51,16 @@ import org.cef.browser.CefRequestContext;
  * end; {@link PageDownloadState} holds the ask, the start and the hold. Its item hears when its first navigation
  * becomes a download ({@link #onFirstNavigationDownload}, F28), and its downloads when a save chooser for it is
  * cancelled ({@link #onSaveCancelled}, F1.3).
+ *
+ * <p><b>Logins.</b> Its item's password manager runs a login script in each http or https document of the page's main
+ * frame as it starts loading, and answers the page's login queries later, once each ({@link #handleLogins},
+ * {@link #loginQuery}, {@link PageQuery}); {@link PageLoginHooks} holds the script and the handler, and the page's
+ * close cancels the queries not answered (plan 8). Each HTTP sign-in Chromium asks for one of the page's requests goes
+ * to its item, to answer once ({@link #onSignIn}, {@link SignIn}), judged against the page's top address: its main
+ * frame's latest navigation request, after its redirects, or its latest commit, whichever came last
+ * ({@link #topAddress()}), and stamped with that navigation's number and whether the page's user activation or Jasper
+ * began it ({@link #latestNavigation()}); and so does each final main-frame response's status
+ * ({@link #onMainFrameResponse}).
  */
 public final class Page implements AutoCloseable {
     /** The longest {@link #source} waits for Chromium's HTML. */
@@ -115,6 +126,11 @@ public final class Page implements AutoCloseable {
     private final PageDownloadState downloadState = new PageDownloadState();
     // Plan 7: what the page gives the tools: their scripts, its load ends, their reports and its find's top frame.
     private final PageToolHooks toolHooks = new PageToolHooks(this);
+    // Plan 8: what the page gives its password manager: its login script and the handler of its queries.
+    private final PageLoginHooks loginHooks = new PageLoginHooks();
+    // The time its navigations' marks and activations are read at: the system's, or a test's. Read on Chromium's
+    // thread.
+    private volatile LongSupplier clock = System::currentTimeMillis;
     // Where the page's dialogs and file choosers show, and where its right-click menu shows; its item gives them.
     private DialogPlace dialogPlace;
     private MenuPlace menuPlace;
@@ -167,7 +183,7 @@ public final class Page implements AutoCloseable {
     public Page(URI url, Runnable changed, Favicons favicons, Executor background, PageContext context) {
         // Functions of the page, not of its browser's type: making a page loads no Chromium class.
         this(url, changed, favicons, background, context, page -> NavigationHistory.read(page.readyBrowser()),
-            (page, id) -> NavigationHistory.goTo(page.readyBrowser(), id));
+            (page, id) -> NavigationHistory.goTo(page.readyBrowser(), id, page::historyEntryRefused));
     }
 
     /**
@@ -453,9 +469,22 @@ public final class Page implements AutoCloseable {
         if (ready) browser.reload();
     }
 
-    /** Stops the page loading. */
+    /**
+     * Stops the page loading: a navigation Jasper started for the user that has not made its request yet makes none,
+     * so its mark is dropped (plan 8's L44), as Chromium reports nothing for a navigation stopped while the old
+     * document's {@code beforeunload} runs.
+     */
     public void stop() {
+        loginHooks.dropMark();
         if (ready && !closed) browser.stopLoad();
+    }
+
+    /**
+     * Chromium refused the history entry Jasper sent the page to ({@link #goToHistoryEntry}), so that navigation makes
+     * no request: its mark is dropped (plan 8's L44). Any thread.
+     */
+    void historyEntryRefused() {
+        loginHooks.dropMark();
     }
 
     /** Cuts the selection of the page's focused frame, as its Edit menu's Cut would. */
@@ -915,6 +944,208 @@ public final class Page implements AutoCloseable {
     }
 
     /**
+     * Has {@code handler} answer the page's login queries, which the {@code links} package's opener bridge hands it
+     * ({@link #loginQuery}), and has each of its main frames run {@code script} as an {@code http} or {@code https}
+     * document starts loading, from now on until the page's close: there and then on Chromium's thread, so it runs
+     * before the document's own scripts, as a rule, and never in a challenge provider's frame or one of Jasper's own
+     * pages. The page's item gives them once, when it has a password manager (plan 8). Nothing after {@link #close()}.
+     *
+     * @param script the login script, which Jasper wrote
+     * @param handler given each of the page's queries, on the UI thread, to answer later, once
+     * @throws IllegalStateException when the page has been given a handler already
+     */
+    public void handleLogins(String script, Consumer<PageQuery> handler) {
+        Objects.requireNonNull(script, "script");
+        Objects.requireNonNull(handler, "handler");
+        loginHooks.handle(script, handler);
+    }
+
+    /**
+     * A login query of the page's, from its top frame: its handler is handed it ({@link #handleLogins}), or it fails
+     * {@link PageQuery#REFUSED}, "This page has no password manager.", when the page has none or has closed. The page's
+     * close cancels each query its handler has not answered.
+     *
+     * @param query the query, the page's
+     * @throws IllegalArgumentException for another page's query
+     */
+    public void loginQuery(PageQuery query) {
+        Objects.requireNonNull(query, "query");
+        if (query.page() != this) throw new IllegalArgumentException("A login query of another page");
+        loginHooks.query(query);
+    }
+
+    /**
+     * The login script a main frame runs as it starts loading the document at {@code address}, as
+     * {@link PageLoginHooks#script} gives it. Chromium's thread.
+     */
+    Optional<String> loginScript(String address) {
+        return loginHooks.script(address);
+    }
+
+    /**
+     * A main-frame navigation of a page, as Chromium's IO thread noted its request (plan 8's L31, L35, L42). Its
+     * redirects keep what its request noted.
+     *
+     * @param number the number of the page's main-frame navigation requests up to it: each new request raises it, a
+     *     redirect does not; 0 before the first
+     * @param activated whether the page had a user activation as its request started, as a link the user clicks or a
+     *     key the user presses gives one, from a press or key since the main frame last started loading a document
+     * @param byJasper whether its request is the one Jasper's own navigation for the user made: the first main-frame
+     *     request within 10 s after it ({@link #onNavigate}), with nothing between that ends that navigation first: no
+     *     address change or load start of the main frame, no end of another request than the latest, no download start
+     *     of another address, no Stop and no history entry refused
+     */
+    public record Navigation(long number, boolean activated, boolean byJasper) {
+        /** No navigation yet. */
+        public static final Navigation NONE = new Navigation(0, false, false);
+    }
+
+    /**
+     * Chromium's IO thread notes that the page's main frame starts a navigation request for {@code url}: a new
+     * navigation ({@link #latestNavigation()}), begun with the page's user activation or not, as the activation reads
+     * now, unconsumed, and Jasper's or not, as it takes Jasper's mark; and the page's top address until the next
+     * request, redirect or commit ({@link #topAddress()}). Any thread.
+     *
+     * @param url the request's address, as Chromium names it; a null address is not noted, but the request counts
+     */
+    public void mainFrameRequested(String url) {
+        mainFrameRequested(url, clock.getAsLong());
+    }
+
+    /** As {@link #mainFrameRequested(String)}, at {@code nowMillis}. Any thread. */
+    void mainFrameRequested(String url, long nowMillis) {
+        loginHooks.mainFrameRequested(url, activation(), nowMillis);
+    }
+
+    /**
+     * Chromium's thread notes that the page's main frame starts loading a document: a user activation from before it
+     * begins no later navigation, and a mark of Jasper's navigation that no request took is dropped (plan 8's L42).
+     * Chromium's thread.
+     */
+    void mainFrameStarting() {
+        loginHooks.mainFrameStarting(clock.getAsLong());
+    }
+
+    /** Has the page read the time for its navigations' marks and activations from {@code clock}: a test's. */
+    void useClock(LongSupplier clock) {
+        this.clock = Objects.requireNonNull(clock, "clock");
+    }
+
+    /**
+     * Chromium's IO thread notes that a request of the page's main-frame navigation is redirected to {@code url} (F6):
+     * the same navigation, and the page's top address until the next request, redirect or commit. Any thread.
+     *
+     * @param url the address it is redirected to, as Chromium names it; a null is ignored
+     */
+    public void mainFrameRedirected(String url) {
+        loginHooks.mainFrameRedirected(url);
+    }
+
+    /**
+     * The number of the page's main-frame navigation requests so far, as Chromium's IO thread noted them: each new one
+     * counts, its redirects do not ({@link #mainFrameRequested}, {@link #mainFrameRedirected}), so an HTTP sign-in and
+     * the responses that follow it can be told to belong to one navigation (plan 8's L31). Any thread.
+     *
+     * @return the number; 0 before the first
+     */
+    public long navigation() {
+        return loginHooks.navigation().number();
+    }
+
+    /**
+     * The page's latest main-frame navigation, as Chromium's IO thread noted its request: its number
+     * ({@link #navigation()}), whether it began with the page's user activation and whether its request took Jasper's
+     * mark, as Jasper's own navigation's, read together. Any thread.
+     *
+     * @return the navigation; {@link Navigation#NONE} before the first
+     */
+    public Navigation latestNavigation() {
+        return loginHooks.navigation();
+    }
+
+    /**
+     * Chromium's thread notes that the page's main frame committed {@code url}, before the UI thread hears of it
+     * ({@link #addressChanged}): the page's top address at once, until the next request or commit (L23). Any thread.
+     */
+    void mainFrameCommitted(String url) {
+        loginHooks.mainFrameCommitted(url);
+    }
+
+    /**
+     * Chromium's thread notes that the page's main-frame request for {@code url} ended without a commit, as it failed
+     * or became a download: while it is the top address, the commit before it is the top address again (L24). Any
+     * thread.
+     */
+    void mainFrameRequestEnded(String url) {
+        loginHooks.mainFrameRequestEnded(url);
+    }
+
+    /**
+     * The address an HTTP sign-in of the page is judged against ({@link SignIn#topAddress()}): that of its main frame's
+     * latest navigation request ({@link #mainFrameRequested}), after its redirects ({@link #mainFrameRedirected}), or
+     * of its latest commit, whichever came last, as Chromium's threads noted them; a request that failed or became a
+     * download falls back to the commit before it. Before either, the committed address ({@link #committedAddress()}).
+     * A request that has not committed counts, as a main frame's own challenge comes before its commit; a commit with
+     * no request of its own, as a document restored without one, counts too, so it never inherits the request before it
+     * (L23). Any thread.
+     *
+     * @return the address, as Chromium writes it; empty before the page has either
+     */
+    public String topAddress() {
+        return loginHooks.topAddress(committed);
+    }
+
+    /**
+     * Tells {@code listener} each HTTP sign-in Chromium asks for one of the page's requests ({@link #signIn}), to
+     * answer once, later: Chromium's request waits until it is. The page's item listens, with or without a password
+     * manager (plan 8).
+     *
+     * @param listener told on the UI thread
+     * @return the registration; the page's close ends it
+     */
+    public Subscription onSignIn(Consumer<SignIn> listener) {
+        Objects.requireNonNull(listener, "listener");
+        return loginHooks.onSignIn(listener);
+    }
+
+    /**
+     * Chromium asks for an HTTP sign-in for one of the page's requests, which the {@code links} package's request
+     * handler has made and posted: those who asked {@link #onSignIn} are told it. It is cancelled at once when no one
+     * has asked, after {@link #close()}, or when one of them throws, so that no request waits on nothing. UI thread.
+     *
+     * @param signIn the sign-in, not yet answered
+     */
+    public void signIn(SignIn signIn) {
+        Objects.requireNonNull(signIn, "signIn");
+        loginHooks.signIn(signIn);
+    }
+
+    /**
+     * Tells {@code listener} the address and HTTP status of each final response to a navigation of the page's main
+     * frame, as Chromium reports it ({@link #mainFrameResponded}): a redirect is none.
+     *
+     * @param listener told the response's address and status, on the UI thread
+     * @return the registration; the page's close ends it
+     */
+    public Subscription onMainFrameResponse(BiConsumer<String, Integer> listener) {
+        Objects.requireNonNull(listener, "listener");
+        return loginHooks.onMainFrameResponse(listener);
+    }
+
+    /**
+     * The page's main frame got the final response to a navigation, as the {@code links} package's opener bridge reads
+     * it on Chromium's IO thread and posts it: those who asked {@link #onMainFrameResponse} are told. Nothing after
+     * {@link #close()}. UI thread.
+     *
+     * @param url the response's address, as Chromium names it
+     * @param status its HTTP status, such as 200 or 401
+     */
+    public void mainFrameResponded(String url, int status) {
+        Objects.requireNonNull(url, "url");
+        loginHooks.mainFrameResponded(url, status);
+    }
+
+    /**
      * Tells {@code listener} each time the page's main frame starts loading a document, as {@link #onLoadStart} does, with
      * how the load reached it: each of the page's visits, for its item's history.
      *
@@ -1284,6 +1515,7 @@ public final class Page implements AutoCloseable {
         CompletableFuture<Void> held = downloadState.held(this);
         loadStarts.clear();
         toolHooks.close();
+        loginHooks.close();
         selectionGestures.clear();
         view.endSelectionGestures();
         visits.clear();
@@ -1333,8 +1565,12 @@ public final class Page implements AutoCloseable {
         return PageToolHooks.runsScriptsIn(address);
     }
 
-    /** Jasper sends the page elsewhere. */
+    /**
+     * Jasper sends the page elsewhere: its next main-frame request is marked Jasper's (plan 8's L42), and those who
+     * asked {@link #onNavigate} are told.
+     */
     private void navigated() {
+        loginHooks.jaspersNavigation(clock.getAsLong());
         for (Runnable listener : navigations) listener.run();
     }
 

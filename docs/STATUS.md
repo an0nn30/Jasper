@@ -1,5 +1,272 @@
 # Jasper — Status and Handoff
 
+**Browser plan 8: logins — 2026-11-11** (`claude/browser-logins`, worktree `.claude/worktrees/browser-4b-4c-e6deab`,
+from local `main` `c01d2feec`, which has plans 4a, 4b, 4c, 9, 5, 6 and 7 merged; the plan `58962695b`, brought in from
+`5c42e4a82`, commits `a2b5c118a` to `322bd5793`, the docs, `fd709d04b` and `479738513`, local `main` `0a4ec9bb9` (the
+Editor file associations' plan 2) merged in as `ebfdc45ac`, and the final fix wave, `4c7afdbe7` to `35a622f74`, and its
+docs; merged into local `main` as `06b05b729`, with the user's ruling L46 after it; not pushed;
+[plan](superpowers/plans/2026-10-30-browser-8-logins.md), whose banner lists
+every deviation by task, [spec](superpowers/specs/2026-10-26-jasper-browser-plugin-design.md) sections 12, 13, 17, 21
+and 23, [guide](browser.md#logins); executed with per-task subagents and reviews, Task 1 as 1a and 1b, Task 4 as 4a and
+4b and Task 5 as 5a and 5b, each task's fix rounds until its re-review found every finding addressed; the final reviews
+passed Tasks 1a-4b, Tasks 5a-6 and the docs "With fixes", and the fix wave that followed, with rounds after its
+re-reviews, is done). The Credential Vault plays iTerm2's password manager in the Browser:
+- **Field buttons:** 🔑 in a focused password field and 🎫 in an `autocomplete=username` one, titled "Open Password
+  Manager", in the top frame of `http` and `https` pages (F13, L17), from `login-fields.js` in a closed shadow root on a
+  constructed sheet. A click opens the Vault's picker on an area anchor at the field (SDK 0.32.0), beside it and never
+  over it (L37, L40), searched for the page's host without `www.` (F26), with no row active until the user moves to one
+  (L36), only after a mouse press inside that field with no key since, at a field no taller than 200 CSS pixels (F3,
+  L20, L21, L37, L38); a password login fills the password, or the user name and then the next password field. The
+  picker closes on a scroll, a zoom, a resize, a navigation or the tab's close (L6, L19).
+- **HTTP sign-ins:** every challenge Chromium asks of a page gets Jasper's "Sign In" dialog, "The website “HOST”
+  requires a user name and password for “REALM”." with the realm cleaned and cut (F9), or "The proxy “HOST:PORT”…"
+  (F22), one per page at a time behind its permission prompt, sharing the page's flood guard (F4), closed at the next
+  document's load start (F8), one answer serving the page's other challenges of its protection space (F30).
+  **Password Manager** for a server's Basic challenge outside /dev/null with the Vault; **Remember this password** only
+  for the top-level navigation's own (F5, L3).
+- **Remembered sign-ins:** a sign-in answered with Remember saves at the page's next main-frame 2xx from its origin in
+  the navigation it answered, after any redirect (L34), as "scheme://host[:port] (realm)" with a saved grant for the
+  Browser (F11); while the Vault is unlocked a remembered login signs the top-level challenge in without the dialog when
+  the user began its navigation, from Jasper (its own request, within 10 s) or within 5 s of a click or key in the page
+  (L35, L42-L44), once per name until that navigation's own answer commits a page (L30, L31), so a wrong password shows
+  the dialog.
+- **Manage Saved Passwords** (button **Manage Passwords**) in Settings › Tools › Browser › Privacy & Data, only with the
+  Vault: it closes Settings, asking about unsaved changes, then opens the Vault's manager (F7, L2).
+
+The user's calls (relayed 2026-11-09; no change asked), with the controller's refinements, each the stricter reading of
+the call (L3):
+- **Field buttons in the top frame only:** a login form in any frame has none.
+- **The dialog without the Vault plugin:** it still shows, without Password Manager and Remember, so pages can sign in.
+- **Proxy challenges get the plain dialog,** headed "The proxy “HOST:PORT” requires a user name and password for
+  “REALM”." (F22, L3); each tab a proxy challenges asks on its own (a known gap).
+- **No silent fill in /dev/null,** nor Password Manager or Remember there; the field buttons still fill (F24).
+- **`saveLogin` replaces the granted login of the same name,** refined to the one whose only saved grant is the saving
+  plugin's (F11, L3): a login another plugin can read is left alone and a new one added beside it.
+- **Refinements:** F5 (L3), Remember and the silent fill only for the top-level navigation's own challenge, judged by
+  address as JCEF names no frame (spec section 21), and a framed Basic challenge gets Password Manager without Remember
+  (L27); F7 (L2), `SettingsPanelHost.closeThen`, so Settings' modality never blocks the Vault's manager and its unlock
+  prompt.
+- **The user's ruling on what may start a silent sign-in (L46, 2026-11-11, "After your click (Recommended)"):** an
+  address the user types, a bookmark, Back or Forward, and a link the user clicks; a redirect, a meta refresh or a
+  script's navigation without a click shows the sign-in prompt instead. Declined: Jasper's own navigations only, with
+  the prompt always shown prefilled as Chrome does, and the plan's any top-level navigation.
+
+SDK 0.32.0 (every bundled range `>=0.32.0, <0.33`): `ContentArea` and `UiView.anchorAt(String, ContentArea)` (L1, an SDK
+value in place of the plan's `java.awt.Rectangle`), `SettingsPanelHost.closeThen(Runnable)` (L2), with the testkit's
+`FakePluginHost.popoverAreas`, `answerDiscard` and `discardQuestions`. Credential Vault 0.9.0: `CredentialPickRequest`'s
+starting `search`, `saveLogin`, `credentialIfGranted` and `openManager`; every plugin's anchored picker ignores a choice
+for 500 ms after it shows (L20), and one with a starting search activates no row until the user moves to one (L36);
+an unlock prompt that cannot show is forgotten, its waiters answering as cancelled (L10, L11). The app's host keeps an
+area anchor's popover beside its area, never over it, closing it when neither side has room for the content's minimum
+height, and the kit reports a pressed picker row before it accepts it (L37, L40). The Browser stays 0.2.0 (F17), with
+an optional `requires` of the Vault `>=0.9.0`; plan 8 adds no download, no licence and no third-party file. Docs: the
+Browser guide (Logins, /dev/null mode, Clearing data, the HTTP proxy's 407 and Settings), the Credential Vault guide,
+plugin APIs' `credential`, `pick` and `importSshKeys` rows (L11), the README's, Plugins' and the docs index's Browser
+descriptions, AGENTS.md's Verified JCEF behaviour (the auth and query callbacks' finalizers,
+`CefClient.getAuthCredentials` for a null browser, no `ClearHttpAuthCredentials`), the plan's
+banner and this entry; the SDK guides, the testkit README and plugin authoring came with Task 1b, plugin APIs and the
+Vault guide with Task 2, and AGENTS.md's architecture sentence and the SDK architecture with Task 3. The final reviews,
+dispatched 2026-11-11 over plan 8's own diff after the merge, `0a4ec9bb9..ebfdc45ac` (A: Tasks 1a-4b; B: Tasks 5a-6;
+C: the docs), led to the fix wave: W1a, `4c7afdbe7` and its round 2, `20a93e6b3` (the Vault's picker, the kit and the
+app's popover host: L36, L37's host half, L39, L40); W1b, `59ef0a25b` and its rounds 2 and 3, `563a73a65` and
+`35a622f74` (the Browser: L34, L35, L37's cap, L38, L41-L44, and the items L22, L25, L29 and L32 sent to the wave);
+and W2's docs (L33's nine minors, review C's three, A's minor 6 and the wave's behaviour: the Browser guide, the
+Credential Vault guide, plugin APIs, plugin UI, plugin authoring, the SDK architecture, `UiView.anchorAt`'s and
+`CredentialPickRequest`'s Javadoc and the SDK reference, the checklist, the banner and this entry). Verification: the
+last full check, at `35a622f74` after the fix wave's code (the controller's full check, JBR 25.0.4.1 b635.75 jcef,
+10m 37s), gave **16,355 tests, 0 failures, 0 errors, 109 skipped** (1,434 classes in the 16 build folders, without the
+example plugin's: jasper-app 5,475 with 96 skipped, Editor 5,392 with 4 skipped, Browser 1,883 with 1 skipped,
+jasper-ui 1,024, Remote 660, jasper-terminal 512 with 7 skipped, jasper-sdk-testkit 334, File Server 303, Vault 279 with
+1 skipped, jasper-buddy 176, jasper-sdk 139): plan 7's 15,911, plan 8's 309 by its docs, the Editor file associations'
+plan 2's 97 tests and 4 skips at the merge, and the fix wave's 38. The full checks after each task: 15,911 (Task 1a,
+indicative), 15,934 and 15,942 (1b), 15,973 and 15,990 (2), 16,024 and 16,028 (3), 16,056 and 16,060 (4a), 16,097,
+16,105 and 16,106 (4b), 16,144 and 16,149 (5a), 16,178 and 16,189 (5b), 16,207 and 16,220 (6) and 16,220 (the docs),
+each with 105 skipped; then, each with 109 skipped, 16,317 at the merge (`ebfdc45ac`), 16,326 (`4c7afdbe7`), 16,343
+(`20a93e6b3`, with 1 failure: D49's `FilterListTest` flake, whose re-run passed, 21 of 21) and 16,351 (`563a73a65`);
+every other run had 0 failures and 0 errors; the example external plugin's `check pluginZip` against `build/sdk-release`
+passed after each. The docs commits change no source, and the controller runs the full check and the external-plugin
+check on them. No GUI was launched.
+
+Each task's commits (the banner has each one's deviations):
+- The plan: `58962695b` "Docs: plan 8, logins".
+- Task 1a: `a2b5c118a` "SDK: 0.32.0".
+- Task 1b: `0894c27f3` "SDK 0.32.0: an anchor on an area of custom content, and closing Settings first" and
+  `61a584675` "SDK 0.32.0: the anchor's and closeThen's review fixes".
+- Task 2: `d6836bbab` "Vault: the picker's starting search, saveLogin, credentialIfGranted and openManager",
+  `93e226465` "Vault: the login API's review fixes" and `ee2b4cfaf` "Vault: an unlock prompt that cannot show is
+  forgotten".
+- Task 3: `42b019702` "Browser: the optional Vault, login names and Manage Saved Passwords" and `9b600a31f` "Browser:
+  the Vault bridge's review fixes".
+- Task 4a: `6c50db78e` "Browser: the page's login queries" and `de4b36437` "Browser: the login queries' review fixes".
+- Task 4b: `07b9d7c98` "Browser: the Vault's 🔑 and 🎫 buttons on page fields", `819c4d68c` "Browser and Vault: the
+  field buttons' review fixes" and `c06d07097` "Browser and Vault: the press oracle and wording".
+- Task 5a: `81876a884` "Browser: HTTP sign-ins reach the page" and `c0bc64927` "Browser: the sign-ins' top address
+  follows each commit".
+- Task 5b: `a7c34cc91` "Browser: Jasper's dialog for HTTP sign-ins", `5b7b3252b` "Browser: the sign-in dialog's review
+  fixes" and `e96d6bea1` "Browser: the flood bypass ends on Cancel".
+- Task 6: `f59b26b0b` "Browser: Remember this password, and remembered sign-ins without the dialog", `171e595d6`
+  "Browser: the silent fill re-arms only on its own origin's page" and `322bd5793` "Browser: a silent fill re-arms only
+  after its own answer".
+- Task 7: `fd709d04b` "Docs: the Browser's logins"; Task 8: `479738513` "Docs: plan 8's GUI check, pending".
+- The merge: `ebfdc45ac` "Merge local main (Editor file associations 2) into the Browser's logins branch".
+- The final fix wave: `4c7afdbe7` "Vault and app: a page's picker pre-selects nothing and never covers its field"
+  (W1a), `59ef0a25b` "Browser: plan 8's final fixes" (W1b), `20a93e6b3` "Kit and app: a pressed picker row is chosen;
+  no sliver popover" (W1a's round 2), `563a73a65` "Browser: a silent fill answers to the user's own navigation" (W1b's
+  round 2), `35a622f74` "Browser: Jasper's mark ends with a navigation that will not happen" (W1b's round 3) and
+  "Docs: plan 8's final wave" (W2).
+
+The controller's rulings, one line each (the pre-flight scan's F1-F30 adopted as L0):
+- L0: every ruling the pre-flight scan proposed (F1-F30) is adopted, except where L1-L3 decide otherwise.
+- L1: F1: `UiView.anchorAt` takes the SDK record `ContentArea(x, y, width, height)`, not `java.awt.Rectangle`, so the
+  SDK names no more AWT and `PluginPresentationCheck` gains no exception.
+- L2: F7 is built in Task 1b: `SettingsPanelHost.closeThen(Runnable)` closes Settings, asking about unsaved changes,
+  before Manage Saved Passwords opens the Vault's manager, which Settings' modality would block.
+- L3: F5, F11 and F22 refine the user's calls without reversing them; F17 keeps the Browser at 0.2.0;
+  `getAuthCredentials` is built for either thread (F12), which Task 8 records.
+- L4: Task 1b's deviations accepted; `ContentArea` refuses an edge past the int range, `closeThen`'s action is
+  contained in both runtimes, and the plugins' test `RecordingView`s pass `anchorAt` on.
+- L5: an area anchor must lie inside its content when it is made; `closeThen` enforces the UI thread and runs its
+  action a turn later, once Settings' modal loop has unwound; the Javadoc says content that scrolls or zooms closes its
+  own anchor.
+- L6: the field picker closes on a page scroll, a Jasper zoom change, a navigation or a resize, as the host cannot see
+  Chromium's scrolling.
+- L7: Task 1b round 1's choices accepted: the deferral in `SettingsDialog`, a stopped plugin's action skipped, and
+  containment shown through the contract and the failure records.
+- L8: Task 2's choices accepted; a lock during the save's write answers empty though the login may be written (a known
+  gap).
+- L9: `saveLogin` runs the Vault's changed hook after its commit; a throw from `requestUnlock` zeroes the copy and
+  rethrows; `openManager` does nothing for a null or closed owner; the three new members enforce the UI thread.
+- L10: the changed hook is contained at both its callers, and `requestUnlock` forgets a prompt it could not show, its
+  waiters answering false.
+- L11: an unshowable prompt reads as a cancel at its callers, which plugin APIs' rows now say; two pre-existing Vault
+  minors are deferred (below).
+- L12: the Browser's pick uses only a password login, still fetching and closing any other, so its one-time grant is
+  spent; a kind filter in the Vault's picker is a follow-up.
+- L13: a challenge whose origin `LoginName.of` refuses, such as a host with an underscore, gets the plain dialog and
+  logs nothing about the host.
+- L14: a key-and-password account fills nothing either, as `useGranted` and `saveLogin` take only `ACCOUNT_PASSWORD`.
+- L15: no reply to a login query once Chromium has stopped (plan 6's F43), through one stopped supplier for both
+  routers.
+- L16: a cancel from Chromium before the UI thread's hand-off is seen there, so no picker opens and closes at once.
+- L17: Task 4a's fix round (L15, L16, contained cancel listeners, a throwing origin read answering GONE);
+  `login-fields.js` does nothing in an opaque document.
+- L18: Task 4a's last minors go to Task 4b: `PageQuery.answer` answers false once Chromium has stopped, and the handler
+  checks `live()` before the picker opens.
+- L19: Task 4b's concerns accepted: the scroll close through CEF's cancel (a Task 8 line), a same-document address
+  change closing the picker, and a button off its field under a root `transform` or `filter` (a known gap).
+- L20: a pick needs its activating press inside the area it names, and every plugin's anchored picker ignores a choice
+  for 500 ms after it shows; a search anchored on the login name is a Vault follow-up.
+- L21: a press outside the area spends the click, so a page learns at most one bit per press (a known gap);
+  `VaultApi.pick`'s Javadoc names the 500 ms; the picker's keyboard path is a Task 8 line.
+- L22: the stale `consumeActivation` Javadoc, a refused anchor spending the click and long Javadoc lines go to the final
+  wave.
+- L23: each main-frame commit clears the noted request, so a restored page of another origin inherits no top-level
+  standing.
+- L24: L23 on Chromium's thread, before the commit's post; `topLevel()` is false for a proxy; a main-frame load error
+  and a download of the top address fall back to the commit before.
+- L25: Task 5a accepted; a same-document commit during a pending navigation and a refused redirect only withhold (known
+  gaps); `onResourceLoadComplete` with the request's identity is a follow-up.
+- L26: the flood guard counts a queued sign-in as quick, as `PermissionPrompt`'s queue does (a known gap); after a
+  Cancel each waiting challenge of the same space asks on its own; the dialog is titled "Sign In", as Chrome's is.
+- L27: a top-level challenge of a navigation Jasper started for the user shows past a tripped flood guard until the next
+  load start; `BrowserPlugin.stop` ends every sign-in before Chromium closes; a framed Basic challenge has Password
+  Manager without Remember, as the plan says.
+- L28: a Cancel of a dialog admitted past the trip, or a main-frame load failure, ends that navigation's bypass.
+- L29: Task 5b accepted; matching the load failure's URL and `SignInDialog`'s overstated sentence go to the final wave;
+  the waiting limit and a proxy's challenge of the user's navigation are known gaps.
+- L30: a tried name is re-armed only by a main-frame response of its own origin that is neither a 401 nor a 407, at the
+  commit of that origin that follows; a load start drops the pending save.
+- L31: the stricter reading of L30 holds, and a name whose fill sent a password re-arms only on the answer to the fill's
+  own navigation, its redirects included; a fill whose navigation is replaced leaves the name tried while the tab lasts.
+- L32: Task 6 accepted; the top address's write order, test and Javadoc nits and L29's URL match for the answer's reset
+  go to the final wave; the other costs are known gaps.
+- L33: Tasks 7 and 8 accepted; their review's nine docs minors go to the final wave's docs (W2), and L11's two Vault
+  minors stay in plan 8's entry.
+- L34: a pending save belongs to its sign-in's navigation: it saves only at a 2xx of that navigation, and a main-frame
+  load failure drops it.
+- L35: the silent fill needs the user's action: its navigation began within the page's user activation, or is Jasper's
+  own (option (b), which the user chose: L46).
+- L36: a chooser with a starting search activates no row until the user moves to one, so Enter on typed text chooses
+  nothing, and its search keeps the caret at its end, unselected; Remote's and File Server's keep the first row active.
+- L37: an area anchor's popover never covers its area, no taller than the larger room beside it; the Browser refuses a
+  field taller than 200 CSS pixels, spending the click.
+- L38: a pick needs that nothing activated the page after its press, and a query from a document of another origin than
+  the bridge's record answers GONE; `useGranted` and `saveLogin` picking different same-named logins is a known gap.
+- L39: W1a's calls accepted: an active id naming no row clears the kit's highlight and Up from none goes to the last
+  row; the Vault echoes `Selected` into every chooser, so Remote's and File Server's highlight follows the filter; a
+  searched chooser ignores a choice of a row not active; no room beside the area cancels the pick.
+- L40: the kit reports a pressed row as `Selected` before it accepts it, so a click chooses in a searched chooser; a
+  room below the content's minimum height counts as none; a press while the picker settles is recorded.
+- L41: W1b's concerns accepted: option (b)'s residuals are known gaps; a pick from a document record without an origin
+  keeps "The password manager fills only web pages."; any load failure drops the pending save, and only a failure of
+  the challenge's own address ends the bypass or an answer, each failing safe.
+- L42: Jasper's half of the silent fill is Jasper's own request: a mark the next main-frame request takes within 10 s,
+  dropped first by an address change, a load start or a request's end; an activation counts only after the page's last
+  main-frame load start.
+- L43: W1b round 2's calls accepted (the Jasper half also keeps L27's flag; a request's end, a download's included,
+  drops the mark; a mark set while Chromium starts lapses), each refusing more.
+- L44: `Page.stop()` and a history entry Chromium refuses drop the mark, and a request's end drops it only for another
+  address than the latest request's; a new tab's first page and a sub-resource challenge of the top address are
+  recorded.
+- L45: AGENTS.md's Verified JCEF behaviour keeps only what javap confirmed; the main-frame redirect sentence waits for
+  the F6 line.
+- L46: the user's ruling (2026-11-11, "After your click (Recommended)"): L35's option (b) stands: a silent sign-in
+  starts from an address the user types, a bookmark, Back, Forward or a link the user clicks, and a redirect, a meta
+  refresh or a script's navigation without a click shows the prompt.
+
+Known gaps and follow-ups (the banner has them all, with the deferred minors): a page that navigates to an address and
+fetches that same address, or its origin's root, gets that navigation's top-level standing, a page can move the top
+address within its own origin with `pushState`, and when CEF names only an origin every same-origin challenge does (F5,
+L23, L30; Task 8's F12 line records which form arrives), though a password still goes only to its own origin; a commit
+Chromium reports after the next request has started, and a challenge read between a request's two writes if
+`getAuthCredentials` runs on another thread than the request's (F12), are judged against the other address, showing the
+dialog without Remember (L23, L32); each tab a proxy challenges asks on its own, and a proxy's challenge of the user's
+navigation gets no flood bypass (F22, L29); an HTTP sign-in lasts until Jasper quits, a /dev/null group's until the
+group closes, and Clear Website Data does not end it, as JCEF cannot clear Chromium's HTTP auth cache (F23); the field
+buttons are absent in frames (the user's call), inside shadow roots (L20) and in opaque documents (L17), sit off the
+field on pages with a root `transform` or `filter` (L19), can be misplaced by another item's zoom of the same host,
+which then refuses rather than opens elsewhere (L20), and need an emoji font on Linux (F27); the Vault's starting search
+is a substring, so other sites' logins can be listed (L20); a page learns one bit per press, whether the press lay
+inside a rect the page names (L21); a press within the picker's first 500 ms makes its row active, so a later Enter
+chooses it, which no page path reaches after L37 (L40); the reply's password copies (`new String`, `StrictJson`'s
+builder, the reply text) and JCEF's `Continue(String, String)` cannot be zeroed; a lock during the save's write answers
+empty though the login may be in the vault at its next unlock (L8); `useGranted` and `saveLogin` can pick different
+logins of one name (L38); a main-frame request that never commits and reports no error, such as a 204, keeps its
+top-level standing until the next request or commit, and a same-document commit of the shown page during a pending
+navigation withholds that navigation's Remember (L24, L25); a page that trips the dialog limit, as with three realms at
+once, loses its third sign-in, its alerts and its permission prompts until it loads again, a page with 8 challenges
+waiting can cancel the user's navigation's at arrival, a link click or Reload in a tripped page gets no bypass, and a
+failure Chromium reports for a redirect target ends neither the bypass nor a fill's answer (L26, L28, L29, L41; a Task 8
+line records the address); after a Cancel each waiting challenge of the same space asks on its own, at most two (L26);
+the old document can drop the user's pending save with any challenge, any main-frame load failure before the 2xx drops
+it, a replaced navigation's late `ERR_ABORTED` included, and a save is lost if CEF asks the request handler again on a
+redirect, which would count a new navigation (L30, L34, L41); after a silent fill that Stop or a quick navigation
+interrupts, the dialog shows for that name in that tab until it closes, and a quick new request can cost a fill that
+worked its re-arm (L31, L32); two top-level challenges of one name with no response between fill the first and show the
+dialog for the second; a prerender activation, if this CEF prerenders through the page's handler, is unchecked (L32);
+two realms that differ only in control characters share one login name (F9). The silent fill's own (L35, L41-L44): a
+navigation a page's script starts within 5 s of any click or key of the user's in its document counts as the user's,
+so a page can wait for a click and then send the tab, or a form, to a remembered site, once per name per tab (option
+(b)'s cost); a navigation of Jasper's that Chromium never starts and that reports nothing lends its mark to a request of
+the page's within 10 s (Stop and a refused history entry drop it), and a page's request that races Jasper's can take the
+mark first, Jasper's own then showing the dialog; Jasper's mark outlives its commit, so a sub-resource challenge for the
+top address can fill with the top document's own login (L44); and, each showing the dialog instead of a fill, a new
+tab's first page (a bookmark or link opened in a new tab, a terminal's link, a restored tab) is never Jasper's
+navigation, Jasper's request more than 10 s after the user's action (as while Chromium first starts) is not Jasper's,
+another navigation's load start, commit, failure or download, or a late refusal of an earlier history jump, before
+Jasper's request drops its mark, and a previous document's load start handled after Jasper's navigation ends that
+navigation's flag (L42-L44). Follow-ups: a filter by kind in the Vault's picker (L12) and a search anchored on the login
+name (L20); `onResourceLoadComplete` with the request's identity (L25). Deferred findings, pre-existing in the Vault and
+unfixed in plan 8 (L11): `VaultManagerDialog` keeps a settled `unlockPrompt` when `panel.showUnlock` throws, so
+`changed()` skips `passiveUnlock()` until the next prompt replaces it; and `UnlockPrompt.finish` runs its dismiss
+listeners before it completes the waiters, so a throwing listener leaves them incomplete (`unlock` is already null, so
+the next request still makes a fresh prompt). A test flake (plan 7's D49): `FilterListTest.theHourlyCheckRunsByItself`
+failed again in the full check at `20a93e6b3`, as JUnit could not delete its `@TempDir` (`adblock` not empty); its
+re-run passed. Task 8 (the user's check on macOS, with their OK): pending, F12, F14, F6, F13 and F7 first, then the
+plan's eight lines with the task reviews' lines, the known gaps' lines and the fix wave's
+([checklist](browser-verification.md#plan-8-logins)). Windows and Linux are not run; plan 8 adds no start-up or memory
+line; no JavaScript runs in a test (`login-fields.js` is checked as text, with `node --check` and a stub harness).
+
 **Browser plan 7: downloads and page tools — 2026-11-10** (`claude/browser-downloads-page-tools`, worktree
 `.claude/worktrees/browser-4b-4c-e6deab`, from local `main` `417e2270f`, which has plans 4a, 4b, 4c, 9, 5 and 6 merged;
 the plan `a52181595`, brought in from `5c42e4a82`, commits `371a94680` to `87e4fb7c3`, and the docs, `2a8b0a782` and
@@ -246,7 +513,7 @@ JavaScript runs in a test (D3).
 
 **Editor file associations, plan 2: the platform layer — 2026-11-10** (`claude/editor-file-associations-2`, worktree `.claude/worktrees/editor-file-associations-2`; [plan 2](superpowers/plans/2026-11-10-editor-file-associations-2-platform-layer.md); not merged or pushed): plan 2 of 3 is done. `dev.jasper.app.platform.FileAssociations` answers, claims and restores file-type handlers through `MacFileAssociations`, `WindowsFileAssociations` (Windows Settings; never `UserChoice`) and `LinuxFileAssociations` (`xdg-mime`, `mimeapps.list`), keeps the previous handlers in `file-associations.toml`, and is wired through `ApplicationBootstrap` and `JasperApplication` (refreshed on window activation). `file-types.tsv` is the catalogue; `docs/app-architecture.md` and `docs/app-maintenance.md` say so. A `JasperApplication` test ends the plan 1 loop: a declined `JASPER` open, the desktop's edit hand-back, and one `OUTSIDE` open. Changes from the plan: (a) the Windows installer registers the `JasperFile` ProgId, and a status check that sees Jasper re-writes `Capabilities\FileAssociations\<ext>` after an upgrade deletes `Software\Jasper\Capabilities`; (b) `file-types.tsv` is shared by the code and the packaging build; (c) Unavailable and Refusal are enums, plus `Outcome.Refused(Refusal)` made only by the facade; (d) the previous handler is saved before the claim, and an unreadable `file-associations.toml` is moved to `file-associations.toml.bad`; (e) the macOS harness fails only for an extension that resolves to a declared non-text type; (f) on Linux, restoring "no previous app" is Done once Jasper's own lines leave `mimeapps.list`; (g) restoring an app that is gone gives `PreviousGone` on macOS and Linux. Catalogue: `.ts` emptied on macOS and Linux (`video/mp2t`) with the TypeScript import removed; `.zsh` is `public.zsh-script`, `.bash` `public.bash-script`, `.txt` `public.plain-text`, `.log` `com.apple.log`. Pending: the Linux real-database check in `jasper-ci-linux` (Docker was not running); the Windows-only tests (`WindowsRegistryTest`, `Verify-Installer.ps1`, `InstallerAcceptanceTest`); `packageApp` plus `verifyPackage` on macOS; the plan's GUI checks. Plan 3 (SDK surface, testkit, the Editor's File associations section) is not written. Final-review fixes: a failed claim keeps its saved entry while the type is still Jasper's; claim and restore ask nothing when unavailable (`Failed("unavailable: <reason>")`); restore hands back only types Jasper still opens and drops the others' entries; `unavailable()` has its own lock and is primed on the worker; Windows names an app without a `UserChoice`, reads `Applications\jasper.exe` as Jasper and refuses `PATHEXT` and shell-handled extensions outside the catalogue; Linux counts types that inherit from `text/plain` (`mime/subclasses`) as text; `Handler.Unknown` replaces `Other("", "")`; a status pass asks each shared type once.
 
-**Editor file associations, plan 3: the SDK surface and the Editor's section — 2026-11-17** (`claude/editor-file-associations-3`, worktree `.claude/worktrees/editor-file-associations-3`; [plan 3](superpowers/plans/2026-11-11-editor-file-associations-3-settings-section.md), whose banner lists the deviations (a) to (g); [guide](editor.md#making-jasper-the-default-for-file-types); not merged or pushed): plan 3 of 3 is done. `Platform.fileAssociations()` (SDK 0.31.0, capability `files.associate`) has the app adapter `HostedFileAssociations` and a testkit fake under one contract suite, and the Editor's settings page has a File associations section with ticks, Make Jasper the Default (Choose in Windows Settings… on Windows), Restore Previous, Add Extension and Remove, saving `file_association_extensions`. Pending: the Windows-only tests (`WindowsRegistryTest`, `Verify-Installer.ps1`, `InstallerAcceptanceTest`); the Linux real-database check in `jasper-ci-linux`; `packageApp` plus `verifyPackage` on macOS; the GUI checks (plan 2's, plus the section's layout in the three themes, add, remove and claim round trips on each platform, the Windows flow from the button to Settings and back, and Remove in a user row's context menu).
+**Editor file associations, plan 3: the SDK surface and the Editor's section — 2026-11-17** (`claude/editor-file-associations-3`, worktree `.claude/worktrees/editor-file-associations-3`; [plan 3](superpowers/plans/2026-11-11-editor-file-associations-3-settings-section.md), whose banner lists the deviations (a) to (g); [guide](editor.md#making-jasper-the-default-for-file-types); merged into local main 2026-11-18, not pushed): plan 3 of 3 is done. `Platform.fileAssociations()` (SDK 0.32.0, capability `files.associate`) has the app adapter `HostedFileAssociations` and a testkit fake under one contract suite, and the Editor's settings page has a File associations section with ticks, Make Jasper the Default (Choose in Windows Settings… on Windows), Restore Previous, Add Extension and Remove, saving `file_association_extensions`. Pending: the Windows-only tests (`WindowsRegistryTest`, `Verify-Installer.ps1`, `InstallerAcceptanceTest`); the Linux real-database check in `jasper-ci-linux`; `packageApp` plus `verifyPackage` on macOS; the GUI checks (plan 2's, plus the section's layout in the three themes, add, remove and claim round trips on each platform, the Windows flow from the button to Settings and back, and Remove in a user row's context menu).
 
 **Browser plan 6: privacy — 2026-11-09** (`claude/browser-privacy`, worktree `.claude/worktrees/browser-4b-4c-e6deab`,
 from local `main` `ef3347601`, which has plans 4a, 4b, 4c, 9 and 5 merged; the plan `daa19c574`, commits `827ac12ba`
@@ -1220,6 +1487,14 @@ Browser Tab after a failed start), ran on 2026-10-30 and passed after the sandbo
 memory run (`run-macos.sh memory`: RSS unused, after one page, two minutes after closing) and the AOT check (a trained
 cache holds no `org.cef` class); Windows and Linux are not run.
 
+**Gentoo source package — 2026-11-01: INSTALLED AND REVIEWED.** The repository-local [overlay](../packaging/gentoo/README.md) builds pinned source with checksum-pinned offline Maven inputs, a private JCEF JBR and explicit GTK/Qt/KDE USE flags. Clean sandboxed all-off/all-on builds and headless package verification pass. The final GTK-only package is installed and recorded in world; package ownership, relative command link, CLI help, Java/JCEF native loading and all 60 installed ELF runtime dependencies pass. Only portal and GTK 3 helpers ship in this configuration. Ten catalog regressions, the offline Gradle fixture and hostile-directory ELF regression pass; independent task and whole-branch reviews found no actionable defects. [Verification](superpowers/plans/2026-11-01-gentoo-package-verification.md) records evidence and QA notes. User graphical acceptance remains pending. [Plan](superpowers/plans/2026-11-01-gentoo-package.md).
+
+**Gentoo UI fixture follow-up — 2026-11-01: IMPLEMENTED; REVIEW PENDING.** The second full build reached five UI fixture failures that treated catalog heights as fixed despite supported host-font growth. Navigation, panel empty actions, classic Settings search/frame and Editor bar tests now assert catalog floors, padded line fit and minimality while retaining exact spacing, bounds, rule colors and hairlines. Gentoo passes all 47 affected-class tests and the complete UI suite: 971 tests, two skips, no failures/errors; five mutations still reject inflated/clipped controls or shifted search geometry. No production behavior changed. This extends [Task 2](superpowers/plans/2026-11-01-optional-linux-integrations.md); final whole-build confirmation remains pending.
+
+**Gentoo fixture portability follow-up — 2026-11-01: IMPLEMENTED; REVIEW PENDING.** The first full Gentoo build exposed host-font assumptions in search/selection pixel checks, Editor fields and enlarged Vault segments, plus an inherited Gentoo prompt callback incompatible with nounset. Text sampling now uses existing 4x opaque-interior practice; sizing checks retain exact compactness while measuring the actual font; the nounset fixture owns its prompt/callbacks. No production behavior changed. Gentoo affected/source-scan scope passes 46 tests with seven optional-shell skips; local scope passes 37 with one skip. Five mutations still reject incorrect ink, absent text, shell errors and inflated control sizes. This extends [Task 2](superpowers/plans/2026-11-01-optional-linux-integrations.md); full-build retry and review remain pending.
+
+**Optional Linux integrations — 2026-11-01: IMPLEMENTED AND REVIEWED.** Per-integration `auto|off|required` selection removes the GTK/Qt SDK mandate from ordinary builds; strict mode requires full native coverage and release checks. Staging, JVM resource tests and packaging share a selected-helper manifest; disabled/missing SDK outputs are removed. Gentoo ARM64 passes eight Gradle policy regressions, five selected-package checks, 84 focused JVM tests in auto mode, all-off package staging/JVM checks, GTK ABI/native suites and Qt6/KDE6 native suites. Missing Qt5/KF5 warns; required/strict absence, invalid options, old CMake and real compiler failures are covered. CI retains explicit seven-helper release floors and its baseline/equipped-runtime split. [Plan](superpowers/plans/2026-11-01-optional-linux-integrations.md) records the approved scope; full build/check, independent review and authorized desktop launch remain pending.
+
 **PR #3 Windows check sharding — 2026-10-29: REVIEW PENDING.** App and other module checks run on isolated Windows runners with one Gradle worker each; both must pass. Each verifies its task graph against the original Check graph and records the graphs. Local graph and failure fixtures pass; hosted Windows validation remains pending. The existing watchdog limits remain. This extends Task 10 CI execution.
 
 **PR #3 tray withdrawal CI follow-up — 2026-10-29: REVIEW PENDING.** The failed-withdrawal test first proves the legacy-to-modern handoff, then checks events from the withdrawal itself. A deterministic legacy-first ordering reproduces macOS CI’s failure before correction; mutations prove both discovery and legacy publication remain blocked. Local tray scope passes 45 tests with one Linux-only skip; hosted confirmation remains pending. This extends Task 10 test portability.
@@ -1520,8 +1795,8 @@ plugins on the public plugin SDK. The [documentation index](README.md) lists eve
   `claude/test-isolation-leaks` (the Swing test-isolation guard, 3 commits).
 - **Modules.** `jasper-ui`, `jasper-terminal`, `jasper-app`, `jasper-buddy`, `jasper-sdk` and `jasper-sdk-testkit`, plus
   one `:jasper-plugin-<dir>` for each directory under `plugins/`.
-- **SDK** `0.31.0` (`JasperSdk.VERSION`; no release carries it yet, `v1.0.0` has 0.18.1); every bundled plugin declares
-  `sdk = ">=0.31.0, <0.32"`.
+- **SDK** `0.32.0` (`JasperSdk.VERSION`; no release carries it yet, `v1.0.0` has 0.18.1); every bundled plugin declares
+  `sdk = ">=0.32.0, <0.33"`.
 - **Themes.** Built in: Jasper Meadow (`jasper-meadow`, Dark and Light; the default theme of both appearances under
   either look), Slate Cobalt (Dark and Light; start-up falls back to its Dark variant when a theme cannot be applied),
   Catppuccin Latte, Frappé, Macchiato and Mocha, and Ubuntu Yaru; the Enterprise plugin adds the Enterprise theme.

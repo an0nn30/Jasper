@@ -127,6 +127,35 @@ class FakePluginSettingsTest {
         assertThatIllegalStateException().isThrownBy(() -> settings.get().page(rows -> {throw new AssertionError("Lazy page");}));
     }); }
 
+    /**
+     * Browser plan 8 Task 1b (SDK 0.32.0, L5): as the host, the fake Settings runs a page's {@code closeThen} action in a
+     * later UI turn, records a throwing one in {@link FakePluginHost#failures()} and runs nothing once the plugin stopped.
+     */
+    @Test void closeThenRunsItsActionLaterContainedAndNotForAStoppedPlugin() throws Exception {
+        var rows = new AtomicReference<dev.jasper.sdk.settings.SettingsPanelHost>();
+        var ran = new ArrayList<String>();
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            host.start(INFO, Set.of(), Set.of(), context -> context.settings().page(page -> {
+                rows.set(page);
+                return context.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Text("body",
+                    dev.jasper.sdk.ui.ControlState.READY, "Body", dev.jasper.sdk.ui.Nodes.TextRole.BODY)), e -> {});
+            }));
+            host.settingsPanel("test.fake").orElseThrow();
+            rows.get().closeThen(() -> { ran.add("throws"); throw new IllegalStateException("a failing action"); });
+            assertThat(host.settingsPanelView("test.fake")).as("closed at once").isEmpty();
+            assertThat(ran).as("the action waits").isEmpty();
+            assertThat(host.failures()).isEmpty();
+        });
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            assertThat(ran).containsExactly("throws");
+            assertThat(host.failures()).contains("Settings callback failed");
+            host.settingsPanel("test.fake").orElseThrow();
+            rows.get().closeThen(() -> ran.add("after the plugin stopped"));
+            host.stopAll();
+        });
+        javax.swing.SwingUtilities.invokeAndWait(() -> assertThat(ran).as("nothing runs for a stopped plugin").containsExactly("throws"));
+    }
+
     /** As the host: a font hint's row is the font picker, a file hint's a path whose Browse takes the next queued file selection. */
     @Test void hintedRowsAreTheFontPickerAndAPathWithBrowse() throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
         var font = new AtomicReference<Setting<String>>();

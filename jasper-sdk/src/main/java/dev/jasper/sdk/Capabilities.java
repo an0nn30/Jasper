@@ -79,7 +79,7 @@ public final class Capabilities {
     /**
      * Choosing Jasper as the system's app for file types, through {@code Platform.fileAssociations}.
      *
-     * @since 0.31.0
+     * @since 0.32.0
      */
     public static final String FILE_ASSOCIATIONS = "files.associate";
     /** Every capability this SDK version knows. */

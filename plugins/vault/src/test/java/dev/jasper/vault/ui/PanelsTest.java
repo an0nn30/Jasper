@@ -129,4 +129,14 @@ class PanelsTest {
             panel.close();
         });
     }
+
+    /** Task 1b's review (L4): the recording kit's views pass an area anchor on to the fake, which refuses an unmounted view. */
+    @Test void recordingViewsPassAreaAnchorsOn() throws Exception {
+        edt(() -> {
+            var view = new RecordingKit("dev.jasper.vault").create(new dev.jasper.sdk.ui.ViewSpec(new Nodes.Custom("page", dev.jasper.sdk.ui.ControlState.READY,
+                "page.content", Nodes.CustomKind.PREVIEW, "Page")), event -> { });
+            assertThatIllegalArgumentException().as("the fake's answer, not the SDK default's UnsupportedOperationException")
+                .isThrownBy(() -> view.anchorAt("page", new dev.jasper.sdk.ui.ContentArea(0, 0, 1, 1)));
+        });
+    }
 }

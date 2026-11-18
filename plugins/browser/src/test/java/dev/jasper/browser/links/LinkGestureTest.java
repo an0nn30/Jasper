@@ -78,7 +78,7 @@ class LinkGestureTest {
             case MouseEvent.BUTTON2 -> InputEvent.BUTTON2_DOWN_MASK;
             default -> InputEvent.BUTTON3_DOWN_MASK;
         };
-        return new LastPress(button, keys | buttonMask, 1_000);
+        return new LastPress(button, keys | buttonMask, 1_000, 0, 0);
     }
 
     private static String describe(int keys) {

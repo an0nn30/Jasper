@@ -101,7 +101,7 @@ public interface Platform {
      *
      * @return the associations
      * @throws UnsupportedOperationException if the host predates this call
-     * @since 0.31.0
+     * @since 0.32.0
      */
     default FileAssociations fileAssociations() {
         throw new UnsupportedOperationException("File associations are unavailable");

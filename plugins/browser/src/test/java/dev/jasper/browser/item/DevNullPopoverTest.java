@@ -99,7 +99,7 @@ class DevNullPopoverTest {
             context = started.get();
             var stores = new DataStores(memory.make(), memory::make, () -> PageTestAccess.recordingContext(new AtomicInteger()),
                 () -> false);
-            items = new BrowserItems(context, settings.get()::read, stores, page -> { });
+            items = new BrowserItems(context, settings.get()::read, stores, Optional.empty(), page -> { });
         }
 
         BrowserItem devNullItem() {

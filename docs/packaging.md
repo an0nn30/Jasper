@@ -2,7 +2,8 @@
 
 Jasper ships as a native application image that bundles a trimmed JetBrains Runtime, so users need no Java: a
 `Jasper.app` and DMG on macOS, a portable ZIP and a per-user setup wizard on Windows, and `.deb` and `.rpm` packages on
-Linux. Every package carries the application, all ten bundled plugins, Jasper's own launcher with its start-up recovery
+Linux. A [Gentoo source overlay](../packaging/gentoo/README.md) builds the application with optional GTK/Qt/KDE USE
+flags. Every package carries the application, all ten bundled plugins, Jasper's own launcher with its start-up recovery
 helper `jasper-watch`, and the native [`jasper` command](command-line.md); the Windows packages also carry the offline
 [Cygwin starter environment](#bundled-cygwin). jpackage builds only for the machine it runs on, so each package is built
 on the operating system and architecture it is for (aarch64 or x64). Installing and using a package on the desktop is
@@ -601,7 +602,7 @@ Windows job fails while [`validation.json`](#bundled-cygwin) lacks native and in
 architecture. The publish job refuses to continue if the tag moved during the build, requires exactly the nine packages,
 the two Cygwin source archives (`amd64` and `aarch64`) and the five SDK jars (`jasper-sdk-<v>.jar`,
 `jasper-sdk-<v>-sources.jar`, `jasper-sdk-<v>-javadoc.jar`, `jasper-sdk-testkit-<v>.jar` and
-`jasper-sdk-testkit-<v>-sources.jar`, where `<v>` is `JasperSdk.VERSION`, now 0.31.0), and writes `SHA256SUMS`. It
+`jasper-sdk-testkit-<v>-sources.jar`, where `<v>` is `JasperSdk.VERSION`, now 0.32.0), and writes `SHA256SUMS`. It
 creates a draft prerelease titled `Jasper X.Y.Z` with generated notes, uploads the files, checks that the release holds
 exactly those files, and publishes it as a prerelease that is not marked latest. A failed upload leaves the draft, which
 a rerun finishes; a published release for the tag is never overwritten.

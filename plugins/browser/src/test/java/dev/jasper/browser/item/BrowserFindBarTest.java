@@ -333,7 +333,7 @@ class BrowserFindBarTest {
             context.set(plugin);
             settings.set(BrowserSettings.declare(plugin.settings()));
         });
-        var item = new BrowserItems(context.get(), settings.get()::read, new DataStores(memory.make(), () -> false), page -> { })
+        var item = new BrowserItems(context.get(), settings.get()::read, new DataStores(memory.make(), () -> false), Optional.empty(), page -> { })
             .open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
         find = PageTestAccess.recordingFind(List.of("main", "child"), Optional.of("main"), ran, waits);
         PageTestAccess.useFind(item.page(), find);

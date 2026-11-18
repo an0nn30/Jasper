@@ -4358,6 +4358,64 @@ public abstract class PluginContractTest {
         h.ui(() -> assertThatIllegalStateException().isThrownBy(() -> settings.get().page(panel)));
     }
 
+    /**
+     * Browser plan 8 Task 1b (SDK 0.32.0, F7, L5): a plugin's own page closes Settings, which asks about unsaved changes as
+     * Cancel does, and then runs the action in a later UI turn, once the page is gone; kept open, Settings runs nothing.
+     * Only the UI thread may ask.
+     */
+    @Test void aSettingsPageClosesSettingsFirstAskingAboutUnsavedChanges() {
+        var size = new AtomicReference<Setting<Integer>>();
+        var rows = new AtomicReference<dev.jasper.sdk.settings.SettingsPanelHost>();
+        var calls = new CopyOnWriteArrayList<String>();
+        h.start(info("test.close"), Set.of(), Set.of(), context -> {
+            size.set(context.settings().declare(SettingSpec.of("size", SettingKind.integer(8, 48), 13).label("Size")));
+            context.settings().page(new SettingsPanel() {
+                @Override public dev.jasper.sdk.ui.UiView create(dev.jasper.sdk.settings.SettingsPanelHost host) {
+                    rows.set(host);
+                    return context.kit().create(new ViewSpec(host.row(size.get())), event -> { });
+                }
+                @Override public void dispose() { calls.add("dispose"); }
+            });
+        });
+        h.openSettingsPage("test.close");
+        assertThatIllegalStateException().as("off the UI thread").isThrownBy(() -> rows.get().closeThen(() -> calls.add("off the UI thread")));
+        assertThat(h.settingsOpen()).isTrue();
+        h.answerDiscard(false);
+        h.ui(() -> {
+            rows.get().stage(size.get(), 20);
+            rows.get().closeThen(() -> calls.add("kept open"));
+        });
+        assertThat(h.discardQuestions()).as("asked about the unsaved change").isEqualTo(1);
+        assertThat(h.settingsOpen()).as("Keep Editing").isTrue();
+        assertThat(calls).as("nothing runs").isEmpty();
+        h.answerDiscard(true);
+        h.ui(() -> {
+            rows.get().closeThen(() -> calls.add("then, Settings open: " + h.settingsOpen()));
+            assertThat(calls).as("the action waits for a later UI turn").containsExactly("dispose");
+        });
+        h.ui(() -> { });
+        assertThat(h.discardQuestions()).isEqualTo(2);
+        assertThat(calls).as("the page is gone first").containsExactly("dispose", "then, Settings open: false");
+        assertThat(h.savedSetting("test.close", "size")).as("the change was discarded").isEmpty();
+        h.ui(() -> assertThatIllegalStateException().as("a closed page").isThrownBy(() -> rows.get().closeThen(() -> calls.add("late"))));
+        h.openSettingsPage("test.close");
+        h.ui(() -> rows.get().closeThen(() -> calls.add("unchanged")));
+        h.ui(() -> { });
+        assertThat(h.discardQuestions()).as("nothing to ask about").isEqualTo(2);
+        assertThat(h.settingsOpen()).isFalse();
+        assertThat(calls).containsExactly("dispose", "then, Settings open: false", "dispose", "unchanged");
+        // A throwing action is contained: Settings stays closed, the plugin runs on, and a later action still runs.
+        h.openSettingsPage("test.close");
+        h.ui(() -> rows.get().closeThen(() -> { calls.add("throws"); throw new IllegalStateException("a failing action"); }));
+        h.ui(() -> { });
+        assertThat(h.settingsOpen()).isFalse();
+        assertThat(h.active("test.close")).as("contained").isTrue();
+        h.openSettingsPage("test.close");
+        h.ui(() -> rows.get().closeThen(() -> calls.add("after the failure")));
+        h.ui(() -> { });
+        assertThat(calls).endsWith("dispose", "throws", "dispose", "after the failure");
+    }
+
     /** Vim IdeaVim keys spec 4: a plugin opens Settings at its own page, on the UI thread, while it runs. */
     @Test void aPluginOpensItsSettingsPageOnTheUiThreadWhileItRuns() {
         var settings = new AtomicReference<PluginSettings>();
@@ -5273,7 +5331,7 @@ public abstract class PluginContractTest {
         return context.get();
     }
 
-    /** SDK 0.31.0: file associations need {@code files.associate}. */
+    /** SDK 0.32.0: file associations need {@code files.associate}. */
     @Test void fileAssociationsNeedTheCapability() {
         PluginContext a = started("test.a", Set.of());
         h.ui(() -> assertThatThrownBy(() -> a.platform().fileAssociations())
@@ -5282,14 +5340,14 @@ public abstract class PluginContractTest {
         h.ui(() -> assertThat(b.platform().fileAssociations()).isNotNull());
     }
 
-    /** SDK 0.31.0: {@code Platform.fileAssociations()} itself is a UI-thread call. */
+    /** SDK 0.32.0: {@code Platform.fileAssociations()} itself is a UI-thread call. */
     @Test void fileAssociationsNeedTheUiThread() {
         PluginContext a = associating("test.a");
         assertThatThrownBy(() -> a.platform().fileAssociations()).isInstanceOf(IllegalStateException.class);
         h.ui(() -> assertThat(a.platform().fileAssociations()).isNotNull());
     }
 
-    /** SDK 0.31.0: {@code forget} drops only a declaration; who opens the type and what the claim saved stay. */
+    /** SDK 0.32.0: {@code forget} drops only a declaration; who opens the type and what the claim saved stay. */
     @Test void forgetKeepsWhatAClaimSaved() {
         PluginContext a = associating("test.a");
         var xcode = new dev.jasper.sdk.ui.FileAssociations.Handler.Other("Xcode");
@@ -5310,7 +5368,7 @@ public abstract class PluginContractTest {
         assertThat(status.getFirst().types().getFirst().handler()).isEqualTo(xcode);
     }
 
-    /** SDK 0.31.0: {@code unavailable} gives the host's reason, and a claim then fails each extension without a type. */
+    /** SDK 0.32.0: {@code unavailable} gives the host's reason, and a claim then fails each extension without a type. */
     @Test void unavailableIsReportedAndBlocksNothing() {
         PluginContext a = associating("test.a");
         h.ui(() -> assertThat(a.platform().fileAssociations().unavailable()).isEmpty());
@@ -5327,7 +5385,7 @@ public abstract class PluginContractTest {
         });
     }
 
-    /** SDK 0.31.0: a claim saves the previous application and takes the type; a restore hands it back. */
+    /** SDK 0.32.0: a claim saves the previous application and takes the type; a restore hands it back. */
     @Test void aClaimSavesThePreviousAppAndARestoreHandsItBack() {
         PluginContext a = associating("test.a");
         var xcode = new dev.jasper.sdk.ui.FileAssociations.Handler.Other("Xcode");
@@ -5350,7 +5408,7 @@ public abstract class PluginContractTest {
             new dev.jasper.sdk.ui.FileAssociations.TypeState("t.java", xcode, Optional.empty()))));
     }
 
-    /** SDK 0.31.0: the browser's extensions and invalid ones are refused, whatever their case. */
+    /** SDK 0.32.0: the browser's extensions and invalid ones are refused, whatever their case. */
     @Test void browserOwnedAndInvalidExtensionsAreRefused() {
         PluginContext a = associating("test.a");
         var results = onUi(() -> a.platform().fileAssociations().claim(List.of(".HTML", "../x")));
@@ -5361,7 +5419,7 @@ public abstract class PluginContractTest {
                 new dev.jasper.sdk.ui.FileAssociations.Outcome.Refused(dev.jasper.sdk.ui.FileAssociations.Refusal.INVALID)));
     }
 
-    /** SDK 0.31.0: {@code onChanged} runs on the UI thread after a claim, and a stopped plugin hears nothing. */
+    /** SDK 0.32.0: {@code onChanged} runs on the UI thread after a claim, and a stopped plugin hears nothing. */
     @Test void onChangedRunsOnTheUiThreadAfterAClaimAndEndsWithThePlugin() {
         PluginContext a = associating("test.a");
         h.ui(() -> h.fileType(".java", List.of("t.java")));
@@ -5376,7 +5434,7 @@ public abstract class PluginContractTest {
         assertThat(heard).as("the stopped plugin's handler").containsExactly("a");
     }
 
-    /** SDK 0.31.0: every future completes on the UI thread. */
+    /** SDK 0.32.0: every future completes on the UI thread. */
     @Test void everyFutureCompletesOnTheUiThread() {
         PluginContext a = associating("test.a");
         h.ui(() -> h.fileType(".java", List.of("t.java")));

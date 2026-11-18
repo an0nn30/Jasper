@@ -39,7 +39,10 @@ final class HostedKitView implements UiView {
  boolean closed(){return closed.get();}
  void dispatch(UiEvent event){if(closed.get()||!owner.live())return;try{if(hostEvents.test(event))return;events.accept(event);}catch(Throwable failure){owner.failed();}}
  @Override public void update(ViewSpec next){guard();if(updating)throw new IllegalStateException("Reentrant view update");updating=true;try{owner.validateIcons(next);var projected=hostSpec.apply(next);if(projected!=next)owner.validateIcons(projected);view.update(hostModule.apply(KitValues.toModule(projected)));sourceSpec=next;spec=projected;}finally{updating=false;}checkAnchors();updated.run();}
- @Override public UiAnchor anchor(String id){guard();if(mount==null || owner.anchorHost==null)throw new IllegalArgumentException("Unmounted view");var anchor=new HostedAnchor(this,id);anchors.add(anchor);anchor.onClosed(() -> anchors.remove(anchor));return anchor;}
+ @Override public UiAnchor anchor(String id){return issue(id,null);}
+ /** An anchor on an area of a Custom node's content, the SDK's area converted to the content's AWT geometry here. */
+ @Override public UiAnchor anchorAt(String id,ContentArea area){guard();Objects.requireNonNull(id,"customId");Objects.requireNonNull(area,"area");return issue(id,new java.awt.Rectangle(area.x(),area.y(),area.width(),area.height()));}
+ private UiAnchor issue(String id,java.awt.Rectangle areaOrNull){guard();if(mount==null || owner.anchorHost==null)throw new IllegalArgumentException("Unmounted view");var anchor=new HostedAnchor(this,id,areaOrNull);anchors.add(anchor);anchor.onClosed(() -> anchors.remove(anchor));return anchor;}
  @Override public ViewSpec spec(){guard();return spec;}
  /** Host-only original plugin descriptor, before draft/search row projection. */
  ViewSpec sourceSpec(){guard();return sourceSpec;}

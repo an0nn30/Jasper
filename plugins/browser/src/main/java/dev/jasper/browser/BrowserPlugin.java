@@ -22,6 +22,8 @@ import dev.jasper.browser.item.SourcePage;
 import dev.jasper.browser.item.WebMenu;
 import dev.jasper.browser.item.WebsiteData;
 import dev.jasper.browser.links.PageNavigation;
+import dev.jasper.browser.logins.HttpSignIns;
+import dev.jasper.browser.logins.VaultLogins;
 import dev.jasper.browser.page.DownloadProgress;
 import dev.jasper.browser.page.DownloadStart;
 import dev.jasper.browser.page.DownloadTarget;
@@ -109,7 +111,10 @@ import java.util.function.Function;
  * JDK's default. Chromium's downloads go to the {@link Downloads}, which reads the Downloads folder once a page first
  * starts, makes the Downloads menu with the first download and marks each finished file; a page that closes keeps its
  * browser until its downloads end; quitting stops the running ones, and once Chromium has ended their partial files go.
- * Save Page As's chooser starts in that folder, and its saved folder shows as a download's file does.
+ * Save Page As's chooser starts in that folder, and its saved folder shows as a download's file does. With the
+ * Credential Vault, an optional plugin it looks up once at its start, its items have the Vault's logins and its Settings
+ * page has Manage Saved Passwords, which opens the Vault's manager over the window Settings showed over once Settings
+ * has closed; without it, none of the Vault's parts appear.
  */
 public class BrowserPlugin implements Plugin {
     static final String NEW_TAB = "dev.jasper.browser.new_tab", NEW_WINDOW = "dev.jasper.browser.new_window";
@@ -128,6 +133,10 @@ public class BrowserPlugin implements Plugin {
     private SourcePage sources;
     private FilterList filters;
     private Downloads downloads;
+    // Plan 8 Task 3: the Credential Vault's logins, found once at the start; empty without the Vault.
+    private Optional<VaultLogins> vault = Optional.empty();
+    // Plan 8 Task 5: the run's HTTP sign-ins, made at the start.
+    private HttpSignIns signIns;
     private boolean running;
     // Plan 6's F3: the HTTP proxy the plugin's own fetches go through, read as the filter list makes its client.
     private volatile Optional<InetSocketAddress> proxy = Optional.empty();
@@ -236,7 +245,18 @@ public class BrowserPlugin implements Plugin {
         Chromium engine = chromium;
         // Spec section 1: whether the onboarding is finished, read from its marker on the background executor.
         var onboarding = new Onboarding(data.resolve("onboarding-finished"), context.background());
-        var items = new BrowserItems(context, settings::read, dataStores, page -> {
+        // Plan 8 Task 3 (F20): the Credential Vault, an optional plugin, looked up once. Without it its API's classes cannot
+        // load, which the lookup reads as absent; the catch here is for the lookup's own class, which names the API.
+        try {
+            vault = VaultLogins.find(context);
+        } catch (NoClassDefFoundError absent) {
+            vault = Optional.empty();
+        }
+        // Plan 8 Task 5: the run's HTTP sign-ins, whose dialog shows with or without the Vault; its failures post in the
+        // plugin's own group.
+        var signIns = new HttpSignIns(vault, context.notifications().group());
+        this.signIns = signIns;
+        var items = new BrowserItems(context, settings::read, dataStores, vault, signIns, page -> {
             PageNavigation.prepare(engine, filters);
             PageDownloads.prepare(engine, downloadStarts, downloadUpdates, downloadsAbandoned);
             // Plan 7's F3: the Downloads folder is read and made on the background executor as the first page starts.
@@ -262,9 +282,11 @@ public class BrowserPlugin implements Plugin {
         // persistent store's Clear Cookies, Clear Website Data and Manage Site Permissions. Making it opens nothing.
         var websiteData = new WebsiteData(chromium, dataStores.persistent(), () -> persistentAddresses(items, dataStores),
             sites -> { if (running) items.reloadShowing(dataStores.persistent(), sites); }, EventQueue::invokeLater, this::notCleared);
-        // Its Ad Blocking section shows the filter list's statistics, and Update Now.
+        // Its Ad Blocking section shows the filter list's statistics, and Update Now. With the Vault, its Privacy & Data
+        // section shows Manage Saved Passwords too (plan 8 Task 3).
+        Optional<Runnable> savedPasswords = vault.isPresent() ? Optional.of(this::manageSavedPasswords) : Optional.empty();
         var panel = new BrowserSettingsPanel(context.kit(), settings, new BrowserSettingsPanel.Actions(websiteData::clearCookies,
-            websiteData::clearAll, this::managePermissions, this::show),
+            websiteData::clearAll, this::managePermissions, savedPasswords, this::show),
             new BrowserSettingsPanel.FilterStatistics(filters::status, () -> filters.staleDays(Instant.now()), filters::updateNow));
         filters.onChanged(panel::filtersChanged);
         context.settings().page(panel);
@@ -362,7 +384,8 @@ public class BrowserPlugin implements Plugin {
 
     /**
      * Jasper quits, or the plugin is turned off. The running downloads are cancelled and the pages' holds complete, then
-     * the filter list's checks, its download under way and its client end.
+     * the filter list's checks, its download under way and its client end, and the pages' HTTP sign-ins are cancelled,
+     * their dialogs closed, and their passwords' saves withdrawn or dropped.
      * The items close their open Edit Bookmark panels, whose bookmarks keep the tags they show, and give history their
      * pages' last titles, then the data stores close: the persistent history and
      * bookmarks' database takes no more work and closes once the work given before has run, and each /dev/null store
@@ -379,6 +402,9 @@ public class BrowserPlugin implements Plugin {
         if (downloads != null) downloads.stopAll();
         // The filter list's checks, its download under way and its client end.
         if (filters != null) filters.close();
+        // Plan 8's L27: every page's sign-ins, shown or waiting, are cancelled while Chromium still runs, and (F10)
+        // their saves end.
+        if (signIns != null) signIns.close();
         if (items != null) items.close();
         if (dataStores != null) dataStores.close();
         if (sources != null) sources.close();
@@ -439,6 +465,17 @@ public class BrowserPlugin implements Plugin {
         Optional<Throwable> unavailable = chromium.unavailable();
         if (unavailable.isPresent()) tell(unavailable.get());
         else items.open(PermissionsPage.ADDRESS, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), dataStores.persistent());
+    }
+
+    /**
+     * Manage Saved Passwords, once Settings has closed (F7): the Credential Vault's manager over the active window, the
+     * window Settings showed over, as {@link #show} finds it; the Vault creates a vault or unlocks first, as Open
+     * Vault... does. Nothing while the plugin is stopped, or without the Vault or an active window. UI thread.
+     */
+    void manageSavedPasswords() {
+        if (!running || vault.isEmpty()) return;
+        VaultLogins logins = vault.get();
+        context.terminals().activeWindow().ifPresent(logins::openManager);
     }
 
     /**

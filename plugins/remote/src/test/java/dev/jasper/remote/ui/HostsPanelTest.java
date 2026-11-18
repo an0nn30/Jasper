@@ -705,4 +705,14 @@ class HostsPanelTest {
         for (int i = 0; i < rows(panel).size(); i++) if (rows(panel).get(i) instanceof HostRows.Host row && row.host().id().equals(host.id())) return i;
         throw new AssertionError("host row not shown");
     }
+
+    /** Task 1b's review (L4): the recording kit's views pass an area anchor on to the fake, which refuses an unmounted view. */
+    @Test void recordingViewsPassAreaAnchorsOn() throws Exception {
+        edt(() -> {
+            var view = new RecordingKit("dev.jasper.remote").create(new dev.jasper.sdk.ui.ViewSpec(new Nodes.Custom("page", dev.jasper.sdk.ui.ControlState.READY,
+                "page.content", Nodes.CustomKind.PREVIEW, "Page")), event -> { });
+            assertThatIllegalArgumentException().as("the fake's answer, not the SDK default's UnsupportedOperationException")
+                .isThrownBy(() -> view.anchorAt("page", new dev.jasper.sdk.ui.ContentArea(0, 0, 1, 1)));
+        });
+    }
 }

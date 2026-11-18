@@ -48,6 +48,28 @@ class ChromiumBoundaryTest {
                 .as(name).isEmpty();
     }
 
+    /**
+     * Plan 8's F4: the sign-in dialog lives in {@code dialogs}, beside the page's other dialogs, yet names no Chromium
+     * type, no Vault type and nothing of the {@code logins} package, which names it.
+     */
+    @Test void theSignInDialogNamesNoChromiumVaultOrLoginsType() throws Exception {
+        Path classes = Path.of(BrowserPlugin.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+        Path dialogs = classes.resolve("dev/jasper/browser/dialogs");
+        List<String> named = List.of("org/cef/", "com/jetbrains/cef/", "org.cef.", "com.jetbrains.cef.", "dev/jasper/vault/",
+            "dev.jasper.vault.", "dev/jasper/browser/logins/", "dev.jasper.browser.logins.");
+        var found = new java.util.ArrayList<String>();
+        try (Stream<Path> files = Files.list(dialogs)) {
+            List<Path> dialog = files.filter(file -> file.getFileName().toString().matches("SignInDialog(\\$.*)?\\.class"))
+                .sorted().toList();
+            assertThat(dialog).as("the dialog and its nested classes").hasSizeGreaterThan(1);
+            for (Path file : dialog)
+                for (var entry : ClassFile.of().parse(Files.readAllBytes(file)).constantPool())
+                    if (entry instanceof Utf8Entry utf8 && named.stream().anyMatch(utf8.stringValue()::contains))
+                        found.add(file.getFileName() + ": " + utf8.stringValue());
+        }
+        assertThat(found).isEmpty();
+    }
+
     /** Each class outside the Chromium packages that has a Utf8 entry naming a Chromium type, as {@code class: entry}. */
     private static List<String> violations(Path classes) throws IOException {
         var found = new java.util.ArrayList<String>();

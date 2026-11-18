@@ -1482,7 +1482,7 @@ class BrowserItemTest {
         });
         var stores = new DataStores(persistent, memory::make, () -> PageTestAccess.recordingContext(new AtomicInteger()),
             () -> settings.get().read().devNullMode());
-        return new BrowserItems(context.get(), settings.get()::read, stores, start, later, fetches);
+        return new BrowserItems(context.get(), settings.get()::read, stores, Optional.empty(), start, later, fetches);
     }
 
     /** As {@link #items(FakePluginHost, Consumer, Later, Fetches)}, with delays that never end and fetches nobody answers. */

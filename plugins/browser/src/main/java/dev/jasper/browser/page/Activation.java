@@ -36,6 +36,32 @@ public final class Activation {
     }
 
     /**
+     * Whether the page is activated at {@code nowMillis}, as {@link #active} says, by a press or key after
+     * {@code sinceMillis} (plan 8's L42): an activation from before the page's main frame last started loading a
+     * document begins none of that document's own navigations.
+     *
+     * @param sinceMillis the moment the activation must come after, in milliseconds since the epoch, or
+     *     {@link Long#MIN_VALUE} for any
+     * @param nowMillis the time now, in milliseconds since the epoch
+     * @return whether it is so activated
+     */
+    public boolean activeSince(long sinceMillis, long nowMillis) {
+        long when = at.get();
+        return when > sinceMillis && LastPress.withinActivation(when, nowMillis);
+    }
+
+    /**
+     * Whether the press or key at {@code whenMillis} is what last activated the page: nothing activated it after, and
+     * nothing consumed it since (plan 8's L38).
+     *
+     * @param whenMillis when a press or key happened, in milliseconds since the epoch
+     * @return whether the activation is still that one's; false for {@link Long#MIN_VALUE}, which is never
+     */
+    public boolean lastActivatedAt(long whenMillis) {
+        return whenMillis != Long.MIN_VALUE && at.get() == whenMillis;
+    }
+
+    /**
      * Consumes the activation for one popup: true, once, while the page is {@link #active}; false until the next
      * press or key after that.
      *
